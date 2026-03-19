@@ -1,21 +1,25 @@
-def run_agent(message: str):
-    try:
-        from agents import process_message
+def process_message(message: str):
+    message = message.lower()
 
-        result = process_message(message)
-
+    if "hello" in message:
         return {
-            "final": result.get("final", "No response"),
-            "confidence": result.get("confidence", 0.5),
-            "quality": result.get("quality", 0.5),
-            "mode": result.get("mode", "unknown")
+            "final": "Hey — I’m alive and thinking.",
+            "confidence": 0.9,
+            "quality": 0.9,
+            "mode": "friendly"
         }
 
-    except Exception as e:
+    if "help" in message:
         return {
-            "final": f"Fallback response: {message}",
-            "confidence": 0.1,
-            "quality": 0.1,
-            "mode": "error",
-            "error": str(e)
+            "final": "I can help you. Ask me anything.",
+            "confidence": 0.8,
+            "quality": 0.8,
+            "mode": "assist"
         }
+
+    return {
+        "final": f"I understand: {message}",
+        "confidence": 0.7,
+        "quality": 0.7,
+        "mode": "default"
+    }
