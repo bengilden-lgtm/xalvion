@@ -1,0 +1,401 @@
+[
+  {
+    "time": "2026-03-19 18:22:30.827049",
+    "input": "heya",
+    "confidence": 0.4,
+    "quality": 0.2,
+    "length": 47
+  },
+  {
+    "time": "2026-03-19 18:23:02.686751",
+    "input": "i want to talk about buisness what do you know about moeny",
+    "confidence": 0.4,
+    "quality": 1.0,
+    "length": 420
+  },
+  {
+    "time": "2026-03-19 18:24:26.050838",
+    "input": "i just created this really intelligent ai dual brain system it really could go anyway but id love to make a solid amounbt of money from it what would u do",
+    "confidence": 0.4,
+    "quality": 1.0,
+    "length": 1792
+  },
+  {
+    "time": "2026-03-19 18:25:15.384424",
+    "input": "who are u?",
+    "confidence": 0.4,
+    "quality": 0.8,
+    "length": 426
+  },
+  {
+    "time": "2026-03-19 18:25:42.806540",
+    "input": "i hate u hahaha",
+    "confidence": 0.4,
+    "quality": 1.0,
+    "length": 305
+  },
+  {
+    "time": "2026-03-19 18:30:15.416583",
+    "input": "whats up u pickle",
+    "confidence": 0.6,
+    "quality": 0.8,
+    "length": 197
+  },
+  {
+    "time": "2026-03-19 18:30:39.043679",
+    "input": "im not angry it was a joke haha",
+    "confidence": 0.6,
+    "quality": 1.0,
+    "length": 138
+  },
+  {
+    "time": "2026-03-19 18:30:59.706708",
+    "input": "just chilling ngl",
+    "confidence": 0.6,
+    "quality": 0.7,
+    "length": 239
+  },
+  {
+    "time": "2026-03-19 18:31:33.360612",
+    "input": "are u claud?",
+    "confidence": 0.6,
+    "quality": 0.6,
+    "length": 257
+  },
+  {
+    "time": "2026-03-19 18:36:35.356555",
+    "input": "wassup",
+    "confidence": 0.6,
+    "quality": 0.9,
+    "length": 43
+  },
+  {
+    "time": "2026-03-19 18:36:36.966653",
+    "input": "i hate u haha",
+    "confidence": 0.6,
+    "quality": 0.9,
+    "length": 19
+  },
+  {
+    "time": "2026-03-19 18:36:44.129724",
+    "input": "just chilling",
+    "confidence": 0.6,
+    "quality": 0.9,
+    "length": 428
+  },
+  {
+    "time": "2026-03-19 18:37:05.468633",
+    "input": "are u claude",
+    "confidence": 0.6,
+    "quality": 0.8,
+    "length": 355
+  },
+  {
+    "time": "2026-03-19 18:43:49.248919",
+    "input": "just chilling",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 88
+  },
+  {
+    "time": "2026-03-19 18:43:51.000653",
+    "input": "wassup",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 114
+  },
+  {
+    "time": "2026-03-19 18:43:57.852311",
+    "input": "i built an ai system",
+    "confidence": 0.6,
+    "quality": 0.9,
+    "length": 284
+  },
+  {
+    "time": "2026-03-19 18:44:19.997656",
+    "input": "how do i make money",
+    "confidence": 0.6,
+    "quality": 0.8,
+    "length": 966
+  },
+  {
+    "time": "2026-03-19 18:45:18.308943",
+    "input": "youre smart whoever made u must be awesome as fuck",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 127
+  },
+  {
+    "time": "2026-03-19 18:45:38.549560",
+    "input": "how about this i am your creator",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 83
+  },
+  {
+    "time": "2026-03-19 18:46:29.817744",
+    "input": "lucrative amounts of money so i can paint beautifull art all day and never ever work a shit job hahah",
+    "confidence": 0.6,
+    "quality": 0.9,
+    "length": 1329
+  },
+  {
+    "time": "2026-03-19 18:47:16.108225",
+    "input": "how would you help my eytsy site get more traffic and sales",
+    "confidence": 0.4,
+    "quality": 0.9,
+    "length": 1654
+  },
+  {
+    "time": "2026-03-19 18:48:21.534319",
+    "input": "how would u help id have to implement u somehow into my website i have no idea how to do such athing (;",
+    "confidence": 0.4,
+    "quality": 0.85,
+    "length": 1878
+  },
+  {
+    "time": "2026-03-19 19:46:48.510099",
+    "input": "python ticket_engine.pyrun",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 93
+  },
+  {
+    "time": "2026-03-19 19:47:04.892974",
+    "input": "",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 36
+  },
+  {
+    "time": "2026-03-19 19:47:12.999882",
+    "input": "python ticket_engine.py run",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 120
+  },
+  {
+    "time": "2026-03-19 19:48:21.457963",
+    "input": "thats the purpose of my creation i believe i want ot a profitable ai ticket support system helping orders and making money in the process",
+    "confidence": 0.4,
+    "quality": 0.9,
+    "length": 2448
+  },
+  {
+    "time": "2026-03-19 19:48:22.772638",
+    "input": "",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 41
+  },
+  {
+    "time": "2026-03-19 19:48:24.225036",
+    "input": "",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 38
+  },
+  {
+    "time": "2026-03-19 20:12:38.320370",
+    "input": "hey",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 69
+  },
+  {
+    "time": "2026-03-19 20:21:08.738547",
+    "input": "can u scan yourself and let me know why the ticket engine isnt working",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 145
+  },
+  {
+    "time": "2026-03-19 20:33:52.230017",
+    "input": "You are a professional AI support agent.\n\nCustomer: Sarah\nCustomer LTV: $120\nSentiment Score: 7/10\n\nIssue:\nI was charged twice\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 505
+  },
+  {
+    "time": "2026-03-19 20:34:02.411414",
+    "input": "You are a professional AI support agent.\n\nCustomer: Emma\nCustomer LTV: $300\nSentiment Score: 3/10\n\nIssue:\nMy package is late and I'm really annoyed\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 554
+  },
+  {
+    "time": "2026-03-19 20:34:13.003127",
+    "input": "You are a professional AI support agent.\n\nCustomer: Emma\nCustomer LTV: $300\nSentiment Score: 4/10\n\nIssue:\nMy package is late and I'm really annoyed\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.85,
+    "length": 592
+  },
+  {
+    "time": "2026-03-19 20:34:21.813122",
+    "input": "You are a professional AI support agent.\n\nCustomer: John\nCustomer LTV: $650\nSentiment Score: 2/10\n\nIssue:\nMy package is late and I'm really annoyed\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 573
+  },
+  {
+    "time": "2026-03-19 20:34:30.907006",
+    "input": "You are a professional AI support agent.\n\nCustomer: Sarah\nCustomer LTV: $120\nSentiment Score: 1/10\n\nIssue:\nMy package is late and I'm really annoyed\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.85,
+    "length": 585
+  },
+  {
+    "time": "2026-03-19 20:43:09.689598",
+    "input": "You are a professional AI support agent.\n\nCustomer: Emma\nCustomer LTV: $300\nSentiment Score: 3/10\n\nIssue:\nMy package is late and I'm really annoyed\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 526
+  },
+  {
+    "time": "2026-03-19 20:43:18.527014",
+    "input": "You are a professional AI support agent.\n\nCustomer: Mike\nCustomer LTV: $980\nSentiment Score: 7/10\n\nIssue:\nI was charged twice\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 471
+  },
+  {
+    "time": "2026-03-19 20:43:31.949115",
+    "input": "You are a professional AI support agent.\n\nCustomer: John\nCustomer LTV: $650\nSentiment Score: 6/10\n\nIssue:\nWhere is my order?\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 489
+  },
+  {
+    "time": "2026-03-19 20:43:47.886495",
+    "input": "You are a professional AI support agent.\n\nCustomer: Mike\nCustomer LTV: $980\nSentiment Score: 6/10\n\nIssue:\nWhere is my order?\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.9,
+    "length": 412
+  },
+  {
+    "time": "2026-03-19 20:43:59.882677",
+    "input": "You are a professional AI support agent.\n\nCustomer: Mike\nCustomer LTV: $980\nSentiment Score: 2/10\n\nIssue:\nI want a refund this is terrible service\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.9,
+    "length": 717
+  },
+  {
+    "time": "2026-03-19 20:59:23.027357",
+    "input": "You are a professional AI support agent.\n\nCustomer: John\nCustomer LTV: $650\nSentiment Score: 4/10\n\nIssue:\nI want a refund this is terrible service\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.85,
+    "length": 611
+  },
+  {
+    "time": "2026-03-19 20:59:31.631106",
+    "input": "You are a professional AI support agent.\n\nCustomer: Emma\nCustomer LTV: $300\nSentiment Score: 8/10\n\nIssue:\nWhere is my order?\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 432
+  },
+  {
+    "time": "2026-03-19 20:59:38.628364",
+    "input": "You are a professional AI support agent.\n\nCustomer: Emma\nCustomer LTV: $300\nSentiment Score: 6/10\n\nIssue:\nWhere is my order?\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 465
+  },
+  {
+    "time": "2026-03-19 20:59:47.118854",
+    "input": "You are a professional AI support agent.\n\nCustomer: Mike\nCustomer LTV: $980\nSentiment Score: 3/10\n\nIssue:\nMy package is late and I'm really annoyed\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 563
+  },
+  {
+    "time": "2026-03-19 20:59:54.935471",
+    "input": "You are a professional AI support agent.\n\nCustomer: Emma\nCustomer LTV: $300\nSentiment Score: 1/10\n\nIssue:\nI want a refund this is terrible service\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 616
+  },
+  {
+    "time": "2026-03-19 21:07:42.264157",
+    "input": "You are a professional AI support agent.\n\nCustomer: Sarah\nCustomer LTV: $120\nSentiment Score: 6/10\n\nIssue:\nI was charged twice\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.9,
+    "length": 569
+  },
+  {
+    "time": "2026-03-19 21:07:51.598715",
+    "input": "You are a professional AI support agent.\n\nCustomer: Mike\nCustomer LTV: $980\nSentiment Score: 2/10\n\nIssue:\nOrder arrived damaged\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.9,
+    "length": 560
+  },
+  {
+    "time": "2026-03-19 21:08:00.966607",
+    "input": "You are a professional AI support agent.\n\nCustomer: Emma\nCustomer LTV: $300\nSentiment Score: 7/10\n\nIssue:\nI was charged twice\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 552
+  },
+  {
+    "time": "2026-03-19 21:08:10.002928",
+    "input": "You are a professional AI support agent.\n\nCustomer: Sarah\nCustomer LTV: $120\nSentiment Score: 3/10\n\nIssue:\nOrder arrived damaged\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.9,
+    "length": 508
+  },
+  {
+    "time": "2026-03-19 21:08:17.849696",
+    "input": "You are a professional AI support agent.\n\nCustomer: Mike\nCustomer LTV: $980\nSentiment Score: 9/10\n\nIssue:\nWhere is my order?\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 463
+  },
+  {
+    "time": "2026-03-19 21:10:29.804767",
+    "input": "You are a professional AI support agent.\n\nCustomer: Sarah\nCustomer LTV: $120\nSentiment Score: 3/10\n\nIssue:\nI want a refund this is terrible service\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.9,
+    "length": 638
+  },
+  {
+    "time": "2026-03-19 21:10:38.937234",
+    "input": "You are a professional AI support agent.\n\nCustomer: Sarah\nCustomer LTV: $120\nSentiment Score: 8/10\n\nIssue:\nI was charged twice\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.9,
+    "length": 501
+  },
+  {
+    "time": "2026-03-19 21:10:49.581718",
+    "input": "You are a professional AI support agent.\n\nCustomer: Mike\nCustomer LTV: $980\nSentiment Score: 3/10\n\nIssue:\nI want a refund this is terrible service\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.85,
+    "length": 555
+  },
+  {
+    "time": "2026-03-19 21:10:58.461010",
+    "input": "You are a professional AI support agent.\n\nCustomer: Emma\nCustomer LTV: $300\nSentiment Score: 1/10\n\nIssue:\nOrder arrived damaged\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 564
+  },
+  {
+    "time": "2026-03-19 21:11:06.899489",
+    "input": "You are a professional AI support agent.\n\nCustomer: Sarah\nCustomer LTV: $120\nSentiment Score: 9/10\n\nIssue:\nWhere is my order?\n\nInstructions:\n- Decide best action (refund, escalate, reassure, etc)\n- Be concise but human\n- Prioritize high LTV customers\n- Handle negative sentiment carefully\n\nRespond ONLY with the final message to the customer.",
+    "confidence": 1,
+    "quality": 0.8,
+    "length": 516
+  },
+  {
+    "time": "2026-03-19 21:30:28.446067",
+    "input": "hey",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 66
+  },
+  {
+    "time": "2026-03-19 21:30:43.855645",
+    "input": "im going to be rich haha",
+    "confidence": 0.6,
+    "quality": 0.97,
+    "length": 119
+  }
+]
