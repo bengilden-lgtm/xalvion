@@ -1,25 +1,20 @@
-def process_message(message: str):
-    message = message.lower()
+def run_agent(message: str):
+    try:
+        from agents import process_message
 
-    if "hello" in message:
+        result = process_message(message)
+
         return {
-            "final": "Hey — I’m alive and thinking.",
-            "confidence": 0.9,
-            "quality": 0.9,
-            "mode": "friendly"
+            "final": result.get("final", "No response"),
+            "confidence": result.get("confidence", 0.5),
+            "quality": result.get("quality", 0.5),
+            "mode": result.get("mode", "unknown")
         }
 
-    if "help" in message:
+    except Exception as e:
         return {
-            "final": "I can help you. Ask me anything.",
-            "confidence": 0.8,
-            "quality": 0.8,
-            "mode": "assist"
+            "final": f"ERROR: {str(e)}",
+            "confidence": 0,
+            "quality": 0,
+            "mode": "debug"
         }
-
-    return {
-        "final": f"I understand: {message}",
-        "confidence": 0.7,
-        "quality": 0.7,
-        "mode": "default"
-    }
