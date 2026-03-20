@@ -1,21 +1,31 @@
+import os
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 def run_agent(message: str):
-    """
-    Basic AI logic (upgradeable later)
-    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a smart helpful AI assistant."},
+                {"role": "user", "content": message}
+            ]
+        )
 
-    # Simple intelligent response (for now)
-    if "hello" in message.lower():
-        response = "Hey 👋 how can I help you today?"
-    elif "how are you" in message.lower():
-        response = "I'm running perfectly 🚀 how about you?"
-    elif "what is xalvion" in message.lower():
-        response = "Xalvion is your AI SaaS system — and it's live."
-    else:
-        response = f"You said: {message}"
+        reply = response.choices[0].message.content
 
-    return {
-        "final": response,
-        "confidence": 0.95,
-        "quality": 0.95,
-        "mode": "live"
-    }
+        return {
+            "final": reply,
+            "confidence": 0.95,
+            "quality": 0.95,
+            "mode": "ai"
+        }
+
+    except Exception as e:
+        return {
+            "final": f"Error: {str(e)}",
+            "confidence": 0,
+            "quality": 0,
+            "mode": "error"
+        }
