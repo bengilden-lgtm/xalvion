@@ -6,6 +6,7 @@ app = FastAPI()
 
 class ChatRequest(BaseModel):
     message: str
+    user_id: str
 
 @app.get("/")
 def root():
