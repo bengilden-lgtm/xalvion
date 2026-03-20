@@ -2,6 +2,9 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from agent import run_agent
 
+# ✅ THIS LINE WAS MISSING (CRITICAL)
+app = FastAPI()
+
 API_KEYS = ["xalvion-secret-key"]
 
 def verify_key(x_api_key: str):
@@ -19,6 +22,7 @@ def root():
 @app.post("/chat")
 def chat(req: ChatRequest, x_api_key: str = Header(...)):
     verify_key(x_api_key)
+
     result = run_agent(req.message)
 
     return {
