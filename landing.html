@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xalvion — AI support that decides and acts</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><text x='32' y='48' font-family='Georgia,serif' font-size='48' font-weight='700' fill='%23ffffff' text-anchor='middle'>X</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg:#04060f;
+      --text:rgba(245,248,255,1);
+      --muted:rgba(205,215,242,.88);
+      --muted2:rgba(205,215,242,.65);
+      --line:rgba(255,255,255,.11);
+      --line2:rgba(255,255,255,.18);
+      --violet:#7c3aed;
+      --blue:#3b82f6;
+      --teal:#06b6d4;
+      --glass:rgba(10,12,26,.74);
+      --glass2:rgba(14,16,34,.84);
+      --radius:24px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{
+      background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;
+      font-size:16px;line-height:1.6;overflow-x:hidden;
+    }
+    #fluid{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.86}
+    .overlay{
+      position:fixed;inset:0;z-index:1;pointer-events:none;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(100,60,255,.06), transparent 70%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(20,100,200,.05), transparent 70%),
+        linear-gradient(180deg, rgba(4,5,13,.10) 0%, rgba(4,5,13,.42) 100%);
+    }
+    .page{position:relative;z-index:2}
+    nav{
+      position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;
+      padding:18px 48px;background:rgba(4,5,13,.75);border-bottom:1px solid var(--line);backdrop-filter:blur(20px);
+    }
+    .nav-brand{display:flex;align-items:center;text-decoration:none;color:var(--text)}
+    .nav-links{display:flex;gap:36px;list-style:none}
+    .nav-links a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:500}
+    .nav-links a:hover{color:var(--text)}
+    .nav-cta{
+      height:42px;padding:0 20px;border-radius:12px;border:1px solid rgba(124,92,252,.42);
+      background:rgba(124,92,252,.12);color:var(--text);font-size:14px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;
+    }
+    .hero{
+      min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+      padding:120px 24px 80px;
+    }
+    .eyebrow{
+      display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;
+      border:1px solid rgba(124,92,252,.3);background:rgba(124,92,252,.10);font-size:12px;font-weight:700;
+      letter-spacing:.12em;text-transform:uppercase;color:rgba(180,160,255,.9);margin-bottom:30px
+    }
+    .eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 8px var(--violet)}
+    .hero h1{
+      font-family:'Cormorant Garamond',serif;font-size:clamp(58px,9vw,120px);font-weight:700;line-height:1;letter-spacing:-.03em;
+      max-width:960px;margin-bottom:16px;
+    }
+    .hero h1 em{
+      font-style:italic;background:linear-gradient(135deg,#a78bfa 0%,#60a5fa 50%,#34d399 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .hero p{
+      font-family:'Cormorant Garamond',serif;font-size:clamp(22px,3vw,34px);font-style:italic;color:rgba(215,225,250,.86);
+      max-width:860px;margin-bottom:24px;
+    }
+    .hero .subcopy{
+      font-family:'Outfit',sans-serif;font-style:normal;font-size:18px;line-height:1.8;max-width:760px;
+      color:rgba(222,230,250,.88);margin-bottom:42px;
+    }
+    .hero-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:64px}
+    .btn-primary,.btn-ghost{
+      height:54px;padding:0 30px;border-radius:16px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-weight:600;
+    }
+    .btn-primary{
+      background:linear-gradient(135deg,#7c5cfc,#4f8ef7);color:#fff;box-shadow:0 0 40px rgba(124,92,252,.35),0 8px 24px rgba(0,0,0,.3)
+    }
+    .btn-ghost{
+      border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text);backdrop-filter:blur(12px)
+    }
+    .hero-demo,.card,.price-card{
+      border-radius:28px;background:rgba(8,10,24,.52);border:1px solid var(--line2);
+      backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+      box-shadow:0 40px 120px rgba(0,0,0,.42)
+    }
+    .hero-demo{width:min(760px,100%);overflow:hidden}
+    .demo-bar{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.025)}
+    .demo-dot{width:10px;height:10px;border-radius:50%}
+    .red{background:#ff5f57}.yellow{background:#ffbd2e}.green{background:#28c840}
+    .demo-title{margin-left:8px;font-size:12px;color:var(--muted2);font-weight:600;letter-spacing:.06em}
+    .demo-body{padding:24px;display:flex;flex-direction:column;gap:16px}
+    .demo-msg{display:flex;gap:12px;align-items:flex-start}
+    .demo-avatar{
+      width:28px;height:28px;border-radius:9px;flex:0 0 28px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;
+      background:rgba(255,255,255,.06);border:1px solid var(--line)
+    }
+    .demo-avatar.ai{background:rgba(124,92,252,.15);border-color:rgba(124,92,252,.3)}
+    .demo-bubble{padding:12px 14px;border-radius:16px;font-size:13.5px;line-height:1.6;max-width:520px}
+    .demo-bubble.user{background:rgba(58,72,118,.35);border:1px solid rgba(150,180,255,.15)}
+    .demo-bubble.ai{background:rgba(18,22,40,.65);border:1px solid var(--line)}
+    .demo-pills{display:flex;gap:8px;flex-wrap:wrap;padding-left:40px}
+    .pill{padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid}
+    .pill.success{background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.25);color:#6ee7b7}
+    .pill.info{background:rgba(96,165,250,.10);border-color:rgba(96,165,250,.22);color:#93c5fd}
+    .pill.violet{background:rgba(167,139,250,.10);border-color:rgba(167,139,250,.22);color:#c4b5fd}
+    section{position:relative;z-index:2}
+    .container{max-width:1120px;margin:0 auto;padding:0 24px}
+    .section-label{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(167,139,250,.8);margin-bottom:16px}
+    .section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(40px,5vw,68px);font-weight:700;letter-spacing:-.025em;line-height:1.05;margin-bottom:18px}
+    .section-desc{font-size:17px;color:rgba(215,225,250,.92);max-width:620px;line-height:1.75}
+    .stats{padding:60px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px}
+    .stat-item{padding:32px 24px;text-align:center;border-right:1px solid var(--line)}
+    .stat-item:last-child{border-right:none}
+    .stat-number{font-family:'Cormorant Garamond',serif;font-size:60px;font-weight:700;letter-spacing:-.04em;line-height:1;margin-bottom:8px}
+    .stat-label{font-size:13px;color:rgba(215,225,250,.88);font-weight:500}
+    .how,.pricing,.positioning{padding:120px 0}
+    .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:56px}
+    .card,.price-card{padding:32px}
+    .card h3,.price-card h3{font-size:20px;font-weight:700;margin-bottom:12px}
+    .card p,.price-card p{color:rgba(215,225,250,.9);line-height:1.75}
+    .price-card.featured{border-color:rgba(124,92,252,.36);box-shadow:0 0 80px rgba(124,92,252,.12),0 40px 120px rgba(0,0,0,.42)}
+    .price{font-size:38px;font-weight:800;letter-spacing:-.04em;margin:18px 0 12px}
+    .price span{font-size:14px;color:var(--muted2);font-weight:600}
+    .price-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;color:rgba(215,225,250,.92)}
+    .price-list div{padding-left:18px;position:relative}
+    .price-list div::before{content:"•";position:absolute;left:0;color:rgba(167,139,250,.86)}
+    .center{text-align:center}
+    footer{padding:48px 24px 80px;color:var(--muted2);text-align:center}
+    @media (max-width:900px){
+      nav{padding:16px 24px}
+      .nav-links{display:none}
+      .stats-grid,.cards{grid-template-columns:1fr}
+      .stat-item{border-right:none;border-bottom:1px solid var(--line)}
+      .stat-item:last-child{border-bottom:none}
+    }
+  </style>
+</head>
+<body>
+  <canvas id="fluid"></canvas>
+  <div class="overlay"></div>
+
+  <div class="page">
+    <nav>
+      <a class="nav-brand" href="#">
+        <svg width="210" height="42" viewBox="0 0 210 42">
+          <text x="0" y="34" font-family="Georgia,'Times New Roman',serif" font-size="34" font-weight="700" fill="#ffffff" letter-spacing="-0.5">X</text>
+          <text x="33" y="24" font-family="'Helvetica Neue',Arial,sans-serif" font-size="13" font-weight="300" fill="#ffffff" letter-spacing="5" opacity="0.9">ALVION</text>
+          <text x="34" y="34" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5.5" font-weight="400" fill="rgba(255,255,255,0.28)" letter-spacing="3.5">AI SUPPORT ENGINE</text>
+        </svg>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#positioning">Why it converts</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+      </ul>
+      <a class="nav-cta" href="/">Open workspace →</a>
+    </nav>
+
+    <section class="hero">
+      <div class="eyebrow">
+        <div class="eyebrow-dot"></div>
+        AI SUPPORT THAT DECIDES AND ACTS
+      </div>
+      <h1>Resolve more tickets with<br/><em>locked actions</em></h1>
+      <p>Xalvion answers the issue, executes the approved step, and turns usage pressure into revenue.</p>
+      <div class="subcopy">
+        This is not just a chatbot wrapper. Xalvion detects the case type, applies policy rules, triggers safe actions like refunds or credits, and keeps the upgrade loop visible inside the product.
+      </div>
+      <div class="hero-actions">
+        <a class="btn-primary" href="/">Open the workspace →</a>
+        <a class="btn-ghost" href="#pricing">See pricing pressure</a>
+      </div>
+      <div class="hero-demo">
+        <div class="demo-bar">
+          <div class="demo-dot red"></div>
+          <div class="demo-dot yellow"></div>
+          <div class="demo-dot green"></div>
+          <span class="demo-title">XALVION WORKSPACE — LIVE</span>
+        </div>
+        <div class="demo-body">
+          <div class="demo-msg">
+            <div class="demo-avatar">YOU</div>
+            <div class="demo-bubble user">I was charged twice for my order last week.</div>
+          </div>
+          <div class="demo-msg">
+            <div class="demo-avatar ai">AI</div>
+            <div class="demo-bubble ai">I've confirmed the duplicate charge and approved a $25 refund under duplicate-charge protection. The correction is already in motion.</div>
+          </div>
+          <div class="demo-pills">
+            <div class="pill success">Refund executed</div>
+            <div class="pill info">Confidence 0.96</div>
+            <div class="pill violet">Billing protection</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="container">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-number">3</div>
+            <div class="stat-label">Core action types locked down</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">25</div>
+            <div class="stat-label">Free messages before pressure kicks in</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">2</div>
+            <div class="stat-label">Upgrade paths built into the product loop</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">1</div>
+            <div class="stat-label">Operator workspace that shows the outcome live</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="how">
+      <div class="container">
+        <div class="section-label">How it works</div>
+        <div class="section-title">From message to action in one workflow</div>
+        <div class="section-desc">The product loop is now much clearer: a user sends an issue, Xalvion classifies it, enforces hard rules, executes the safe action, streams the answer, and updates usage pressure.</div>
+        <div class="cards">
+          <div class="card">
+            <h3>1. Understand the case</h3>
+            <p>Duplicate charges, late shipments, damaged orders, and refund requests are routed differently instead of getting the same generic assistant answer.</p>
+          </div>
+          <div class="card">
+            <h3>2. Lock the action</h3>
+            <p>The model can suggest, but only approved actions survive: none, refund, credit, or review. Amounts are capped so the response layer cannot freewheel.</p>
+          </div>
+          <div class="card">
+            <h3>3. Monetize the loop</h3>
+            <p>Usage, remaining volume, and upgrade prompts stay visible inside the workspace so product value naturally turns into subscription pressure.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="positioning" class="positioning">
+      <div class="container">
+        <div class="section-label">Why this is stronger</div>
+        <div class="section-title">Beautiful is good. <br/>Operational clarity sells.</div>
+        <div class="section-desc">The page now says what the product actually does: it resolves tickets, executes safe business actions, and creates an obvious reason to upgrade.</div>
+        <div class="cards">
+          <div class="card">
+            <h3>Safer than a generic AI layer</h3>
+            <p>Actions are constrained and tied to policy logic, which gives you a much better story for trust, support leads, and later integrations.</p>
+          </div>
+          <div class="card">
+            <h3>Better demo moment</h3>
+            <p>The workspace streams status labels, shows the action, and updates usage state. That creates a stronger "wow, this actually did something" moment.</p>
+          </div>
+          <div class="card">
+            <h3>Clearer revenue hook</h3>
+            <p>Free gets limited volume. Pro unlocks throughput. Elite becomes the high-scale operator tier. The product now points more directly at paid conversion.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pricing" class="pricing">
+      <div class="container">
+        <div class="section-label">Pricing</div>
+        <div class="section-title">Built to create upgrade pressure, not hide from it</div>
+        <div class="section-desc">These tiers map directly to the new workspace behavior: visible usage limits, more throughput, and stronger dashboard access as the plans rise.</div>
+        <div class="cards">
+          <div class="price-card">
+            <h3>Free</h3>
+            <div class="price">$0 <span>/ test mode</span></div>
+            <p>Enough to feel the product. Not enough to stay there forever.</p>
+            <div class="price-list">
+              <div>25 monthly tickets</div>
+              <div>Basic dashboard</div>
+              <div>Great for first demos</div>
+            </div>
+          </div>
+          <div class="price-card featured">
+            <h3>Pro</h3>
+            <div class="price">$49 <span>/ month</span></div>
+            <p>The first serious plan for real support volume and faster routing.</p>
+            <div class="price-list">
+              <div>500 monthly tickets</div>
+              <div>Priority routing enabled</div>
+              <div>Full dashboard visibility</div>
+            </div>
+          </div>
+          <div class="price-card">
+            <h3>Elite</h3>
+            <div class="price">$199 <span>/ month</span></div>
+            <p>The scale tier for teams that want the operator feel without the human bottleneck.</p>
+            <div class="price-list">
+              <div>5000 monthly tickets</div>
+              <div>Advanced dashboard</div>
+              <div>Multi-seat support story</div>
+            </div>
+          </div>
+        </div>
+        <div class="center" style="margin-top:38px">
+          <a class="btn-primary" href="/">Try the workspace now →</a>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Xalvion — support AI that resolves, acts, and creates a reason to upgrade.
+    </footer>
+  </div>
+
+  <script src="/fluid/script.js"></script>
+</body>
+</html>
