@@ -1,3 +1,10 @@
 fastapi
 uvicorn
 pydantic
+python-dotenv
+openai
+sqlalchemy
+passlib[bcrypt]
+python-jose
+stripe
+requests

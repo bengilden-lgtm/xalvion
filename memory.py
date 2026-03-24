@@ -1,79 +1,165 @@
+from __future__ import annotations
+
 import json
 import os
+import time
+from typing import Any, Dict, List
 
 MEMORY_FILE = "memory.json"
+MAX_HISTORY = 30
 
 
-# 📂 LOAD MEMORY
-def load_memory():
+def load_memory() -> Dict[str, Any]:
     if not os.path.exists(MEMORY_FILE):
         return {}
 
-    with open(MEMORY_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
-# 💾 SAVE MEMORY
-def save_memory(memory):
-    with open(MEMORY_FILE, "w") as f:
+def save_memory(memory: Dict[str, Any]) -> None:
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
         json.dump(memory, f, indent=2)
 
 
-# 🧠 GET USER MEMORY
-def get_user_memory(user_id):
+def get_user_memory(user_id: str) -> Dict[str, Any]:
     memory = load_memory()
-    return memory.get(user_id, {
-        "history": [],
-        "soul_file": "",
-        "sentiment_avg": 5
-    })
+    return memory.get(
+        user_id,
+        {
+            "history": [],
+            "soul_file": "",
+            "sentiment_avg": 5.0,
+        },
+    )
 
 
-# 📝 UPDATE MEMORY
-def update_memory(user_id, ticket, response):
+def calculate_importance(message: str, sentiment: int) -> float:
+    text = (message or "").lower()
+    score = 1.0
+
+    if sentiment <= 3:
+        score += 2.0
+
+    keywords = [
+        "refund",
+        "charged twice",
+        "stress",
+        "angry",
+        "frustrated",
+        "annoyed",
+        "damaged",
+        "late",
+        "not working",
+        "error",
+        "urgent",
+    ]
+    if any(k in text for k in keywords):
+        score += 2.0
+
+    if len(text) > 80:
+        score += 1.0
+
+    return score
+
+
+def apply_decay(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    now = time.time()
+
+    for item in history:
+        age = max(0.0, now - float(item.get("timestamp", now)))
+        decay_factor = max(0.60, 1.0 - (age / 250000.0))
+        item["importance"] = round(float(item.get("importance", 1.0)) * decay_factor, 4)
+
+    return history
+
+
+def get_top_memories(history: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, Any]]:
+    return sorted(history, key=lambda x: float(x.get("importance", 1.0)), reverse=True)[:limit]
+
+
+def generate_soul_file(user_data: Dict[str, Any]) -> str:
+    history = user_data.get("history", [])
+    top = get_top_memories(history, 5)
+
+    top_issues = [h.get("issue", "") for h in top if h.get("issue")]
+    avg_sentiment = round(float(user_data.get("sentiment_avg", 5.0)), 2)
+
+    profile_lines = []
+    if avg_sentiment <= 3.5:
+        profile_lines.append("- Often frustrated or under pressure")
+    elif avg_sentiment <= 6.5:
+        profile_lines.append("- Mixed emotional baseline")
+    else:
+        profile_lines.append("- Generally stable")
+
+    profile_lines.append("- Responds best to clear, direct help")
+    profile_lines.append("- Reduce effort and avoid vague answers")
+
+    joined_issues = "\n".join(f"- {issue}" for issue in top_issues[:5]) if top_issues else "- No major repeated issues yet"
+
+    return (
+        "User Memory Summary\n"
+        f"Emotional baseline: {avg_sentiment}/10\n\n"
+        "Repeated themes:\n"
+        f"{joined_issues}\n\n"
+        "Response style guidance:\n"
+        + "\n".join(profile_lines)
+    )
+
+
+def update_memory(user_id: str, ticket: Dict[str, Any], response: str) -> None:
     memory = load_memory()
 
-    user_data = memory.get(user_id, {
-        "history": [],
-        "soul_file": "",
-        "sentiment_avg": 5
-    })
+    user_data = memory.get(
+        user_id,
+        {
+            "history": [],
+            "soul_file": "",
+            "sentiment_avg": 5.0,
+        },
+    )
 
-    # ADD TO HISTORY
-    user_data["history"].append({
-        "issue": ticket["issue"],
-        "sentiment": ticket["sentiment"],
-        "response": response
-    })
+    issue = str(ticket.get("issue", "")).strip()
+    sentiment = int(ticket.get("sentiment", 5))
 
-    # LIMIT HISTORY (COST CONTROL)
-    if len(user_data["history"]) > 10:
-        user_data["history"] = user_data["history"][-10:]
+    entry = {
+        "issue": issue,
+        "sentiment": sentiment,
+        "response": response,
+        "importance": calculate_importance(issue, sentiment),
+        "timestamp": time.time(),
+    }
 
-    # UPDATE SENTIMENT AVERAGE
-    sentiments = [h["sentiment"] for h in user_data["history"]]
-    user_data["sentiment_avg"] = sum(sentiments) / len(sentiments)
+    user_data["history"].append(entry)
+    user_data["history"] = apply_decay(user_data["history"])[-MAX_HISTORY:]
 
-    # 🧠 SOUL FILE (COMPRESSED MEMORY)
+    sentiments = [float(h.get("sentiment", 5)) for h in user_data["history"]] or [5.0]
+    user_data["sentiment_avg"] = round(sum(sentiments) / len(sentiments), 2)
     user_data["soul_file"] = generate_soul_file(user_data)
 
     memory[user_id] = user_data
     save_memory(memory)
 
 
-# 🧠 SOUL FILE GENERATOR
-def generate_soul_file(user_data):
-    issues = [h["issue"] for h in user_data["history"][-5:]]
-    avg_sentiment = round(user_data["sentiment_avg"], 2)
+def get_prompt_memory(user_id: str, limit: int = 5) -> str:
+    user_data = get_user_memory(user_id)
+    history = user_data.get("history", [])
+    top = get_top_memories(history, limit)
 
-    return f"""
-User has recent issues: {issues}
-Average sentiment: {avg_sentiment}/10
+    if not top:
+        return "No important prior memory."
 
-Behavior pattern:
-- {"Frustrated user" if avg_sentiment < 4 else "Neutral/Positive user"}
+    lines = []
+    for item in top:
+        lines.append(
+            f"- Issue: {item.get('issue', '')} | "
+            f"Sentiment: {item.get('sentiment', 5)} | "
+            f"Importance: {item.get('importance', 1.0)}"
+        )
 
-Focus:
-- Resolve issues quickly
-- Maintain trust
-"""
+    return "\n".join(lines)

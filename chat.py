@@ -13,7 +13,7 @@ while True:
         print(get_metrics())
         continue
 
-    result = run_agent(user)
+    result = run_agent(user, "local_user")
 
     if "error" in result:
         print("❌", result["error"])
@@ -23,7 +23,3 @@ while True:
     print(f"\n📊 Confidence: {round(result['confidence'], 2)}")
     print(f"🧠 Quality: {round(result['quality'], 2)}")
     print(f"🎭 Mode: {result['mode']}")
-
-@app.post("/chat")
-def chat(req: ChatRequest):
-    return {"response": f"SAFE MODE: {req.message}"}
