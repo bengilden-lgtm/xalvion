@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, AsyncIterator
 
 import stripe
+import uvicorn
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -17,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from sqlalchemy import Column, Float, Integer, String, Text, create_engine
+from sqlalchemy import Column, Integer, String, Float, Text, create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from agent import run_agent
@@ -44,40 +45,49 @@ STRIPE_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 STRIPE_PRICE_PRO = os.getenv("STRIPE_PRICE_PRO", "").strip()
 STRIPE_PRICE_ELITE = os.getenv("STRIPE_PRICE_ELITE", "").strip()
-ALLOW_DIRECT_BILLING_BYPASS = (
-    os.getenv("ALLOW_DIRECT_BILLING_BYPASS", "false").strip().lower() == "true"
-)
+ALLOW_DIRECT_BILLING_BYPASS = os.getenv("ALLOW_DIRECT_BILLING_BYPASS", "false").strip().lower() == "true"
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:8001").rstrip("/")
-CHECKOUT_SUCCESS_URL = os.getenv(
-    "CHECKOUT_SUCCESS_URL", f"{FRONTEND_URL}?checkout=success"
-)
-CHECKOUT_CANCEL_URL = os.getenv(
-    "CHECKOUT_CANCEL_URL", f"{FRONTEND_URL}?checkout=cancel"
-)
+CHECKOUT_SUCCESS_URL = os.getenv("CHECKOUT_SUCCESS_URL", f"{FRONTEND_URL}?checkout=success")
+CHECKOUT_CANCEL_URL = os.getenv("CHECKOUT_CANCEL_URL", f"{FRONTEND_URL}?checkout=cancel")
 
 STREAM_CHUNK_SIZE = 18
 STREAM_CHUNK_DELAY = 0.02
 STATUS_STEP_DELAY = 0.22
 MAX_AUTO_REFUND = 50
 
+# =========================================================
+# APPROVAL THRESHOLDS + LIVE MODE
+# =========================================================
+
 APPROVAL_THRESHOLD = float(os.getenv("APPROVAL_THRESHOLD", "25.00"))
 LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
+
+# =========================================================
+# RULES SYSTEM
+# =========================================================
 
 REFUND_RULES = {
     "enabled": True,
     "allowed_tiers": {"pro", "elite", "dev"},
+
+    # increase slightly for testing
     "max_auto_refund_amount": 50.00,
+
+    # 🔥 FIX: include actual agent outputs
     "allowed_issue_types": {
         "duplicate_charge",
         "double_charge",
         "billing_issue",
         "payment_issue",
         "refund_request",
-        "billing_duplicate_charge",
+        "billing_duplicate_charge",  # ← ADD THIS
         "general_support",
     },
-    "blocked_order_statuses": set(),
+
+    # 🔥 FIX: allow unknown during testing
+    "blocked_order_statuses": set(),  # ← EMPTY
+
     "min_confidence": 0.5,
     "min_quality": 0.5,
 }
@@ -144,16 +154,29 @@ app = FastAPI(title="Xalvion Sovereign Brain")
 if os.path.isdir(FLUID_DIR):
     app.mount("/fluid", StaticFiles(directory=FLUID_DIR), name="fluid")
 
+ALLOWED_ORIGINS = [
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8001",
+    "http://127.0.0.1:8001",
+    "https://www.xalvion.tech",
+    "https://xalvion.tech",
+]
+
+frontend_origin = os.getenv("FRONTEND_URL", "").rstrip("/")
+if frontend_origin and frontend_origin not in ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS.append(frontend_origin)
+
+extra_origins = os.getenv("ALLOWED_ORIGINS", "")
+for origin in [item.strip().rstrip("/") for item in extra_origins.split(",") if item.strip()]:
+    if origin not in ALLOWED_ORIGINS:
+        ALLOWED_ORIGINS.append(origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:8001",
-        "http://127.0.0.1:8001",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -350,7 +373,7 @@ def get_current_user(
 
 
 def require_admin(user: User = Depends(get_current_user)):
-    if not ADMIN_USERNAME or user.username != ADMIN_USERNAME:
+    if user.username != ADMIN_USERNAME:
         raise HTTPException(status_code=403, detail="Admin only")
     return user
 
@@ -395,8 +418,14 @@ def build_agent_meta(req: SupportRequest, user: User) -> dict[str, Any]:
 
 def safe_refund_reason(value: str | None) -> str:
     text = (value or "").strip().lower()
-    allowed = {"duplicate", "fraudulent", "requested_by_customer"}
-    return text if text in allowed else "requested_by_customer"
+    allowed = {
+        "duplicate",
+        "fraudulent",
+        "requested_by_customer",
+    }
+    if text in allowed:
+        return text
+    return "requested_by_customer"
 
 
 def cents_from_dollars(amount: Any) -> int:
@@ -481,37 +510,46 @@ def evaluate_refund_rules(
     rule_checks: list[dict[str, Any]] = []
 
     def add_rule(name: str, passed: bool, detail: str) -> None:
-        rule_checks.append({"rule": name, "passed": passed, "detail": detail})
+        rule_checks.append({
+            "rule": name,
+            "passed": passed,
+            "detail": detail,
+        })
 
     add_rule(
         "refund_rules_enabled",
         REFUND_RULES["enabled"],
-        "Automatic refund rules are enabled." if REFUND_RULES["enabled"] else "Automatic refund rules are disabled.",
+        "Automatic refund rules are enabled." if REFUND_RULES["enabled"] else "Automatic refund rules are disabled."
     )
+
     add_rule(
         "allowed_tier",
         tier in REFUND_RULES["allowed_tiers"],
-        f"Tier '{tier}' is {'allowed' if tier in REFUND_RULES['allowed_tiers'] else 'not allowed'} for automatic refunds.",
+        f"Tier '{tier}' is {'allowed' if tier in REFUND_RULES['allowed_tiers'] else 'not allowed'} for automatic refunds."
     )
+
     add_rule(
         "allowed_issue_type",
         issue_type in REFUND_RULES["allowed_issue_types"],
-        f"Issue type '{issue_type}' is {'allowed' if issue_type in REFUND_RULES['allowed_issue_types'] else 'not allowed'} for automatic refunds.",
+        f"Issue type '{issue_type}' is {'allowed' if issue_type in REFUND_RULES['allowed_issue_types'] else 'not allowed'} for automatic refunds."
     )
+
     add_rule(
         "not_blocked_order_status",
         order_status not in REFUND_RULES["blocked_order_statuses"],
-        f"Order status '{order_status}' is {'acceptable' if order_status not in REFUND_RULES['blocked_order_statuses'] else 'blocked'} for automatic refunds.",
+        f"Order status '{order_status}' is {'acceptable' if order_status not in REFUND_RULES['blocked_order_statuses'] else 'blocked'} for automatic refunds."
     )
+
     add_rule(
         "minimum_confidence",
         confidence >= REFUND_RULES["min_confidence"],
-        f"Confidence {confidence:.2f} must be at least {REFUND_RULES['min_confidence']:.2f}.",
+        f"Confidence {confidence:.2f} must be at least {REFUND_RULES['min_confidence']:.2f}."
     )
+
     add_rule(
         "minimum_quality",
         quality >= REFUND_RULES["min_quality"],
-        f"Quality {quality:.2f} must be at least {REFUND_RULES['min_quality']:.2f}.",
+        f"Quality {quality:.2f} must be at least {REFUND_RULES['min_quality']:.2f}."
     )
 
     charge_amount = int(charge_context["charge_amount"])
@@ -521,27 +559,31 @@ def evaluate_refund_rules(
     add_rule(
         "captured_charge",
         bool(charge_context.get("captured", False)),
-        "Charge is captured and can be refunded." if charge_context.get("captured", False) else "Charge is not captured.",
+        "Charge is captured and can be refunded." if charge_context.get("captured", False) else "Charge is not captured."
     )
+
     add_rule(
         "remaining_refundable_amount",
         remaining_refundable > 0,
-        f"Remaining refundable amount is ${dollars_from_cents(remaining_refundable):.2f}.",
+        f"Remaining refundable amount is ${dollars_from_cents(remaining_refundable):.2f}."
     )
+
     add_rule(
         "auto_refund_threshold",
         dollars_from_cents(refund_cents) <= REFUND_RULES["max_auto_refund_amount"],
-        f"Refund ${dollars_from_cents(refund_cents):.2f} must be at or below ${REFUND_RULES['max_auto_refund_amount']:.2f}.",
+        f"Refund ${dollars_from_cents(refund_cents):.2f} must be at or below ${REFUND_RULES['max_auto_refund_amount']:.2f}."
     )
+
     add_rule(
         "positive_requested_amount",
         requested_cents > 0,
-        f"Requested refund is ${dollars_from_cents(requested_cents):.2f}.",
+        f"Requested refund is ${dollars_from_cents(requested_cents):.2f}."
     )
+
     add_rule(
         "positive_refund_amount",
         refund_cents > 0,
-        f"Actual refund would be ${dollars_from_cents(refund_cents):.2f}.",
+        f"Actual refund would be ${dollars_from_cents(refund_cents):.2f}."
     )
 
     blocked_rules = [r for r in rule_checks if not r["passed"]]
@@ -800,7 +842,9 @@ def log_action(
 def check_requires_approval(action: str, amount: float) -> bool:
     if not LIVE_MODE:
         return False
-    return action == "refund" and float(amount or 0) > APPROVAL_THRESHOLD
+    if action == "refund" and float(amount or 0) > APPROVAL_THRESHOLD:
+        return True
+    return False
 
 
 def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
@@ -819,16 +863,11 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
     if needs_approval:
         result["action"] = "review"
         result["amount"] = 0
-        result["reason"] = (
-            f"Refund of ${amount:.2f} exceeds approval threshold "
-            f"(${APPROVAL_THRESHOLD:.2f}). Manual approval required."
-        )
-        result["response"] = (
-            "I've flagged this refund for manual approval as the amount exceeds "
-            "the auto-approval limit. Your team will review and process it shortly."
-        )
+        result["reason"] = f"Refund of ${amount:.2f} exceeds approval threshold (${APPROVAL_THRESHOLD:.2f}). Manual approval required."
+        result["response"] = "I've flagged this refund for manual approval as the amount exceeds the auto-approval limit. Your team will review and process it shortly."
         result["final"] = result["response"]
         result["tool_status"] = "pending_approval"
+
     else:
         result = apply_real_actions(result, req, user)
 
@@ -933,10 +972,7 @@ def validate_upgrade_request(desired: str, current_tier: str) -> None:
         raise HTTPException(status_code=400, detail=f"Already on {desired}")
 
     if current_tier == "elite" and desired == "pro":
-        raise HTTPException(
-            status_code=400,
-            detail="Downgrades are not supported from this endpoint",
-        )
+        raise HTTPException(status_code=400, detail="Downgrades are not supported from this endpoint")
 
 
 def create_checkout_session_for_user(user: User, desired: str):
@@ -1029,7 +1065,7 @@ def me(user: User = Depends(get_current_user)):
         "dashboard_access": usage_summary["dashboard_access"],
         "priority_routing": usage_summary["priority_routing"],
         "is_dev": usage_summary["tier"] == "dev",
-        "is_admin": bool(ADMIN_USERNAME) and user.username == ADMIN_USERNAME,
+        "is_admin": user.username == ADMIN_USERNAME,
     }
 
 
@@ -1091,7 +1127,7 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(req.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if ADMIN_USERNAME and user.username == ADMIN_USERNAME and user.tier != "elite":
+    if user.username == ADMIN_USERNAME and user.tier != "elite":
         user.tier = "elite"
         db.commit()
         db.refresh(user)
@@ -1105,7 +1141,7 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
         "usage": usage_summary["usage"],
         "limit": usage_summary["limit"],
         "remaining": usage_summary["remaining"],
-        "is_admin": bool(ADMIN_USERNAME) and user.username == ADMIN_USERNAME,
+        "is_admin": user.username == ADMIN_USERNAME,
     }
 
 
@@ -1122,25 +1158,20 @@ def upgrade_plan(
 
     if STRIPE_KEY and PRICE_MAP.get(desired):
         session = create_checkout_session_for_user(user, desired)
-        current_plan = get_plan_config(current_tier)
-        usage = int(getattr(user, "usage", 0) or 0)
         return {
             "mode": "checkout",
             "checkout_url": session.url,
             "session_id": session.id,
             "tier": current_tier,
-            "usage": usage,
-            "limit": current_plan["monthly_limit"],
-            "remaining": max(0, current_plan["monthly_limit"] - usage),
+            "usage": int(getattr(user, "usage", 0) or 0),
+            "limit": get_plan_config(current_tier)["monthly_limit"],
+            "remaining": max(0, get_plan_config(current_tier)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)),
         }
 
     if not ALLOW_DIRECT_BILLING_BYPASS:
         raise HTTPException(
             status_code=500,
-            detail=(
-                "Stripe is not fully configured yet. Add STRIPE_SECRET_KEY and price IDs, "
-                "or enable ALLOW_DIRECT_BILLING_BYPASS for local testing."
-            ),
+            detail="Stripe is not fully configured yet. Add STRIPE_SECRET_KEY and price IDs, or enable ALLOW_DIRECT_BILLING_BYPASS for local testing.",
         )
 
     user.tier = desired
@@ -1170,9 +1201,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         if STRIPE_WEBHOOK_SECRET:
             event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
         else:
-            event = stripe.Event.construct_from(
-                json.loads(payload.decode("utf-8")), stripe.api_key
-            )
+            event = stripe.Event.construct_from(json.loads(payload.decode("utf-8")), stripe.api_key)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Webhook parse failed: {exc}") from exc
 
@@ -1186,6 +1215,9 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
         if username and tier:
             apply_successful_upgrade(db, username, tier)
+
+    if event_type in {"customer.subscription.deleted", "customer.subscription.updated"}:
+        pass
 
     return {"received": True, "type": event_type}
 
@@ -1210,7 +1242,10 @@ def admin_list_users(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    return [{"username": u.username, "tier": u.tier, "usage": u.usage} for u in db.query(User).all()]
+    return [
+        {"username": u.username, "tier": u.tier, "usage": u.usage}
+        for u in db.query(User).all()
+    ]
 
 
 @app.post("/admin/set-tier")
@@ -1304,11 +1339,7 @@ def admin_approve_action(
 
 
 @app.post("/support")
-def support(
-    req: SupportRequest,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
+def support(req: SupportRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return run_support(req, user, db)
 
 
@@ -1329,9 +1360,6 @@ async def support_stream(
         },
     )
 
-
 if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
