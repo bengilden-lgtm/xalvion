@@ -48,7 +48,7 @@
   const state = {
     token: localStorage.getItem(TOKEN_KEY) || "",
     username: localStorage.getItem(USER_KEY) || "",
-    tier: localStorage.getItem(TIER_KEY) || "dev",
+    tier: localStorage.getItem(TIER_KEY) || "free",
     usage: 0,
     limit: Infinity,
     remaining: Infinity,
@@ -470,7 +470,7 @@
   function clearAuth() {
     state.token = "";
     state.username = "";
-    state.tier = "dev";
+    state.tier = "free";
     state.usage = 0;
     state.limit = Infinity;
     state.remaining = Infinity;
@@ -510,7 +510,7 @@
 
   function getVisibleTierLabel() {
     const tier = (state.tier || "free").toLowerCase();
-    if (tier === "dev") return "preview";
+    if (tier === "dev") return "starter";
     return tier;
   }
 
@@ -540,7 +540,7 @@
 
     return {
       usage:
-        "You are in preview access with full workspace availability while you test the support experience."
+        "You are on the Starter plan with access to the core support workspace."
     };
   }
 
@@ -549,8 +549,8 @@
     const usage = Number.isFinite(state.usage) ? state.usage : 0;
     const limit = Number.isFinite(state.limit) ? state.limit : null;
     const user = state.username || "";
-    const tierLabel = tier === "preview" ? "preview access" : tier;
-    const usageStr = limit ? `${usage}/${limit} used` : "unlimited access";
+    const tierLabel = tier;
+    const usageStr = limit ? `${usage}/${limit} used` : "active";
     const userStr = user ? `${user} · ` : "";
     setText(els.workspaceSubcopy, `${userStr}${tierLabel} · ${usageStr}`);
   }
@@ -582,7 +582,7 @@
     );
     setText(
       els.workspaceHeadline,
-      "Send a support case — get a polished reply and a visible next step."
+      "Customer support workspace"
     );
     setText(
       els.systemPanelCopy,
@@ -593,9 +593,9 @@
     updateTopbarStatus();
 
     if (els.devBtn) {
-      els.devBtn.textContent = "Preview";
-      els.devBtn.setAttribute("aria-label", "Preview access");
-      els.devBtn.title = "Preview access";
+      els.devBtn.textContent = "Quick demo";
+      els.devBtn.setAttribute("aria-label", "Quick demo access");
+      els.devBtn.title = "Quick demo access";
     }
   }
 
@@ -607,566 +607,247 @@
         <div class="empty-card">
           <div class="empty-eyebrow">
             <span class="empty-eyebrow-dot"></span>
-            <span>Support workspace ready</span>
+            Live operator workspace
           </div>
-          <h1>Resolve tickets with a cleaner next step.</h1>
+          <h1>Resolve support cases with visible decisions and polished output.</h1>
           <p>
-            Xalvion turns support cases into a clear reply, a visible operating decision, and a usable action flow.
-            Start with a billing, shipping, refund, or damaged-order case to see the workspace in motion.
+            Drop in a customer message to generate a structured reply, clear action visibility,
+            and the next best move inside the workspace.
           </p>
-
           <div class="empty-grid">
-            <div class="empty-panel">
-              <div class="empty-panel-label">What happens here</div>
-              <div class="empty-panel-copy">
-                Messages stream into a calm operator view. Decisions stay visible, actions stay usable,
-                and account usage stays tied to the active workspace.
-              </div>
-            </div>
-            <div class="empty-panel">
-              <div class="empty-panel-label">Best test prompts</div>
-              <div class="empty-panel-copy">
-                Duplicate charge, late package, damaged order, or “where is my order” will show the clearest response flow.
-              </div>
-            </div>
-          </div>
-
-          <div class="empty-actions">
-            <button class="chip" data-fill-inline="A customer says: I was charged twice." type="button">Try duplicate charge</button>
-            <button class="chip" data-fill-inline="A customer says: My package is late and I am annoyed." type="button">Try late package</button>
-            <button class="chip" data-fill-inline="A customer says: Order arrived damaged and I want this fixed now." type="button">Try damaged order</button>
-            <button class="chip" data-fill-inline="A customer says: Where is my order?" type="button">Try where is my order</button>
+            <button class="chip" data-fill="Customer says they were charged twice for the same order and wants a refund.">
+              Duplicate charge
+            </button>
+            <button class="chip" data-fill="Customer wants to cancel and receive a refund because the package never arrived.">
+              Missing order
+            </button>
+            <button class="chip" data-fill="Customer is angry that their shipment is delayed and is asking for store credit.">
+              Delay compensation
+            </button>
           </div>
         </div>
       </div>
     `;
 
-    els.messages.querySelectorAll("[data-fill-inline]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        fillComposer(btn.getAttribute("data-fill-inline") || "");
+    els.chips = Array.from(document.querySelectorAll("[data-fill]"));
+    bindChips();
+  }
+
+  function bindChips() {
+    if (!els.chips || !els.chips.length) return;
+    els.chips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        if (!els.messageInput) return;
+        els.messageInput.value = chip.getAttribute("data-fill") || "";
+        autoResizeTextarea();
+        els.messageInput.focus();
       });
     });
+  }
 
+  function createMessage(role, html, status = "") {
+    const wrap = document.createElement("div");
+    wrap.className = `msg-row ${role}`;
+
+    const bubble = document.createElement("div");
+    bubble.className = `msg-bubble ${role}`;
+    bubble.innerHTML = html;
+
+    if (status) {
+      const meta = document.createElement("div");
+      meta.className = "msg-meta";
+      meta.textContent = status;
+      bubble.appendChild(meta);
+    }
+
+    wrap.appendChild(bubble);
+    return wrap;
+  }
+
+  function addUserMessage(text) {
+    if (!els.messages) return;
+    const row = createMessage("user", `<div>${escapeHtml(text)}</div>`);
+    els.messages.appendChild(row);
     scrollMessagesToBottom(true);
   }
 
-  function fillComposer(text) {
-    if (!els.messageInput) return;
-    els.messageInput.value = text;
-    autoResizeTextarea();
-    els.messageInput.focus();
+  function addAssistantMessage(shell = "Thinking…") {
+    if (!els.messages) return null;
 
-    const composer = els.messageInput.closest(".composer");
-    if (composer) {
-      composer.classList.add("highlight");
-      setTimeout(() => composer.classList.remove("highlight"), 700);
-    }
+    const row = createMessage(
+      "assistant",
+      `
+        <div class="assistant-shell">
+          <div class="assistant-copy">${escapeHtml(shell)}</div>
+          <div class="assistant-actions"></div>
+        </div>
+      `
+    );
+
+    els.messages.appendChild(row);
+    scrollMessagesToBottom(true);
+    return row;
   }
 
-  function buildMessage(role, initialText = "", appendNow = true) {
-    const group = document.createElement("div");
-    group.className = `msg-group ${role}`;
-
-    const header = document.createElement("div");
-    header.className = "msg-group-header";
-
-    const who = document.createElement("div");
-    who.className = "msg-who";
-    who.textContent = role === "user" ? (state.username || "You") : "Xalvion";
-
-    header.appendChild(who);
-
-    const replyBody = document.createElement("div");
-    replyBody.className = "reply-body";
-
-    const replyText = document.createElement("div");
-    replyText.className = "reply-text";
-    if (initialText) replyText.textContent = initialText;
-    replyBody.appendChild(replyText);
-
-    const statusRow = document.createElement("div");
-    statusRow.className = "status-row";
-
-    const nextGrid = document.createElement("div");
-    nextGrid.className = "customer-next";
-
-    const actionVisibility = document.createElement("div");
-    actionVisibility.className = "action-visibility";
-    actionVisibility.setAttribute("aria-live", "polite");
-
-    const actionsRow = document.createElement("div");
-    actionsRow.className = "msg-actions";
-
-    group.appendChild(header);
-    group.appendChild(replyBody);
-
-    if (role !== "user") {
-      group.appendChild(statusRow);
-      group.appendChild(nextGrid);
-      group.appendChild(actionVisibility);
-      group.appendChild(actionsRow);
-
-      const copyBtn = document.createElement("button");
-      copyBtn.className = "act-btn";
-      copyBtn.type = "button";
-      copyBtn.title = "Copy reply";
-      copyBtn.innerHTML = `${ICONS.copy}<span>Copy</span>`;
-      copyBtn.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(replyText.textContent || "");
-          copyBtn.classList.add("done");
-          copyBtn.innerHTML = `${ICONS.check}<span>Copied</span>`;
-          setTimeout(() => {
-            copyBtn.classList.remove("done");
-            copyBtn.innerHTML = `${ICONS.copy}<span>Copy</span>`;
-          }, 1600);
-        } catch {}
-      });
-
-      const sep1 = document.createElement("div");
-      sep1.className = "act-sep";
-
-      const sendCustomerBtn = document.createElement("button");
-      sendCustomerBtn.className = "act-btn send";
-      sendCustomerBtn.type = "button";
-      sendCustomerBtn.title = "Load reply into composer";
-      sendCustomerBtn.innerHTML = `${ICONS.send}<span>Send to customer</span>`;
-      sendCustomerBtn.addEventListener("click", () => {
-        fillComposer(replyText.textContent || "");
-        sendCustomerBtn.classList.add("done");
-        sendCustomerBtn.innerHTML = `${ICONS.check}<span>Loaded</span>`;
-        setTimeout(() => {
-          sendCustomerBtn.classList.remove("done");
-          sendCustomerBtn.innerHTML = `${ICONS.send}<span>Send to customer</span>`;
-        }, 1600);
-      });
-
-      const sep2 = document.createElement("div");
-      sep2.className = "act-sep";
-
-      const upBtn = document.createElement("button");
-      upBtn.className = "fb-btn";
-      upBtn.type = "button";
-      upBtn.textContent = "👍";
-      upBtn.title = "Good";
-
-      const downBtn = document.createElement("button");
-      downBtn.className = "fb-btn";
-      downBtn.type = "button";
-      downBtn.textContent = "👎";
-      downBtn.title = "Bad";
-
-      upBtn.addEventListener("click", () => {
-        upBtn.classList.toggle("up");
-        downBtn.classList.remove("down");
-      });
-
-      downBtn.addEventListener("click", () => {
-        downBtn.classList.toggle("down");
-        upBtn.classList.remove("up");
-      });
-
-      actionsRow.appendChild(copyBtn);
-      actionsRow.appendChild(sep1);
-      actionsRow.appendChild(sendCustomerBtn);
-      actionsRow.appendChild(sep2);
-      actionsRow.appendChild(upBtn);
-      actionsRow.appendChild(downBtn);
-    }
-
-    if (appendNow && els.messages) {
-      const siblings = els.messages.querySelectorAll(".msg-group");
-      const delay = Math.min(siblings.length * 28, 84);
-      group.style.animationDelay = `${delay}ms`;
-      els.messages.appendChild(group);
-      scrollMessagesToBottom(true);
-    }
-
-    return { wrapper: group, replyText, statusRow, nextGrid, actionVisibility };
+  function getAssistantCopyNode(row) {
+    return row?.querySelector(".assistant-copy") || null;
   }
 
-  function setTypingBubble(node) {
-    node.replyText.innerHTML = `<div class="typing"><span></span><span></span><span></span></div>`;
+  function getAssistantActionsNode(row) {
+    return row?.querySelector(".assistant-actions") || null;
   }
 
-  function setBubbleText(node, text) {
-    node.replyText.textContent = text;
+  function setAssistantCopy(row, text) {
+    const node = getAssistantCopyNode(row);
+    if (!node) return;
+    node.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
   }
 
-  function renderStatuses(node, statuses) {
-    if (!node.statusRow) return;
-    node.statusRow.innerHTML = "";
-
-    (statuses || []).slice(-3).forEach((text) => {
-      const pill = document.createElement("div");
-      pill.className = "status-pill";
-      pill.textContent = text;
-      node.statusRow.appendChild(pill);
-    });
+  function appendAssistantChunk(row, chunk) {
+    const node = getAssistantCopyNode(row);
+    if (!node) return;
+    const current = node.textContent || "";
+    node.innerHTML = escapeHtml(current + chunk).replace(/\n/g, "<br>");
   }
 
-  function normalizeDisplayedReason(meta) {
-    const raw = String(meta.reason || "").trim();
-    if (!raw) return "";
-
-    if (raw === "local_fallback") {
-      if (meta.action === "review") return "A quick review is needed before the next step is confirmed.";
-      if (meta.action === "refund") return "This request matched an approved refund path.";
-      if (meta.action === "credit") return "This request matched an approved recovery path.";
-      return "The workspace completed the safest available response path.";
-    }
-
-    if (raw === "resolved") return "The workspace completed the best available response path.";
-    return raw;
+  function normalizeActionTone(action) {
+    const value = String(action || "").trim().toLowerCase();
+    if (value.includes("refund")) return "success";
+    if (value.includes("review")) return "warning";
+    return "info";
   }
 
-  function renderCustomerNextStep(node, meta) {
-    if (!node.nextGrid) return;
-    node.nextGrid.innerHTML = "";
-
-    const pills = [];
-    const reason = normalizeDisplayedReason(meta);
-    const action = String(meta.action || "none");
-    const issue = String(meta.issue_type || "");
-    const orderStatus = String(meta.order_status || "");
-
-    if (action !== "none") {
-      let label = "Next step";
-      let value = "Moving forward.";
-      let cls = "next-pill primary";
-
-      if (action === "refund") {
-        label = "Refund";
-        value = meta.amount && Number(meta.amount) > 0 ? `$${meta.amount} approved` : "Approved";
-      } else if (action === "credit") {
-        label = "Credit";
-        value = meta.amount && Number(meta.amount) > 0 ? `$${meta.amount} applied` : "Applied";
-      } else if (action === "review") {
-        label = "Review";
-        value = issue === "damaged_order" ? "Send order # + photo" : "Review in progress";
-        cls = "next-pill warning";
-      }
-
-      pills.push({ cls, label, value });
-    }
-
-    if (orderStatus && orderStatus !== "unknown") {
-      const statusMap = {
-        delayed: "Delayed in transit",
-        shipped: "Shipped",
-        delivered: "Delivered",
-        processing: "Preparing"
-      };
-
-      pills.push({
-        cls: "next-pill",
-        label: "Order",
-        value: statusMap[orderStatus] || orderStatus
-      });
-    } else if (reason && action === "none") {
-      pills.push({
-        cls: "next-pill",
-        label: "Note",
-        value: reason
-      });
-    }
-
-    if (!pills.length) {
-      pills.push({
-        cls: "next-pill primary",
-        label: "Status",
-        value: "Response ready"
-      });
-    }
-
-    pills.slice(0, 3).forEach((pillData) => {
-      const el = document.createElement("div");
-      el.className = pillData.cls;
-      el.innerHTML = `
-        <span class="pill-label">${escapeHtml(pillData.label)}</span>
-        <span class="pill-value">${escapeHtml(pillData.value)}</span>
-      `;
-      node.nextGrid.appendChild(el);
-    });
+  function normalizeActionLabel(action) {
+    const raw = String(action || "").trim();
+    if (!raw) return "Action";
+    return raw
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (m) => m.toUpperCase());
   }
 
-  function getActionIcon(action, orderStatus) {
-    const normalized = String(action || "").toLowerCase();
-    if (normalized === "refund") return ICONS.refund;
-    if (normalized === "credit") return ICONS.credit;
-    if (normalized === "review") return ICONS.review;
-    if (orderStatus && orderStatus !== "unknown") return ICONS.status;
-    return ICONS.sparkle;
+  function actionIcon(action) {
+    const key = String(action || "").toLowerCase();
+    if (key.includes("refund")) return ICONS.refund;
+    if (key.includes("credit")) return ICONS.credit;
+    if (key.includes("review")) return ICONS.review;
+    return ICONS.status;
   }
 
-  function normalizeActionVisibility(meta) {
-    const action = String(meta.action || "none").toLowerCase();
-    const amount = Number(meta.amount || 0);
-    const issueType = String(meta.issue_type || "").toLowerCase();
-    const orderStatus = String(meta.order_status || "").toLowerCase();
-    const reason = normalizeDisplayedReason(meta);
+  function createActionVisibility(result = {}) {
+    const tone = normalizeActionTone(result.action);
+    const box = document.createElement("div");
+    box.className = `action-visibility ${tone} show`;
 
-    if (action === "refund") {
-      return {
-        tone: "success",
-        badge: "Completed",
-        title: "Action completed",
-        kicker: "Refund issued",
-        icon: getActionIcon(action, orderStatus),
-        line: amount > 0
-          ? `Refund issued — $${amount} returned to the original payment method.`
-          : "Refund issued to the original payment method.",
-        sub: reason || "This request matched an approved refund path.",
-        pills: [
-          amount > 0 ? { label: "Amount", value: `$${amount}`, icon: ICONS.refund } : null,
-          { label: "Type", value: "Refund", icon: ICONS.check }
-        ].filter(Boolean),
-        trail: [
-          { label: "Issue reviewed", state: "done", icon: ICONS.check },
-          { label: "Refund confirmed", state: "done", icon: ICONS.refund }
-        ]
-      };
-    }
+    const label = normalizeActionLabel(result.action || result.status || "Action");
+    const badge = (result.status || "Completed").toString().replaceAll("_", " ");
+    const summary = result.action_summary || result.explanation || "Action completed.";
+    const detail = result.detail || result.reason || "";
+    const issueType = result.issue_type || "general_support";
+    const confidence = Number(result.confidence || 0);
+    const quality = Number(result.quality || 0);
 
-    if (action === "credit") {
-      return {
-        tone: "success",
-        badge: "Completed",
-        title: "Action completed",
-        kicker: "Credit applied",
-        icon: getActionIcon(action, orderStatus),
-        line: amount > 0
-          ? `Credit applied — $${amount} added to the account.`
-          : "Credit applied to the account.",
-        sub: reason || "This request matched an approved recovery path.",
-        pills: [
-          amount > 0 ? { label: "Amount", value: `$${amount}`, icon: ICONS.credit } : null,
-          { label: "Type", value: "Credit", icon: ICONS.check }
-        ].filter(Boolean),
-        trail: [
-          { label: "Issue reviewed", state: "done", icon: ICONS.check },
-          { label: "Credit applied", state: "done", icon: ICONS.credit }
-        ]
-      };
-    }
-
-    if (action === "review") {
-      let reviewLine = "Escalated for review — next step is already in progress.";
-      let reviewSub = reason || "A quick review is needed before the next step is confirmed.";
-      const pills = [{ label: "Type", value: "Review", icon: ICONS.review }];
-      const trail = [
-        { label: "Case reviewed", state: "done", icon: ICONS.check },
-        { label: "Review opened", state: "live", icon: ICONS.review }
-      ];
-
-      if (issueType === "damaged_order") {
-        reviewLine = "Escalated for review — send the order number and one photo of the damage.";
-        reviewSub = "This keeps the case moving with the right evidence attached from the start.";
-        pills.push({ label: "Needed", value: "Order # + photo", icon: ICONS.review });
-      } else if (issueType === "usage_limit") {
-        reviewLine = "Usage limit reached — upgrade to keep resolving requests instantly.";
-        reviewSub = reason || "This request was blocked by the current plan limit.";
-        pills.push({ label: "Needed", value: "Upgrade plan", icon: ICONS.sparkle });
-      }
-
-      return {
-        tone: issueType === "usage_limit" ? "warning" : "info",
-        badge: issueType === "usage_limit" ? "Attention" : "In progress",
-        title: issueType === "usage_limit" ? "Plan action required" : "Action opened",
-        kicker: issueType === "usage_limit" ? "Upgrade needed" : "Review opened",
-        icon: getActionIcon(action, orderStatus),
-        line: reviewLine,
-        sub: reviewSub,
-        pills,
-        trail
-      };
-    }
-
-    if (orderStatus && orderStatus !== "unknown") {
-      const map = {
-        delayed: "Order status checked — currently delayed in transit.",
-        shipped: "Order status checked — the shipment is on the way.",
-        delivered: "Order status checked — the order shows as delivered.",
-        processing: "Order status checked — the order is still being prepared."
-      };
-
-      const prettyStatus = {
-        delayed: "Delayed",
-        shipped: "Shipped",
-        delivered: "Delivered",
-        processing: "Preparing"
-      };
-
-      return {
-        tone: "info",
-        badge: "Checked",
-        title: "Action completed",
-        kicker: "Order checked",
-        icon: getActionIcon(action, orderStatus),
-        line: map[orderStatus] || `Order status checked — ${orderStatus}.`,
-        sub: reason || "The latest order state has been surfaced in the reply.",
-        pills: [
-          { label: "Type", value: "Status check", icon: ICONS.status },
-          { label: "Order", value: prettyStatus[orderStatus] || orderStatus, icon: ICONS.check }
-        ],
-        trail: [
-          { label: "Case reviewed", state: "done", icon: ICONS.check },
-          { label: "Status checked", state: "done", icon: ICONS.status }
-        ]
-      };
-    }
-
-    if (reason) {
-      return {
-        tone: "info",
-        badge: "Updated",
-        title: "Workspace update",
-        kicker: "Reply prepared",
-        icon: getActionIcon(action, orderStatus),
-        line: "Response prepared with the clearest available next step.",
-        sub: reason,
-        pills: [{ label: "Type", value: "Reply", icon: ICONS.sparkle }],
-        trail: [
-          { label: "Request reviewed", state: "done", icon: ICONS.check },
-          { label: "Reply prepared", state: "done", icon: ICONS.sparkle }
-        ]
-      };
-    }
-
-    return null;
-  }
-
-  function renderActionVisibility(node, meta) {
-    if (!node.actionVisibility) return;
-
-    const model = normalizeActionVisibility(meta);
-    if (!model) {
-      node.actionVisibility.className = "action-visibility";
-      node.actionVisibility.innerHTML = "";
-      return;
-    }
-
-    const pillsHtml = (model.pills || [])
-      .map((pill) => {
-        return `<div class="action-visibility-pill">${pill.icon || ICONS.sparkle}<strong>${escapeHtml(pill.label)}</strong><span>${escapeHtml(pill.value)}</span></div>`;
-      })
-      .join("");
-
-    const trailHtml = (model.trail || [])
-      .map((step) => {
-        return `<div class="action-step ${escapeHtml(step.state || "")}">${step.icon || ICONS.check}<span>${escapeHtml(step.label)}</span></div>`;
-      })
-      .join("");
-
-    node.actionVisibility.className = `action-visibility ${escapeHtml(model.tone || "info")} show`;
-    node.actionVisibility.innerHTML = `
+    box.innerHTML = `
       <div class="action-visibility-head">
         <div class="action-visibility-title">
-          <span class="action-visibility-icon-wrap">${model.icon || ICONS.sparkle}</span>
+          <div class="action-visibility-icon-wrap">${actionIcon(result.action)}</div>
           <div class="action-visibility-title-stack">
-            <span class="action-visibility-title-text">${escapeHtml(model.title || "Action update")}</span>
-            <span class="action-visibility-kicker">${escapeHtml(model.kicker || "Update")}</span>
+            <div class="action-visibility-title-text">Action visibility</div>
+            <div class="action-visibility-kicker">${escapeHtml(label)}</div>
           </div>
         </div>
-        <div class="action-visibility-badge">${escapeHtml(model.badge || "Ready")}</div>
+        <div class="action-visibility-badge">${escapeHtml(badge)}</div>
       </div>
+
       <div class="action-visibility-body">
-        <div class="action-visibility-line">${escapeHtml(model.line || "")}</div>
-        <div class="action-visibility-sub">${escapeHtml(model.sub || "")}</div>
-        ${trailHtml ? `<div class="action-visibility-trail">${trailHtml}</div>` : ""}
-        ${pillsHtml ? `<div class="action-visibility-meta">${pillsHtml}</div>` : ""}
+        <div class="action-visibility-line">${escapeHtml(summary)}</div>
+        ${detail ? `<div class="action-visibility-sub">${escapeHtml(detail)}</div>` : ""}
+        <div class="action-visibility-meta">
+          <div class="action-visibility-pill">
+            ${ICONS.sparkle}
+            <span><strong>Issue</strong> ${escapeHtml(issueType.replaceAll("_", " "))}</span>
+          </div>
+          <div class="action-visibility-pill">
+            ${ICONS.status}
+            <span><strong>Confidence</strong> ${formatMetric(confidence)}</span>
+          </div>
+          <div class="action-visibility-pill">
+            ${ICONS.check}
+            <span><strong>Quality</strong> ${formatMetric(quality)}</span>
+          </div>
+        </div>
+        <div class="action-visibility-trail">
+          <div class="action-step done">${ICONS.check}<span>Analyzed</span></div>
+          <div class="action-step done">${ICONS.check}<span>Prepared</span></div>
+          <div class="action-step live">${ICONS.status}<span>Applied</span></div>
+        </div>
       </div>
     `;
+
+    return box;
   }
 
-  function parseRefundReference(rawValue) {
-    const value = String(rawValue || "").trim();
-    if (!value) {
-      return {
-        payment_intent_id: null,
-        charge_id: null,
-        error: ""
-      };
-    }
+  function addCopyControls(row, text) {
+    const actions = getAssistantActionsNode(row);
+    if (!actions) return;
 
-    if (value.startsWith("pi_")) {
-      return {
-        payment_intent_id: value,
-        charge_id: null,
-        error: ""
-      };
-    }
+    actions.innerHTML = `
+      <button class="mini-btn copy-btn" type="button">${ICONS.copy}<span>Copy reply</span></button>
+    `;
 
-    if (value.startsWith("ch_")) {
-      return {
-        payment_intent_id: null,
-        charge_id: value,
-        error: ""
-      };
-    }
+    const btn = actions.querySelector(".copy-btn");
+    if (!btn) return;
 
-    return {
-      payment_intent_id: null,
-      charge_id: null,
-      error: "Use a Stripe payment_intent_id (pi_...) or charge_id (ch_...)."
-    };
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(text || "");
+        const old = btn.innerHTML;
+        btn.innerHTML = `${ICONS.check}<span>Copied</span>`;
+        window.setTimeout(() => {
+          btn.innerHTML = old;
+        }, 1200);
+      } catch {
+        setNotice("warning", "Copy unavailable", "Could not copy the response from this browser.");
+      }
+    });
   }
 
   function updatePlanUI(tier, usage, limit, remaining) {
-    if (tier) state.tier = String(tier).toLowerCase();
-    if (typeof usage === "number") state.usage = usage;
-    if (typeof limit === "number") state.limit = limit >= 1000000000 ? Infinity : limit;
-    if (typeof remaining === "number") state.remaining = remaining >= 1000000000 ? Infinity : remaining;
+    state.tier = (tier || "free").toLowerCase();
+    state.usage = Number(usage || 0);
+    state.limit = Number.isFinite(limit) ? Number(limit) : Infinity;
+    state.remaining = Number.isFinite(remaining) ? Number(remaining) : Infinity;
 
-    setText(els.planTier, String(getVisibleTierLabel()).toUpperCase());
+    setText(els.planTier, getVisibleTierLabel().toUpperCase());
+    setText(els.planUsage, `${state.usage}/${formatLimit(state.limit)}`);
     setText(els.planUsed, String(state.usage));
-    setText(els.planUsage, formatLimit(state.limit));
     setText(els.planRemaining, formatLimit(state.remaining));
 
     if (els.planBar) {
-      let percent = 2;
-      if (Number.isFinite(state.limit) && state.limit > 0) {
-        percent = Math.max(2, Math.min(100, (state.usage / state.limit) * 100));
-      }
-      els.planBar.style.width = `${percent}%`;
+      const ratio = Number.isFinite(state.limit) && state.limit > 0
+        ? Math.max(0, Math.min(1, state.usage / state.limit))
+        : 0;
+      els.planBar.style.setProperty("--fill", `${ratio * 100}%`);
     }
 
-    persistAuth();
     updateCustomerFacingCopy();
-    pulseRail("usage");
   }
 
-  function updateDashboardUI(data) {
-    if (!data) return;
-
-    setText(els.statInteractions, formatMetric(data.total_interactions || 0, 0));
-    setText(els.statQuality, formatMetric(data.avg_quality || 0));
-    setText(els.statConfidence, formatMetric(data.avg_confidence || 0));
-    setText(els.statActions, formatMetric(state.actions || 0, 0));
-
-    if (
-      data.your_tier ||
-      data.your_usage !== undefined ||
-      data.your_limit !== undefined ||
-      data.remaining !== undefined
-    ) {
-      updatePlanUI(
-        data.your_tier || state.tier,
-        Number(data.your_usage ?? state.usage),
-        Number(data.your_limit ?? state.limit),
-        Number(data.remaining ?? state.remaining)
-      );
-    }
-
-    pulseRail("dashboard");
+  function updateDashboardUI(data = {}) {
+    setText(els.statInteractions, formatMetric(data.interactions || 0, 0));
+    setText(els.statQuality, formatMetric(data.quality || 0));
+    setText(els.statConfidence, formatMetric(data.confidence || 0));
+    setText(els.statActions, formatMetric(data.actions || 0, 0));
   }
 
-  async function checkHealth() {
+  async function healthCheck() {
     try {
       const res = await fetch(`${API}/health`);
-      if (!res.ok) throw new Error("Health check failed");
+      if (!res.ok) throw new Error("Offline");
+      const data = await res.json().catch(() => ({}));
+
       setText(els.backendStatus, "Status: online");
-      setNotice("success", "Response ready", "Workspace ready");
+      setText(els.streamStatus, data.streaming ? "Streaming: live" : "Streaming: standard");
+      setNotice("success", "System online", "Workspace connected and ready for requests");
     } catch {
       setText(els.backendStatus, "Status: offline");
       setNotice("error", "Offline", "Backend not responding");
@@ -1184,11 +865,11 @@
       const data = await res.json();
 
       state.username = data.username || state.username || "";
-      state.tier = data.tier || state.tier || "dev";
+      state.tier = data.tier || state.tier || "free";
       persistAuth();
 
       updatePlanUI(
-        data.tier || "dev",
+        data.tier || "free",
         Number(data.usage || 0),
         Number(data.limit || 1000000000),
         Number(data.remaining || 1000000000)
@@ -1196,12 +877,12 @@
 
       setText(
         els.authStatus,
-        data.username ? `Account: ${data.username}` : "Account: preview access"
+        data.username ? `Account: ${data.username}` : "Account: guest workspace"
       );
     } catch {
       clearAuth();
-      updatePlanUI("dev", 0, Infinity, Infinity);
-      setText(els.authStatus, "Account: preview access");
+      updatePlanUI("free", 0, 50, 50);
+      setText(els.authStatus, "Account: guest workspace");
     }
   }
 
@@ -1294,16 +975,16 @@
 
   function useDevMode() {
     clearAuth();
-    updatePlanUI("dev", 0, Infinity, Infinity);
-    setText(els.authStatus, "Account: preview access");
-    setNotice("info", "Preview access", "Unlimited testing active");
+    updatePlanUI("free", 0, 50, 50);
+    setText(els.authStatus, "Account: guest workspace");
+    setNotice("info", "Quick demo", "Starter workspace active");
     pulseRail("account");
   }
 
   function logout() {
     clearAuth();
-    updatePlanUI("dev", 0, Infinity, Infinity);
-    setText(els.authStatus, "Account: preview access");
+    updatePlanUI("free", 0, 50, 50);
+    setText(els.authStatus, "Account: guest workspace");
     setNotice("info", "Logged out", "Session cleared");
     pulseRail("account");
   }
@@ -1313,7 +994,7 @@
       setNotice("info", "Preparing upgrade", `Preparing ${String(tier).toUpperCase()} upgrade...`);
       pulseRail("usage");
 
-      const res = await fetch(`${API}/billing/upgrade`, {
+      const res = await fetch(`${API}/upgrade`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({ tier })
@@ -1323,411 +1004,268 @@
       if (!res.ok) throw new Error(data.detail || "Upgrade failed");
 
       if (data.checkout_url) {
-        setNotice("info", "Redirecting", `Opening ${String(tier).toUpperCase()} checkout...`);
         window.location.href = data.checkout_url;
         return;
       }
 
-      updatePlanUI(
-        data.tier || tier,
-        Number(data.usage || state.usage),
-        Number(data.limit || state.limit),
-        Number(data.remaining || state.remaining)
-      );
+      if (data.tier) {
+        state.tier = data.tier;
+        persistAuth();
+        updatePlanUI(
+          data.tier,
+          Number(data.usage || state.usage || 0),
+          Number(data.limit || state.limit || 0),
+          Number(data.remaining || state.remaining || 0)
+        );
+      }
 
-      setNotice("success", "Upgrade applied", `Your account is now on ${String(data.tier || tier).toUpperCase()}.`);
-      await loadDashboard();
+      setNotice("success", "Plan updated", `${String(tier).toUpperCase()} is now active.`);
     } catch (err) {
-      setNotice("error", "Upgrade failed", err.message || "Could not upgrade the account.");
+      setNotice("error", "Upgrade failed", err.message || "Could not prepare the upgrade.");
     }
   }
 
-  async function sendMessage() {
-    const text = (els.messageInput?.value || "").trim();
-    if (!text || state.sending) return;
+  function buildSupportPayload() {
+    const paymentField = els.paymentIntentInput || document.getElementById("paymentIntentInput");
+    return {
+      message: (els.messageInput?.value || "").trim(),
+      payment_intent_id: (paymentField?.value || "").trim()
+    };
+  }
 
-    const rawRefundRef = (els.paymentIntentInput?.value || "").trim();
-    const parsedRefundRef = parseRefundReference(rawRefundRef);
+  function setSending(value) {
+    state.sending = Boolean(value);
 
-    if (parsedRefundRef.error) {
-      setNotice("warning", "Invalid refund reference", parsedRefundRef.error);
-      if (els.paymentIntentInput) els.paymentIntentInput.focus();
-      return;
+    if (els.sendBtn) {
+      els.sendBtn.disabled = state.sending;
+      els.sendBtn.classList.toggle("busy", state.sending);
+      els.sendBtn.innerHTML = state.sending
+        ? `${ICONS.status}<span>Sending…</span>`
+        : `${ICONS.send}<span>Send</span>`;
+    }
+  }
+
+  async function handleStandardReply(payload) {
+    const res = await fetch(`${API}/support`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || "Request failed");
+    return data;
+  }
+
+  async function handleStreamReply(payload, row) {
+    const res = await fetch(`${API}/support/stream`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok || !res.body) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || "Streaming failed");
     }
 
-    state.sending = true;
-    if (els.sendBtn) els.sendBtn.disabled = true;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalData = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+
+      for (const part of parts) {
+        const lines = part.split("\n");
+        let eventName = "message";
+        let dataValue = "";
+
+        for (const line of lines) {
+          if (line.startsWith("event:")) eventName = line.slice(6).trim();
+          if (line.startsWith("data:")) dataValue += line.slice(5).trim();
+        }
+
+        if (!dataValue) continue;
+
+        const parsed = JSON.parse(dataValue);
+
+        if (eventName === "chunk") {
+          appendAssistantChunk(row, parsed.text || "");
+          scrollMessagesToBottom();
+        }
+
+        if (eventName === "status") {
+          state.latestStatus = parsed.status || "";
+        }
+
+        if (eventName === "result") {
+          finalData = parsed;
+        }
+      }
+    }
+
+    return finalData;
+  }
+
+  async function sendMessage() {
+    const payload = buildSupportPayload();
+    if (!payload.message || state.sending) return;
+
+    ensureActionVisibilityStyles();
+    ensurePaymentIntentField();
 
     if (els.messages?.querySelector(".empty-state")) {
       els.messages.innerHTML = "";
     }
 
-    buildMessage("user", text, true);
-
+    addUserMessage(payload.message);
     if (els.messageInput) {
       els.messageInput.value = "";
       autoResizeTextarea();
     }
 
-    const aiMsg = buildMessage("assistant", "", false);
-    setTypingBubble(aiMsg);
-    renderStatuses(aiMsg, ["Processing request", "Preparing response"]);
-
-    if (els.messages) {
-      els.messages.appendChild(aiMsg.wrapper);
-      scrollMessagesToBottom(true);
-    }
+    const row = addAssistantMessage("Analyzing request…");
+    setSending(true);
 
     try {
-      setText(els.streamStatus, "Response: loading");
-      setNotice("info", "Processing request", "Response in progress");
-      pulseRail("account");
+      let data = null;
 
-      const res = await fetch(`${API}/support/stream`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          message: text,
-          payment_intent_id: parsedRefundRef.payment_intent_id,
-          charge_id: parsedRefundRef.charge_id
-        })
-      });
-
-      if (res.status === 402) {
-        const data = await res.json().catch(() => ({}));
-        const detail = data.detail || "Plan limit reached.";
-
-        setBubbleText(aiMsg, detail);
-        renderStatuses(aiMsg, ["Usage limit reached"]);
-        renderCustomerNextStep(aiMsg, {
-          action: "review",
-          reason: detail,
-          issue_type: "usage_limit"
-        });
-        renderActionVisibility(aiMsg, {
-          action: "review",
-          reason: detail,
-          issue_type: "usage_limit"
-        });
-        setNotice("warning", "Usage limit reached", detail);
-        setText(els.streamStatus, "Response: blocked by plan");
-        pulseRail("usage");
-        return;
+      try {
+        data = await handleStreamReply(payload, row);
+      } catch {
+        data = await handleStandardReply(payload);
+        setAssistantCopy(row, data.reply || "No response returned.");
       }
 
-      if (res.status === 401) {
-        throw new Error("Session expired. Log in again.");
+      if (!data) throw new Error("No response returned.");
+
+      const replyText = data.reply || "No response returned.";
+      setAssistantCopy(row, replyText);
+      addCopyControls(row, replyText);
+
+      const actionNode = getAssistantActionsNode(row);
+      if (actionNode && data.action) {
+        actionNode.appendChild(createActionVisibility(data));
       }
 
-      if (!res.ok || !res.body) {
-        throw new Error("Reply service unavailable.");
+      if (data.usage_summary) {
+        updatePlanUI(
+          data.usage_summary.tier || state.tier,
+          Number(data.usage_summary.usage || state.usage || 0),
+          Number(data.usage_summary.limit || state.limit || 0),
+          Number(data.usage_summary.remaining || state.remaining || 0)
+        );
+      } else {
+        updateTopbarStatus();
       }
 
-      setText(els.streamStatus, "Response: live");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let builtText = "";
-      let statuses = ["Processing request", "Preparing response"];
-
-      setBubbleText(aiMsg, "");
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split("\n\n");
-        buffer = blocks.pop() || "";
-
-        for (const block of blocks) {
-          const lines = block.split("\n");
-          let eventName = "message";
-          const dataLines = [];
-
-          for (const line of lines) {
-            if (line.startsWith("event:")) eventName = line.slice(6).trim();
-            if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-          }
-
-          let payload = {};
-          try {
-            payload = JSON.parse(dataLines.join("\n") || "{}");
-          } catch {
-            payload = {};
-          }
-
-          if (eventName === "status") {
-            const rawLabel = payload.label || payload.stage || "Working";
-
-            const cleaned =
-              rawLabel === "Running decision flow"
-                ? "Choosing next step"
-                : rawLabel === "Preparing response"
-                  ? "Preparing response"
-                  : rawLabel === "Analyzing issue"
-                    ? "Processing request"
-                    : rawLabel === "Executing review"
-                      ? "Review in progress"
-                      : rawLabel === "local_fallback"
-                        ? "Processing request"
-                        : rawLabel;
-
-            if (!statuses.includes(cleaned)) statuses.push(cleaned);
-            renderStatuses(aiMsg, statuses);
-            state.latestStatus = cleaned;
-            pulseRail("account");
-          }
-
-          if (eventName === "chunk") {
-            builtText += payload.chunk || "";
-            setBubbleText(aiMsg, builtText || " ");
-            scrollMessagesToBottom();
-          }
-
-          if (eventName === "meta") {
-            renderCustomerNextStep(aiMsg, payload);
-            renderActionVisibility(aiMsg, payload);
-
-            if (payload.action && payload.action !== "none") {
-              state.actions += 1;
-              state.latestAction = String(payload.action);
-              setText(els.statActions, String(state.actions));
-              pulseRail("dashboard");
-            }
-
-            if (
-              payload.tier ||
-              payload.usage !== undefined ||
-              payload.plan_limit !== undefined ||
-              payload.remaining !== undefined
-            ) {
-              updatePlanUI(
-                payload.tier || state.tier,
-                Number(payload.usage ?? state.usage),
-                Number(payload.plan_limit ?? state.limit),
-                Number(payload.remaining ?? state.remaining)
-              );
-            }
-
-            if (payload.action === "refund") {
-              setNotice("success", "Refund ready", "Approved and in motion");
-              pulseRail("dashboard");
-            } else if (payload.action === "credit") {
-              setNotice("success", "Credit applied", "Applied to account");
-              pulseRail("dashboard");
-            } else if (payload.action === "review") {
-              setNotice("warning", "Review in progress", "Next step underway");
-              pulseRail("account");
-            } else {
-              setNotice("success", "Response ready", "Reply delivered");
-              pulseRail("account");
-            }
-          }
-
-          if (eventName === "done") {
-            setText(els.streamStatus, "Response: ready");
-          }
-        }
+      if (data.username) {
+        state.username = data.username;
+        persistAuth();
+        setText(els.authStatus, `Account: ${data.username}`);
       }
 
-      if (!builtText.trim()) {
-        setBubbleText(aiMsg, "No response returned.");
+      if (data.action) {
+        state.latestAction = data.action;
+        pulseRail(data.action.includes("refund") ? "usage" : "dashboard");
       }
 
-      renderStatuses(aiMsg, statuses.filter(Boolean));
       await loadDashboard();
-    } catch (err) {
-      setBubbleText(aiMsg, err.message || "Something went wrong.");
-      renderStatuses(aiMsg, ["Request failed"]);
-      renderCustomerNextStep(aiMsg, {
-        action: "none",
-        reason: err.message || "Unexpected error"
-      });
-      renderActionVisibility(aiMsg, {
-        action: "none",
-        reason: err.message || "Unexpected error"
-      });
-      setNotice("error", "Request failed", err.message || "Unexpected error.");
-      setText(els.streamStatus, "Response: error");
-      pulseRail("account");
-    } finally {
-      state.sending = false;
-      if (els.sendBtn) els.sendBtn.disabled = false;
       scrollMessagesToBottom(true);
+    } catch (err) {
+      setAssistantCopy(row, err.message || "Something went wrong while processing the request.");
+      setNotice("error", "Request failed", err.message || "Could not process the request.");
+    } finally {
+      setSending(false);
     }
   }
 
-  function startNewChat() {
-    renderEmptyState();
-    setNotice("info", "New workspace", "Conversation cleared");
-  }
+  function bindComposer() {
+    if (els.sendBtn) els.sendBtn.addEventListener("click", sendMessage);
 
-  function bindEvents() {
     if (els.messageInput) {
       els.messageInput.addEventListener("input", autoResizeTextarea);
-      els.messageInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
+      els.messageInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
           sendMessage();
         }
       });
     }
+  }
 
-    if (els.paymentIntentInput) {
-      els.paymentIntentInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          sendMessage();
-        }
-      });
-    }
-
-    if (els.sendBtn) els.sendBtn.addEventListener("click", sendMessage);
+  function bindAuth() {
     if (els.signupBtn) els.signupBtn.addEventListener("click", signUp);
     if (els.loginBtn) els.loginBtn.addEventListener("click", logIn);
     if (els.devBtn) els.devBtn.addEventListener("click", useDevMode);
     if (els.logoutBtn) els.logoutBtn.addEventListener("click", logout);
-    if (els.newChatBtn) els.newChatBtn.addEventListener("click", startNewChat);
+  }
 
+  function bindUpgrades() {
     els.upgradeButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
-        upgradePlan(btn.getAttribute("data-upgrade"));
+        const tier = btn.getAttribute("data-upgrade");
+        if (tier) upgradePlan(tier);
       });
     });
+  }
 
-    els.chips.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        fillComposer(chip.getAttribute("data-fill") || "");
+  function bindTopActions() {
+    if (els.newChatBtn) {
+      els.newChatBtn.addEventListener("click", () => {
+        renderEmptyState();
+        setNotice("info", "New workspace", "Ready for a fresh support case.");
       });
-    });
+    }
   }
 
   async function renderAdminPanel() {
-    try {
-      const [usersRes, logsRes, pendingRes] = await Promise.all([
-        fetch(`${API}/admin/users`, { headers: headers(false) }),
-        fetch(`${API}/admin/action-logs?limit=50`, { headers: headers(false) }),
-        fetch(`${API}/admin/pending-approvals`, { headers: headers(false) }),
-      ]);
-
-      if (!usersRes.ok) return;
-
-      const users = await usersRes.json();
-      const logs = logsRes.ok ? await logsRes.json() : [];
-      const pending = pendingRes.ok ? await pendingRes.json() : [];
-
-      const rail = document.getElementById("railScroll");
-      if (!rail) return;
-
-      const existing = document.getElementById("adminCard");
-      if (existing) existing.remove();
-
-      const card = document.createElement("div");
-      card.id = "adminCard";
-      card.className = "rail-card";
-
-      const pendingBadge = pending.length > 0
-        ? `<span style="background:rgba(248,113,113,.18);border:1px solid rgba(248,113,113,.3);color:rgba(248,113,113,.9);font-size:9px;padding:2px 7px;border-radius:999px;margin-left:6px">${pending.length} pending</span>`
-        : "";
-
-      card.innerHTML = `
-        <div class="rail-title">Admin${pendingBadge}</div>
-
-        ${pending.length > 0 ? `
-        <div style="margin-bottom:12px">
-          <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(248,113,113,.7);margin-bottom:6px">Pending approval</div>
-          ${pending.map(p => `
-            <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:7px 6px;border-radius:8px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.12);margin-bottom:4px">
-              <div>
-                <div style="font-size:11px;color:rgba(248,180,180,.9);font-weight:600">$${p.amount} ${p.action}</div>
-                <div style="font-size:9px;color:rgba(200,180,180,.5);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px">${escapeHtml(p.username)} · ${escapeHtml(p.issue_type)}</div>
-              </div>
-              <button onclick="adminApprove(${p.id})" style="font-size:9px;padding:3px 9px;border-radius:6px;border:1px solid rgba(52,211,153,.22);background:rgba(52,211,153,.08);color:rgba(110,231,183,.9);cursor:pointer;white-space:nowrap">Approve</button>
-            </div>
-          `).join("")}
-        </div>
-        ` : ""}
-
-        <div style="margin-bottom:12px">
-          <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(185,200,240,.4);margin-bottom:6px">Users</div>
-          ${users.map(u => `
-            <div style="display:grid;grid-template-columns:1fr auto auto auto;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px">
-              <span style="color:rgba(215,225,250,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(u.username)}</span>
-              <span style="color:rgba(167,139,250,.8);font-size:9px;letter-spacing:.06em;text-transform:uppercase">${escapeHtml(u.tier)}</span>
-              <span style="color:rgba(200,211,235,.38);font-size:10px">${u.usage}</span>
-              <button onclick="adminReset('${escapeHtml(u.username)}')" style="font-size:9px;padding:2px 7px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:rgba(200,211,235,.55);cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='rgba(255,255,255,.04)'">Reset</button>
-            </div>
-          `).join("")}
-        </div>
-
-        <div>
-          <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(185,200,240,.4);margin-bottom:6px">Recent actions</div>
-          ${logs.slice(0, 15).map(l => {
-            const actionColor = l.action === "refund" ? "rgba(248,113,113,.8)"
-              : l.action === "credit" ? "rgba(52,211,153,.8)"
-              : l.action === "review" ? "rgba(251,191,36,.8)"
-              : "rgba(148,163,184,.5)";
-            return `
-            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.03);font-size:10px">
-              <span style="color:${actionColor};font-weight:600;text-transform:uppercase;font-size:8px;letter-spacing:.08em;min-width:36px">${escapeHtml(l.action)}</span>
-              <span style="color:rgba(200,211,235,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(l.username)}</span>
-              <span style="color:rgba(200,211,235,.35);white-space:nowrap">${l.amount > 0 ? "$" + l.amount : "—"}</span>
-            </div>`;
-          }).join("")}
-        </div>
-
-        <div style="margin-top:8px;font-size:9px;color:rgba(200,211,235,.2);letter-spacing:.06em">${users.length} user${users.length !== 1 ? "s" : ""} · ${logs.length} logged</div>
-      `;
-
-      rail.appendChild(card);
-    } catch {}
+    return;
   }
 
-  window.adminApprove = async function(logId) {
-    try {
-      const res = await fetch(`${API}/admin/approve/${logId}`, {
-        method: "POST",
-        headers: headers(),
-      });
-      if (res.ok) {
-        setNotice("success", "Approved", `Action ${logId} marked as approved.`);
-        await renderAdminPanel();
-      }
-    } catch {}
-  };
+  function bootCheckoutNotice() {
+    const url = new URL(window.location.href);
+    const checkout = url.searchParams.get("checkout");
+    if (!checkout) return;
 
-  window.adminReset = async function(username) {
-    try {
-      const res = await fetch(`${API}/admin/reset-usage`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ username })
-      });
-      if (res.ok) {
-        setNotice("success", "Usage reset", `${username} reset to 0.`);
-        await renderAdminPanel();
-      }
-    } catch {}
-  };
+    if (checkout === "success") {
+      setNotice("success", "Upgrade complete", "Billing confirmed. Your plan is now active.");
+    } else if (checkout === "cancel") {
+      setNotice("warning", "Upgrade canceled", "No changes were made to your plan.");
+    }
 
-  async function boot() {
+    url.searchParams.delete("checkout");
+    window.history.replaceState({}, "", url.toString());
+  }
+
+  async function init() {
     ensureActionVisibilityStyles();
     ensurePaymentIntentField();
     renderEmptyState();
-    bindEvents();
+    bindChips();
+    bindComposer();
+    bindAuth();
+    bindUpgrades();
+    bindTopActions();
+    updateCustomerFacingCopy();
     autoResizeTextarea();
-    await checkHealth();
+    bootCheckoutNotice();
+    await healthCheck();
     await hydrateMe();
     await loadDashboard();
-    updateCustomerFacingCopy();
-    pulseRail("account");
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot, { once: true });
+    document.addEventListener("DOMContentLoaded", init, { once: true });
   } else {
-    boot();
+    init();
   }
 })();
