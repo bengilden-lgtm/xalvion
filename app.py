@@ -1011,24 +1011,37 @@ def create_checkout_session_for_user(user: User, desired: str):
             },
             client_reference_id=user.username,
         )
+        print(
+            f"[STRIPE] checkout session created "
+            f"session_id={getattr(session, 'id', None)!r} "
+            f"username={user.username!r} "
+            f"desired={desired!r}"
+        )
     except Exception as exc:
+        print(f"[STRIPE] checkout session create failed username={user.username!r} desired={desired!r} error={exc}")
         raise HTTPException(status_code=500, detail=f"Stripe checkout error: {exc}") from exc
 
     return session
 
 
 def apply_successful_upgrade(db: Session, username: str, tier: str) -> User | None:
+    print(f"[STRIPE] apply_successful_upgrade called username={username!r} tier={tier!r}")
+
     user = db.query(User).filter(User.username == username).first()
     if not user:
+        print(f"[STRIPE] user not found for username={username!r}")
         return None
 
     desired = (tier or "").strip().lower()
     if desired not in {"pro", "elite"}:
+        print(f"[STRIPE] invalid desired tier={desired!r} for username={username!r}")
         return user
 
+    print(f"[STRIPE] before upgrade user={user.username!r} current_tier={user.tier!r}")
     user.tier = desired
     db.commit()
     db.refresh(user)
+    print(f"[STRIPE] upgrade committed for user={user.username!r}, new tier={user.tier!r}")
     return user
 
 
@@ -1176,6 +1189,13 @@ def upgrade_plan(
     desired = (req.tier or "").strip().lower()
     current_tier = get_public_plan_name(user)
 
+    print(
+        f"[STRIPE] /billing/upgrade called "
+        f"username={getattr(user, 'username', None)!r} "
+        f"current_tier={current_tier!r} "
+        f"desired={desired!r}"
+    )
+
     validate_upgrade_request(desired, current_tier)
 
     if STRIPE_KEY and PRICE_MAP.get(desired):
@@ -1195,6 +1215,8 @@ def upgrade_plan(
             status_code=500,
             detail="Stripe is not fully configured yet. Add STRIPE_SECRET_KEY and price IDs, or enable ALLOW_DIRECT_BILLING_BYPASS for local testing.",
         )
+
+    print(f"[STRIPE] direct billing bypass active for username={user.username!r} desired={desired!r}")
 
     user.tier = desired
     db.commit()
@@ -1219,27 +1241,40 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
 
+    print(f"[STRIPE] webhook received payload_bytes={len(payload)} has_signature={bool(sig_header)}")
+
     try:
         if STRIPE_WEBHOOK_SECRET:
             event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
         else:
             event = stripe.Event.construct_from(json.loads(payload.decode("utf-8")), stripe.api_key)
     except Exception as exc:
+        print(f"[STRIPE] webhook parse failed error={exc}")
         raise HTTPException(status_code=400, detail=f"Webhook parse failed: {exc}") from exc
 
     event_type = event.get("type", "")
     data_object = event.get("data", {}).get("object", {}) or {}
+
+    print(f"[STRIPE] webhook parsed event_type={event_type!r}")
 
     if event_type == "checkout.session.completed":
         metadata = data_object.get("metadata", {}) or {}
         username = (metadata.get("username") or data_object.get("client_reference_id") or "").strip()
         tier = (metadata.get("tier") or "").strip().lower()
 
+        print(f"[STRIPE] checkout.session.completed username={username!r} tier={tier!r}")
+        print(f"[STRIPE] metadata={metadata!r}")
+        print(f"[STRIPE] client_reference_id={data_object.get('client_reference_id', None)!r}")
+        print(f"[STRIPE] session_id={data_object.get('id', None)!r}")
+
         if username and tier:
-            apply_successful_upgrade(db, username, tier)
+            upgraded_user = apply_successful_upgrade(db, username, tier)
+            print(f"[STRIPE] upgraded_user={getattr(upgraded_user, 'username', None)!r}")
+        else:
+            print("[STRIPE] missing username or tier in checkout.session.completed")
 
     if event_type in {"customer.subscription.deleted", "customer.subscription.updated"}:
-        pass
+        print(f"[STRIPE] subscription lifecycle event received type={event_type!r}")
 
     return {"received": True, "type": event_type}
 
