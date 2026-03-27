@@ -267,8 +267,11 @@ def get_db():
         db.close()
 
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+def hash_password(password: str):
+    # bcrypt max = 72 bytes → safely truncate
+    if len(password.encode("utf-8")) > 72:
+        password = password.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+  return pwd_context.hash(password)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
