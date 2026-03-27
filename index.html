@@ -4,33 +4,32 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Xalvion — AI support command center</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%237c3aed'/><text x='32' y='47' font-family='Georgia,serif' font-size='46' font-weight='700' fill='white' text-anchor='middle'>X</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%237c3aed'/%3E%3Ctext x='32' y='47' font-family='Georgia,serif' font-size='46' font-weight='700' fill='white' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E">
   <style>
     :root {
-      --bg: #050714;
-      --bg-elev: rgba(10, 14, 30, 0.78);
-      --bg-soft: rgba(255, 255, 255, 0.045);
-      --panel: linear-gradient(180deg, rgba(18, 24, 48, 0.72), rgba(8, 12, 28, 0.82));
-      --panel-2: linear-gradient(180deg, rgba(16, 21, 43, 0.88), rgba(10, 14, 28, 0.92));
-      --line: rgba(255, 255, 255, 0.08);
-      --line-strong: rgba(255, 255, 255, 0.15);
-      --text: rgba(246, 248, 255, 0.98);
-      --muted: rgba(185, 197, 230, 0.76);
-      --muted-2: rgba(160, 174, 210, 0.52);
+      --bg: #050815;
+      --panel: linear-gradient(180deg, rgba(14, 18, 36, 0.88), rgba(8, 11, 24, 0.92));
+      --panel-soft: rgba(255,255,255,0.045);
+      --panel-soft-2: rgba(255,255,255,0.03);
+      --line: rgba(255,255,255,0.08);
+      --line-strong: rgba(255,255,255,0.14);
+      --text: rgba(246,248,255,0.98);
+      --muted: rgba(189,199,230,0.76);
+      --muted-2: rgba(160,173,205,0.56);
       --violet: #8b6fff;
       --violet-2: #6552ff;
-      --cyan: #49b3ff;
-      --green: #51d9a8;
-      --amber: #ffcd6b;
-      --red: #ff7a8d;
-      --shadow: 0 24px 80px rgba(0,0,0,.34);
-      --blur: 22px;
-      --radius-xl: 28px;
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --left: 310px;
-      --right: 330px;
-      --top: 84px;
+      --cyan: #58b9ff;
+      --green: #50d8a8;
+      --amber: #ffcf70;
+      --red: #ff7c91;
+      --radius-xl: 26px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --shadow: 0 24px 70px rgba(0,0,0,.34);
+      --blur: 20px;
+      --left: 290px;
+      --right: 320px;
+      --top: 82px;
     }
 
     * { box-sizing: border-box; }
@@ -50,7 +49,7 @@
       height: 100%;
       z-index: 0;
       pointer-events: none;
-      filter: brightness(.9) saturate(1.02);
+      filter: brightness(.92) saturate(1.05);
     }
 
     body::before {
@@ -60,9 +59,9 @@
       z-index: 1;
       pointer-events: none;
       background:
-        radial-gradient(circle at 15% 15%, rgba(139, 111, 255, 0.08), transparent 24%),
-        radial-gradient(circle at 84% 12%, rgba(73, 179, 255, 0.08), transparent 28%),
-        linear-gradient(180deg, rgba(5, 7, 20, 0.18), rgba(5, 7, 20, 0.42));
+        radial-gradient(circle at 15% 10%, rgba(139,111,255,.09), transparent 24%),
+        radial-gradient(circle at 84% 14%, rgba(88,185,255,.08), transparent 28%),
+        linear-gradient(180deg, rgba(5,8,21,.10), rgba(5,8,21,.42));
     }
 
     .shell {
@@ -89,16 +88,15 @@
 
     .topbar {
       grid-area: top;
-      min-width: 0;
-      border-radius: var(--radius-xl);
       display: grid;
       grid-template-columns: auto minmax(280px, 1fr) auto;
       align-items: center;
       gap: 16px;
-      padding: 18px 22px;
+      border-radius: var(--radius-xl);
+      padding: 16px 20px;
       background:
-        linear-gradient(180deg, rgba(16, 21, 46, 0.78), rgba(8, 13, 28, 0.84)),
-        radial-gradient(circle at 22% 30%, rgba(139,111,255,.08), transparent 22%);
+        linear-gradient(180deg, rgba(14,18,36,.84), rgba(8,12,26,.9)),
+        radial-gradient(circle at 22% 26%, rgba(139,111,255,.10), transparent 18%);
     }
 
     .brand {
@@ -108,44 +106,44 @@
       min-width: 0;
     }
     .brand-mark {
-      width: 44px;
-      height: 44px;
+      width: 46px;
+      height: 46px;
       border-radius: 14px;
       display: grid;
       place-items: center;
       font-family: Georgia, serif;
-      font-size: 28px;
+      font-size: 29px;
       font-weight: 700;
       color: white;
-      background: linear-gradient(135deg, rgba(139,111,255,.96), rgba(77,148,255,.92));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 12px 30px rgba(98,84,255,.28);
+      background: linear-gradient(135deg, rgba(139,111,255,.98), rgba(89,145,255,.94));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 16px 30px rgba(98,84,255,.28);
+      flex: 0 0 46px;
     }
-    .brand-copy { min-width: 0; }
     .eyebrow {
       font-size: 11px;
       letter-spacing: .18em;
       text-transform: uppercase;
       color: var(--muted-2);
+      font-weight: 800;
       margin-bottom: 4px;
-      font-weight: 700;
     }
     .brand-title {
-      font-size: 22px;
-      line-height: 1;
+      font-size: 21px;
       font-weight: 800;
       letter-spacing: -.03em;
+      line-height: 1;
     }
     .brand-sub {
       margin-top: 5px;
-      color: var(--muted);
       font-size: 13px;
+      color: var(--muted);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .command {
-      height: 52px;
+      height: 50px;
       border-radius: 16px;
       border: 1px solid var(--line);
       background: rgba(255,255,255,.04);
@@ -156,32 +154,33 @@
       color: var(--muted);
       min-width: 0;
     }
+    .command svg { width: 18px; height: 18px; flex: 0 0 18px; }
     .command input {
       flex: 1;
       min-width: 0;
-      background: transparent;
       border: 0;
       outline: 0;
+      background: transparent;
       color: var(--text);
       font: inherit;
       font-size: 14px;
     }
     .command-kbd {
-      padding: 6px 8px;
       border-radius: 10px;
-      border: 1px solid rgba(255,255,255,.08);
+      border: 1px solid var(--line);
       background: rgba(255,255,255,.04);
+      padding: 6px 8px;
       color: var(--muted-2);
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .top-actions {
       display: flex;
       align-items: center;
+      justify-content: flex-end;
       gap: 10px;
       flex-wrap: wrap;
-      justify-content: flex-end;
     }
 
     .status-pill,
@@ -193,68 +192,75 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      min-height: 34px;
       border-radius: 999px;
       border: 1px solid var(--line);
-      background: rgba(255,255,255,.04);
-      padding: 8px 12px;
+      background: rgba(255,255,255,.045);
+      padding: 0 12px;
       font-size: 12px;
-      color: var(--muted);
       font-weight: 700;
+      color: var(--muted);
       line-height: 1;
     }
-    .status-dot,
-    .dot {
+    .status-dot, .dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
       background: var(--green);
-      box-shadow: 0 0 18px rgba(81,217,168,.58);
+      box-shadow: 0 0 16px rgba(80,216,168,.55);
       flex: 0 0 8px;
     }
-    .status-pill.warning .status-dot,
-    .chip.warning .dot,
-    .queue-pill.warning .dot { background: var(--amber); box-shadow: 0 0 18px rgba(255,205,107,.48); }
-    .status-pill.danger .status-dot,
-    .chip.danger .dot,
-    .queue-pill.danger .dot { background: var(--red); box-shadow: 0 0 18px rgba(255,122,141,.48); }
+    .status-pill.warning .status-dot, .chip.warning .dot { background: var(--amber); box-shadow: 0 0 16px rgba(255,207,112,.55); }
+    .status-pill.danger .status-dot, .chip.danger .dot { background: var(--red); box-shadow: 0 0 16px rgba(255,124,145,.55); }
 
-    .icon-btn,
-    .ghost-btn,
-    .primary-btn,
-    .secondary-btn,
-    .plan-btn,
-    .filter-btn,
-    .auth-btn,
-    .suggestion-btn,
-    .composer-send,
-    .empty-btn,
-    .toolbar-btn {
+    button {
       border: 0;
       cursor: pointer;
-      color: var(--text);
       font: inherit;
-      transition: transform .18s ease, border-color .18s ease, background .18s ease, opacity .18s ease, box-shadow .18s ease;
+      color: var(--text);
+      transition: transform .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease, opacity .16s ease;
     }
     button:hover { transform: translateY(-1px); }
     button:active { transform: translateY(0); }
 
+    .icon-btn,
+    .secondary-btn,
+    .primary-btn,
+    .auth-btn,
+    .plan-btn,
+    .toolbar-btn,
+    .composer-send,
+    .empty-btn,
+    .suggestion-btn,
+    .filter-btn {
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.05);
+    }
     .icon-btn,
     .toolbar-btn {
       width: 46px;
       height: 46px;
       display: grid;
       place-items: center;
-      border-radius: 14px;
-      border: 1px solid var(--line);
       background: rgba(255,255,255,.045);
     }
     .icon-btn svg,
     .toolbar-btn svg,
     .composer-send svg { width: 18px; height: 18px; }
 
-    .sidebar,
-    .workspace,
-    .insights {
+    .primary-btn,
+    .auth-btn.primary,
+    .plan-btn.primary,
+    .composer-send,
+    .empty-btn.primary {
+      border: 0;
+      color: white;
+      background: linear-gradient(135deg, rgba(139,111,255,.98), rgba(90,132,255,.95));
+      box-shadow: 0 18px 28px rgba(98,84,255,.24);
+    }
+
+    .sidebar, .workspace, .insights {
       min-width: 0;
       min-height: 0;
       border-radius: var(--radius-xl);
@@ -273,25 +279,22 @@
     .scroll::-webkit-scrollbar { width: 10px; }
     .scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 999px; }
 
-    .sidebar-inner,
-    .insights-inner {
+    .sidebar-inner, .insights-inner {
       padding: 18px;
       display: flex;
       flex-direction: column;
       gap: 14px;
     }
 
-    .stack-card,
-    .panel,
+    .rail-card,
     .metric-card,
-    .ticket-card,
     .auth-card,
-    .detail-block,
-    .plan-card,
-    .mini-stat,
-    .composer-card,
     .banner,
-    .highlight-card {
+    .composer-card,
+    .thread,
+    .highlight-card,
+    .panel-card,
+    .detail-block {
       border-radius: var(--radius-lg);
       border: 1px solid var(--line);
       background: rgba(255,255,255,.038);
@@ -302,47 +305,60 @@
       padding: 18px;
       background:
         linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.03)),
-        radial-gradient(circle at 85% 20%, rgba(139,111,255,.16), transparent 26%);
+        radial-gradient(circle at 88% 18%, rgba(139,111,255,.16), transparent 26%);
     }
     .hero-card h2 {
       margin: 0;
       font-size: 24px;
-      line-height: 1.02;
       letter-spacing: -.04em;
+      line-height: 1.02;
     }
     .hero-card p {
       margin: 10px 0 0;
-      color: var(--muted);
       font-size: 14px;
-      line-height: 1.5;
+      line-height: 1.58;
+      color: var(--muted);
     }
 
-    .auth-card { padding: 16px; }
+    .notice {
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.045);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    .notice.success { border-color: rgba(80,216,168,.18); background: rgba(80,216,168,.08); }
+    .notice.error { border-color: rgba(255,124,145,.18); background: rgba(255,124,145,.08); }
+    .notice.warning { border-color: rgba(255,207,112,.18); background: rgba(255,207,112,.08); }
+    .notice.info { border-color: rgba(88,185,255,.18); background: rgba(88,185,255,.08); }
+    .notice-title { font-weight: 800; font-size: 13px; }
+    .notice-detail, .notice-copy { margin-top: 4px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+    .notice .dot { margin-top: 5px; }
+
+    .auth-card, .panel-card { padding: 16px; }
     .section-label {
       font-size: 11px;
-      text-transform: uppercase;
       letter-spacing: .18em;
+      text-transform: uppercase;
       color: var(--muted-2);
       font-weight: 800;
       margin-bottom: 10px;
     }
-    .auth-grid,
-    .button-grid,
-    .plan-grid,
-    .stats-grid,
-    .detail-grid {
-      display: grid;
-      gap: 10px;
-    }
+    .auth-grid, .button-grid, .mini-grid { display: grid; gap: 10px; }
     .button-grid { grid-template-columns: 1fr 1fr; }
+
     .auth-input,
     .composer-input,
     .composer-extra,
+    .search-input,
     .filter-input {
       width: 100%;
       border-radius: 14px;
       border: 1px solid var(--line);
-      background: rgba(4, 7, 20, 0.52);
+      background: rgba(4,7,18,.52);
       color: var(--text);
       font: inherit;
       padding: 13px 14px;
@@ -352,73 +368,67 @@
     .auth-input:focus,
     .composer-input:focus,
     .composer-extra:focus,
+    .search-input:focus,
     .filter-input:focus,
     .command input:focus {
-      border-color: rgba(139,111,255,.48);
+      border-color: rgba(139,111,255,.42);
       box-shadow: 0 0 0 4px rgba(139,111,255,.12);
-      background: rgba(9, 12, 26, 0.76);
+      background: rgba(10,13,28,.76);
     }
+
     .auth-btn,
-    .secondary-btn,
     .plan-btn,
+    .filter-btn,
     .empty-btn,
-    .filter-btn {
-      height: 44px;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,.05);
-      color: var(--text);
+    .suggestion-btn,
+    .secondary-btn {
+      min-height: 44px;
       padding: 0 14px;
       font-weight: 700;
     }
-    .primary-btn,
-    .composer-send {
-      background: linear-gradient(135deg, rgba(139,111,255,.98), rgba(92,130,255,.95));
-      box-shadow: 0 16px 30px rgba(98,84,255,.25);
-    }
-    .auth-btn.primary,
-    .plan-btn.primary,
-    .empty-btn.primary,
-    .primary-btn {
-      border: 0;
-      color: white;
-    }
+
     .auth-meta {
+      margin-top: 10px;
       display: flex;
-      justify-content: space-between;
-      gap: 8px;
       align-items: center;
+      justify-content: space-between;
+      gap: 10px;
       color: var(--muted);
       font-size: 12px;
-      margin-top: 10px;
     }
 
-    .notice {
-      padding: 13px 14px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,.08);
-      background: rgba(255,255,255,.045);
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
+    .suggestion-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr 1fr;
     }
-    .notice .dot { margin-top: 4px; }
-    .notice-title { font-weight: 800; font-size: 13px; }
-    .notice-copy { color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: 2px; }
+    .suggestion-btn {
+      text-align: left;
+      padding: 12px 13px;
+      min-height: 0;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+    .suggestion-btn strong { display: block; color: var(--text); margin-bottom: 3px; font-size: 13px; }
 
     .mini-stats {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    .mini-stat { padding: 14px; }
-    .mini-stat-value {
-      font-size: 28px;
+    .metric-card {
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+    }
+    .metric-card .value {
+      font-size: 30px;
       font-weight: 800;
       letter-spacing: -.05em;
       line-height: 1;
     }
-    .mini-stat-label {
+    .metric-card .label {
       margin-top: 8px;
       color: var(--muted);
       font-size: 12px;
@@ -430,34 +440,32 @@
       grid-template-rows: auto auto minmax(0, 1fr) auto;
       gap: 14px;
       padding: 16px;
-      background: var(--panel-2);
+      background:
+        linear-gradient(180deg, rgba(13,17,34,.92), rgba(7,10,22,.95)),
+        radial-gradient(circle at 78% 18%, rgba(139,111,255,.10), transparent 20%);
     }
 
     .workspace-head {
       display: flex;
+      align-items: flex-start;
       justify-content: space-between;
-      align-items: center;
       gap: 12px;
-      min-width: 0;
-    }
-    .workspace-title {
-      min-width: 0;
     }
     .workspace-title h1 {
       margin: 0;
-      font-size: 30px;
-      letter-spacing: -.05em;
+      font-size: 34px;
       line-height: 1;
+      letter-spacing: -.05em;
     }
     .workspace-title p {
       margin: 8px 0 0;
       color: var(--muted);
       font-size: 14px;
-      max-width: 720px;
+      max-width: 760px;
+      line-height: 1.55;
     }
     .workspace-tools {
       display: flex;
-      align-items: center;
       gap: 10px;
       flex-wrap: wrap;
       justify-content: flex-end;
@@ -475,384 +483,298 @@
     }
     .banner-copy strong { display: block; font-size: 14px; }
     .banner-copy span { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .panel-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .secondary-btn, .primary-btn { height: 44px; padding: 0 16px; font-weight: 800; }
 
-    .board {
-      min-height: 0;
-      display: grid;
-      grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
-      gap: 14px;
-    }
-
-    .inbox,
     .thread {
       min-height: 0;
-      display: flex;
-      flex-direction: column;
-      border-radius: var(--radius-xl);
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,.03);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
       overflow: hidden;
     }
-
-    .panel-head {
+    .thread-head {
       padding: 14px 16px;
       border-bottom: 1px solid rgba(255,255,255,.06);
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       gap: 12px;
-    }
-    .panel-title { font-size: 14px; font-weight: 800; letter-spacing: .01em; }
-    .panel-sub { color: var(--muted-2); font-size: 12px; }
-
-    .inbox-filters {
-      padding: 12px 14px;
-      display: grid;
-      gap: 10px;
-      border-bottom: 1px solid rgba(255,255,255,.06);
-      background: rgba(255,255,255,.02);
-    }
-    .filter-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 110px;
-      gap: 10px;
-    }
-    .filter-btn.active { border-color: rgba(139,111,255,.42); background: rgba(139,111,255,.12); }
-
-    .ticket-list {
-      min-height: 0;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .ticket-card {
-      padding: 14px;
-      cursor: pointer;
-      transition: transform .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease;
-    }
-    .ticket-card:hover { transform: translateY(-1px); }
-    .ticket-card.active {
-      border-color: rgba(139,111,255,.32);
-      background:
-        linear-gradient(180deg, rgba(139,111,255,.12), rgba(255,255,255,.03)),
-        rgba(255,255,255,.03);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 18px 30px rgba(8,12,30,.25);
-    }
-    .ticket-top,
-    .ticket-meta,
-    .detail-row,
-    .composer-row,
-    .panel-actions,
-    .plan-top,
-    .detail-actions,
-    .rail-row,
-    .operator-row,
-    .usage-row,
-    .stat-split {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      min-width: 0;
-    }
-    .ticket-title {
-      font-weight: 750;
-      font-size: 14px;
-      line-height: 1.35;
-      letter-spacing: -.01em;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      color: rgba(248,250,255,.98);
-    }
-    .ticket-preview,
-    .detail-copy,
-    .muted-copy {
-      margin-top: 9px;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.5;
-    }
-    .ticket-meta {
-      margin-top: 12px;
-      flex-wrap: wrap;
-    }
-    .ticket-metrics {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .mini-chip,
-    .tag,
-    .action-pill {
-      padding: 7px 10px;
-      font-size: 11px;
-    }
-
-    .thread-head {
-      padding: 16px 18px;
-      border-bottom: 1px solid rgba(255,255,255,.06);
-      display: grid;
-      gap: 12px;
-      background: rgba(255,255,255,.02);
     }
     .detail-title {
-      font-size: 24px;
-      line-height: 1.08;
-      letter-spacing: -.04em;
+      font-size: 16px;
       font-weight: 800;
+      line-height: 1.2;
     }
-    .detail-sub { color: var(--muted); font-size: 13px; }
-    .detail-actions { flex-wrap: wrap; }
+    .detail-sub {
+      margin-top: 6px;
+      color: var(--muted-2);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .detail-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
 
-    .thread-scroll {
+    .messages-scroll {
       min-height: 0;
-      padding: 18px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
+      overflow: auto;
+      scrollbar-width: thin;
     }
-    .message {
-      max-width: min(740px, 100%);
+
+    .empty-state {
+      min-height: 100%;
       border-radius: 20px;
-      border: 1px solid rgba(255,255,255,.06);
-      padding: 14px 15px;
-      background: rgba(255,255,255,.034);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+      border: 1px dashed rgba(255,255,255,.08);
+      background: rgba(255,255,255,.02);
+      padding: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: var(--muted);
     }
-    .message.user {
-      align-self: flex-start;
-      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.025));
+    .empty-card { max-width: 560px; }
+    .empty-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
     }
-    .message.ai {
-      align-self: flex-end;
-      background:
-        linear-gradient(180deg, rgba(139,111,255,.11), rgba(255,255,255,.028)),
-        rgba(255,255,255,.03);
-      border-color: rgba(139,111,255,.18);
+    .empty-eyebrow-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 16px rgba(80,216,168,.55);
     }
-    .message-head {
+    .empty-card h1 {
+      margin: 16px 0 10px;
+      font-size: 34px;
+      letter-spacing: -.05em;
+      line-height: 1.04;
+    }
+    .empty-card p {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.65;
+      color: var(--muted);
+    }
+    .empty-grid {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .msg-group {
+      display: grid;
+      gap: 8px;
+      animation: fadeUp .2s ease;
+    }
+    .msg-group.user { justify-items: end; }
+    .msg-group.assistant { justify-items: start; }
+    .msg-group-header {
+      width: 100%;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 8px;
+    }
+    .msg-group.user .msg-group-header { justify-content: flex-end; }
+    .msg-who {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       font-size: 11px;
-      letter-spacing: .12em;
+      letter-spacing: .14em;
       text-transform: uppercase;
       color: var(--muted-2);
       font-weight: 800;
     }
-    .message-body {
-      font-size: 14px;
-      line-height: 1.6;
-      color: rgba(245,248,255,.98);
+    .reply-body {
+      width: min(760px, 100%);
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      padding: 16px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+    }
+    .msg-group.user .reply-body {
+      background: linear-gradient(135deg, rgba(139,111,255,.18), rgba(89,145,255,.12));
+      border-color: rgba(139,111,255,.28);
+    }
+    .reply-text {
       white-space: pre-wrap;
-      word-break: break-word;
+      font-size: 15px;
+      line-height: 1.72;
+      color: rgba(245,247,255,.98);
     }
-    .detail-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    .assistant-actions {
+      width: min(760px, 100%);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-start;
     }
-    .detail-block {
-      padding: 14px;
-      background: rgba(255,255,255,.028);
+    .typing {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 24px;
     }
-    .detail-block strong { display: block; font-size: 13px; margin-bottom: 8px; }
+    .typing span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.72);
+      animation: blink 1s infinite ease-in-out;
+    }
+    .typing span:nth-child(2){ animation-delay: .15s; }
+    .typing span:nth-child(3){ animation-delay: .3s; }
 
     .composer-card {
       padding: 14px;
       display: grid;
       gap: 12px;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.025)),
-        rgba(255,255,255,.02);
+      background: rgba(255,255,255,.04);
     }
     .suggestions {
       display: flex;
-      gap: 8px;
       flex-wrap: wrap;
+      gap: 10px;
     }
-    .suggestion-btn {
-      padding: 9px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,.035);
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
+    .composer-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 180px 180px auto;
+      gap: 10px;
+      align-items: end;
     }
-    .composer-row { align-items: flex-end; }
-    .composer-main { flex: 1; min-width: 0; }
     .composer-input {
-      min-height: 112px;
-      max-height: 240px;
-      resize: vertical;
-      line-height: 1.55;
+      min-height: 120px;
+      resize: none;
+      line-height: 1.65;
+      padding-top: 14px;
     }
-    .composer-extras {
+    .composer-send {
+      height: 52px;
+      min-width: 96px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 800;
+    }
+    .composer-note {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted-2);
+      font-size: 12px;
+    }
+
+    .insights-inner { gap: 12px; }
+    .rail-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .01em;
+      margin-bottom: 12px;
+    }
+    .rail-title svg { width: 14px; height: 14px; }
+
+    .stats-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    .composer-send {
-      width: 60px;
-      height: 60px;
+    .mini-stat {
+      padding: 14px;
       border-radius: 18px;
-      flex: 0 0 60px;
-      display: grid;
-      place-items: center;
-      border: 0;
-      color: white;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
     }
-    .composer-footer {
+    .mini-stat-value {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -.05em;
+      line-height: 1;
+    }
+    .mini-stat-label {
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--muted);
+    }
+
+    .usage-track {
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,.06);
+      margin-top: 12px;
+    }
+    .usage-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(139,111,255,.95), rgba(88,185,255,.88));
+      transition: width .3s ease;
+    }
+    .usage-row {
+      margin-top: 10px;
       display: flex;
       justify-content: space-between;
       gap: 10px;
-      align-items: center;
-      color: var(--muted-2);
+      color: var(--muted);
       font-size: 12px;
-      flex-wrap: wrap;
     }
 
-    .stream-box {
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,.08);
-      background: rgba(255,255,255,.03);
-      padding: 12px 13px;
-      display: none;
+    .account-list {
+      display: grid;
       gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
     }
-    .stream-box.show { display: grid; }
-    .stream-step {
+    .account-item {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 10px;
-      color: var(--muted);
-      font-size: 13px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
     }
-    .stream-step.active { color: var(--text); }
-    .stream-step.done { color: rgba(208,246,231,.92); }
-    .stream-step-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.16);
-      transition: background .18s ease, box-shadow .18s ease;
-      flex: 0 0 10px;
-    }
-    .stream-step.active .stream-step-dot {
-      background: var(--violet);
-      box-shadow: 0 0 16px rgba(139,111,255,.6);
-    }
-    .stream-step.done .stream-step-dot {
-      background: var(--green);
-      box-shadow: 0 0 16px rgba(81,217,168,.48);
-    }
-
-    .insights-inner {
-      background:
-        linear-gradient(180deg, rgba(16, 21, 44, 0.78), rgba(9, 13, 28, 0.84)),
-        radial-gradient(circle at 80% 8%, rgba(139,111,255,.08), transparent 20%);
-    }
-    .metric-card,
-    .plan-card,
-    .highlight-card { padding: 16px; }
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .metric-number {
-      font-size: 32px;
-      line-height: 1;
-      font-weight: 800;
-      letter-spacing: -.05em;
-    }
-    .metric-label {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.4;
-    }
-    .usage-track {
-      margin-top: 12px;
-      width: 100%;
-      height: 10px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.05);
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,.05);
-    }
-    .usage-fill {
-      width: 0%;
-      height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, rgba(139,111,255,.98), rgba(82,201,255,.96));
-      transition: width .22s ease;
-    }
-    .plan-grid { margin-top: 14px; }
-    .plan-card.featured {
-      border-color: rgba(139,111,255,.26);
-      background:
-        linear-gradient(180deg, rgba(139,111,255,.1), rgba(255,255,255,.03)),
-        rgba(255,255,255,.03);
-    }
-    .plan-price {
-      font-size: 30px;
-      line-height: 1;
-      font-weight: 800;
-      letter-spacing: -.05em;
-    }
-    .plan-price span { font-size: 14px; color: var(--muted); font-weight: 600; margin-left: 4px; }
-    .plan-list {
-      list-style: none;
-      padding: 0;
-      margin: 12px 0 0;
-      display: grid;
-      gap: 7px;
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .plan-list li::before {
-      content: "•";
-      color: rgba(174, 223, 255, 0.88);
-      margin-right: 8px;
-    }
-    .plan-btn { width: 100%; margin-top: 14px; }
-
-    .empty-state {
-      padding: 32px 22px;
-      text-align: center;
-      color: var(--muted);
-      display: grid;
-      gap: 14px;
-      place-items: center;
-    }
-    .empty-icon {
-      width: 68px;
-      height: 68px;
-      border-radius: 22px;
-      display: grid;
-      place-items: center;
-      background: rgba(255,255,255,.045);
-      border: 1px solid rgba(255,255,255,.08);
-      color: rgba(226,232,255,.9);
-    }
-    .empty-icon svg { width: 28px; height: 28px; }
+    .account-item:last-child { border-bottom: 0; padding-bottom: 0; }
+    .account-item strong { color: var(--text); font-weight: 700; }
 
     .hide { display: none !important; }
-    .danger-copy { color: rgba(255,170,183,.92); }
-    .success-copy { color: rgba(181,247,221,.92); }
-    .muted { color: var(--muted); }
 
-    @media (max-width: 1280px) {
-      :root { --left: 280px; --right: 300px; }
-      .board { grid-template-columns: 280px minmax(0, 1fr); }
+    @keyframes blink { 0%, 100% { opacity: .35; transform: scale(.9); } 50% { opacity: 1; transform: scale(1); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 1320px) {
+      :root { --left: 272px; --right: 300px; }
+      .composer-grid { grid-template-columns: minmax(0, 1fr) 160px 160px auto; }
     }
 
-    @media (max-width: 1120px) {
+    @media (max-width: 1100px) {
       body { overflow: auto; }
       .shell {
         height: auto;
@@ -862,54 +784,12 @@
         grid-template-areas:
           "top"
           "center"
-          "left"
-          "right";
+          "right"
+          "left";
       }
       .topbar { grid-template-columns: 1fr; }
-      .board { grid-template-columns: 1fr; }
-      .detail-grid,
-      .composer-extras,
-      .metric-grid,
-      .mini-stats,
-      .button-grid { grid-template-columns: 1fr 1fr; }
-    }
-
-    @media (max-width: 760px) {
-      .shell { padding: 10px; gap: 10px; }
-      .topbar,
-      .workspace,
-      .sidebar,
-      .insights { border-radius: 22px; }
-      .workspace-head,
-      .banner,
-      .panel-head,
-      .thread-head,
-      .hero-card,
-      .auth-card,
-      .plan-card,
-      .metric-card,
-      .highlight-card,
-      .composer-card,
-      .mini-stat,
-      .detail-block,
-      .ticket-card { padding-left: 14px; padding-right: 14px; }
-      .workspace-title h1 { font-size: 26px; }
-      .detail-title { font-size: 21px; }
-      .detail-grid,
-      .composer-extras,
-      .metric-grid,
-      .mini-stats,
-      .button-grid,
-      .filter-row { grid-template-columns: 1fr; }
-      .workspace-tools,
-      .top-actions,
-      .detail-actions,
-      .ticket-meta,
-      .suggestions,
-      .panel-actions,
-      .composer-footer { justify-content: flex-start; }
-      .composer-row { flex-direction: column; align-items: stretch; }
-      .composer-send { width: 100%; height: 52px; border-radius: 14px; }
+      .composer-grid { grid-template-columns: 1fr; }
+      .sidebar, .workspace, .insights { min-height: 0; }
     }
   </style>
 </head>
@@ -923,31 +803,39 @@
         <div class="brand-copy">
           <div class="eyebrow">AI support command center</div>
           <div class="brand-title">Xalvion</div>
-          <div class="brand-sub" id="brandSubcopy">Resolve tickets, surface the right action, and make upgrade value obvious.</div>
+          <div class="brand-sub" id="brandSubcopy">Fast, clear support responses with the right next step built in.</div>
         </div>
       </div>
 
-      <label class="command" aria-label="Search tickets">
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4"></circle><path d="M13 13l-3-3"></path></svg>
-        <input id="globalSearch" type="text" placeholder="Search tickets, message history, issue types…" autocomplete="off" />
+      <label class="command" aria-label="Global search">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="4"></circle><path d="M13 13l-3-3"></path></svg>
+        <input type="text" placeholder="Search tickets, workflows, account state..." />
         <span class="command-kbd">/</span>
       </label>
 
       <div class="top-actions">
-        <div class="status-pill" id="healthPill"><span class="status-dot"></span><span id="healthLabel">Checking backend</span></div>
-        <div class="status-pill" id="authPill"><span class="status-dot"></span><span id="authLabel">Guest workspace</span></div>
-        <button class="icon-btn" type="button" id="newTicketBtn" title="New ticket">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
+        <div class="status-pill"><span class="status-dot"></span><span id="backendStatus">Checking backend</span></div>
+        <div class="status-pill"><span class="status-dot"></span><span id="authStatus">Guest workspace</span></div>
+        <button class="icon-btn" type="button" id="newChatBtn" title="New workspace">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 3v10M3 8h10"></path></svg>
         </button>
       </div>
     </header>
 
     <aside class="sidebar glass">
-      <div class="scroll sidebar-inner">
-        <section class="hero-card stack-card">
-          <div class="eyebrow">Positioning</div>
-          <h2>Make support feel like a revenue engine.</h2>
-          <p>Show the operator answer, the action taken, the risk, the confidence, and the upgrade pressure in the same frame.</p>
+      <div class="scroll sidebar-inner" id="railScroll">
+        <section class="hero-card rail-card">
+          <div class="eyebrow">Operator engine</div>
+          <h2 id="workspaceHeadline">Customer support workspace</h2>
+          <p id="systemPanelCopy">Response-ready workspace with clean output, visible progress, and clear action flow.</p>
+        </section>
+
+        <section class="notice info" id="notice">
+          <span class="dot"></span>
+          <div>
+            <div class="notice-title" id="noticeTitle">Workspace ready</div>
+            <div class="notice-detail" id="noticeDetail">The system will attach live states, reply quality, and action visibility as soon as you run a case.</div>
+          </div>
         </section>
 
         <section class="auth-card">
@@ -957,54 +845,38 @@
             <input class="auth-input" id="passwordInput" type="password" placeholder="Password" autocomplete="current-password" />
           </div>
           <div class="button-grid" style="margin-top:10px">
-            <button class="auth-btn primary" type="button" id="signupBtn">Sign up</button>
-            <button class="auth-btn" type="button" id="loginBtn">Log in</button>
-            <button class="auth-btn" type="button" id="demoBtn">Quick demo</button>
+            <button class="auth-btn" type="button" id="signupBtn">Sign up</button>
+            <button class="auth-btn primary" type="button" id="loginBtn">Log in</button>
+            <button class="auth-btn" type="button" id="devBtn">Quick demo</button>
             <button class="auth-btn" type="button" id="logoutBtn">Log out</button>
           </div>
           <div class="auth-meta">
-            <span id="accountStatus">Status: guest</span>
-            <span id="operatorMode">Mode: balanced</span>
+            <span id="streamStatus">Streaming: standard</span>
+            <span>Mode: balanced</span>
           </div>
         </section>
 
-        <section class="notice" id="noticeBox">
-          <span class="dot"></span>
-          <div>
-            <div class="notice-title" id="noticeTitle">Workspace ready</div>
-            <div class="notice-copy" id="noticeCopy">Use the demo flow or sign in to keep ticket history and plan usage synced.</div>
+        <section class="panel-card">
+          <div class="section-label">Launch prompts</div>
+          <div class="suggestion-grid">
+            <button class="suggestion-btn" type="button" data-fill="Customer says they were charged twice for the same order and wants a refund."><strong>Duplicate charge</strong>Billing case with immediate action pressure.</button>
+            <button class="suggestion-btn" type="button" data-fill="Customer wants to cancel and receive a refund because the package never arrived."><strong>Missing order</strong>High-risk retention and logistics issue.</button>
+            <button class="suggestion-btn" type="button" data-fill="Customer is angry that their shipment is delayed and is asking for store credit."><strong>Delay compensation</strong>Fast path for retention-friendly handling.</button>
+            <button class="suggestion-btn" type="button" data-fill="Customer cannot log in and keeps getting a password error."><strong>Login issue</strong>Non-refund support case to test reply quality.</button>
           </div>
         </section>
 
-        <section class="stack-card" style="padding:16px">
-          <div class="section-label">Queue snapshot</div>
+        <section class="panel-card">
+          <div class="section-label">Live operator signals</div>
           <div class="mini-stats">
-            <div class="mini-stat">
-              <div class="mini-stat-value" id="queueNew">0</div>
-              <div class="mini-stat-label">New tickets</div>
+            <div class="metric-card">
+              <div class="value" id="statInteractions">0</div>
+              <div class="label">Tickets handled</div>
             </div>
-            <div class="mini-stat">
-              <div class="mini-stat-value" id="queueWaiting">0</div>
-              <div class="mini-stat-label">Waiting review</div>
+            <div class="metric-card">
+              <div class="value" id="statActions">0</div>
+              <div class="label">Actions completed</div>
             </div>
-            <div class="mini-stat">
-              <div class="mini-stat-value" id="queueResolved">0</div>
-              <div class="mini-stat-label">Resolved</div>
-            </div>
-            <div class="mini-stat">
-              <div class="mini-stat-value" id="queueHigh">0</div>
-              <div class="mini-stat-label">High priority</div>
-            </div>
-          </div>
-        </section>
-
-        <section class="stack-card" style="padding:16px">
-          <div class="section-label">Canned prompts</div>
-          <div class="suggestions">
-            <button class="suggestion-btn" type="button" data-fill="Customer says they were charged twice on one order.">Duplicate charge</button>
-            <button class="suggestion-btn" type="button" data-fill="Customer says their package arrived damaged and wants this fixed today.">Damaged order</button>
-            <button class="suggestion-btn" type="button" data-fill="Customer says their order is late and they need a concrete update.">Late package</button>
-            <button class="suggestion-btn" type="button" data-fill="Customer cannot log in and keeps getting a password error.">Login issue</button>
           </div>
         </section>
       </div>
@@ -1013,8 +885,8 @@
     <main class="workspace glass">
       <div class="workspace-head">
         <div class="workspace-title">
-          <h1>Zendesk-killer workspace</h1>
-          <p id="workspaceSubcopy">Live inbox, action visibility, and outcome metrics in one clean support cockpit.</p>
+          <h1>Clean operator workspace</h1>
+          <p id="workspaceSubcopy">Live inbox-quality execution without the clutter. Run a case, inspect the response, and keep the product pressure visible without trashing the visual hierarchy.</p>
         </div>
         <div class="workspace-tools">
           <div class="chip" id="ticketCountChip"><span class="dot"></span><span>0 tickets</span></div>
@@ -1024,206 +896,99 @@
 
       <section class="banner">
         <div class="banner-copy">
-          <strong id="bannerTitle">AI operator with visible decisions</strong>
-          <span id="bannerCopy">When support runs well, the operator should see why the action happened, how risky the case is, and what the next move is without leaving the page.</span>
+          <strong>Visible decisions without fake clutter</strong>
+          <span>One thread, one clear composer, one clean metrics rail. The value should feel premium before the user even reads the first reply.</span>
         </div>
         <div class="panel-actions">
-          <button class="secondary-btn" type="button" id="refreshBtn">Refresh</button>
-          <button class="primary-btn" type="button" id="focusComposerBtn" style="height:44px;border-radius:14px;padding:0 16px">Open composer</button>
+          <button class="secondary-btn" type="button" id="newChatBtnFallback" onclick="document.getElementById('newChatBtn').click()">Reset</button>
         </div>
       </section>
 
-      <section class="board">
-        <div class="inbox">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">Inbox</div>
-              <div class="panel-sub">Search, sort, and open recent tickets.</div>
-            </div>
-            <button class="toolbar-btn" type="button" id="clearFiltersBtn" title="Clear filters">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h10M5.5 8H10.5M7 12h2"/></svg>
-            </button>
+      <section class="thread">
+        <div class="thread-head">
+          <div>
+            <div class="detail-title">Live support thread</div>
+            <div class="detail-sub">The operator answer, action card, memory context, and next-best-action chips all stay in one readable flow.</div>
           </div>
-
-          <div class="inbox-filters">
-            <div class="filter-row">
-              <input class="filter-input" id="ticketSearchInput" type="text" placeholder="Search tickets" />
-              <select class="filter-input" id="ticketSortSelect">
-                <option value="newest">Newest</option>
-                <option value="oldest">Oldest</option>
-                <option value="urgency">Urgency</option>
-                <option value="churn_risk">Churn risk</option>
-                <option value="priority">Priority</option>
-              </select>
-            </div>
-            <div class="suggestions">
-              <button class="filter-btn active" type="button" data-queue="">All</button>
-              <button class="filter-btn" type="button" data-queue="new">New</button>
-              <button class="filter-btn" type="button" data-queue="waiting">Waiting</button>
-              <button class="filter-btn" type="button" data-queue="resolved">Resolved</button>
-              <button class="filter-btn" type="button" data-queue="refund_risk">Refund risk</button>
-            </div>
-          </div>
-
-          <div class="scroll ticket-list" id="ticketList">
-            <div class="empty-state" id="ticketEmptyState">
-              <div class="empty-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3.5h10v9H3z"/><path d="M3 6h10"/></svg></div>
-              <div>
-                <strong style="display:block;color:var(--text);font-size:16px">No tickets yet</strong>
-                <div style="margin-top:6px">Send a support request to populate the inbox and metrics.</div>
-              </div>
-            </div>
+          <div class="detail-actions">
+            <span class="tag" id="planUsage">0 / 50 used</span>
           </div>
         </div>
 
-        <div class="thread">
-          <div class="thread-head">
-            <div>
-              <div class="detail-title" id="detailTitle">Pick a ticket or run a new one</div>
-              <div class="detail-sub" id="detailSub">The active case will show the customer issue, AI reply, action taken, and internal note.</div>
-            </div>
-            <div class="detail-actions" id="detailBadges"></div>
-          </div>
+        <div class="messages-scroll" id="messages"></div>
+      </section>
 
-          <div class="scroll thread-scroll" id="threadScroll">
-            <div class="empty-state" id="threadEmptyState">
-              <div class="empty-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11v7h-7l-3 2v-9z"/></svg></div>
-              <div>
-                <strong style="display:block;color:var(--text);font-size:16px">Support thread ready</strong>
-                <div style="margin-top:6px">Use one of the canned prompts or type a case below to see the live action flow.</div>
-              </div>
-              <button class="empty-btn primary" type="button" id="emptyComposeBtn">Start with a demo ticket</button>
-            </div>
-            <div id="threadContent" class="hide"></div>
-          </div>
+      <section class="composer-card">
+        <div class="suggestions">
+          <button class="suggestion-btn" type="button" data-fill="Customer says they were charged twice for order #1001 and wants this fixed immediately.">Chargeback risk</button>
+          <button class="suggestion-btn" type="button" data-fill="Customer says their package is delayed and they want the best next step, not a vague apology.">Shipping escalation</button>
+          <button class="suggestion-btn" type="button" data-fill="Customer says they want a refund because the order arrived broken.">Refund request</button>
+        </div>
 
-          <div class="composer-card" id="composerCard">
-            <div class="suggestions">
-              <button class="suggestion-btn" type="button" data-fill="Customer says they were charged twice for order #1001 and wants this fixed immediately.">Chargeback risk</button>
-              <button class="suggestion-btn" type="button" data-fill="Customer says their package is delayed and they want the best next step, not a vague apology.">Shipping escalation</button>
-              <button class="suggestion-btn" type="button" data-fill="Customer says they want a refund because the order arrived broken.">Refund request</button>
-            </div>
+        <div class="composer-grid">
+          <textarea class="composer-input" id="messageInput" placeholder="Paste a customer issue or type a support request..."></textarea>
+          <input class="composer-extra" id="paymentIntentInput" type="text" placeholder="Optional payment ref" />
+          <input class="composer-extra" type="text" placeholder="Optional order status" />
+          <button class="composer-send" id="sendBtn" type="button">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 2.5L7 9M13.5 2.5L9 13.5 7 9l-4.5-2 11-5z"></path></svg>
+            <span>Send</span>
+          </button>
+        </div>
 
-            <div class="stream-box" id="streamBox">
-              <div class="stream-step active" data-step="0"><span class="stream-step-dot"></span><span>Reviewing request</span></div>
-              <div class="stream-step" data-step="1"><span class="stream-step-dot"></span><span>Choosing next step</span></div>
-              <div class="stream-step" data-step="2"><span class="stream-step-dot"></span><span>Drafting response</span></div>
-            </div>
-
-            <div class="composer-row">
-              <div class="composer-main">
-                <textarea class="composer-input" id="messageInput" placeholder="Paste a customer issue or type a support request…"></textarea>
-              </div>
-              <button class="composer-send" type="button" id="sendBtn" aria-label="Send">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 2.5 7 9"/><path d="M13.5 2.5 9 13.5 7 9l-4.5-2 11-4.5z"/></svg>
-              </button>
-            </div>
-
-            <div class="composer-extras">
-              <input class="composer-extra" id="paymentIntentInput" type="text" placeholder="Optional payment_intent_id or charge_id" />
-              <input class="composer-extra" id="orderStatusInput" type="text" placeholder="Optional order status: delayed, shipped, delivered…" />
-            </div>
-
-            <div class="composer-footer">
-              <span id="composerHint">Use streaming mode to make the product feel alive and premium.</span>
-              <span id="composerStatus">Ready</span>
-            </div>
-          </div>
+        <div class="composer-note">
+          <span id="usagePanelCopy">Starter capacity with core support flow.</span>
+          <span>Press Enter to send • Shift + Enter for a new line</span>
         </div>
       </section>
     </main>
 
     <aside class="insights glass">
       <div class="scroll insights-inner">
-        <section class="metric-card">
-          <div class="section-label">Dashboard</div>
-          <div class="metric-grid">
-            <div class="highlight-card">
-              <div class="metric-number" id="statTickets">0</div>
-              <div class="metric-label">Tickets handled</div>
+        <section class="panel-card" id="dashboardCard">
+          <div class="rail-title">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5h10"></path><path d="M4.5 10V6.5"></path><path d="M8 10V4.5"></path><path d="M11.5 10V7.5"></path></svg>
+            Dashboard
+          </div>
+          <div class="stats-grid">
+            <div class="mini-stat">
+              <div class="mini-stat-value" id="statConfidence">0.00</div>
+              <div class="mini-stat-label">Average confidence</div>
             </div>
-            <div class="highlight-card">
-              <div class="metric-number" id="statActions">0</div>
-              <div class="metric-label">Actions completed</div>
-            </div>
-            <div class="highlight-card">
-              <div class="metric-number" id="statConfidence">0.00</div>
-              <div class="metric-label">Average confidence</div>
-            </div>
-            <div class="highlight-card">
-              <div class="metric-number" id="statQuality">0.00</div>
-              <div class="metric-label">Average quality</div>
+            <div class="mini-stat">
+              <div class="mini-stat-value" id="statQuality">0.00</div>
+              <div class="mini-stat-label">Average quality</div>
             </div>
           </div>
         </section>
 
-        <section class="metric-card">
-          <div class="section-label">Plan usage</div>
-          <div class="usage-row">
-            <div>
-              <div class="metric-number" style="font-size:26px" id="planTier">Free</div>
-              <div class="metric-label" id="planSummary">Starter capacity with core support flow.</div>
-            </div>
-            <div class="queue-pill" id="planBadge"><span class="dot"></span><span id="planBadgeLabel">0 / 50</span></div>
+        <section class="panel-card" id="usageCard">
+          <div class="rail-title">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="4" width="13" height="9" rx="2"></rect><path d="M8 7.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z"></path></svg>
+            Plan usage
           </div>
-          <div class="usage-track"><div class="usage-fill" id="usageFill"></div></div>
-          <div class="stat-split" style="margin-top:10px;color:var(--muted);font-size:12px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:34px;font-weight:800;letter-spacing:-.05em;line-height:1" id="planTier">FREE</div>
+              <div style="margin-top:6px;color:var(--muted);font-size:13px;line-height:1.55" id="usagePanelCopyAlt">Starter capacity with core support flow.</div>
+            </div>
+            <div class="chip"><span class="dot"></span><span id="planUsagePill">0 / 50</span></div>
+          </div>
+          <div class="usage-track"><div class="usage-fill" id="planBar"></div></div>
+          <div class="usage-row">
             <span id="planUsed">Used 0</span>
             <span id="planRemaining">Remaining 50</span>
           </div>
         </section>
 
-        <section class="metric-card">
-          <div class="section-label">Decision visibility</div>
-          <div class="detail-block" style="padding:0;border:0;background:none">
-            <strong style="padding:0 0 8px">Latest action</strong>
-            <div class="detail-copy" id="latestActionCopy">No action yet. Run a ticket to populate the action trace.</div>
+        <section class="panel-card" id="accountCard">
+          <div class="rail-title">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.2" r="2.4"></circle><path d="M3 13c0-2.7 2.25-4.8 5-4.8S13 10.3 13 13"></path></svg>
+            Account state
           </div>
-          <div class="detail-grid" style="margin-top:12px">
-            <div class="detail-block">
-              <strong>Tool status</strong>
-              <div class="detail-copy" id="latestToolStatus">—</div>
-            </div>
-            <div class="detail-block">
-              <strong>Operator mode</strong>
-              <div class="detail-copy" id="latestOperatorMode">balanced</div>
-            </div>
-          </div>
-        </section>
-
-        <section class="metric-card">
-          <div class="section-label">Upgrade pressure</div>
-          <div class="plan-grid" id="planGrid">
-            <article class="plan-card featured">
-              <div class="plan-top">
-                <div>
-                  <div class="panel-title">Pro</div>
-                  <div class="panel-sub">Higher throughput</div>
-                </div>
-                <div class="plan-price">$29<span>/mo</span></div>
-              </div>
-              <ul class="plan-list">
-                <li>500 monthly tickets</li>
-                <li>Priority routing</li>
-                <li>Bigger history window</li>
-              </ul>
-              <button class="plan-btn primary" type="button" data-upgrade="pro">Upgrade to Pro</button>
-            </article>
-            <article class="plan-card">
-              <div class="plan-top">
-                <div>
-                  <div class="panel-title">Elite</div>
-                  <div class="panel-sub">Scale without pressure</div>
-                </div>
-                <div class="plan-price">$99<span>/mo</span></div>
-              </div>
-              <ul class="plan-list">
-                <li>5,000 monthly tickets</li>
-                <li>Advanced dashboard</li>
-                <li>Top-priority routing</li>
-              </ul>
-              <button class="plan-btn" type="button" data-upgrade="elite">Upgrade to Elite</button>
-            </article>
+          <div class="account-list">
+            <div class="account-item"><span>Workspace</span><strong id="authStatusMirror">Guest workspace</strong></div>
+            <div class="account-item"><span>Backend</span><strong id="backendStatusMirror">Checking backend</strong></div>
+            <div class="account-item"><span>Stream</span><strong id="streamStatusMirror">Streaming: standard</strong></div>
           </div>
         </section>
       </div>
@@ -1232,5 +997,24 @@
 
   <script src="/fluid/script.js"></script>
   <script src="/app.js"></script>
+  <script>
+    // mirror a few visible status labels for a cleaner right rail without changing app.js
+    const mirror = () => {
+      const pairs = [
+        ['authStatus','authStatusMirror'],
+        ['backendStatus','backendStatusMirror'],
+        ['streamStatus','streamStatusMirror'],
+        ['planUsage','planUsagePill'],
+        ['usagePanelCopy','usagePanelCopyAlt']
+      ];
+      pairs.forEach(([a,b]) => {
+        const src = document.getElementById(a);
+        const dst = document.getElementById(b);
+        if (src && dst) dst.textContent = src.textContent;
+      });
+    };
+    new MutationObserver(mirror).observe(document.body, { subtree: true, childList: true, characterData: true });
+    window.addEventListener('load', mirror);
+  </script>
 </body>
 </html>
