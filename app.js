@@ -66,7 +66,9 @@
     credit: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M2 6.5h12"/><path d="M5 10h2.5"/></svg>`,
     review: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.5"/><path d="M8 5.2v3.2"/><path d="M8 10.9h.01"/></svg>`,
     status: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5h10"/><path d="M4.5 10V6.5"/><path d="M8 10V4.5"/><path d="M11.5 10V7.5"/></svg>`,
-    sparkle: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2 1.2-3Z"/><path d="M12.4 10.8l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6Z"/></svg>`
+    sparkle: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2 1.2-3Z"/><path d="M12.4 10.8l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6Z"/></svg>`,
+    crown: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5h12"/><path d="M3 12.5 2.2 5.5l3.4 2.4L8 3l2.4 4.9 3.4-2.4-.8 7"/></svg>`,
+    bolt: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8.8 1.5 3.5 8h3.2L6.1 14.5 12.5 7.2H9.2l-.4-5.7Z"/></svg>`
   };
 
   function ensureActionVisibilityStyles() {
@@ -393,10 +395,6 @@
         border-color:rgba(255,255,255,.14);
       }
 
-      .mini-btn.copy-btn:active{
-        transform:translateY(0);
-      }
-
       .mini-btn.copy-btn svg{
         width:15px;
         height:15px;
@@ -413,6 +411,228 @@
         clip:rect(0, 0, 0, 0) !important;
         white-space:nowrap !important;
         border:0 !important;
+      }
+
+      .upgrade-stack{
+        display:grid;
+        gap:12px;
+        margin-top:10px;
+      }
+
+      .upgrade-card{
+        position:relative;
+        overflow:hidden;
+        border-radius:18px;
+        border:1px solid rgba(255,255,255,.08);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.015)),
+          radial-gradient(circle at 88% 12%, rgba(139,111,255,.10), transparent 30%);
+        box-shadow:0 14px 36px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.03);
+        padding:14px 14px 13px;
+        transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+      }
+
+      .upgrade-card:hover{
+        transform:translateY(-1px);
+        border-color:rgba(255,255,255,.12);
+        box-shadow:0 18px 42px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.04);
+      }
+
+      .upgrade-card.popular{
+        border-color:rgba(139,111,255,.20);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.036), rgba(255,255,255,.018)),
+          radial-gradient(circle at 88% 12%, rgba(139,111,255,.16), transparent 32%);
+      }
+
+      .upgrade-badge{
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        min-height:24px;
+        padding:0 9px;
+        border-radius:999px;
+        border:1px solid rgba(255,255,255,.08);
+        background:rgba(255,255,255,.04);
+        color:rgba(232,239,255,.86);
+        font-size:10px;
+        font-weight:800;
+        letter-spacing:.10em;
+        text-transform:uppercase;
+        margin-bottom:10px;
+      }
+
+      .upgrade-badge svg{
+        width:10px;
+        height:10px;
+      }
+
+      .upgrade-badge.popular{
+        border-color:rgba(139,111,255,.24);
+        background:rgba(139,111,255,.13);
+        color:rgba(235,228,255,.96);
+      }
+
+      .upgrade-plan-row{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:10px;
+      }
+
+      .upgrade-plan-title{
+        font-size:16px;
+        font-weight:800;
+        color:rgba(242,246,255,.97);
+        letter-spacing:-.01em;
+      }
+
+      .upgrade-plan-price{
+        font-size:13px;
+        font-weight:700;
+        color:rgba(205,218,250,.82);
+        white-space:nowrap;
+      }
+
+      .upgrade-plan-copy{
+        margin-top:6px;
+        font-size:12.5px;
+        line-height:1.6;
+        color:rgba(205,218,250,.76);
+      }
+
+      .upgrade-plan-points{
+        display:grid;
+        gap:6px;
+        margin-top:11px;
+      }
+
+      .upgrade-point{
+        display:flex;
+        align-items:flex-start;
+        gap:8px;
+        font-size:11.5px;
+        line-height:1.45;
+        color:rgba(225,233,252,.82);
+      }
+
+      .upgrade-point svg{
+        width:11px;
+        height:11px;
+        margin-top:2px;
+        flex:0 0 auto;
+        color:rgba(147,197,253,.92);
+      }
+
+      .upgrade-cta{
+        display:inline-flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        width:100%;
+        min-height:46px;
+        margin-top:12px;
+        padding:0 14px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,.08);
+        background:rgba(255,255,255,.05);
+        color:rgba(246,248,255,.98);
+        font-size:13px;
+        font-weight:800;
+        letter-spacing:.01em;
+        cursor:pointer;
+        transition:transform .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease, opacity .16s ease;
+      }
+
+      .upgrade-cta:hover{
+        transform:translateY(-1px);
+        background:rgba(255,255,255,.08);
+        border-color:rgba(255,255,255,.14);
+        box-shadow:0 10px 24px rgba(0,0,0,.14);
+      }
+
+      .upgrade-cta.primary{
+        border-color:rgba(139,111,255,.26);
+        background:linear-gradient(135deg, rgba(139,111,255,.23), rgba(104,140,255,.19));
+        box-shadow:0 14px 28px rgba(80,52,196,.22);
+      }
+
+      .upgrade-cta.primary:hover{
+        background:linear-gradient(135deg, rgba(139,111,255,.29), rgba(104,140,255,.24));
+      }
+
+      .upgrade-cta svg{
+        width:14px;
+        height:14px;
+        flex:0 0 auto;
+      }
+
+      .upgrade-cta[disabled]{
+        opacity:.55;
+        cursor:default;
+        pointer-events:none;
+      }
+
+      .upgrade-footnote{
+        margin-top:10px;
+        font-size:11px;
+        line-height:1.55;
+        color:rgba(186,201,238,.62);
+      }
+
+      .upgrade-context{
+        margin-top:12px;
+        border-top:1px solid rgba(255,255,255,.06);
+        padding-top:12px;
+      }
+
+      .upgrade-context-title{
+        font-size:11px;
+        letter-spacing:.14em;
+        text-transform:uppercase;
+        color:rgba(185,201,238,.48);
+        font-weight:800;
+        margin-bottom:8px;
+      }
+
+      .upgrade-context-copy{
+        font-size:12px;
+        line-height:1.62;
+        color:rgba(212,223,248,.75);
+      }
+
+      .upgrade-alert{
+        display:none;
+        margin-top:10px;
+        padding:10px 12px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,.08);
+        background:rgba(255,255,255,.035);
+        color:rgba(233,239,255,.88);
+        font-size:12px;
+        line-height:1.55;
+      }
+
+      .upgrade-alert.show{
+        display:block;
+      }
+
+      .upgrade-alert.warning{
+        border-color:rgba(245,158,11,.18);
+        background:rgba(245,158,11,.08);
+        color:rgba(255,241,194,.94);
+      }
+
+      .upgrade-alert.info{
+        border-color:rgba(59,130,246,.18);
+        background:rgba(59,130,246,.08);
+        color:rgba(219,233,255,.94);
+      }
+
+      .upgrade-alert.success{
+        border-color:rgba(52,211,153,.18);
+        background:rgba(52,211,153,.08);
+        color:rgba(201,255,229,.94);
       }
 
       @keyframes xalvionActionReveal{
@@ -572,28 +792,55 @@
     if (tier === "free") {
       return {
         usage:
-          "You are on the Free plan. As usage grows, you can upgrade for more monthly capacity and a larger support workspace."
+          "You are on the Free plan. As usage grows, upgrading unlocks more monthly capacity, faster response handling, and a stronger support workflow.",
+        teaser:
+          "Pro unlocks faster handling and higher limits. Elite unlocks maximum capacity and priority routing across the workspace."
       };
     }
 
     if (tier === "pro") {
       return {
         usage:
-          "You are on the Pro plan with expanded monthly capacity and priority routing for higher support volume."
+          "You are on the Pro plan with expanded monthly capacity and priority routing for higher support volume.",
+        teaser:
+          "Elite unlocks maximum capacity, top-priority routing, and the most advanced Xalvion workspace access."
       };
     }
 
     if (tier === "elite") {
       return {
         usage:
-          "You are on the Elite plan with the highest monthly capacity and advanced access across the workspace."
+          "You are on the Elite plan with the highest monthly capacity and advanced access across the workspace.",
+        teaser:
+          "You are on the highest Xalvion tier with full access to the premium support workflow."
       };
     }
 
     return {
       usage:
-        "You are on the Starter plan with access to the core support workspace."
+        "You are on the Starter plan with access to the core support workspace.",
+      teaser:
+        "Unlock higher usage limits and stronger support throughput with a paid plan."
     };
+  }
+
+  function getUsagePressureMessage() {
+    if (!Number.isFinite(state.limit) || state.limit <= 0) return "";
+    const ratio = state.usage / state.limit;
+
+    if (ratio >= 0.9) {
+      return "Workspace capacity is nearly reached. Upgrade now to avoid interruptions in active support flow.";
+    }
+    if (ratio >= 0.7) {
+      return "You’re approaching your monthly limit. Upgrading now prevents interruptions as usage grows.";
+    }
+    if ((state.tier || "free") === "free") {
+      return "Free is built for proving value. Paid plans unlock more capacity, faster handling, and stronger customer continuity.";
+    }
+    if ((state.tier || "free") === "pro") {
+      return "Elite removes pressure at scale with maximum capacity and top-priority routing when support volume spikes.";
+    }
+    return "";
   }
 
   function updateTopbarStatus() {
@@ -639,9 +886,9 @@
       els.systemPanelCopy,
       "Response-ready workspace with clean output, visible progress, and clear action flow."
     );
-
     setText(els.usagePanelCopy, planCopy.usage);
     updateTopbarStatus();
+    renderUpgradePanel();
 
     if (els.devBtn) {
       els.devBtn.textContent = "Quick demo";
@@ -873,6 +1120,164 @@
     });
   }
 
+  function getUpgradeConfig() {
+    return {
+      free: {
+        pro: {
+          title: "Pro",
+          price: "$29/mo",
+          badge: "Most popular",
+          badgeClass: "popular",
+          titleCopy: "Scale your support without friction.",
+          subcopy: "More capacity, faster responses, and priority handling to keep every customer interaction smooth and reliable.",
+          points: [
+            "More capacity for growing support demand",
+            "Faster response handling for active workflows",
+            "Priority processing for stronger customer continuity"
+          ],
+          cta: "Unlock Pro — Scale Your Support",
+          ctaClass: "primary"
+        },
+        elite: {
+          title: "Elite",
+          price: "$99/mo",
+          badge: "Full power",
+          badgeClass: "",
+          titleCopy: "The full Xalvion experience.",
+          subcopy: "Maximum capacity, highest priority processing, and unrestricted access to advanced support capabilities.",
+          points: [
+            "Maximum throughput for serious support volume",
+            "Highest priority routing across the workspace",
+            "Built for mission-critical customer operations"
+          ],
+          cta: "Go Elite — Full Power Access",
+          ctaClass: ""
+        }
+      },
+      pro: {
+        elite: {
+          title: "Elite",
+          price: "$99/mo",
+          badge: "Next level",
+          badgeClass: "",
+          titleCopy: "Run support at full power.",
+          subcopy: "Maximum capacity and top-tier priority deliver the fastest, most reliable customer resolutions possible.",
+          points: [
+            "Maximum capacity when support volume spikes",
+            "Top-priority handling for critical operations",
+            "Full access to the most advanced workflow tools"
+          ],
+          cta: "Go Elite — Full Power Access",
+          ctaClass: "primary"
+        }
+      },
+      elite: {}
+    };
+  }
+
+  function mountUpgradePanel() {
+    const plansSection = document.querySelector(".plans, [data-plans], .left-plans");
+    if (!plansSection) return null;
+
+    let host = plansSection.querySelector(".upgrade-stack");
+    if (host) return host;
+
+    if (els.upgradeButtons.length) {
+      els.upgradeButtons.forEach((btn) => {
+        const oldWrap = btn.closest(".plan-btn-wrap, .plan-row, .upgrade-row, .plan-item");
+        if (oldWrap) oldWrap.remove();
+        else btn.remove();
+      });
+      els.upgradeButtons = [];
+    }
+
+    host = document.createElement("div");
+    host.className = "upgrade-stack";
+    plansSection.appendChild(host);
+    return host;
+  }
+
+  function renderUpgradePanel() {
+    const host = mountUpgradePanel();
+    if (!host) return;
+
+    const plan = (state.tier || "free").toLowerCase();
+    const configs = getUpgradeConfig();
+    const options = configs[plan] || {};
+    const pressure = getUsagePressureMessage();
+    const teaser = getPlanCopy().teaser || "";
+
+    let html = "";
+
+    if (plan === "elite") {
+      html = `
+        <div class="upgrade-card popular">
+          <div class="upgrade-badge popular">${ICONS.crown}<span>Highest tier active</span></div>
+          <div class="upgrade-plan-row">
+            <div class="upgrade-plan-title">Elite active</div>
+            <div class="upgrade-plan-price">Full access</div>
+          </div>
+          <div class="upgrade-plan-copy">
+            You’re already on the highest Xalvion plan with maximum capacity and top-priority support routing.
+          </div>
+          <div class="upgrade-context">
+            <div class="upgrade-context-title">Current advantage</div>
+            <div class="upgrade-context-copy">${escapeHtml(teaser)}</div>
+          </div>
+        </div>
+      `;
+      host.innerHTML = html;
+      return;
+    }
+
+    Object.entries(options).forEach(([tier, cfg]) => {
+      html += `
+        <div class="upgrade-card ${cfg.badgeClass === "popular" ? "popular" : ""}">
+          ${cfg.badge ? `<div class="upgrade-badge ${cfg.badgeClass}">${cfg.badgeClass === "popular" ? ICONS.crown : ICONS.bolt}<span>${escapeHtml(cfg.badge)}</span></div>` : ""}
+          <div class="upgrade-plan-row">
+            <div class="upgrade-plan-title">${escapeHtml(cfg.title)}</div>
+            <div class="upgrade-plan-price">${escapeHtml(cfg.price)}</div>
+          </div>
+          <div class="upgrade-plan-copy">
+            <strong>${escapeHtml(cfg.titleCopy)}</strong><br>
+            ${escapeHtml(cfg.subcopy)}
+          </div>
+          <div class="upgrade-plan-points">
+            ${cfg.points.map((point) => `
+              <div class="upgrade-point">
+                ${ICONS.check}
+                <span>${escapeHtml(point)}</span>
+              </div>
+            `).join("")}
+          </div>
+          <button class="upgrade-cta ${cfg.ctaClass}" type="button" data-upgrade="${escapeHtml(tier)}">
+            <span>${escapeHtml(cfg.cta)}</span>
+            ${ICONS.send}
+          </button>
+          <div class="upgrade-footnote">
+            ${plan === "free"
+              ? tier === "pro"
+                ? "Built for growth-stage usage and stronger response continuity."
+                : "Best for high-volume teams that need maximum capacity and priority treatment."
+              : "Upgrade when your support volume, urgency, or operational complexity outgrows Pro."}
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+      <div class="upgrade-context">
+        <div class="upgrade-context-title">Why upgrade now</div>
+        <div class="upgrade-context-copy">${escapeHtml(teaser)}</div>
+        ${pressure ? `<div class="upgrade-alert ${((state.tier || "free") === "free" && state.usage / Math.max(state.limit || 1, 1) < 0.7) ? "info" : "warning"} show">${escapeHtml(pressure)}</div>` : ""}
+      </div>
+    `;
+
+    host.innerHTML = html;
+    els.upgradeButtons = Array.from(host.querySelectorAll("[data-upgrade]"));
+    bindUpgrades();
+  }
+
   function updatePlanUI(tier, usage, limit, remaining) {
     state.tier = (tier || "free").toLowerCase();
     state.usage = Number(usage || 0);
@@ -957,7 +1362,7 @@
       const data = await res.json();
       updateDashboardUI(data);
     } catch {
-      // keep stable
+      // stable
     }
   }
 
@@ -1070,7 +1475,7 @@
     }
 
     try {
-      setNotice("info", "Preparing upgrade", `Preparing ${desired.toUpperCase()} upgrade...`);
+      setNotice("info", "Securing your upgrade", `Preparing ${desired.toUpperCase()} — you’ll be redirected to complete payment securely.`);
       pulseRail("usage");
 
       const res = await fetch(`${API}/billing/upgrade`, {
@@ -1339,9 +1744,7 @@
     bindChips();
     bindComposer();
     bindAuth();
-    bindUpgrades();
     bindTopActions();
-    updateCustomerFacingCopy();
     autoResizeTextarea();
     bootCheckoutNotice();
     await healthCheck();
