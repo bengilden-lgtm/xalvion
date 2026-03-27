@@ -69,24 +69,24 @@ LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
 
 REFUND_RULES = {
     "enabled": True,
-    "allowed_tiers": {"pro", "elite", "dev"},
+    "allowed_tiers": {"pro", "elite"},
 
     # increase slightly for testing
     "max_auto_refund_amount": 50.00,
 
-    # 🔥 FIX: include actual agent outputs
+    # include actual agent outputs
     "allowed_issue_types": {
         "duplicate_charge",
         "double_charge",
         "billing_issue",
         "payment_issue",
         "refund_request",
-        "billing_duplicate_charge",  # ← ADD THIS
+        "billing_duplicate_charge",
         "general_support",
     },
 
-    # 🔥 FIX: allow unknown during testing
-    "blocked_order_statuses": set(),  # ← EMPTY
+    # allow unknown during testing
+    "blocked_order_statuses": set(),
 
     "min_confidence": 0.5,
     "min_quality": 0.5,
@@ -291,7 +291,7 @@ def decode_token(token: str) -> str | None:
 
 def get_plan_name(user: User | None) -> str:
     if not user:
-        return "dev"
+        return "free"
     tier = (getattr(user, "tier", None) or "free").strip().lower()
     return tier if tier in PLAN_CONFIG else "free"
 
@@ -355,7 +355,7 @@ def get_current_user(
     db: Session = Depends(get_db),
 ):
     if not authorization:
-        return User(username="dev_user", password="", usage=0, tier="dev")
+        return User(username="guest", password="", usage=0, tier="free")
 
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid auth header")
@@ -886,7 +886,7 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         approved=False,
     )
 
-    if hasattr(user, "usage") and user.username != "dev_user":
+    if hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
         user.usage = int(getattr(user, "usage", 0) or 0) + 1
         db.commit()
         db.refresh(user)
@@ -1056,9 +1056,12 @@ def health():
 @app.get("/me")
 def me(user: User = Depends(get_current_user)):
     usage_summary = get_usage_summary(user)
+    public_username = "" if user.username in {"guest", "dev_user"} else user.username
+    public_tier = "free" if usage_summary["tier"] == "dev" else usage_summary["tier"]
+
     return {
-        "username": user.username,
-        "tier": usage_summary["tier"],
+        "username": public_username,
+        "tier": public_tier,
         "usage": usage_summary["usage"],
         "limit": usage_summary["limit"],
         "remaining": usage_summary["remaining"],
@@ -1092,7 +1095,7 @@ def dashboard_summary(user: User = Depends(get_current_user), db: Session = Depe
         "pro_users": pro_users,
         "elite_users": elite_users,
         "your_usage": usage_summary["usage"],
-        "your_tier": usage_summary["tier"],
+        "your_tier": "free" if usage_summary["tier"] == "dev" else usage_summary["tier"],
         "your_limit": usage_summary["limit"],
         "remaining": usage_summary["remaining"],
         "dashboard_access": usage_summary["dashboard_access"],
@@ -1359,6 +1362,7 @@ async def support_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))

@@ -1170,7 +1170,12 @@
       if (data.username) {
         state.username = data.username;
         persistAuth();
-        setText(els.authStatus, `Account: ${data.username}`);
+        setText(
+  els.authStatus,
+  data.username && data.username !== "dev_user"
+    ? `Account: ${data.username}`
+    : "Account: guest workspace"
+);
       }
 
       if (data.action) {
