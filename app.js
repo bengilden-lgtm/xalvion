@@ -68,14 +68,15 @@
     status: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5h10"/><path d="M4.5 10V6.5"/><path d="M8 10V4.5"/><path d="M11.5 10V7.5"/></svg>`,
     sparkle: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2 1.2-3Z"/><path d="M12.4 10.8l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6Z"/></svg>`,
     crown: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5h12"/><path d="M3 12.5 2.2 5.5l3.4 2.4L8 3l2.4 4.9 3.4-2.4-.8 7"/></svg>`,
-    bolt: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8.8 1.5 3.5 8h3.2L6.1 14.5 12.5 7.2H9.2l-.4-5.7Z"/></svg>`
+    bolt: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8.8 1.5 3.5 8h3.2L6.1 14.5 12.5 7.2H9.2l-.4-5.7Z"/></svg>`,
+    arrow: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10"/><path d="M9.5 4.5 13 8l-3.5 3.5"/></svg>`
   };
 
-  function ensureActionVisibilityStyles() {
-    if (document.getElementById("xalvion-action-visibility-styles")) return;
+  function ensureInjectedStyles() {
+    if (document.getElementById("xalvion-runtime-styles")) return;
 
     const style = document.createElement("style");
-    style.id = "xalvion-action-visibility-styles";
+    style.id = "xalvion-runtime-styles";
     style.textContent = `
       .action-visibility{
         display:none;
@@ -87,7 +88,7 @@
           radial-gradient(circle at 88% 18%, rgba(139,111,255,.08), transparent 28%);
         box-shadow:0 12px 34px rgba(0,0,0,.11), inset 0 1px 0 rgba(255,255,255,.03);
         overflow:hidden;
-        animation:xalvionActionReveal .26s cubic-bezier(.22,1,.36,1) both;
+        animation:xalvionReveal .26s cubic-bezier(.22,1,.36,1) both;
         position:relative;
       }
 
@@ -102,21 +103,10 @@
         opacity:.7;
       }
 
-      .action-visibility.show{
-        display:block;
-      }
-
-      .action-visibility.success::before{
-        background:linear-gradient(180deg, rgba(110,231,183,.9), rgba(110,231,183,.14));
-      }
-
-      .action-visibility.warning::before{
-        background:linear-gradient(180deg, rgba(252,211,77,.92), rgba(252,211,77,.16));
-      }
-
-      .action-visibility.info::before{
-        background:linear-gradient(180deg, rgba(96,165,250,.92), rgba(96,165,250,.16));
-      }
+      .action-visibility.show{display:block;}
+      .action-visibility.success::before{background:linear-gradient(180deg, rgba(110,231,183,.9), rgba(110,231,183,.14));}
+      .action-visibility.warning::before{background:linear-gradient(180deg, rgba(252,211,77,.92), rgba(252,211,77,.16));}
+      .action-visibility.info::before{background:linear-gradient(180deg, rgba(96,165,250,.92), rgba(96,165,250,.16));}
 
       .action-visibility-head{
         display:flex;
@@ -125,525 +115,177 @@
         gap:12px;
         padding:11px 12px 10px;
         border-bottom:1px solid rgba(255,255,255,.05);
-        background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.005));
       }
 
-      .action-visibility-title{
-        display:flex;
-        align-items:center;
-        gap:9px;
-        min-width:0;
-      }
-
+      .action-visibility-title{display:flex;align-items:center;gap:9px;min-width:0;}
       .action-visibility-icon-wrap{
-        width:24px;
-        height:24px;
-        border-radius:9px;
-        flex:0 0 24px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        background:rgba(255,255,255,.04);
-        border:1px solid rgba(255,255,255,.07);
-        color:rgba(228,234,252,.92);
+        width:24px;height:24px;border-radius:9px;flex:0 0 24px;display:flex;align-items:center;justify-content:center;
+        background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);color:rgba(228,234,252,.92);
       }
-
       .action-visibility.success .action-visibility-icon-wrap{
-        background:rgba(52,211,153,.08);
-        border-color:rgba(52,211,153,.18);
-        color:rgba(110,231,183,.96);
-        box-shadow:0 0 18px rgba(52,211,153,.10);
+        background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.18);color:rgba(110,231,183,.96);
       }
-
       .action-visibility.warning .action-visibility-icon-wrap{
-        background:rgba(245,158,11,.08);
-        border-color:rgba(245,158,11,.18);
-        color:rgba(252,211,77,.98);
-        box-shadow:0 0 18px rgba(245,158,11,.10);
+        background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.18);color:rgba(252,211,77,.98);
       }
-
       .action-visibility.info .action-visibility-icon-wrap{
-        background:rgba(59,130,246,.08);
-        border-color:rgba(59,130,246,.18);
-        color:rgba(147,197,253,.98);
-        box-shadow:0 0 18px rgba(59,130,246,.10);
+        background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.18);color:rgba(147,197,253,.98);
       }
-
-      .action-visibility-icon-wrap svg{
-        width:12px;
-        height:12px;
-      }
-
-      .action-visibility-title-stack{
-        min-width:0;
-        display:flex;
-        flex-direction:column;
-        gap:2px;
-      }
-
+      .action-visibility-icon-wrap svg{width:12px;height:12px;}
+      .action-visibility-title-stack{min-width:0;display:flex;flex-direction:column;gap:2px;}
       .action-visibility-title-text{
-        font-size:11px;
-        letter-spacing:.14em;
-        text-transform:uppercase;
-        font-weight:800;
-        color:rgba(188,201,238,.62);
-        white-space:nowrap;
+        font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:rgba(188,201,238,.62);white-space:nowrap;
       }
-
       .action-visibility-kicker{
-        font-size:12px;
-        font-weight:700;
-        color:rgba(234,240,255,.94);
-        white-space:nowrap;
-        overflow:hidden;
-        text-overflow:ellipsis;
+        font-size:12px;font-weight:700;color:rgba(234,240,255,.94);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
       }
-
       .action-visibility-badge{
-        font-size:10px;
-        font-weight:700;
-        letter-spacing:.10em;
-        text-transform:uppercase;
-        color:rgba(218,227,252,.78);
-        border:1px solid rgba(255,255,255,.08);
-        background:rgba(255,255,255,.04);
-        border-radius:999px;
-        padding:4px 8px;
-        white-space:nowrap;
+        font-size:10px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(218,227,252,.78);
+        border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);border-radius:999px;padding:4px 8px;white-space:nowrap;
       }
-
-      .action-visibility.success .action-visibility-badge{
-        color:rgba(201,255,229,.92);
-        border-color:rgba(52,211,153,.16);
-        background:rgba(52,211,153,.08);
-      }
-
-      .action-visibility.warning .action-visibility-badge{
-        color:rgba(255,241,194,.92);
-        border-color:rgba(245,158,11,.18);
-        background:rgba(245,158,11,.08);
-      }
-
-      .action-visibility.info .action-visibility-badge{
-        color:rgba(219,233,255,.92);
-        border-color:rgba(59,130,246,.18);
-        background:rgba(59,130,246,.08);
-      }
-
-      .action-visibility-body{
-        display:flex;
-        flex-direction:column;
-        gap:9px;
-        padding:13px 12px 12px;
-      }
-
-      .action-visibility-line{
-        font-size:14px;
-        line-height:1.65;
-        color:rgba(236,242,255,.96);
-      }
-
-      .action-visibility-sub{
-        font-size:12px;
-        line-height:1.58;
-        color:rgba(191,205,240,.72);
-      }
-
-      .action-visibility-meta{
-        display:flex;
-        flex-wrap:wrap;
-        gap:8px;
-        margin-top:2px;
-      }
-
+      .action-visibility-body{display:flex;flex-direction:column;gap:9px;padding:13px 12px 12px;}
+      .action-visibility-line{font-size:14px;line-height:1.65;color:rgba(236,242,255,.96);}
+      .action-visibility-sub{font-size:12px;line-height:1.58;color:rgba(191,205,240,.72);}
+      .action-visibility-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px;}
       .action-visibility-pill{
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
-        min-height:28px;
-        padding:0 10px;
-        border-radius:999px;
-        border:1px solid rgba(255,255,255,.07);
-        background:rgba(255,255,255,.03);
-        font-size:11px;
-        color:rgba(205,218,250,.78);
+        display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 10px;border-radius:999px;
+        border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);font-size:11px;color:rgba(205,218,250,.78);
       }
-
-      .action-visibility-pill svg{
-        width:11px;
-        height:11px;
-        opacity:.76;
-      }
-
+      .action-visibility-pill svg{width:11px;height:11px;opacity:.76;}
       .action-visibility-pill strong{
-        font-size:10px;
-        letter-spacing:.08em;
-        text-transform:uppercase;
-        color:rgba(160,180,228,.48);
+        font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(160,180,228,.48);
       }
-
-      .action-visibility-trail{
-        display:flex;
-        align-items:center;
-        gap:8px;
-        flex-wrap:wrap;
-        margin-top:2px;
-      }
-
+      .action-visibility-trail{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px;}
       .action-step{
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
-        min-height:26px;
-        padding:0 10px;
-        border-radius:999px;
-        background:rgba(255,255,255,.028);
-        border:1px solid rgba(255,255,255,.06);
-        font-size:11px;
-        color:rgba(216,226,250,.78);
+        display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 10px;border-radius:999px;
+        background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.06);font-size:11px;color:rgba(216,226,250,.78);
       }
+      .action-step svg{width:10px;height:10px;opacity:.82;}
+      .action-step.done{color:rgba(201,255,229,.90);border-color:rgba(52,211,153,.16);background:rgba(52,211,153,.08);}
+      .action-step.live{color:rgba(219,233,255,.90);border-color:rgba(59,130,246,.16);background:rgba(59,130,246,.08);}
 
-      .action-step svg{
-        width:10px;
-        height:10px;
-        opacity:.82;
-      }
-
-      .action-step.done{
-        color:rgba(201,255,229,.90);
-        border-color:rgba(52,211,153,.16);
-        background:rgba(52,211,153,.08);
-      }
-
-      .action-step.live{
-        color:rgba(219,233,255,.90);
-        border-color:rgba(59,130,246,.16);
-        background:rgba(59,130,246,.08);
-      }
-
-      .refund-assist{
-        display:grid;
-        gap:8px;
-        margin-bottom:8px;
-      }
-
+      .refund-assist{display:grid;gap:8px;margin-bottom:8px;}
       .refund-assist-label{
-        font-size:11px;
-        letter-spacing:.14em;
-        text-transform:uppercase;
-        color:rgba(190,204,240,.48);
-        font-weight:700;
-        padding:0 2px;
+        font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(190,204,240,.48);font-weight:700;padding:0 2px;
       }
-
       .refund-assist-input{
-        width:100%;
-        min-width:0;
-        height:40px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,.08);
-        background:rgba(9,12,24,.42);
-        color:rgba(241,246,255,.96);
-        padding:0 14px;
-        font-size:13px;
-        outline:none;
-        transition:border-color .16s ease, background .16s ease, box-shadow .16s ease, transform .16s ease;
+        width:100%;min-width:0;height:40px;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:rgba(9,12,24,.42);
+        color:rgba(241,246,255,.96);padding:0 14px;font-size:13px;outline:none;
+        transition:border-color .16s ease, background .16s ease, box-shadow .16s ease;
       }
-
-      .refund-assist-input::placeholder{
-        color:rgba(210,222,250,.34);
-      }
-
-      .refund-assist-input:hover{
-        background:rgba(9,12,24,.50);
-        border-color:rgba(255,255,255,.10);
-      }
-
+      .refund-assist-input::placeholder{color:rgba(210,222,250,.34);}
+      .refund-assist-input:hover{background:rgba(9,12,24,.50);border-color:rgba(255,255,255,.10);}
       .refund-assist-input:focus{
-        border-color:rgba(139,111,255,.28);
-        background:rgba(10,13,26,.54);
-        box-shadow:0 0 0 3px rgba(139,111,255,.08);
+        border-color:rgba(139,111,255,.28);background:rgba(10,13,26,.54);box-shadow:0 0 0 3px rgba(139,111,255,.08);
       }
 
-      .assistant-actions{
-        display:flex;
-        align-items:flex-start;
-        gap:10px;
-        flex-wrap:wrap;
-        margin-top:14px;
-      }
+      .assistant-actions{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-top:14px;}
 
       .mini-btn.copy-btn{
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        width:34px;
-        height:34px;
-        padding:0;
-        border-radius:10px;
-        border:1px solid rgba(255,255,255,.08);
-        background:rgba(255,255,255,.045);
-        color:rgba(232,238,255,.92);
+        display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border-radius:10px;
+        border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.045);color:rgba(232,238,255,.92);
         box-shadow:0 8px 20px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.04);
-        transition:transform .16s ease, background .16s ease, border-color .16s ease, color .16s ease;
-        flex:0 0 auto;
+        transition:transform .16s ease, background .16s ease, border-color .16s ease;color .16s ease;flex:0 0 auto;
       }
-
       .mini-btn.copy-btn:hover{
-        transform:translateY(-1px);
-        background:rgba(255,255,255,.075);
-        border-color:rgba(255,255,255,.14);
+        transform:translateY(-1px);background:rgba(255,255,255,.075);border-color:rgba(255,255,255,.14);
       }
-
-      .mini-btn.copy-btn svg{
-        width:15px;
-        height:15px;
-        display:block;
-      }
-
+      .mini-btn.copy-btn svg{width:15px;height:15px;display:block;}
       .mini-btn.copy-btn span{
-        position:absolute !important;
-        width:1px !important;
-        height:1px !important;
-        padding:0 !important;
-        margin:-1px !important;
-        overflow:hidden !important;
-        clip:rect(0, 0, 0, 0) !important;
-        white-space:nowrap !important;
-        border:0 !important;
+        position:absolute !important;width:1px !important;height:1px !important;padding:0 !important;margin:-1px !important;
+        overflow:hidden !important;clip:rect(0, 0, 0, 0) !important;white-space:nowrap !important;border:0 !important;
       }
 
-      .upgrade-stack{
-        display:grid;
-        gap:12px;
-        margin-top:10px;
-      }
-
-      .upgrade-card{
-        position:relative;
-        overflow:hidden;
-        border-radius:18px;
-        border:1px solid rgba(255,255,255,.08);
+      .x-upgrade-stack{display:grid;gap:12px;margin-top:10px;}
+      .x-upgrade-card{
+        position:relative;overflow:hidden;border-radius:18px;border:1px solid rgba(255,255,255,.08);
         background:
-          linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.015)),
-          radial-gradient(circle at 88% 12%, rgba(139,111,255,.10), transparent 30%);
-        box-shadow:0 14px 36px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.03);
+          linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.016)),
+          radial-gradient(circle at 88% 14%, rgba(139,111,255,.12), transparent 34%);
+        box-shadow:0 14px 36px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.03);
         padding:14px 14px 13px;
-        transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+        transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
       }
-
-      .upgrade-card:hover{
-        transform:translateY(-1px);
-        border-color:rgba(255,255,255,.12);
-        box-shadow:0 18px 42px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.04);
+      .x-upgrade-card:hover{
+        transform:translateY(-1px);border-color:rgba(255,255,255,.13);box-shadow:0 18px 42px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.04);
       }
-
-      .upgrade-card.popular{
-        border-color:rgba(139,111,255,.20);
-        background:
-          linear-gradient(180deg, rgba(255,255,255,.036), rgba(255,255,255,.018)),
-          radial-gradient(circle at 88% 12%, rgba(139,111,255,.16), transparent 32%);
-      }
-
-      .upgrade-badge{
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
-        min-height:24px;
-        padding:0 9px;
-        border-radius:999px;
-        border:1px solid rgba(255,255,255,.08);
-        background:rgba(255,255,255,.04);
-        color:rgba(232,239,255,.86);
-        font-size:10px;
-        font-weight:800;
-        letter-spacing:.10em;
-        text-transform:uppercase;
-        margin-bottom:10px;
-      }
-
-      .upgrade-badge svg{
-        width:10px;
-        height:10px;
-      }
-
-      .upgrade-badge.popular{
+      .x-upgrade-card.popular{
         border-color:rgba(139,111,255,.24);
-        background:rgba(139,111,255,.13);
-        color:rgba(235,228,255,.96);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.018)),
+          radial-gradient(circle at 88% 12%, rgba(139,111,255,.18), transparent 32%);
       }
-
-      .upgrade-plan-row{
-        display:flex;
-        align-items:flex-start;
-        justify-content:space-between;
-        gap:10px;
+      .x-upgrade-badge{
+        display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 9px;border-radius:999px;
+        border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.045);color:rgba(232,239,255,.86);
+        font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;margin-bottom:10px;
       }
-
-      .upgrade-plan-title{
-        font-size:16px;
-        font-weight:800;
-        color:rgba(242,246,255,.97);
-        letter-spacing:-.01em;
+      .x-upgrade-badge svg{width:10px;height:10px;}
+      .x-upgrade-badge.popular{
+        border-color:rgba(139,111,255,.26);background:rgba(139,111,255,.14);color:rgba(239,234,255,.98);
       }
-
-      .upgrade-plan-price{
-        font-size:13px;
-        font-weight:700;
-        color:rgba(205,218,250,.82);
-        white-space:nowrap;
+      .x-upgrade-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+      .x-upgrade-title{font-size:16px;font-weight:800;color:rgba(242,246,255,.97);letter-spacing:-.01em;}
+      .x-upgrade-price{font-size:13px;font-weight:700;color:rgba(205,218,250,.82);white-space:nowrap;}
+      .x-upgrade-copy{margin-top:6px;font-size:12.5px;line-height:1.62;color:rgba(205,218,250,.76);}
+      .x-upgrade-copy strong{color:rgba(244,247,255,.96);font-weight:800;}
+      .x-upgrade-points{display:grid;gap:6px;margin-top:11px;}
+      .x-upgrade-point{
+        display:flex;align-items:flex-start;gap:8px;font-size:11.5px;line-height:1.45;color:rgba(225,233,252,.84);
       }
-
-      .upgrade-plan-copy{
-        margin-top:6px;
-        font-size:12.5px;
-        line-height:1.6;
-        color:rgba(205,218,250,.76);
-      }
-
-      .upgrade-plan-points{
-        display:grid;
-        gap:6px;
-        margin-top:11px;
-      }
-
-      .upgrade-point{
-        display:flex;
-        align-items:flex-start;
-        gap:8px;
-        font-size:11.5px;
-        line-height:1.45;
-        color:rgba(225,233,252,.82);
-      }
-
-      .upgrade-point svg{
-        width:11px;
-        height:11px;
-        margin-top:2px;
-        flex:0 0 auto;
-        color:rgba(147,197,253,.92);
-      }
-
-      .upgrade-cta{
-        display:inline-flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:10px;
-        width:100%;
-        min-height:46px;
-        margin-top:12px;
-        padding:0 14px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,.08);
-        background:rgba(255,255,255,.05);
-        color:rgba(246,248,255,.98);
-        font-size:13px;
-        font-weight:800;
-        letter-spacing:.01em;
-        cursor:pointer;
+      .x-upgrade-point svg{width:11px;height:11px;margin-top:2px;flex:0 0 auto;color:rgba(147,197,253,.92);}
+      .x-upgrade-cta{
+        display:inline-flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:46px;margin-top:12px;
+        padding:0 14px;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.05);
+        color:rgba(246,248,255,.98);font-size:13px;font-weight:800;letter-spacing:.01em;cursor:pointer;
         transition:transform .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease, opacity .16s ease;
       }
-
-      .upgrade-cta:hover{
-        transform:translateY(-1px);
-        background:rgba(255,255,255,.08);
-        border-color:rgba(255,255,255,.14);
-        box-shadow:0 10px 24px rgba(0,0,0,.14);
+      .x-upgrade-cta:hover{
+        transform:translateY(-1px);background:rgba(255,255,255,.082);border-color:rgba(255,255,255,.14);box-shadow:0 10px 24px rgba(0,0,0,.14);
       }
-
-      .upgrade-cta.primary{
-        border-color:rgba(139,111,255,.26);
-        background:linear-gradient(135deg, rgba(139,111,255,.23), rgba(104,140,255,.19));
-        box-shadow:0 14px 28px rgba(80,52,196,.22);
+      .x-upgrade-cta.primary{
+        border-color:rgba(139,111,255,.28);
+        background:linear-gradient(135deg, rgba(139,111,255,.24), rgba(104,140,255,.20));
+        box-shadow:0 14px 28px rgba(80,52,196,.20);
       }
-
-      .upgrade-cta.primary:hover{
-        background:linear-gradient(135deg, rgba(139,111,255,.29), rgba(104,140,255,.24));
+      .x-upgrade-cta.primary:hover{
+        background:linear-gradient(135deg, rgba(139,111,255,.30), rgba(104,140,255,.25));
       }
-
-      .upgrade-cta svg{
-        width:14px;
-        height:14px;
-        flex:0 0 auto;
+      .x-upgrade-cta svg{width:14px;height:14px;flex:0 0 auto;}
+      .x-upgrade-cta[disabled]{opacity:.56;pointer-events:none;cursor:default;}
+      .x-upgrade-foot{margin-top:10px;font-size:11px;line-height:1.55;color:rgba(186,201,238,.62);}
+      .x-upgrade-context{
+        margin-top:12px;border-top:1px solid rgba(255,255,255,.06);padding-top:12px;
       }
-
-      .upgrade-cta[disabled]{
-        opacity:.55;
-        cursor:default;
-        pointer-events:none;
+      .x-upgrade-context-title{
+        font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(185,201,238,.48);font-weight:800;margin-bottom:8px;
       }
-
-      .upgrade-footnote{
-        margin-top:10px;
-        font-size:11px;
-        line-height:1.55;
-        color:rgba(186,201,238,.62);
+      .x-upgrade-context-copy{
+        font-size:12px;line-height:1.62;color:rgba(212,223,248,.75);
       }
-
-      .upgrade-context{
-        margin-top:12px;
-        border-top:1px solid rgba(255,255,255,.06);
-        padding-top:12px;
+      .x-upgrade-alert{
+        display:none;margin-top:10px;padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.08);font-size:12px;line-height:1.55;
       }
-
-      .upgrade-context-title{
-        font-size:11px;
-        letter-spacing:.14em;
-        text-transform:uppercase;
-        color:rgba(185,201,238,.48);
-        font-weight:800;
-        margin-bottom:8px;
+      .x-upgrade-alert.show{display:block;}
+      .x-upgrade-alert.warning{
+        border-color:rgba(245,158,11,.18);background:rgba(245,158,11,.08);color:rgba(255,241,194,.94);
       }
-
-      .upgrade-context-copy{
-        font-size:12px;
-        line-height:1.62;
-        color:rgba(212,223,248,.75);
+      .x-upgrade-alert.info{
+        border-color:rgba(59,130,246,.18);background:rgba(59,130,246,.08);color:rgba(219,233,255,.94);
       }
-
-      .upgrade-alert{
-        display:none;
-        margin-top:10px;
-        padding:10px 12px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,.08);
-        background:rgba(255,255,255,.035);
-        color:rgba(233,239,255,.88);
-        font-size:12px;
-        line-height:1.55;
-      }
-
-      .upgrade-alert.show{
-        display:block;
-      }
-
-      .upgrade-alert.warning{
-        border-color:rgba(245,158,11,.18);
-        background:rgba(245,158,11,.08);
-        color:rgba(255,241,194,.94);
-      }
-
-      .upgrade-alert.info{
-        border-color:rgba(59,130,246,.18);
-        background:rgba(59,130,246,.08);
-        color:rgba(219,233,255,.94);
-      }
-
-      .upgrade-alert.success{
+      .x-upgrade-current{
         border-color:rgba(52,211,153,.18);
-        background:rgba(52,211,153,.08);
-        color:rgba(201,255,229,.94);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.038), rgba(255,255,255,.016)),
+          radial-gradient(circle at 88% 12%, rgba(52,211,153,.15), transparent 34%);
+      }
+      .x-upgrade-current-copy{
+        margin-top:8px;font-size:12.5px;line-height:1.62;color:rgba(212,223,248,.76);
       }
 
-      @keyframes xalvionActionReveal{
+      @keyframes xalvionReveal{
         from{opacity:0;transform:translateY(6px) scale(.995)}
         to{opacity:1;transform:translateY(0) scale(1)}
-      }
-
-      @media (max-width:900px){
-        .action-visibility{
-          margin-left:15px;
-        }
       }
     `;
     document.head.appendChild(style);
@@ -794,7 +436,7 @@
         usage:
           "You are on the Free plan. As usage grows, upgrading unlocks more monthly capacity, faster response handling, and a stronger support workflow.",
         teaser:
-          "Pro unlocks faster handling and higher limits. Elite unlocks maximum capacity and priority routing across the workspace."
+          "Pro unlocks higher limits and faster handling. Elite unlocks maximum capacity, top-priority routing, and the full Xalvion experience."
       };
     }
 
@@ -803,7 +445,7 @@
         usage:
           "You are on the Pro plan with expanded monthly capacity and priority routing for higher support volume.",
         teaser:
-          "Elite unlocks maximum capacity, top-priority routing, and the most advanced Xalvion workspace access."
+          "Elite removes pressure at scale with maximum capacity, top-priority routing, and the most advanced workspace access."
       };
     }
 
@@ -812,7 +454,7 @@
         usage:
           "You are on the Elite plan with the highest monthly capacity and advanced access across the workspace.",
         teaser:
-          "You are on the highest Xalvion tier with full access to the premium support workflow."
+          "You’re already on the highest Xalvion tier with full access to the premium support workflow."
       };
     }
 
@@ -829,16 +471,16 @@
     const ratio = state.usage / state.limit;
 
     if (ratio >= 0.9) {
-      return "Workspace capacity is nearly reached. Upgrade now to avoid interruptions in active support flow.";
+      return "Workspace capacity is almost reached. Upgrade now to avoid interruptions during active support demand.";
     }
     if (ratio >= 0.7) {
-      return "You’re approaching your monthly limit. Upgrading now prevents interruptions as usage grows.";
+      return "You’re approaching your monthly limit. Upgrading now keeps support flow smooth as demand rises.";
     }
     if ((state.tier || "free") === "free") {
-      return "Free is built for proving value. Paid plans unlock more capacity, faster handling, and stronger customer continuity.";
+      return "Free is great for proving value. Paid plans are built for reliability, speed, and customer continuity.";
     }
     if ((state.tier || "free") === "pro") {
-      return "Elite removes pressure at scale with maximum capacity and top-priority routing when support volume spikes.";
+      return "Elite is built for heavier support volume when faster routing and more headroom directly impact customer experience.";
     }
     return "";
   }
@@ -887,6 +529,7 @@
       "Response-ready workspace with clean output, visible progress, and clear action flow."
     );
     setText(els.usagePanelCopy, planCopy.usage);
+
     updateTopbarStatus();
     renderUpgradePanel();
 
@@ -913,15 +556,9 @@
             and the next best move inside the workspace.
           </p>
           <div class="empty-grid">
-            <button class="chip" data-fill="Customer says they were charged twice for the same order and wants a refund.">
-              Duplicate charge
-            </button>
-            <button class="chip" data-fill="Customer wants to cancel and receive a refund because the package never arrived.">
-              Missing order
-            </button>
-            <button class="chip" data-fill="Customer is angry that their shipment is delayed and is asking for store credit.">
-              Delay compensation
-            </button>
+            <button class="chip" data-fill="Customer says they were charged twice for the same order and wants a refund.">Duplicate charge</button>
+            <button class="chip" data-fill="Customer wants to cancel and receive a refund because the package never arrived.">Missing order</button>
+            <button class="chip" data-fill="Customer is angry that their shipment is delayed and is asking for store credit.">Delay compensation</button>
           </div>
         </div>
       </div>
@@ -1128,30 +765,32 @@
           price: "$29/mo",
           badge: "Most popular",
           badgeClass: "popular",
-          titleCopy: "Scale your support without friction.",
-          subcopy: "More capacity, faster responses, and priority handling to keep every customer interaction smooth and reliable.",
+          headline: "Scale your support without friction.",
+          body: "More capacity, faster responses, and priority handling to keep every customer interaction smooth and reliable.",
           points: [
-            "More capacity for growing support demand",
-            "Faster response handling for active workflows",
-            "Priority processing for stronger customer continuity"
+            "Higher monthly capacity for growing demand",
+            "Faster response handling during busy periods",
+            "Priority routing for stronger customer continuity"
           ],
           cta: "Unlock Pro — Scale Your Support",
-          ctaClass: "primary"
+          ctaClass: "primary",
+          foot: "Built for growth-stage usage and stronger day-to-day operational flow."
         },
         elite: {
           title: "Elite",
           price: "$99/mo",
           badge: "Full power",
           badgeClass: "",
-          titleCopy: "The full Xalvion experience.",
-          subcopy: "Maximum capacity, highest priority processing, and unrestricted access to advanced support capabilities.",
+          headline: "The full Xalvion experience.",
+          body: "Maximum capacity, highest priority processing, and unrestricted access to advanced support capabilities.",
           points: [
             "Maximum throughput for serious support volume",
             "Highest priority routing across the workspace",
-            "Built for mission-critical customer operations"
+            "Built for mission-critical support operations"
           ],
           cta: "Go Elite — Full Power Access",
-          ctaClass: ""
+          ctaClass: "",
+          foot: "Best for heavier volume, higher urgency, and premium support performance."
         }
       },
       pro: {
@@ -1160,121 +799,136 @@
           price: "$99/mo",
           badge: "Next level",
           badgeClass: "",
-          titleCopy: "Run support at full power.",
-          subcopy: "Maximum capacity and top-tier priority deliver the fastest, most reliable customer resolutions possible.",
+          headline: "Run support at full power.",
+          body: "Maximum capacity and top-tier priority deliver the fastest, most reliable customer resolutions possible.",
           points: [
-            "Maximum capacity when support volume spikes",
-            "Top-priority handling for critical operations",
-            "Full access to the most advanced workflow tools"
+            "More headroom when volume spikes",
+            "Top-priority handling for critical workflows",
+            "Full access to the strongest Xalvion setup"
           ],
           cta: "Go Elite — Full Power Access",
-          ctaClass: "primary"
+          ctaClass: "primary",
+          foot: "Upgrade when support demand, urgency, or complexity starts outgrowing Pro."
         }
       },
       elite: {}
     };
   }
 
-  function mountUpgradePanel() {
-    const plansSection = document.querySelector(".plans, [data-plans], .left-plans");
-    if (!plansSection) return null;
-
-    let host = plansSection.querySelector(".upgrade-stack");
-    if (host) return host;
-
-    if (els.upgradeButtons.length) {
-      els.upgradeButtons.forEach((btn) => {
-        const oldWrap = btn.closest(".plan-btn-wrap, .plan-row, .upgrade-row, .plan-item");
-        if (oldWrap) oldWrap.remove();
-        else btn.remove();
-      });
-      els.upgradeButtons = [];
+  function findPlansMount() {
+    if (document.querySelector(".x-upgrade-stack")) {
+      return document.querySelector(".x-upgrade-stack").parentElement;
     }
 
-    host = document.createElement("div");
-    host.className = "upgrade-stack";
-    plansSection.appendChild(host);
-    return host;
+    if (els.upgradeButtons.length) {
+      const first = els.upgradeButtons[0];
+      return (
+        first.closest(".plans") ||
+        first.closest("[data-plans]") ||
+        first.parentElement?.parentElement ||
+        first.parentElement
+      );
+    }
+
+    return (
+      document.querySelector(".plans") ||
+      document.querySelector("[data-plans]") ||
+      null
+    );
   }
 
   function renderUpgradePanel() {
-    const host = mountUpgradePanel();
-    if (!host) return;
+    const mount = findPlansMount();
+    if (!mount) return;
 
-    const plan = (state.tier || "free").toLowerCase();
+    const oldButtons = Array.from(mount.querySelectorAll("[data-upgrade]"));
+    oldButtons.forEach((btn) => {
+      const wrap =
+        btn.closest(".x-upgrade-stack") ||
+        btn.closest(".plan-btn-wrap") ||
+        btn.closest(".plan-row") ||
+        btn.closest(".upgrade-row") ||
+        btn.closest(".plan-item") ||
+        btn;
+      if (!wrap.classList?.contains("x-upgrade-stack")) {
+        wrap.remove();
+      }
+    });
+
+    let stack = mount.querySelector(".x-upgrade-stack");
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.className = "x-upgrade-stack";
+      mount.appendChild(stack);
+    }
+
+    const tier = (state.tier || "free").toLowerCase();
     const configs = getUpgradeConfig();
-    const options = configs[plan] || {};
+    const options = configs[tier] || {};
     const pressure = getUsagePressureMessage();
     const teaser = getPlanCopy().teaser || "";
 
-    let html = "";
-
-    if (plan === "elite") {
-      html = `
-        <div class="upgrade-card popular">
-          <div class="upgrade-badge popular">${ICONS.crown}<span>Highest tier active</span></div>
-          <div class="upgrade-plan-row">
-            <div class="upgrade-plan-title">Elite active</div>
-            <div class="upgrade-plan-price">Full access</div>
+    if (tier === "elite") {
+      stack.innerHTML = `
+        <div class="x-upgrade-card x-upgrade-current">
+          <div class="x-upgrade-badge popular">${ICONS.crown}<span>Highest tier active</span></div>
+          <div class="x-upgrade-row">
+            <div class="x-upgrade-title">Elite active</div>
+            <div class="x-upgrade-price">Full access</div>
           </div>
-          <div class="upgrade-plan-copy">
-            You’re already on the highest Xalvion plan with maximum capacity and top-priority support routing.
+          <div class="x-upgrade-current-copy">
+            You’re already on the highest Xalvion plan with maximum capacity, top-priority routing, and the strongest workspace access.
           </div>
-          <div class="upgrade-context">
-            <div class="upgrade-context-title">Current advantage</div>
-            <div class="upgrade-context-copy">${escapeHtml(teaser)}</div>
+          <div class="x-upgrade-context">
+            <div class="x-upgrade-context-title">Current advantage</div>
+            <div class="x-upgrade-context-copy">${escapeHtml(teaser)}</div>
           </div>
         </div>
       `;
-      host.innerHTML = html;
+      els.upgradeButtons = [];
       return;
     }
 
-    Object.entries(options).forEach(([tier, cfg]) => {
+    let html = "";
+    Object.entries(options).forEach(([planKey, cfg]) => {
       html += `
-        <div class="upgrade-card ${cfg.badgeClass === "popular" ? "popular" : ""}">
-          ${cfg.badge ? `<div class="upgrade-badge ${cfg.badgeClass}">${cfg.badgeClass === "popular" ? ICONS.crown : ICONS.bolt}<span>${escapeHtml(cfg.badge)}</span></div>` : ""}
-          <div class="upgrade-plan-row">
-            <div class="upgrade-plan-title">${escapeHtml(cfg.title)}</div>
-            <div class="upgrade-plan-price">${escapeHtml(cfg.price)}</div>
+        <div class="x-upgrade-card ${cfg.badgeClass === "popular" ? "popular" : ""}">
+          ${cfg.badge ? `<div class="x-upgrade-badge ${cfg.badgeClass}">${cfg.badgeClass === "popular" ? ICONS.crown : ICONS.bolt}<span>${escapeHtml(cfg.badge)}</span></div>` : ""}
+          <div class="x-upgrade-row">
+            <div class="x-upgrade-title">${escapeHtml(cfg.title)}</div>
+            <div class="x-upgrade-price">${escapeHtml(cfg.price)}</div>
           </div>
-          <div class="upgrade-plan-copy">
-            <strong>${escapeHtml(cfg.titleCopy)}</strong><br>
-            ${escapeHtml(cfg.subcopy)}
+          <div class="x-upgrade-copy">
+            <strong>${escapeHtml(cfg.headline)}</strong><br>
+            ${escapeHtml(cfg.body)}
           </div>
-          <div class="upgrade-plan-points">
+          <div class="x-upgrade-points">
             ${cfg.points.map((point) => `
-              <div class="upgrade-point">
+              <div class="x-upgrade-point">
                 ${ICONS.check}
                 <span>${escapeHtml(point)}</span>
               </div>
             `).join("")}
           </div>
-          <button class="upgrade-cta ${cfg.ctaClass}" type="button" data-upgrade="${escapeHtml(tier)}">
+          <button class="x-upgrade-cta ${cfg.ctaClass}" type="button" data-upgrade="${escapeHtml(planKey)}">
             <span>${escapeHtml(cfg.cta)}</span>
-            ${ICONS.send}
+            ${ICONS.arrow}
           </button>
-          <div class="upgrade-footnote">
-            ${plan === "free"
-              ? tier === "pro"
-                ? "Built for growth-stage usage and stronger response continuity."
-                : "Best for high-volume teams that need maximum capacity and priority treatment."
-              : "Upgrade when your support volume, urgency, or operational complexity outgrows Pro."}
-          </div>
+          <div class="x-upgrade-foot">${escapeHtml(cfg.foot)}</div>
         </div>
       `;
     });
 
     html += `
-      <div class="upgrade-context">
-        <div class="upgrade-context-title">Why upgrade now</div>
-        <div class="upgrade-context-copy">${escapeHtml(teaser)}</div>
-        ${pressure ? `<div class="upgrade-alert ${((state.tier || "free") === "free" && state.usage / Math.max(state.limit || 1, 1) < 0.7) ? "info" : "warning"} show">${escapeHtml(pressure)}</div>` : ""}
+      <div class="x-upgrade-context">
+        <div class="x-upgrade-context-title">Why upgrade now</div>
+        <div class="x-upgrade-context-copy">${escapeHtml(teaser)}</div>
+        ${pressure ? `<div class="x-upgrade-alert ${tier === "free" && state.usage / Math.max(state.limit || 1, 1) < 0.7 ? "info" : "warning"} show">${escapeHtml(pressure)}</div>` : ""}
       </div>
     `;
 
-    host.innerHTML = html;
-    els.upgradeButtons = Array.from(host.querySelectorAll("[data-upgrade]"));
+    stack.innerHTML = html;
+    els.upgradeButtons = Array.from(stack.querySelectorAll("[data-upgrade]"));
     bindUpgrades();
   }
 
@@ -1362,7 +1016,7 @@
       const data = await res.json();
       updateDashboardUI(data);
     } catch {
-      // stable
+      // keep stable
     }
   }
 
@@ -1475,7 +1129,11 @@
     }
 
     try {
-      setNotice("info", "Securing your upgrade", `Preparing ${desired.toUpperCase()} — you’ll be redirected to complete payment securely.`);
+      setNotice(
+        "info",
+        "Securing your upgrade",
+        `Preparing ${desired.toUpperCase()} — you’ll be redirected to complete payment securely.`
+      );
       pulseRail("usage");
 
       const res = await fetch(`${API}/billing/upgrade`, {
@@ -1565,7 +1223,6 @@
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-
       const parts = buffer.split("\n\n");
       buffer = parts.pop() || "";
 
@@ -1580,7 +1237,6 @@
         }
 
         if (!dataValue) continue;
-
         const parsed = JSON.parse(dataValue);
 
         if (eventName === "chunk") {
@@ -1605,7 +1261,7 @@
     const payload = buildSupportPayload();
     if (!payload.message || state.sending) return;
 
-    ensureActionVisibilityStyles();
+    ensureInjectedStyles();
     ensurePaymentIntentField();
 
     if (els.messages?.querySelector(".empty-state")) {
@@ -1738,7 +1394,7 @@
   }
 
   async function init() {
-    ensureActionVisibilityStyles();
+    ensureInjectedStyles();
     ensurePaymentIntentField();
     renderEmptyState();
     bindChips();
@@ -1750,6 +1406,7 @@
     await healthCheck();
     await hydrateMe();
     await loadDashboard();
+    renderUpgradePanel();
   }
 
   if (document.readyState === "loading") {
