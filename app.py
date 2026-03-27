@@ -131,6 +131,9 @@ PLAN_CONFIG: dict[str, dict[str, Any]] = {
     },
 }
 
+PUBLIC_PLAN_TIERS = {"free", "pro", "elite"}
+INTERNAL_ONLY_PLAN_TIERS = {"dev"}
+
 PRICE_MAP = {
     "pro": STRIPE_PRICE_PRO,
     "elite": STRIPE_PRICE_ELITE,
@@ -299,6 +302,11 @@ def get_plan_name(user: User | None) -> str:
     return tier if tier in PLAN_CONFIG else "free"
 
 
+def get_public_plan_name(user: User | None) -> str:
+    tier = get_plan_name(user)
+    return tier if tier in PUBLIC_PLAN_TIERS else "free"
+
+
 def get_plan_config(tier: str | None) -> dict[str, Any]:
     key = (tier or "free").strip().lower()
     return PLAN_CONFIG.get(key, PLAN_CONFIG["free"])
@@ -322,7 +330,7 @@ def get_usage_summary(user: User | None) -> dict[str, Any]:
 
 
 def build_upgrade_payload(current_tier: str) -> dict[str, Any]:
-    current_key = current_tier if current_tier in PLAN_CONFIG else "free"
+    current_key = current_tier if current_tier in PUBLIC_PLAN_TIERS else "free"
     suggestions = ["pro", "elite"] if current_key == "free" else ["elite"] if current_key == "pro" else []
     return {
         "current_tier": current_key,
@@ -338,7 +346,7 @@ def build_upgrade_payload(current_tier: str) -> dict[str, Any]:
                 "checkout_ready": bool(PRICE_MAP.get(tier)),
             }
             for tier, cfg in PLAN_CONFIG.items()
-            if tier != "dev"
+            if tier in PUBLIC_PLAN_TIERS
         },
     }
 
@@ -372,6 +380,12 @@ def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
+    return user
+
+
+def require_authenticated_user(user: User = Depends(get_current_user)):
+    if getattr(user, "username", "") in {"", "guest"}:
+        raise HTTPException(status_code=401, detail="Authentication required")
     return user
 
 
@@ -803,7 +817,7 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "tier": usage_summary["tier"],
         "plan_limit": usage_summary["limit"],
         "usage": usage_summary["usage"],
-        "remaining": usage_summary["remaining"],
+        "remaining": max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"]),
     }
 
 
@@ -968,13 +982,12 @@ def validate_upgrade_request(desired: str, current_tier: str) -> None:
     if desired not in {"pro", "elite"}:
         raise HTTPException(status_code=400, detail="Invalid tier")
 
-    if current_tier == "dev":
-        return
+    normalized_current = current_tier if current_tier in PUBLIC_PLAN_TIERS else "free"
 
-    if current_tier == desired:
+    if normalized_current == desired:
         raise HTTPException(status_code=400, detail=f"Already on {desired}")
 
-    if current_tier == "elite" and desired == "pro":
+    if normalized_current == "elite" and desired == "pro":
         raise HTTPException(status_code=400, detail="Downgrades are not supported from this endpoint")
 
 
@@ -1060,24 +1073,27 @@ def health():
 def me(user: User = Depends(get_current_user)):
     usage_summary = get_usage_summary(user)
     public_username = "" if user.username in {"guest", "dev_user"} else user.username
-    public_tier = "free" if usage_summary["tier"] == "dev" else usage_summary["tier"]
+    public_tier = get_public_plan_name(user)
+    public_plan = get_plan_config(public_tier)
+    public_limit = int(public_plan["monthly_limit"])
+    public_remaining = max(0, public_limit - usage_summary["usage"])
 
     return {
         "username": public_username,
         "tier": public_tier,
         "usage": usage_summary["usage"],
-        "limit": usage_summary["limit"],
-        "remaining": usage_summary["remaining"],
-        "dashboard_access": usage_summary["dashboard_access"],
-        "priority_routing": usage_summary["priority_routing"],
-        "is_dev": usage_summary["tier"] == "dev",
+        "limit": public_limit,
+        "remaining": public_remaining,
+        "dashboard_access": public_plan["dashboard_access"],
+        "priority_routing": public_plan["priority_routing"],
+        "is_dev": usage_summary["tier"] == "dev" and user.username == ADMIN_USERNAME,
         "is_admin": user.username == ADMIN_USERNAME,
     }
 
 
 @app.get("/billing/plans")
 def billing_plans(user: User = Depends(get_current_user)):
-    current_tier = get_plan_name(user)
+    current_tier = get_public_plan_name(user)
     return build_upgrade_payload(current_tier)
 
 
@@ -1098,11 +1114,11 @@ def dashboard_summary(user: User = Depends(get_current_user), db: Session = Depe
         "pro_users": pro_users,
         "elite_users": elite_users,
         "your_usage": usage_summary["usage"],
-        "your_tier": "free" if usage_summary["tier"] == "dev" else usage_summary["tier"],
-        "your_limit": usage_summary["limit"],
+        "your_tier": get_public_plan_name(user),
+        "your_limit": get_plan_config(get_public_plan_name(user))["monthly_limit"],
         "remaining": usage_summary["remaining"],
-        "dashboard_access": usage_summary["dashboard_access"],
-        "priority_routing": usage_summary["priority_routing"],
+        "dashboard_access": get_plan_config(get_public_plan_name(user))["dashboard_access"],
+        "priority_routing": get_plan_config(get_public_plan_name(user))["priority_routing"],
     }
 
 
@@ -1154,11 +1170,11 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
 @app.post("/billing/upgrade")
 def upgrade_plan(
     req: UpgradeRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_authenticated_user),
     db: Session = Depends(get_db),
 ):
     desired = (req.tier or "").strip().lower()
-    current_tier = get_plan_name(user)
+    current_tier = get_public_plan_name(user)
 
     validate_upgrade_request(desired, current_tier)
 
