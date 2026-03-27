@@ -1252,20 +1252,31 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         print(f"[STRIPE] webhook parse failed error={exc}")
         raise HTTPException(status_code=400, detail=f"Webhook parse failed: {exc}") from exc
 
-    event_type = event.get("type", "")
-    data_object = event.get("data", {}).get("object", {}) or {}
+    event_type = getattr(event, "type", "") or ""
+    event_data = getattr(event, "data", None)
+    data_object = getattr(event_data, "object", None)
 
     print(f"[STRIPE] webhook parsed event_type={event_type!r}")
 
     if event_type == "checkout.session.completed":
-        metadata = data_object.get("metadata", {}) or {}
-        username = (metadata.get("username") or data_object.get("client_reference_id") or "").strip()
+        metadata = getattr(data_object, "metadata", None) or {}
+
+        if not isinstance(metadata, dict):
+            try:
+                metadata = dict(metadata)
+            except Exception:
+                metadata = {}
+
+        client_reference_id = getattr(data_object, "client_reference_id", None) or ""
+        session_id = getattr(data_object, "id", None)
+
+        username = (metadata.get("username") or client_reference_id or "").strip()
         tier = (metadata.get("tier") or "").strip().lower()
 
         print(f"[STRIPE] checkout.session.completed username={username!r} tier={tier!r}")
         print(f"[STRIPE] metadata={metadata!r}")
-        print(f"[STRIPE] client_reference_id={data_object.get('client_reference_id', None)!r}")
-        print(f"[STRIPE] session_id={data_object.get('id', None)!r}")
+        print(f"[STRIPE] client_reference_id={client_reference_id!r}")
+        print(f"[STRIPE] session_id={session_id!r}")
 
         if username and tier:
             upgraded_user = apply_successful_upgrade(db, username, tier)
