@@ -135,12 +135,147 @@
     .price-list div::before{content:"•";position:absolute;left:0;color:rgba(167,139,250,.86)}
     .center{text-align:center}
     footer{padding:48px 24px 80px;color:var(--muted2);text-align:center}
+
+    .pricing-kicker{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 14px;
+      border-radius:999px;
+      border:1px solid rgba(124,92,252,.28);
+      background:rgba(124,92,252,.10);
+      color:rgba(196,181,253,.94);
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      margin-top:24px;
+      margin-bottom:18px;
+    }
+
+    .pricing-grid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:22px;
+      margin-top:56px;
+      align-items:stretch;
+    }
+
+    .price-card{
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      min-height:100%;
+      overflow:hidden;
+    }
+
+    .price-card.featured{
+      transform:translateY(-10px) scale(1.02);
+      border-color:rgba(124,92,252,.42);
+      box-shadow:
+        0 0 90px rgba(124,92,252,.16),
+        0 40px 120px rgba(0,0,0,.42);
+      background:
+        linear-gradient(180deg, rgba(18,20,42,.92), rgba(10,12,28,.90)),
+        radial-gradient(circle at 50% 0%, rgba(124,92,252,.12), transparent 48%);
+    }
+
+    .plan-badge{
+      position:absolute;
+      top:18px;
+      right:18px;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:7px 12px;
+      border-radius:999px;
+      background:rgba(124,92,252,.16);
+      border:1px solid rgba(124,92,252,.30);
+      color:rgba(225,218,255,.96);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      box-shadow:0 0 24px rgba(124,92,252,.18);
+    }
+
+    .plan-subcopy{
+      color:rgba(215,225,250,.94);
+      line-height:1.75;
+      margin-top:10px;
+    }
+
+    .price-value-note{
+      margin-top:12px;
+      font-size:13px;
+      font-weight:600;
+      color:rgba(170,220,255,.88);
+    }
+
+    .price-list{
+      margin-top:22px;
+      margin-bottom:24px;
+    }
+
+    .plan-cta{
+      margin-top:auto;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .plan-btn{
+      height:50px;
+      border-radius:16px;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      font-weight:700;
+      font-size:15px;
+      transition:transform .14s ease, box-shadow .14s ease, background .14s ease, border-color .14s ease;
+    }
+
+    .plan-btn:hover{
+      transform:translateY(-1px);
+    }
+
+    .plan-btn.primary{
+      background:linear-gradient(135deg,#7c5cfc,#4f8ef7);
+      color:#fff;
+      border:1px solid rgba(124,92,252,.44);
+      box-shadow:0 0 34px rgba(124,92,252,.24),0 12px 26px rgba(0,0,0,.28);
+    }
+
+    .plan-btn.secondary{
+      background:rgba(255,255,255,.05);
+      color:var(--text);
+      border:1px solid var(--line2);
+      backdrop-filter:blur(12px);
+    }
+
+    .plan-meta{
+      font-size:12px;
+      color:rgba(205,215,242,.72);
+      text-align:center;
+    }
+
+    .pricing-footnote{
+      margin-top:34px;
+      text-align:center;
+      font-size:14px;
+      color:rgba(205,215,242,.74);
+    }
+
     @media (max-width:900px){
       nav{padding:16px 24px}
       .nav-links{display:none}
-      .stats-grid,.cards{grid-template-columns:1fr}
+      .stats-grid,.cards,.pricing-grid{grid-template-columns:1fr}
       .stat-item{border-right:none;border-bottom:1px solid var(--line)}
       .stat-item:last-child{border-bottom:none}
+      .price-card.featured{transform:none}
+      .plan-badge{top:16px;right:16px}
     }
   </style>
 </head>
@@ -274,40 +409,68 @@
     <section id="pricing" class="pricing">
       <div class="container">
         <div class="section-label">Pricing</div>
-        <div class="section-title">Built to create upgrade pressure, not hide from it</div>
-        <div class="section-desc">These tiers map directly to the new workspace behavior: visible usage limits, more throughput, and stronger dashboard access as the plans rise.</div>
-        <div class="cards">
+        <div class="section-title">Simple pricing. <br/>Scale as you grow.</div>
+        <div class="section-desc">
+          Start free, prove the workflow, then upgrade when your support volume and automation needs increase.
+          The product is designed to make that step obvious.
+        </div>
+
+        <div class="pricing-kicker">Start free • upgrade when the pressure is real</div>
+
+        <div class="pricing-grid">
           <div class="price-card">
             <h3>Free</h3>
-            <div class="price">$0 <span>/ test mode</span></div>
-            <p>Enough to feel the product. Not enough to stay there forever.</p>
+            <div class="price">$0 <span>/ month</span></div>
+            <p class="plan-subcopy">Enough to experience the workspace and feel the product loop before committing.</p>
             <div class="price-list">
-              <div>25 monthly tickets</div>
+              <div>50 monthly tickets</div>
               <div>Basic dashboard</div>
-              <div>Great for first demos</div>
+              <div>Core support workspace access</div>
+            </div>
+            <div class="plan-cta">
+              <a class="plan-btn secondary" href="/">Start Free</a>
+              <div class="plan-meta">No contract. Explore the workflow first.</div>
             </div>
           </div>
+
           <div class="price-card featured">
+            <div class="plan-badge">Most Popular</div>
             <h3>Pro</h3>
-            <div class="price">$49 <span>/ month</span></div>
-            <p>The first serious plan for real support volume and faster routing.</p>
+            <div class="price">$29 <span>/ month</span></div>
+            <p class="plan-subcopy">For growing teams replacing manual support with a faster, clearer operator workflow.</p>
+            <div class="price-value-note">Replaces hours of repetitive support handling every month.</div>
             <div class="price-list">
               <div>500 monthly tickets</div>
               <div>Priority routing enabled</div>
               <div>Full dashboard visibility</div>
             </div>
+            <div class="plan-cta">
+              <a class="plan-btn primary" href="/">Upgrade to Pro →</a>
+              <div class="plan-meta">Start in seconds. Cancel anytime.</div>
+            </div>
           </div>
+
           <div class="price-card">
             <h3>Elite</h3>
-            <div class="price">$199 <span>/ month</span></div>
-            <p>The scale tier for teams that want the operator feel without the human bottleneck.</p>
+            <div class="price">$99 <span>/ month</span></div>
+            <p class="plan-subcopy">For teams that want to run support at scale with stronger visibility and higher throughput.</p>
+            <div class="price-value-note">Built for serious volume without the human bottleneck.</div>
             <div class="price-list">
               <div>5000 monthly tickets</div>
-              <div>Advanced dashboard</div>
+              <div>Advanced dashboard access</div>
               <div>Multi-seat support story</div>
+            </div>
+            <div class="plan-cta">
+              <a class="plan-btn secondary" href="/">Go Elite →</a>
+              <div class="plan-meta">For higher-volume support operations.</div>
             </div>
           </div>
         </div>
+
+        <div class="pricing-footnote">
+          No contracts. Cancel anytime. Upgrade when you need more power.
+        </div>
+
         <div class="center" style="margin-top:38px">
           <a class="btn-primary" href="/">Try the workspace now →</a>
         </div>
