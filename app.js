@@ -541,7 +541,7 @@
     return {
       usage:
         "You are on the Starter plan with access to the core support workspace."
-    };
+      };
   }
 
   function updateTopbarStatus() {
@@ -990,18 +990,37 @@
   }
 
   async function upgradePlan(tier) {
+    const desired = String(tier || "").trim().toLowerCase();
+
+    if (!desired) {
+      setNotice("error", "Upgrade failed", "No plan was selected.");
+      return;
+    }
+
+    if (!state.token || !state.username) {
+      setNotice(
+        "warning",
+        "Log in required",
+        "Create an account or log in before upgrading so the plan can attach to your workspace."
+      );
+      pulseRail("account");
+      return;
+    }
+
     try {
-      setNotice("info", "Preparing upgrade", `Preparing ${String(tier).toUpperCase()} upgrade...`);
+      setNotice("info", "Preparing upgrade", `Preparing ${desired.toUpperCase()} upgrade...`);
       pulseRail("usage");
 
-      const res = await fetch(`${API}/upgrade`, {
+      const res = await fetch(`${API}/billing/upgrade`, {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify({ tier })
+        body: JSON.stringify({ tier: desired })
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "Upgrade failed");
+      if (!res.ok) {
+        throw new Error(data.detail || `Upgrade failed (${res.status})`);
+      }
 
       if (data.checkout_url) {
         window.location.href = data.checkout_url;
@@ -1019,7 +1038,7 @@
         );
       }
 
-      setNotice("success", "Plan updated", `${String(tier).toUpperCase()} is now active.`);
+      setNotice("success", "Plan updated", `${desired.toUpperCase()} is now active.`);
     } catch (err) {
       setNotice("error", "Upgrade failed", err.message || "Could not prepare the upgrade.");
     }
@@ -1171,11 +1190,11 @@
         state.username = data.username;
         persistAuth();
         setText(
-  els.authStatus,
-  data.username && data.username !== "dev_user"
-    ? `Account: ${data.username}`
-    : "Account: guest workspace"
-);
+          els.authStatus,
+          data.username && data.username !== "dev_user"
+            ? `Account: ${data.username}`
+            : "Account: guest workspace"
+        );
       }
 
       if (data.action) {
