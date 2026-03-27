@@ -363,6 +363,58 @@
         box-shadow:0 0 0 3px rgba(139,111,255,.08);
       }
 
+      .assistant-actions{
+        display:flex;
+        align-items:flex-start;
+        gap:10px;
+        flex-wrap:wrap;
+        margin-top:14px;
+      }
+
+      .mini-btn.copy-btn{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:34px;
+        height:34px;
+        padding:0;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,.08);
+        background:rgba(255,255,255,.045);
+        color:rgba(232,238,255,.92);
+        box-shadow:0 8px 20px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.04);
+        transition:transform .16s ease, background .16s ease, border-color .16s ease, color .16s ease;
+        flex:0 0 auto;
+      }
+
+      .mini-btn.copy-btn:hover{
+        transform:translateY(-1px);
+        background:rgba(255,255,255,.075);
+        border-color:rgba(255,255,255,.14);
+      }
+
+      .mini-btn.copy-btn:active{
+        transform:translateY(0);
+      }
+
+      .mini-btn.copy-btn svg{
+        width:15px;
+        height:15px;
+        display:block;
+      }
+
+      .mini-btn.copy-btn span{
+        position:absolute !important;
+        width:1px !important;
+        height:1px !important;
+        padding:0 !important;
+        margin:-1px !important;
+        overflow:hidden !important;
+        clip:rect(0, 0, 0, 0) !important;
+        white-space:nowrap !important;
+        border:0 !important;
+      }
+
       @keyframes xalvionActionReveal{
         from{opacity:0;transform:translateY(6px) scale(.995)}
         to{opacity:1;transform:translateY(0) scale(1)}
@@ -389,13 +441,13 @@
 
     const label = document.createElement("div");
     label.className = "refund-assist-label";
-    label.textContent = "Refund testing";
+    label.textContent = "Payment reference";
 
     const input = document.createElement("input");
     input.type = "text";
     input.id = "paymentIntentInput";
     input.className = "refund-assist-input";
-    input.placeholder = "Paste Stripe payment_intent_id (pi_...) or charge_id (ch_...)";
+    input.placeholder = "Paste payment_intent_id (pi_...) or charge_id (ch_...) when needed";
 
     wrap.appendChild(label);
     wrap.appendChild(input);
@@ -541,7 +593,7 @@
     return {
       usage:
         "You are on the Starter plan with access to the core support workspace."
-      };
+    };
   }
 
   function updateTopbarStatus() {
@@ -549,10 +601,9 @@
     const usage = Number.isFinite(state.usage) ? state.usage : 0;
     const limit = Number.isFinite(state.limit) ? state.limit : null;
     const user = state.username || "";
-    const tierLabel = tier;
     const usageStr = limit ? `${usage}/${limit} used` : "active";
     const userStr = user ? `${user} · ` : "";
-    setText(els.workspaceSubcopy, `${userStr}${tierLabel} · ${usageStr}`);
+    setText(els.workspaceSubcopy, `${userStr}${tier} · ${usageStr}`);
   }
 
   function pulseRail(target = "account") {
@@ -791,7 +842,10 @@
     if (!actions) return;
 
     actions.innerHTML = `
-      <button class="mini-btn copy-btn" type="button">${ICONS.copy}<span>Copy reply</span></button>
+      <button class="mini-btn copy-btn" type="button" aria-label="Copy reply" title="Copy reply">
+        ${ICONS.copy}
+        <span>Copy reply</span>
+      </button>
     `;
 
     const btn = actions.querySelector(".copy-btn");
@@ -801,9 +855,17 @@
       try {
         await navigator.clipboard.writeText(text || "");
         const old = btn.innerHTML;
+        const oldTitle = btn.title;
+        const oldLabel = btn.getAttribute("aria-label") || "Copy reply";
+
         btn.innerHTML = `${ICONS.check}<span>Copied</span>`;
+        btn.title = "Copied";
+        btn.setAttribute("aria-label", "Copied");
+
         window.setTimeout(() => {
           btn.innerHTML = old;
+          btn.title = oldTitle;
+          btn.setAttribute("aria-label", oldLabel);
         }, 1200);
       } catch {
         setNotice("warning", "Copy unavailable", "Could not copy the response from this browser.");
