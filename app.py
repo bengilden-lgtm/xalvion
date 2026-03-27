@@ -219,6 +219,46 @@ class ActionLog(Base):
     approved = Column(Integer, default=0)
 
 
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+    username = Column(String, nullable=False, index=True)
+    channel = Column(String, default="web")
+    source = Column(String, default="workspace")
+    status = Column(String, default="new", index=True)
+    queue = Column(String, default="new", index=True)
+    priority = Column(String, default="medium")
+    risk_level = Column(String, default="medium")
+    issue_type = Column(String, default="general_support")
+    subject = Column(Text, default="")
+    customer_message = Column(Text, default="")
+    final_reply = Column(Text, default="")
+    internal_note = Column(Text, default="")
+    action = Column(String, default="none")
+    amount = Column(Float, default=0.0)
+    confidence = Column(Float, default=0.0)
+    quality = Column(Float, default=0.0)
+    requires_approval = Column(Integer, default=0)
+    approved = Column(Integer, default=0)
+    churn_risk = Column(Integer, default=0)
+    refund_likelihood = Column(Integer, default=0)
+    abuse_likelihood = Column(Integer, default=0)
+    complexity = Column(Integer, default=0)
+    urgency = Column(Integer, default=0)
+
+
+class OperatorState(Base):
+    __tablename__ = "operator_state"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    mode = Column(String, default="balanced")
+    updated_at = Column(String, nullable=False)
+
+
 Base.metadata.create_all(bind=engine)
 
 # =========================================================
@@ -239,6 +279,8 @@ class SupportRequest(BaseModel):
     payment_intent_id: str | None = None
     charge_id: str | None = None
     refund_reason: str | None = None
+    channel: str | None = None
+    source: str | None = None
 
 
 class UpgradeRequest(BaseModel):
@@ -247,6 +289,16 @@ class UpgradeRequest(BaseModel):
 
 class AdminUserAction(BaseModel):
     username: str
+
+
+class OperatorModeRequest(BaseModel):
+    mode: str
+
+
+class TicketStatusRequest(BaseModel):
+    status: str | None = None
+    queue: str | None = None
+    internal_note: str | None = None
 
 
 # =========================================================
@@ -412,8 +464,36 @@ def enforce_plan_limits(user: User) -> None:
         )
 
 
-def build_agent_meta(req: SupportRequest, user: User) -> dict[str, Any]:
+def get_operator_mode(db: Session) -> str:
+    state = db.query(OperatorState).order_by(OperatorState.id.asc()).first()
+    if not state:
+        state = OperatorState(mode="balanced", updated_at=datetime.utcnow().isoformat())
+        db.add(state)
+        db.commit()
+        db.refresh(state)
+    mode = (state.mode or "balanced").strip().lower()
+    return mode if mode in {"conservative", "balanced", "delight", "fraud_aware"} else "balanced"
+
+
+def set_operator_mode(db: Session, mode: str) -> str:
+    normalized = (mode or "balanced").strip().lower()
+    if normalized not in {"conservative", "balanced", "delight", "fraud_aware"}:
+        raise HTTPException(status_code=400, detail="Invalid operator mode")
+    state = db.query(OperatorState).order_by(OperatorState.id.asc()).first()
+    if not state:
+        state = OperatorState(mode=normalized, updated_at=datetime.utcnow().isoformat())
+        db.add(state)
+    else:
+        state.mode = normalized
+        state.updated_at = datetime.utcnow().isoformat()
+    db.commit()
+    db.refresh(state)
+    return normalized
+
+
+def build_agent_meta(req: SupportRequest, user: User, db: Session | None = None) -> dict[str, Any]:
     plan_name = get_plan_name(user)
+    operator_mode = get_operator_mode(db) if db is not None else "balanced"
     return {
         "sentiment": req.sentiment if req.sentiment is not None else 5,
         "ltv": req.ltv if req.ltv is not None else 0,
@@ -422,7 +502,99 @@ def build_agent_meta(req: SupportRequest, user: User) -> dict[str, Any]:
         "priority_routing": get_plan_config(plan_name)["priority_routing"],
         "payment_intent_id": (req.payment_intent_id or "").strip(),
         "charge_id": (req.charge_id or "").strip(),
+        "operator_mode": operator_mode,
+        "channel": (req.channel or "web").strip() or "web",
+        "source": (req.source or "workspace").strip() or "workspace",
     }
+
+
+def serialize_ticket(ticket: Ticket) -> dict[str, Any]:
+    return {
+        "id": ticket.id,
+        "created_at": ticket.created_at,
+        "updated_at": ticket.updated_at,
+        "username": ticket.username,
+        "channel": ticket.channel,
+        "source": ticket.source,
+        "status": ticket.status,
+        "queue": ticket.queue,
+        "priority": ticket.priority,
+        "risk_level": ticket.risk_level,
+        "issue_type": ticket.issue_type,
+        "subject": ticket.subject,
+        "customer_message": ticket.customer_message,
+        "final_reply": ticket.final_reply,
+        "internal_note": ticket.internal_note,
+        "action": ticket.action,
+        "amount": ticket.amount,
+        "confidence": ticket.confidence,
+        "quality": ticket.quality,
+        "requires_approval": bool(ticket.requires_approval),
+        "approved": bool(ticket.approved),
+        "urgency": ticket.urgency,
+        "churn_risk": ticket.churn_risk,
+        "refund_likelihood": ticket.refund_likelihood,
+        "abuse_likelihood": ticket.abuse_likelihood,
+        "complexity": ticket.complexity,
+    }
+
+
+def create_ticket_record(db: Session, user: User, req: SupportRequest) -> Ticket:
+    now = datetime.utcnow().isoformat()
+    ticket = Ticket(
+        created_at=now,
+        updated_at=now,
+        username=str(getattr(user, "username", "unknown") or "unknown"),
+        channel=(req.channel or "web").strip() or "web",
+        source=(req.source or "workspace").strip() or "workspace",
+        subject=(req.message or "")[:300],
+        customer_message=(req.message or "")[:2000],
+        status="new",
+        queue="new",
+        priority="medium",
+        risk_level="medium",
+        issue_type="general_support",
+    )
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
+
+def update_ticket_from_result(db: Session, ticket: Ticket, result: dict[str, Any]) -> Ticket:
+    decision = result.get("decision") or {}
+    triage = result.get("triage") or {}
+    output = result.get("output") or {}
+    action = str(result.get("action", "none") or "none")
+    queue = str(decision.get("queue", "new") or "new")
+    status = "resolved" if action in {"refund", "credit", "none"} else "escalated"
+    if str(result.get("tool_status", "")).lower() in {"pending_approval", "manual_review"}:
+        status = "waiting"
+    if queue == "resolved":
+        status = "resolved"
+
+    ticket.updated_at = datetime.utcnow().isoformat()
+    ticket.status = status
+    ticket.queue = queue
+    ticket.priority = str(decision.get("priority", result.get("meta", {}).get("priority", "medium")) or "medium")
+    ticket.risk_level = str(decision.get("risk_level", "medium") or "medium")
+    ticket.issue_type = str(result.get("issue_type", "general_support") or "general_support")
+    ticket.final_reply = str(result.get("reply", result.get("final", "")) or "")
+    ticket.internal_note = str(output.get("internal_note", "") or "")
+    ticket.action = action
+    ticket.amount = float(result.get("amount", 0) or 0)
+    ticket.confidence = float(result.get("confidence", 0) or 0)
+    ticket.quality = float(result.get("quality", 0) or 0)
+    ticket.requires_approval = int(bool(decision.get("requires_approval", False)))
+    ticket.approved = 0
+    ticket.urgency = int(triage.get("urgency", 0) or 0)
+    ticket.churn_risk = int(triage.get("churn_risk", 0) or 0)
+    ticket.refund_likelihood = int(triage.get("refund_likelihood", 0) or 0)
+    ticket.abuse_likelihood = int(triage.get("abuse_likelihood", 0) or 0)
+    ticket.complexity = int(triage.get("complexity", 0) or 0)
+    db.commit()
+    db.refresh(ticket)
+    return ticket
 
 
 def safe_refund_reason(value: str | None) -> str:
@@ -780,6 +952,11 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "tool_result": tool_result,
         "tool_status": result.get("tool_status", tool_result.get("status", "unknown")),
         "impact": impact,
+        "decision": result.get("decision", {}),
+        "output": result.get("output", {}),
+        "meta": result.get("meta", {}),
+        "triage": result.get("triage", {}),
+        "history": result.get("history", {}),
         "tier": usage_summary["tier"],
         "plan_limit": usage_summary["limit"],
         "usage": usage_summary["usage"],
@@ -832,16 +1009,17 @@ def check_requires_approval(action: str, amount: float) -> bool:
 
 def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
     enforce_plan_limits(user)
+    ticket = create_ticket_record(db, user, req)
 
     result = run_agent(
         req.message,
         user_id=user.username,
-        meta=build_agent_meta(req, user),
+        meta=build_agent_meta(req, user, db),
     )
 
     action = str(result.get("action", "none") or "none").lower()
     amount = float(result.get("amount", 0) or 0)
-    needs_approval = check_requires_approval(action, amount)
+    needs_approval = check_requires_approval(action, amount) or bool((result.get("decision") or {}).get("requires_approval", False))
 
     if needs_approval:
         result["action"] = "review"
@@ -849,9 +1027,16 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         result["reason"] = f"Refund of ${amount:.2f} exceeds approval threshold (${APPROVAL_THRESHOLD:.2f}). Manual approval required."
         result["response"] = "I've flagged this refund for manual approval as the amount exceeds the auto-approval limit. Your team will review and process it shortly."
         result["final"] = result["response"]
+        result["reply"] = result["response"]
         result["tool_status"] = "pending_approval"
+        result.setdefault("decision", {})["requires_approval"] = True
+        result["decision"]["queue"] = "refund_risk"
+        result["decision"]["priority"] = "high"
+        result["decision"]["risk_level"] = "high"
     else:
         result = apply_real_actions(result, req, user)
+
+    update_ticket_from_result(db, ticket, result)
 
     log_action(
         db,
@@ -873,7 +1058,10 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         db.commit()
         db.refresh(user)
 
-    return serialize_support_result(result, user)
+    serialized = serialize_support_result(result, user)
+    serialized["ticket"] = serialize_ticket(ticket)
+    serialized["operator_mode"] = get_operator_mode(db)
+    return serialized
 
 
 def sse_event(name: str, payload: dict[str, Any]) -> str:
@@ -1091,6 +1279,12 @@ def dashboard_summary(user: User = Depends(get_current_user), db: Session = Depe
 
     usage_summary = get_usage_summary(user)
 
+    auto_resolved = db.query(Ticket).filter(Ticket.status == "resolved").count()
+    escalated = db.query(Ticket).filter(Ticket.status.in_(["waiting", "escalated"])).count()
+    refund_total = sum(float(log.amount or 0) for log in db.query(ActionLog).filter(ActionLog.action == "refund").all())
+    credit_total = sum(float(log.amount or 0) for log in db.query(ActionLog).filter(ActionLog.action == "credit").all())
+    negative_sentiment_cases = db.query(Ticket).filter(Ticket.churn_risk >= 60).count()
+
     return {
         "total_interactions": metrics.get("total_interactions", 0),
         "avg_confidence": metrics.get("avg_confidence", 0),
@@ -1104,6 +1298,12 @@ def dashboard_summary(user: User = Depends(get_current_user), db: Session = Depe
         "remaining": usage_summary["remaining"],
         "dashboard_access": get_plan_config(get_public_plan_name(user))["dashboard_access"],
         "priority_routing": get_plan_config(get_public_plan_name(user))["priority_routing"],
+        "operator_mode": get_operator_mode(db),
+        "refund_total": round(refund_total, 2),
+        "credit_total": round(credit_total, 2),
+        "auto_resolution_rate": round((auto_resolved / max(1, db.query(Ticket).count())) * 100, 2),
+        "escalation_rate": round((escalated / max(1, db.query(Ticket).count())) * 100, 2),
+        "negative_sentiment_cases": negative_sentiment_cases,
     }
 
 
@@ -1372,6 +1572,82 @@ def admin_approve_action(
     log.status = "approved"
     db.commit()
     return {"message": f"Action {log_id} approved", "id": log_id}
+
+
+@app.get("/operator/mode")
+def read_operator_mode(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    return {"mode": get_operator_mode(db)}
+
+
+@app.post("/operator/mode")
+def update_operator_mode(req: OperatorModeRequest, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    mode = set_operator_mode(db, req.mode)
+    return {"mode": mode}
+
+
+@app.get("/tickets")
+def list_tickets(
+    limit: int = 50,
+    queue: str | None = None,
+    status: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Ticket)
+    if getattr(user, "username", "") != ADMIN_USERNAME:
+        query = query.filter(Ticket.username == user.username)
+    if queue:
+        query = query.filter(Ticket.queue == queue)
+    if status:
+        query = query.filter(Ticket.status == status)
+    rows = query.order_by(Ticket.id.desc()).limit(max(1, min(limit, 200))).all()
+    return {
+        "operator_mode": get_operator_mode(db),
+        "tickets": [serialize_ticket(row) for row in rows],
+    }
+
+
+@app.get("/tickets/queues")
+def ticket_queue_counts(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    query = db.query(Ticket)
+    if getattr(user, "username", "") != ADMIN_USERNAME:
+        query = query.filter(Ticket.username == user.username)
+    rows = query.all()
+    counts = {"new": 0, "waiting": 0, "escalated": 0, "refund_risk": 0, "vip": 0, "resolved": 0}
+    for row in rows:
+        queue_name = (row.queue or "new").strip().lower()
+        if queue_name in counts:
+            counts[queue_name] += 1
+    return {"queues": counts, "operator_mode": get_operator_mode(db)}
+
+
+@app.get("/tickets/{ticket_id}")
+def get_ticket(ticket_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if getattr(user, "username", "") != ADMIN_USERNAME and ticket.username != user.username:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return serialize_ticket(ticket)
+
+
+@app.post("/tickets/{ticket_id}/status")
+def update_ticket_status(ticket_id: int, req: TicketStatusRequest, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if req.status:
+        ticket.status = (req.status or ticket.status).strip().lower()
+    if req.queue:
+        ticket.queue = (req.queue or ticket.queue).strip().lower()
+    if req.internal_note:
+        existing = (ticket.internal_note or "").strip()
+        addition = (req.internal_note or "").strip()
+        ticket.internal_note = (existing + "\n" + addition).strip() if existing else addition
+    ticket.updated_at = datetime.utcnow().isoformat()
+    db.commit()
+    db.refresh(ticket)
+    return serialize_ticket(ticket)
 
 
 @app.post("/support")

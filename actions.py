@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+VALID_MODES = {"conservative", "balanced", "delight", "fraud_aware"}
+
 
 def _to_int(value: Any, default: int = 0) -> int:
     try:
@@ -10,10 +12,19 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _clamp(value: Any, low: int, high: int, default: int = 0) -> int:
+    number = _to_int(value, default)
+    if number < low:
+        return low
+    if number > high:
+        return high
+    return number
+
+
 def classify_issue(issue: str) -> str:
     text = (issue or "").lower()
 
-    if "charged twice" in text or "double charge" in text or "billed twice" in text:
+    if "charged twice" in text or "double charge" in text or "billed twice" in text or "duplicate charge" in text:
         return "billing_duplicate_charge"
     if "refund" in text:
         return "refund_request"
@@ -29,102 +40,252 @@ def classify_issue(issue: str) -> str:
     return "general_support"
 
 
+def infer_risk_level(ticket: Dict[str, Any], history: Dict[str, Any] | None = None) -> str:
+    ticket = ticket or {}
+    history = history or {}
+    issue_type = str(ticket.get("issue_type", "general_support"))
+    sentiment = _clamp(ticket.get("sentiment", 5), 1, 10, 5)
+    ltv = max(0, _to_int(ticket.get("ltv", 0), 0))
+    abuse_score = max(0, _to_int(history.get("abuse_score", 0), 0))
+    refund_count = max(0, _to_int(history.get("refund_count", 0), 0))
+
+    risk_points = 0
+    if issue_type in {"billing_duplicate_charge", "refund_request", "damaged_order"}:
+        risk_points += 2
+    if sentiment <= 3:
+        risk_points += 2
+    if ltv >= 800:
+        risk_points += 1
+    if abuse_score >= 2 or refund_count >= 3:
+        risk_points += 2
+
+    if risk_points >= 5:
+        return "high"
+    if risk_points >= 3:
+        return "medium"
+    return "low"
+
+
+def triage_ticket(ticket: Dict[str, Any], history: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    ticket = ticket or {}
+    history = history or {}
+    sentiment = _clamp(ticket.get("sentiment", 5), 1, 10, 5)
+    ltv = max(0, _to_int(ticket.get("ltv", 0), 0))
+    refund_count = max(0, _to_int(history.get("refund_count", 0), 0))
+    abuse_score = max(0, _to_int(history.get("abuse_score", 0), 0))
+    issue_type = str(ticket.get("issue_type", "general_support"))
+
+    urgency = 50
+    if sentiment <= 2:
+        urgency += 28
+    elif sentiment <= 4:
+        urgency += 16
+    if issue_type in {"billing_duplicate_charge", "damaged_order"}:
+        urgency += 18
+    elif issue_type == "shipping_issue":
+        urgency += 10
+
+    churn_risk = 35
+    if sentiment <= 3:
+        churn_risk += 25
+    if ltv >= 500:
+        churn_risk += 20
+    if issue_type in {"refund_request", "billing_duplicate_charge"}:
+        churn_risk += 10
+
+    refund_likelihood = 10
+    if issue_type in {"refund_request", "billing_duplicate_charge"}:
+        refund_likelihood += 50
+    if issue_type == "damaged_order":
+        refund_likelihood += 22
+    if sentiment <= 3:
+        refund_likelihood += 10
+
+    abuse_likelihood = 5 + min(35, abuse_score * 12) + min(20, refund_count * 5)
+    complexity = 25
+    if issue_type in {"auth_issue", "export_error"}:
+        complexity += 15
+    if issue_type in {"refund_request", "billing_duplicate_charge", "damaged_order"}:
+        complexity += 20
+
+    urgency = min(99, urgency)
+    churn_risk = min(99, churn_risk)
+    refund_likelihood = min(99, refund_likelihood)
+    abuse_likelihood = min(99, abuse_likelihood)
+    complexity = min(99, complexity)
+
+    recommended_owner = "ai"
+    if abuse_likelihood >= 50 or complexity >= 70:
+        recommended_owner = "senior_operator"
+    elif refund_likelihood >= 60:
+        recommended_owner = "billing_ops"
+
+    return {
+        "urgency": urgency,
+        "churn_risk": churn_risk,
+        "refund_likelihood": refund_likelihood,
+        "abuse_likelihood": abuse_likelihood,
+        "complexity": complexity,
+        "recommended_owner": recommended_owner,
+        "risk_level": infer_risk_level(ticket, history),
+    }
+
+
 def build_ticket(message: str, user_id: str = "anonymous", meta: Dict[str, Any] | None = None) -> Dict[str, Any]:
     meta = meta or {}
+    history = meta.get("customer_history") or {}
 
     ticket = {
         "customer": user_id,
         "user_id": user_id,
         "issue": (message or "").strip(),
-        "ltv": _to_int(meta.get("ltv", 0), 0),
-        "sentiment": _to_int(meta.get("sentiment", 5), 5),
+        "ltv": max(0, _to_int(meta.get("ltv", 0), 0)),
+        "sentiment": _clamp(meta.get("sentiment", 5), 1, 10, 5),
         "order_status": meta.get("order_status", "unknown"),
         "issue_type": classify_issue(message or ""),
+        "plan_tier": str(meta.get("plan_tier", "free") or "free"),
+        "operator_mode": str(meta.get("operator_mode", "balanced") or "balanced"),
+        "channel": str(meta.get("channel", "web") or "web"),
+        "source": str(meta.get("source", "workspace") or "workspace"),
+        "customer_history": history,
     }
-
+    ticket["triage"] = triage_ticket(ticket, history)
     return ticket
 
 
+def _mode_adjust(action: str, amount: int, operator_mode: str, history: Dict[str, Any]) -> tuple[str, int, str | None]:
+    operator_mode = (operator_mode or "balanced").strip().lower()
+    if operator_mode not in VALID_MODES:
+        operator_mode = "balanced"
+
+    abuse_score = max(0, _to_int(history.get("abuse_score", 0), 0))
+    refund_count = max(0, _to_int(history.get("refund_count", 0), 0))
+
+    if operator_mode == "conservative":
+        if action == "refund":
+            return "review", 0, "Conservative mode routed refund for review"
+        if action == "credit":
+            return "credit", max(5, min(amount, 10)), "Conservative mode reduced automatic credit"
+
+    if operator_mode == "delight":
+        if action == "credit":
+            return "credit", min(amount + 5, 30), "Delight mode increased retention credit"
+        if action == "review":
+            return "credit", 10, "Delight mode converted review into service credit"
+
+    if operator_mode == "fraud_aware":
+        if abuse_score >= 2 or refund_count >= 3:
+            return "review", 0, "Fraud-aware mode detected repeat refund behavior"
+        if action == "credit":
+            return "credit", max(5, min(amount, 10)), "Fraud-aware mode reduced automatic credit"
+
+    return action, amount, None
+
+
 def system_decision(ticket: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Hard non-LLM business rules.
-    These always run first.
-    """
     ticket = ticket or {}
     issue = str(ticket.get("issue", "")).lower()
     issue_type = str(ticket.get("issue_type", "general_support"))
-    sentiment = _to_int(ticket.get("sentiment", 5), 5)
-    ltv = _to_int(ticket.get("ltv", 0), 0)
+    sentiment = _clamp(ticket.get("sentiment", 5), 1, 10, 5)
+    ltv = max(0, _to_int(ticket.get("ltv", 0), 0))
+    history = ticket.get("customer_history") or {}
+    operator_mode = str(ticket.get("operator_mode", "balanced") or "balanced")
+    triage = ticket.get("triage") or triage_ticket(ticket, history)
 
-    # Billing duplicate charge = deterministic action
-    if issue_type == "billing_duplicate_charge" or "charged twice" in issue or "double charge" in issue:
-        return {
-            "action": "refund",
-            "amount": 25,
-            "reason": "Duplicate-charge protection policy",
-            "priority": "high",
-        }
-
-    # High-value, very unhappy customer
-    if sentiment <= 2 and ltv >= 500:
-        return {
-            "action": "refund",
-            "amount": min(max(int(ltv * 0.10), 20), 50),
-            "reason": "High-LTV recovery",
-            "priority": "high",
-        }
-
-    # Damaged order + negative sentiment
-    if issue_type == "damaged_order" and sentiment <= 4:
-        return {
-            "action": "credit",
-            "amount": 20,
-            "reason": "Damaged-order recovery",
-            "priority": "high",
-        }
-
-    # Shipping issue + upset customer
-    if issue_type == "shipping_issue" and sentiment <= 3:
-        return {
-            "action": "credit",
-            "amount": 15,
-            "reason": "Shipping frustration recovery",
-            "priority": "medium",
-        }
-
-    # Refund request but not yet approved automatically
-    if issue_type == "refund_request":
-        return {
-            "action": "review",
-            "amount": 0,
-            "reason": "Refund request needs context review",
-            "priority": "medium",
-        }
-
-    return {
+    base = {
         "action": "none",
         "amount": 0,
         "reason": "No hard-rule action triggered",
         "priority": "normal",
+        "risk_level": triage.get("risk_level", "low"),
+        "queue": "new",
+        "requires_approval": False,
     }
+
+    if history.get("abuse_score", 0) >= 3:
+        base.update({
+            "action": "review",
+            "reason": "Repeat abuse signals detected",
+            "priority": "high",
+            "queue": "refund_risk",
+        })
+        return base
+
+    if issue_type == "billing_duplicate_charge" or "charged twice" in issue or "double charge" in issue:
+        base.update({
+            "action": "refund",
+            "amount": 25,
+            "reason": "Duplicate-charge protection policy",
+            "priority": "high",
+            "queue": "refund_risk",
+            "requires_approval": False,
+        })
+    elif sentiment <= 2 and ltv >= 500:
+        base.update({
+            "action": "refund",
+            "amount": min(max(int(ltv * 0.10), 20), 50),
+            "reason": "High-LTV recovery",
+            "priority": "high",
+            "queue": "vip",
+            "requires_approval": True,
+        })
+    elif issue_type == "damaged_order" and sentiment <= 4:
+        base.update({
+            "action": "credit",
+            "amount": 20,
+            "reason": "Damaged-order recovery",
+            "priority": "high",
+            "queue": "escalated",
+        })
+    elif issue_type == "shipping_issue" and sentiment <= 3:
+        base.update({
+            "action": "credit",
+            "amount": 15,
+            "reason": "Shipping frustration recovery",
+            "priority": "medium",
+            "queue": "waiting",
+        })
+    elif issue_type == "refund_request":
+        base.update({
+            "action": "review",
+            "amount": 0,
+            "reason": "Refund request needs context review",
+            "priority": "medium",
+            "queue": "refund_risk",
+        })
+    elif triage.get("complexity", 0) >= 70:
+        base.update({
+            "action": "review",
+            "amount": 0,
+            "reason": "High-complexity case routed to review",
+            "priority": "high",
+            "queue": "escalated",
+        })
+
+    adjusted_action, adjusted_amount, mode_reason = _mode_adjust(
+        str(base.get("action", "none")),
+        _to_int(base.get("amount", 0), 0),
+        operator_mode,
+        history,
+    )
+    base["action"] = adjusted_action
+    base["amount"] = adjusted_amount
+    if mode_reason:
+        base["reason"] = mode_reason
+        if adjusted_action == "review":
+            base["queue"] = "refund_risk" if issue_type in {"refund_request", "billing_duplicate_charge"} else "escalated"
+
+    return base
 
 
 def apply_learned_rules(ticket: Dict[str, Any], learned_rules: List[Dict[str, Any]] | None) -> Dict[str, Any] | None:
-    """
-    Applies learned rules after hard rules.
-    Rule format:
-    {
-        "trigger": "low_sentiment_shipping",
-        "condition": {"issue_type": "shipping_issue", "sentiment_lte": 3},
-        "action": {"type": "credit", "amount": 10}
-    }
-    """
     if not learned_rules:
         return None
 
     issue_type = str(ticket.get("issue_type", "general_support"))
-    sentiment = _to_int(ticket.get("sentiment", 5), 5)
-    ltv = _to_int(ticket.get("ltv", 0), 0)
+    sentiment = _clamp(ticket.get("sentiment", 5), 1, 10, 5)
+    ltv = max(0, _to_int(ticket.get("ltv", 0), 0))
+    triage = ticket.get("triage") or {}
 
     for rule in learned_rules:
         cond = rule.get("condition", {})
@@ -133,27 +294,46 @@ def apply_learned_rules(ticket: Dict[str, Any], learned_rules: List[Dict[str, An
         issue_ok = cond.get("issue_type") in (None, issue_type)
         sentiment_ok = sentiment <= _to_int(cond.get("sentiment_lte", 10), 10)
         ltv_ok = ltv >= _to_int(cond.get("ltv_gte", 0), 0)
+        urgency_ok = triage.get("urgency", 0) >= _to_int(cond.get("urgency_gte", 0), 0)
 
-        if issue_ok and sentiment_ok and ltv_ok:
+        if issue_ok and sentiment_ok and ltv_ok and urgency_ok:
+            chosen_action = str(action.get("type", "none") or "none")
+            chosen_amount = _to_int(action.get("amount", 0), 0)
+            adjusted_action, adjusted_amount, mode_reason = _mode_adjust(
+                chosen_action,
+                chosen_amount,
+                str(ticket.get("operator_mode", "balanced") or "balanced"),
+                ticket.get("customer_history") or {},
+            )
             return {
-                "action": action.get("type", "none"),
-                "amount": _to_int(action.get("amount", 0), 0),
-                "reason": f"Learned rule: {rule.get('trigger', 'unknown_rule')}",
+                "action": adjusted_action,
+                "amount": adjusted_amount,
+                "reason": mode_reason or f"Learned rule: {rule.get('trigger', 'unknown_rule')}",
                 "priority": "medium",
+                "risk_level": triage.get("risk_level", "medium"),
+                "queue": "waiting",
+                "requires_approval": adjusted_action == "refund" and adjusted_amount >= 25,
             }
 
     return None
 
 
 def calculate_impact(ticket: Dict[str, Any], executed_action: Dict[str, Any]) -> Dict[str, Any]:
-    action = executed_action.get("action", "none")
+    ticket = ticket or {}
+    executed_action = executed_action or {}
+    action = str(executed_action.get("action", "none") or "none")
     amount = _to_int(executed_action.get("amount", 0), 0)
+    triage = ticket.get("triage") or {}
 
     if action == "refund":
-        return {"type": "refund", "amount": amount}
+        return {"type": "refund", "amount": amount, "money_saved": 0, "auto_resolved": True}
     if action == "credit":
-        return {"type": "credit", "amount": amount}
+        recovered = max(10, min(60, amount + 15))
+        return {"type": "credit", "amount": amount, "money_saved": recovered, "auto_resolved": True}
     if action == "review":
-        return {"type": "saved", "amount": 15}
+        return {"type": "saved", "amount": 15, "money_saved": 15, "auto_resolved": False}
 
-    return {"type": "saved", "amount": 50}
+    saved = 25
+    if triage.get("abuse_likelihood", 0) >= 50:
+        saved = 40
+    return {"type": "saved", "amount": saved, "money_saved": saved, "auto_resolved": True}
