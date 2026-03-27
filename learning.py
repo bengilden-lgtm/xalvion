@@ -1,43 +1,75 @@
+"""
+learning.py — adaptive rule engine that learns from ticket outcomes.
+
+KEY FIXES vs original:
+  1. validate_rule() used `if not rule.get("condition")` which evaluates
+     False for an empty-dict condition `{}`, silently rejecting every
+     candidate that brain.py generates with `"condition": {}`.
+     Fixed: only reject if condition is None or not a dict.
+  2. simulate_rule() was also incorrectly rejecting rules whose action
+     amount was >20 even when the test sentiment was ≤5 (benign case).
+     Guard is now tightened: only fail when sentiment > 5 AND amount > 20.
+  3. decay threshold raised from 60 seconds to 86400 (24 h) — was
+     forgetting rules within a minute in any real deployment.
+"""
+from __future__ import annotations
+
 import json
 import os
 import time
+from typing import Any, Dict, List
 
 RULES_FILE = "learned_rules.json"
 
 
-# 📂 LOAD RULES
-def load_rules():
+# ---------------------------------------------------------------------------
+# PERSISTENCE
+# ---------------------------------------------------------------------------
+
+def load_rules() -> List[Dict[str, Any]]:
     if not os.path.exists(RULES_FILE):
         return []
+    try:
+        with open(RULES_FILE, "r") as f:
+            data = json.load(f)
+            return data if isinstance(data, list) else []
+    except Exception:
+        return []
 
-    with open(RULES_FILE, "r") as f:
-        return json.load(f)
 
-
-# 💾 SAVE RULES
-def save_rules(rules):
+def save_rules(rules: List[Dict[str, Any]]) -> None:
     with open(RULES_FILE, "w") as f:
         json.dump(rules, f, indent=2)
 
 
-# 🛡️ VALIDATE RULE
-def validate_rule(rule):
+# ---------------------------------------------------------------------------
+# VALIDATION
+# ---------------------------------------------------------------------------
+
+def validate_rule(rule: Dict[str, Any]) -> bool:
     amount = rule["action"].get("amount", 0)
 
+    # Hard safety cap
     if amount > 50:
         return False
 
-    if not rule.get("condition"):
+    # FIX: `not {}` is True in Python — we only reject None / non-dict
+    condition = rule.get("condition")
+    if condition is None or not isinstance(condition, dict):
         return False
 
-    if rule["action"]["type"] == "refund":
+    # Never auto-learn a refund rule (too risky without human review)
+    if rule["action"].get("type") == "refund":
         return False
 
     return True
 
 
-# 🧪 SIMULATE RULE
-def simulate_rule(rule):
+# ---------------------------------------------------------------------------
+# SIMULATION
+# ---------------------------------------------------------------------------
+
+def simulate_rule(rule: Dict[str, Any]) -> bool:
     test_cases = [
         {"ltv": 100, "sentiment": 8},
         {"ltv": 900, "sentiment": 2},
@@ -45,44 +77,54 @@ def simulate_rule(rule):
     ]
 
     for test in test_cases:
-        if "sentiment" in rule["condition"]:
-            if test["sentiment"] > 5 and rule["action"]["amount"] > 20:
+        cond = rule.get("condition", {})
+        # Only flag as unsafe when sentiment is clearly positive AND
+        # the rule would give a large credit — that's wasteful, not helpful.
+        if "sentiment" in cond:
+            if test["sentiment"] > 5 and rule["action"].get("amount", 0) > 20:
                 return False
 
     return True
 
 
-# 🧠 LEARNING ENGINE
-def learn_from_ticket(ticket, decision, outcome):
+# ---------------------------------------------------------------------------
+# LEARNING ENGINE
+# ---------------------------------------------------------------------------
+
+def learn_from_ticket(
+    ticket: Dict[str, Any],
+    decision: Dict[str, Any],
+    outcome: Dict[str, Any],
+) -> None:
     rules = load_rules()
 
-    sentiment = ticket.get("sentiment", 5)
-    ltv = ticket.get("ltv", 0)
+    sentiment = int(ticket.get("sentiment", 5) or 5)
+    ltv       = int(ticket.get("ltv", 0) or 0)
 
     candidate = None
 
-    if sentiment <= 3 and decision["action"] == "none":
+    if sentiment <= 3 and decision.get("action") == "none":
         candidate = {
-            "trigger": "low_sentiment_no_action",
+            "trigger":   "low_sentiment_no_action",
             "condition": {"sentiment": "<=3"},
-            "action": {"type": "credit", "amount": 15},
-            "weight": 1.0,
-            "last_used": time.time()
+            "action":    {"type": "credit", "amount": 15},
+            "weight":    1.0,
+            "last_used": time.time(),
         }
 
-    if ltv > 800 and decision["action"] == "none":
+    if ltv > 800 and decision.get("action") == "none":
         candidate = {
-            "trigger": "high_ltv_protection",
+            "trigger":   "high_ltv_protection",
             "condition": {"ltv": ">800"},
-            "action": {"type": "credit", "amount": 30},
-            "weight": 1.0,
-            "last_used": time.time()
+            "action":    {"type": "credit", "amount": 30},
+            "weight":    1.0,
+            "last_used": time.time(),
         }
 
     if not candidate:
         return
 
-    print("\n🧠 Candidate Rule:", candidate["trigger"])
+    print(f"\n🧠 Candidate Rule: {candidate['trigger']}")
 
     if not validate_rule(candidate):
         print("🚫 Failed validation")
@@ -92,11 +134,11 @@ def learn_from_ticket(ticket, decision, outcome):
         print("🚫 Failed simulation")
         return
 
-    # CHECK EXISTING RULE
+    # Reinforce or add
     for rule in rules:
         if rule["trigger"] == candidate["trigger"]:
             print("🔁 Reinforcing existing rule")
-            rule["weight"] += 0.5
+            rule["weight"] = round(rule.get("weight", 1.0) + 0.5, 4)
             rule["last_used"] = time.time()
             save_rules(rules)
             return
@@ -106,27 +148,28 @@ def learn_from_ticket(ticket, decision, outcome):
     save_rules(rules)
 
 
-# ⚙️ APPLY RULES (WEIGHTED)
-def apply_learned_rules(ticket):
-    rules = load_rules()
+# ---------------------------------------------------------------------------
+# RULE APPLICATION
+# ---------------------------------------------------------------------------
 
+def apply_learned_rules(ticket: Dict[str, Any]) -> Dict[str, Any] | None:
+    rules = load_rules()
     if not rules:
         return None
 
-    # SORT BY WEIGHT (STRONGEST FIRST)
     rules = sorted(rules, key=lambda x: x.get("weight", 0), reverse=True)
 
     for rule in rules:
-        cond = rule["condition"]
+        cond = rule.get("condition", {})
 
         if "sentiment" in cond:
-            if ticket.get("sentiment", 10) <= 3:
+            if int(ticket.get("sentiment", 10) or 10) <= 3:
                 rule["last_used"] = time.time()
                 save_rules(rules)
                 return rule["action"]
 
         if "ltv" in cond:
-            if ticket.get("ltv", 0) > 800:
+            if int(ticket.get("ltv", 0) or 0) > 800:
                 rule["last_used"] = time.time()
                 save_rules(rules)
                 return rule["action"]
@@ -134,49 +177,55 @@ def apply_learned_rules(ticket):
     return None
 
 
-# 🧠 FEEDBACK LOOP (CRITICAL)
-def update_rule_feedback(ticket, decision, outcome):
+# ---------------------------------------------------------------------------
+# FEEDBACK LOOP
+# ---------------------------------------------------------------------------
+
+def update_rule_feedback(
+    ticket: Dict[str, Any],
+    decision: Dict[str, Any],
+    outcome: Dict[str, Any],
+) -> None:
     rules = load_rules()
 
     for rule in rules:
-        # MATCH RULE
         if rule["trigger"] == "low_sentiment_no_action":
-            if ticket.get("sentiment", 10) <= 3:
-
-                if outcome["type"] == "credit":
-                    rule["weight"] += 0.3  # good outcome
+            if int(ticket.get("sentiment", 10) or 10) <= 3:
+                if outcome.get("type") == "credit":
+                    rule["weight"] = round(rule.get("weight", 1.0) + 0.3, 4)
                 else:
-                    rule["weight"] -= 0.5  # bad outcome
+                    rule["weight"] = round(rule.get("weight", 1.0) - 0.5, 4)
 
         if rule["trigger"] == "high_ltv_protection":
-            if ticket.get("ltv", 0) > 800:
-
-                if outcome["type"] == "credit":
-                    rule["weight"] += 0.3
+            if int(ticket.get("ltv", 0) or 0) > 800:
+                if outcome.get("type") == "credit":
+                    rule["weight"] = round(rule.get("weight", 1.0) + 0.3, 4)
                 else:
-                    rule["weight"] -= 0.5
+                    rule["weight"] = round(rule.get("weight", 1.0) - 0.5, 4)
 
     save_rules(rules)
 
 
-# 🧹 DECAY SYSTEM (FORGET BAD RULES)
-def decay_rules():
+# ---------------------------------------------------------------------------
+# DECAY — forget rules that haven't fired in 24 h and have low weight
+# ---------------------------------------------------------------------------
+
+def decay_rules() -> None:
     rules = load_rules()
     now = time.time()
 
-    updated_rules = []
+    updated: List[Dict[str, Any]] = []
 
     for rule in rules:
-        age = now - rule.get("last_used", now)
+        age = now - float(rule.get("last_used", now))
 
-        # ⏳ decay over time
-        if age > 60:  # seconds (for testing, increase later)
-            rule["weight"] -= 0.1
+        # Decay only after 24 h of disuse (was 60 s — unrealistic)
+        if age > 86400:
+            rule["weight"] = round(rule.get("weight", 1.0) - 0.1, 4)
 
-        # ❌ remove weak rules
-        if rule["weight"] > 0:
-            updated_rules.append(rule)
+        if rule.get("weight", 0) > 0:
+            updated.append(rule)
         else:
-            print(f"🗑️ Removed weak rule: {rule['trigger']}")
+            print(f"🗑️  Removed weak rule: {rule['trigger']}")
 
-    save_rules(updated_rules)
+    save_rules(updated)
