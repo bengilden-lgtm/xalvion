@@ -70,11 +70,7 @@ LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
 REFUND_RULES = {
     "enabled": True,
     "allowed_tiers": {"pro", "elite"},
-
-    # increase slightly for testing
     "max_auto_refund_amount": 50.00,
-
-    # include actual agent outputs
     "allowed_issue_types": {
         "duplicate_charge",
         "double_charge",
@@ -84,10 +80,7 @@ REFUND_RULES = {
         "billing_duplicate_charge",
         "general_support",
     },
-
-    # allow unknown during testing
     "blocked_order_statuses": set(),
-
     "min_confidence": 0.5,
     "min_quality": 0.5,
 }
@@ -132,7 +125,6 @@ PLAN_CONFIG: dict[str, dict[str, Any]] = {
 }
 
 PUBLIC_PLAN_TIERS = {"free", "pro", "elite"}
-INTERNAL_ONLY_PLAN_TIERS = {"dev"}
 
 PRICE_MAP = {
     "pro": STRIPE_PRICE_PRO,
@@ -440,9 +432,7 @@ def safe_refund_reason(value: str | None) -> str:
         "fraudulent",
         "requested_by_customer",
     }
-    if text in allowed:
-        return text
-    return "requested_by_customer"
+    return text if text in allowed else "requested_by_customer"
 
 
 def cents_from_dollars(amount: Any) -> int:
@@ -538,31 +528,26 @@ def evaluate_refund_rules(
         REFUND_RULES["enabled"],
         "Automatic refund rules are enabled." if REFUND_RULES["enabled"] else "Automatic refund rules are disabled."
     )
-
     add_rule(
         "allowed_tier",
         tier in REFUND_RULES["allowed_tiers"],
         f"Tier '{tier}' is {'allowed' if tier in REFUND_RULES['allowed_tiers'] else 'not allowed'} for automatic refunds."
     )
-
     add_rule(
         "allowed_issue_type",
         issue_type in REFUND_RULES["allowed_issue_types"],
         f"Issue type '{issue_type}' is {'allowed' if issue_type in REFUND_RULES['allowed_issue_types'] else 'not allowed'} for automatic refunds."
     )
-
     add_rule(
         "not_blocked_order_status",
         order_status not in REFUND_RULES["blocked_order_statuses"],
         f"Order status '{order_status}' is {'acceptable' if order_status not in REFUND_RULES['blocked_order_statuses'] else 'blocked'} for automatic refunds."
     )
-
     add_rule(
         "minimum_confidence",
         confidence >= REFUND_RULES["min_confidence"],
         f"Confidence {confidence:.2f} must be at least {REFUND_RULES['min_confidence']:.2f}."
     )
-
     add_rule(
         "minimum_quality",
         quality >= REFUND_RULES["min_quality"],
@@ -578,25 +563,21 @@ def evaluate_refund_rules(
         bool(charge_context.get("captured", False)),
         "Charge is captured and can be refunded." if charge_context.get("captured", False) else "Charge is not captured."
     )
-
     add_rule(
         "remaining_refundable_amount",
         remaining_refundable > 0,
         f"Remaining refundable amount is ${dollars_from_cents(remaining_refundable):.2f}."
     )
-
     add_rule(
         "auto_refund_threshold",
         dollars_from_cents(refund_cents) <= REFUND_RULES["max_auto_refund_amount"],
         f"Refund ${dollars_from_cents(refund_cents):.2f} must be at or below ${REFUND_RULES['max_auto_refund_amount']:.2f}."
     )
-
     add_rule(
         "positive_requested_amount",
         requested_cents > 0,
         f"Requested refund is ${dollars_from_cents(requested_cents):.2f}."
     )
-
     add_rule(
         "positive_refund_amount",
         refund_cents > 0,
@@ -637,11 +618,7 @@ def execute_real_refund(
     charge_id = (charge_id or "").strip()
 
     if not STRIPE_KEY:
-        return {
-            "ok": False,
-            "status": "stripe_not_configured",
-            "detail": "Automatic refunds are not configured yet.",
-        }
+        return {"ok": False, "status": "stripe_not_configured", "detail": "Automatic refunds are not configured yet."}
 
     if not payment_intent_id and not charge_id:
         return {
@@ -652,17 +629,10 @@ def execute_real_refund(
 
     cents_requested = cents_from_dollars(amount)
     if cents_requested <= 0:
-        return {
-            "ok": False,
-            "status": "invalid_refund_amount",
-            "detail": "Refund amount must be greater than zero.",
-        }
+        return {"ok": False, "status": "invalid_refund_amount", "detail": "Refund amount must be greater than zero."}
 
     try:
-        charge_context = get_charge_context(
-            payment_intent_id=payment_intent_id,
-            charge_id=charge_id,
-        )
+        charge_context = get_charge_context(payment_intent_id=payment_intent_id, charge_id=charge_id)
         charge_amount = int(charge_context["charge_amount"])
         amount_refunded = int(charge_context.get("amount_refunded", 0) or 0)
         remaining_refundable = max(0, charge_amount - amount_refunded)
@@ -733,11 +703,7 @@ def execute_real_refund(
             "charge_context": charge_context,
         }
     except Exception as exc:
-        return {
-            "ok": False,
-            "status": "stripe_refund_failed",
-            "detail": str(exc),
-        }
+        return {"ok": False, "status": "stripe_refund_failed", "detail": str(exc)}
 
 
 def apply_real_actions(result: dict[str, Any], req: SupportRequest, user: User) -> dict[str, Any]:
@@ -884,7 +850,6 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         result["response"] = "I've flagged this refund for manual approval as the amount exceeds the auto-approval limit. Your team will review and process it shortly."
         result["final"] = result["response"]
         result["tool_status"] = "pending_approval"
-
     else:
         result = apply_real_actions(result, req, user)
 
@@ -1009,13 +974,20 @@ def create_checkout_session_for_user(user: User, desired: str):
                 "username": user.username,
                 "tier": desired,
             },
+            subscription_data={
+                "metadata": {
+                    "username": user.username,
+                    "tier": desired,
+                }
+            },
             client_reference_id=user.username,
         )
         print(
             f"[STRIPE] checkout session created "
             f"session_id={getattr(session, 'id', None)!r} "
             f"username={user.username!r} "
-            f"desired={desired!r}"
+            f"desired={desired!r} "
+            f"price_id={price_id!r}"
         )
     except Exception as exc:
         print(f"[STRIPE] checkout session create failed username={user.username!r} desired={desired!r} error={exc}")
@@ -1045,6 +1017,31 @@ def apply_successful_upgrade(db: Session, username: str, tier: str) -> User | No
     return user
 
 
+def infer_tier_from_checkout_session(session_id: str) -> str:
+    if not session_id or not STRIPE_KEY:
+        return ""
+
+    try:
+        line_items = stripe.checkout.Session.list_line_items(session_id, limit=10)
+    except Exception as exc:
+        print(f"[STRIPE] line item lookup failed session_id={session_id!r} error={exc}")
+        return ""
+
+    items = getattr(line_items, "data", None) or []
+    for item in items:
+        price_obj = getattr(item, "price", None)
+        price_id = getattr(price_obj, "id", None) or ""
+
+        print(f"[STRIPE] line item price_id={price_id!r} for session_id={session_id!r}")
+
+        if price_id and price_id == STRIPE_PRICE_PRO:
+            return "pro"
+        if price_id and price_id == STRIPE_PRICE_ELITE:
+            return "elite"
+
+    return ""
+
+
 # =========================================================
 # ROUTES
 # =========================================================
@@ -1054,13 +1051,7 @@ def apply_successful_upgrade(db: Session, username: str, tier: str) -> User | No
 def serve_index():
     if os.path.exists(INDEX_PATH):
         return FileResponse(INDEX_PATH)
-    return JSONResponse(
-        {
-            "status": "ok",
-            "service": "xalvion-sovereign-brain",
-            "warning": "index.html not found",
-        }
-    )
+    return JSONResponse({"status": "ok", "service": "xalvion-sovereign-brain", "warning": "index.html not found"})
 
 
 @app.get("/app.js")
@@ -1273,6 +1264,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         username = (metadata.get("username") or client_reference_id or "").strip()
         tier = (metadata.get("tier") or "").strip().lower()
 
+        if not tier and session_id:
+            tier = infer_tier_from_checkout_session(session_id)
+            print(f"[STRIPE] inferred tier from line items tier={tier!r}")
+
         print(f"[STRIPE] checkout.session.completed username={username!r} tier={tier!r}")
         print(f"[STRIPE] metadata={metadata!r}")
         print(f"[STRIPE] client_reference_id={client_reference_id!r}")
@@ -1310,10 +1305,7 @@ def admin_list_users(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    return [
-        {"username": u.username, "tier": u.tier, "usage": u.usage}
-        for u in db.query(User).all()
-    ]
+    return [{"username": u.username, "tier": u.tier, "usage": u.usage} for u in db.query(User).all()]
 
 
 @app.post("/admin/set-tier")
@@ -1339,12 +1331,7 @@ def admin_action_logs(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    logs = (
-        db.query(ActionLog)
-        .order_by(ActionLog.id.desc())
-        .limit(max(1, min(limit, 500)))
-        .all()
-    )
+    logs = db.query(ActionLog).order_by(ActionLog.id.desc()).limit(max(1, min(limit, 500))).all()
     return [
         {
             "id": log.id,
