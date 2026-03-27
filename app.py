@@ -915,29 +915,10 @@ def stream_support_events(result: dict[str, Any]) -> AsyncIterator[str]:
             await asyncio.sleep(STATUS_STEP_DELAY)
 
         for part in chunk_text(result.get("reply", ""), STREAM_CHUNK_SIZE):
-            yield sse_event("chunk", {"chunk": part})
+            yield sse_event("chunk", {"text": part})
             await asyncio.sleep(STREAM_CHUNK_DELAY)
 
-        yield sse_event(
-            "meta",
-            {
-                "mode": result.get("mode", "unknown"),
-                "quality": result.get("quality", 0),
-                "confidence": result.get("confidence", 0),
-                "action": result.get("action", "none"),
-                "amount": result.get("amount", 0),
-                "reason": result.get("reason", ""),
-                "issue_type": result.get("issue_type", "general_support"),
-                "order_status": result.get("order_status", "unknown"),
-                "tool_status": result.get("tool_status", "unknown"),
-                "tool_result": result.get("tool_result", {}),
-                "impact": result.get("impact", {}),
-                "tier": result.get("tier", "free"),
-                "plan_limit": result.get("plan_limit", 0),
-                "usage": result.get("usage", 0),
-                "remaining": result.get("remaining", 0),
-            },
-        )
+        yield sse_event("result", result)
         yield sse_event("done", {"ok": True})
 
     return generator()
