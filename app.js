@@ -580,56 +580,47 @@
     });
   }
 
-  function createMessage(role, html, status = "") {
-    const wrap = document.createElement("div");
-    wrap.className = `msg-row ${role}`;
-
-    const bubble = document.createElement("div");
-    bubble.className = `msg-bubble ${role}`;
-    bubble.innerHTML = html;
-
-    if (status) {
-      const meta = document.createElement("div");
-      meta.className = "msg-meta";
-      meta.textContent = status;
-      bubble.appendChild(meta);
-    }
-
-    wrap.appendChild(bubble);
-    return wrap;
-  }
+  // ── PATCH 1: CSS classes now match index.html stylesheet ──────────────────
+  // Old code used .msg-row / .msg-bubble / .assistant-copy — zero CSS rules
+  // for those in index.html, so every message rendered completely invisible.
+  // Correct classes: .msg-group / .reply-body / .reply-text / .msg-who
 
   function addUserMessage(text) {
     if (!els.messages) return;
-    const row = createMessage("user", `<div>${escapeHtml(text)}</div>`);
-    els.messages.appendChild(row);
+    const group = document.createElement("div");
+    group.className = "msg-group user new-msg";
+    group.innerHTML = `
+      <div class="msg-group-header"><div class="msg-who">You</div></div>
+      <div class="reply-body"><div class="reply-text">${escapeHtml(text)}</div></div>
+    `;
+    els.messages.appendChild(group);
     scrollMessagesToBottom(true);
   }
 
   function addAssistantMessage(shell = "Thinking…") {
     if (!els.messages) return null;
-
-    const row = createMessage(
-      "assistant",
-      `
-        <div class="assistant-shell">
-          <div class="assistant-copy">${escapeHtml(shell)}</div>
-          <div class="assistant-actions"></div>
+    const group = document.createElement("div");
+    group.className = "msg-group assistant new-msg";
+    group.innerHTML = `
+      <div class="msg-group-header"><div class="msg-who">Xalvion</div></div>
+      <div class="reply-body">
+        <div class="reply-text js-reply-text">
+          <span class="typing"><span></span><span></span><span></span></span>
         </div>
-      `
-    );
-
-    els.messages.appendChild(row);
+      </div>
+      <div class="assistant-actions js-actions"></div>
+    `;
+    els.messages.appendChild(group);
     scrollMessagesToBottom(true);
-    return row;
+    return group;
   }
 
   function getAssistantCopyNode(row) {
-    return row?.querySelector(".assistant-copy") || null;
+    return row?.querySelector(".js-reply-text") || null;
   }
 
   function getAssistantActionsNode(row) {
-    return row?.querySelector(".assistant-actions") || null;
+    return row?.querySelector(".js-actions") || null;
   }
 
   function setAssistantCopy(row, text) {
@@ -641,6 +632,8 @@
   function appendAssistantChunk(row, chunk) {
     const node = getAssistantCopyNode(row);
     if (!node) return;
+    // Clear typing indicator on first chunk
+    if (node.querySelector(".typing")) node.innerHTML = "";
     const current = node.textContent || "";
     node.innerHTML = escapeHtml(current + chunk).replace(/\n/g, "<br>");
   }
@@ -947,17 +940,20 @@
       const ratio = Number.isFinite(state.limit) && state.limit > 0
         ? Math.max(0, Math.min(1, state.usage / state.limit))
         : 0;
-      els.planBar.style.setProperty("--fill", `${ratio * 100}%`);
+      // PATCH 2b: index.html uses style.width on #planBar, not CSS --fill
+      els.planBar.style.width = `${ratio * 100}%`;
     }
 
     updateCustomerFacingCopy();
   }
 
   function updateDashboardUI(data = {}) {
-    setText(els.statInteractions, formatMetric(data.interactions || 0, 0));
-    setText(els.statQuality, formatMetric(data.quality || 0));
-    setText(els.statConfidence, formatMetric(data.confidence || 0));
-    setText(els.statActions, formatMetric(data.actions || 0, 0));
+    // PATCH 2: API returns total_interactions/avg_quality/avg_confidence
+    // not interactions/quality/confidence — all four stats were stuck at 0
+    setText(els.statInteractions, formatMetric(data.total_interactions || data.interactions || 0, 0));
+    setText(els.statQuality,      formatMetric(data.avg_quality        || data.quality       || 0));
+    setText(els.statConfidence,   formatMetric(data.avg_confidence     || data.confidence    || 0));
+    setText(els.statActions,      formatMetric(data.actions            || 0, 0));
   }
 
   async function healthCheck() {
@@ -1294,30 +1290,28 @@
       addCopyControls(row, replyText);
 
       const actionNode = getAssistantActionsNode(row);
-      if (actionNode && data.action) {
+      if (actionNode && data.action && data.action !== "none") {
         actionNode.appendChild(createActionVisibility(data));
       }
 
-      if (data.usage_summary) {
+      // PATCH 3: API returns tier/usage/plan_limit/remaining at top level,
+      // not nested under usage_summary — plan bar was never updating after sends
+      if (data.tier) {
         updatePlanUI(
-          data.usage_summary.tier || state.tier,
-          Number(data.usage_summary.usage || state.usage || 0),
-          Number(data.usage_summary.limit || state.limit || 0),
-          Number(data.usage_summary.remaining || state.remaining || 0)
+          data.tier,
+          Number(data.usage        || state.usage     || 0),
+          Number(data.plan_limit   || state.limit     || 0),
+          Number(data.remaining    || state.remaining || 0)
         );
       } else {
         updateTopbarStatus();
       }
 
-      if (data.username) {
+      // Only update username for real logged-in accounts
+      if (data.username && data.username !== "dev_user" && data.username !== "guest") {
         state.username = data.username;
         persistAuth();
-        setText(
-          els.authStatus,
-          data.username && data.username !== "dev_user"
-            ? `Account: ${data.username}`
-            : "Account: guest workspace"
-        );
+        setText(els.authStatus, `Account: ${data.username}`);
       }
 
       if (data.action) {
