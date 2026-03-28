@@ -973,6 +973,46 @@
             </div>
           </div>
 
+          <div class="section-label">Integrations</div>
+          <div class="tier-card" id="stripeCard">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+              <div style="min-width:0;">
+                <div style="font-size:13px;font-weight:800;letter-spacing:-.01em;">Stripe</div>
+                <div
+                  id="stripeIntegrationCopy"
+                  class="muted-copy"
+                  style="font-size:12px;line-height:1.55;margin-top:4px;"
+                >
+                  Connect Stripe to execute refunds instead of only preparing them.
+                </div>
+              </div>
+
+              <div
+                id="stripeStatus"
+                class="ghost-btn"
+                style="height:30px;padding:0 10px;cursor:default;white-space:nowrap;"
+              >
+                Not connected
+              </div>
+            </div>
+
+            <div style="display:grid;gap:6px;">
+              <div class="usage-line">
+                <span>Account</span>
+                <span id="stripeAccountPill">No account linked</span>
+              </div>
+              <div class="usage-line">
+                <span>Mode</span>
+                <span id="stripeModePill">Awaiting connection</span>
+              </div>
+            </div>
+
+            <div class="btn-row">
+              <button id="stripeConnectBtn" class="btn" type="button">Connect Stripe</button>
+              <button id="stripeDisconnectBtn" class="ghost-btn" type="button" hidden>Disconnect</button>
+            </div>
+          </div>
+
           <div class="section-label">Plans</div>
           <div class="tier-card">
             <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Upgrade to Pro</span><span>→</span></button>
