@@ -27,8 +27,8 @@
       --radius-xl:26px;
       --radius-lg:20px;
       --radius-md:16px;
-      --sidebar:290px;
-      --rail:280px;
+      --sidebar:236px;
+      --rail:338px;
       --blur:18px;
       --scroll-thumb:rgba(255,255,255,.16);
       --scroll-thumb-hover:rgba(255,255,255,.26);
@@ -84,13 +84,13 @@
       height:100vh;
       display:grid;
       grid-template-columns:var(--sidebar) minmax(0,1fr) var(--rail);
-      gap:12px;
-      padding:12px;
+      gap:16px;
+      padding:16px;
     }
 
     .sidebar,.main,.rail{
       min-width:0;
-      height:calc(100vh - 24px);
+      height:calc(100vh - 32px);
     }
 
     .scroll-shell{
@@ -166,15 +166,25 @@
       overflow:hidden;
       display:flex;
       flex-direction:column;
+      position:relative;
+    }
+
+    .sidebar::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      background:linear-gradient(180deg, rgba(255,255,255,.012), rgba(255,255,255,0));
+      opacity:.8;
     }
 
     .sidebar-scroll{height:100%;border-radius:inherit}
 
     .sidebar-inner{
-      padding:14px;
+      padding:16px;
       display:flex;
       flex-direction:column;
-      gap:12px;
+      gap:14px;
       min-height:100%;
       flex:0 0 auto;
     }
@@ -185,14 +195,14 @@
       gap:4px;
       border-radius:18px;
       padding:14px 14px 12px;
-      background:rgba(255,255,255,.03);
+      background:rgba(255,255,255,.024);
       border:1px solid rgba(255,255,255,.05);
       transition:border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .18s ease;
     }
 
     .brand:hover{
       border-color:rgba(139,111,255,.14);
-      background:rgba(255,255,255,.04);
+      background:rgba(255,255,255,.032);
       transform:translateY(-1px);
       box-shadow:0 10px 26px rgba(0,0,0,.12);
     }
@@ -218,7 +228,7 @@
     .notice{
       border-radius:13px;
       padding:10px 12px;
-      background:rgba(255,255,255,.035);
+      background:rgba(255,255,255,.03);
       border:1px solid rgba(255,255,255,.06);
       display:flex;
       align-items:center;
@@ -259,24 +269,38 @@
     }
 
     .auth-card,.tier-card{
-      border-radius:24px;padding:12px;
-      background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
-      display:flex;flex-direction:column;gap:7px;
+      border-radius:24px;
+      padding:12px;
+      background:rgba(255,255,255,.024);
+      border:1px solid rgba(255,255,255,.06);
+      display:flex;
+      flex-direction:column;
+      gap:7px;
       transition:border-color .16s ease, background .16s ease, transform .16s ease;
     }
 
     .auth-card:hover,.tier-card:hover{
-      border-color:rgba(139,111,255,.10);background:rgba(255,255,255,.035);transform:translateY(-1px);
+      border-color:rgba(139,111,255,.10);
+      background:rgba(255,255,255,.032);
+      transform:translateY(-1px);
     }
 
     .input{
-      width:100%;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.08);
-      background:rgba(0,0,0,.20);color:var(--text);padding:0 12px;font-size:13px;outline:none;
+      width:100%;
+      height:36px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(0,0,0,.20);
+      color:var(--text);
+      padding:0 12px;
+      font-size:13px;
+      outline:none;
       transition:border-color .16s ease,background .16s ease, box-shadow .16s ease;
     }
 
     .input:focus{
-      border-color:rgba(139,111,255,.30);background:rgba(0,0,0,.28);
+      border-color:rgba(139,111,255,.30);
+      background:rgba(0,0,0,.28);
       box-shadow:0 0 0 3px rgba(139,111,255,.08);
     }
 
@@ -304,9 +328,17 @@
     }
 
     .upgrade-btn{
-      height:38px;border-radius:10px;background:rgba(255,255,255,.04);
-      border:1px solid rgba(255,255,255,.08);font-weight:600;font-size:12px;
-      text-align:left;padding:0 12px;display:flex;align-items:center;justify-content:space-between;
+      height:40px;
+      border-radius:12px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      font-weight:600;
+      font-size:12px;
+      text-align:left;
+      padding:0 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
     }
 
     .ghost-btn:hover,.upgrade-btn:hover,.icon-btn:hover,.chip:hover{
@@ -318,505 +350,600 @@
     }
 
     .main{
-      display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;overflow:hidden;
+      display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:14px;overflow:hidden;
     }
 
     .topbar{
-      border-radius:var(--radius-xl);padding:14px 16px;
-      display:flex;align-items:center;justify-content:space-between;gap:12px;
-      flex:0 0 auto;position:relative;overflow:hidden;
+      border-radius:var(--radius-xl);
+      padding:16px 18px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      flex:0 0 auto;
+      position:relative;
+      overflow:hidden;
     }
 
     .topbar::after{
-      content:"";position:absolute;inset:auto -10% 0 auto;
-      width:340px;height:140px;
+      content:"";
+      position:absolute;
+      inset:auto -10% 0 auto;
+      width:340px;
+      height:140px;
       background:radial-gradient(circle, rgba(139,111,255,.12), transparent 70%);
-      pointer-events:none;filter:blur(22px);
+      pointer-events:none;
+      filter:blur(22px);
     }
 
     .title{min-width:0;position:relative;z-index:1}
-    .title h1{font-size:18px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+    .title h1{font-size:22px;font-weight:800;letter-spacing:-.03em;line-height:1.1}
     .title p{
-      margin-top:4px;font-size:12px;color:rgba(190,204,240,.68);line-height:1.4;
-      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.01em;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      margin-top:5px;
+      font-size:12px;
+      color:rgba(190,204,240,.68);
+      line-height:1.4;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      letter-spacing:.01em;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
-    .top-actions{display:flex;gap:10px;position:relative;z-index:1}
-
-    .icon-btn{
-      width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.04);
-      border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;
-      font-size:18px;text-decoration:none;
-    }
-
-    .icon-btn:active{transform:scale(.96)}
-
-    .workspace{
-      border-radius:28px;overflow:hidden;min-height:0;
-      display:grid;grid-template-rows:auto minmax(0,1fr);position:relative;
-    }
-
-    .workspace-intro{
-      padding:11px 15px;border-bottom:1px solid rgba(255,255,255,.055);
-      display:flex;align-items:center;justify-content:space-between;gap:12px;
-      flex:0 0 auto;min-height:42px;
-      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
-    }
-
-    .workspace-intro-left{display:flex;align-items:center;gap:8px;min-width:0}
-    .workspace-intro .section-label{margin:0;padding:0;flex:0 0 auto}
-    .workspace-intro .headline{
-      font-size:12.75px;font-weight:600;color:rgba(215,228,252,.84);
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    }
-
-    .messages-shell{
-      min-height:0;position:relative;--cx:50%;--cy:50%;overflow:hidden;
-    }
-
-    .messages-shell::after{
-      content:'';position:absolute;width:420px;height:420px;border-radius:50%;
-      background:radial-gradient(circle, rgba(139,111,255,.055) 0%, rgba(79,158,255,.03) 28%, transparent 70%);
-      pointer-events:none;transform:translate(-50%,-50%);left:var(--cx);top:var(--cy);
-      opacity:0;transition:opacity .28s ease;z-index:0;filter:blur(8px);
-    }
-
-    .messages-shell:hover::after{opacity:1}
-
-    .messages{
-      min-height:0;height:100%;padding:32px 28px 22px;
-      display:flex;flex-direction:column;gap:22px;overflow-y:auto;position:relative;z-index:1;
-    }
-
-    .empty-state{
-      min-height:100%;display:flex;align-items:flex-start;justify-content:center;
-      padding:24px 18px 24px;animation:fadeUp .28s cubic-bezier(.22,1,.36,1) both;
-    }
-
-    .empty-card{
-      width:min(920px,100%);border-radius:28px;padding:28px 28px 24px;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)),
-        radial-gradient(circle at 82% 12%, rgba(139,111,255,.10), transparent 26%);
-      border:1px solid rgba(255,255,255,.08);
-      box-shadow:0 18px 60px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.04);
-      position:relative;overflow:visible;
-    }
-
-    .empty-card::after{
-      content:"";position:absolute;right:-80px;top:-60px;width:260px;height:260px;border-radius:50%;
-      background:radial-gradient(circle, rgba(139,111,255,.12), transparent 72%);
-      filter:blur(20px);pointer-events:none;
-    }
-
-    .empty-eyebrow{
-      display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.16em;
-      text-transform:uppercase;color:var(--muted-2);font-weight:800;
-    }
-
-    .empty-eyebrow-dot{
-      width:6px;height:6px;border-radius:50%;
-      background:rgba(116,228,184,.88);box-shadow:0 0 12px rgba(116,228,184,.5);
-    }
-
-    .empty-card h1{
-      font-size:clamp(22px,3vw,32px);line-height:1.1;margin-top:12px;letter-spacing:-.04em;
-      max-width:600px;position:relative;z-index:1;
-    }
-
-    .empty-card p{
-      color:rgba(210,225,252,.9);font-size:14.5px;line-height:1.7;margin-top:14px;
-      max-width:760px;position:relative;z-index:1;
-    }
-
-    .empty-grid{
-      display:grid;grid-template-columns:1.35fr .9fr;gap:16px;
-      margin-top:18px;position:relative;z-index:1;
-    }
-
-    .empty-panel{
-      border-radius:18px;padding:14px;
-      background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
-    }
-
-    .empty-panel-label{
-      font-size:12px;letter-spacing:.14em;text-transform:uppercase;
-      color:rgba(190,204,240,.46);font-weight:700;margin-bottom:8px;
-    }
-
-    .empty-panel-copy{color:rgba(220,230,252,.84);font-size:12.5px;line-height:1.65}
-
-    .empty-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;position:relative;z-index:1}
-
-    .msg-group{
-      display:flex;flex-direction:column;gap:0;max-width:100%;width:100%;
-      animation:fadeUp .22s cubic-bezier(.22,1,.36,1) both;
-      border-radius:24px;padding:22px 22px 18px;position:relative;
-      transition:background .18s ease,box-shadow .18s ease,transform .18s ease,border-color .18s ease,opacity .18s ease;
-      border:1px solid transparent;cursor:default;will-change:transform, opacity;
-    }
-
-    .msg-group:hover{
-      background:rgba(255,255,255,.018);border-color:rgba(255,255,255,.04);
-      box-shadow:0 8px 28px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.025);
-      transform:translateY(-1px);
-    }
-
-    .msg-group.assistant{
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.012), rgba(255,255,255,.008)),
-        radial-gradient(circle at 85% 18%, rgba(139,111,255,.05), transparent 28%);
-      border-color:rgba(139,111,255,.05);
-    }
-
-    .msg-group.user{background:rgba(255,255,255,.01);border-color:rgba(255,255,255,.03)}
-
-    .msg-group.assistant:hover{
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,.012)),
-        radial-gradient(circle at 85% 18%, rgba(139,111,255,.08), transparent 26%);
-      border-color:rgba(139,111,255,.08);
-    }
-
-    .msg-group.new-msg{animation:messageRise .34s cubic-bezier(.22,1,.36,1) both}
-
-    @keyframes messageRise{
-      from{opacity:0;transform:translateY(12px) scale(.992);filter:blur(2px)}
-      to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
-    }
-
-    .msg-group-header{display:flex;align-items:center;gap:6px;margin-bottom:12px}
-
-    .msg-who{
-      font-size:12px;font-weight:700;color:rgba(145,165,210,.40);letter-spacing:.02em;
-      text-transform:none;transition:color .16s ease;
-    }
-
-    .msg-group.assistant .msg-who{color:rgba(167,147,255,.58)}
-    .msg-group:hover .msg-who{color:rgba(198,210,242,.72)}
-
-    .reply-body{padding:0 0 0 20px;position:relative}
-
-    .reply-body::before{
-      content:'';position:absolute;left:0;top:2px;bottom:2px;width:2px;border-radius:999px;
-      background:rgba(255,255,255,.07);transition:background .18s ease, box-shadow .18s ease, opacity .18s ease;
-    }
-
-    .msg-group.assistant .reply-body::before{
-      background:linear-gradient(180deg,rgba(139,111,255,.48),rgba(79,158,255,.20));
-    }
-
-    .msg-group.user .reply-body::before{background:rgba(110,130,210,.18)}
-
-    .msg-group.assistant:hover .reply-body::before{
-      background:linear-gradient(180deg,rgba(139,111,255,.78),rgba(79,158,255,.42));
-      box-shadow:0 0 14px rgba(139,111,255,.22);
-    }
-
-    .reply-text{
-      font-size:17px;line-height:1.88;color:rgba(236,242,255,.94);
-      white-space:pre-wrap;word-break:break-word;
-      transition:color .16s ease, opacity .16s ease;max-width:100%;
-    }
-
-    .msg-group.user .reply-text{color:rgba(202,216,248,.84)}
-    .msg-group:hover .reply-text{color:rgba(242,246,255,.98)}
-
-    .typing{display:inline-flex;gap:8px;align-items:center;height:16px}
-
-    .typing span{
-      width:4px;height:4px;border-radius:50%;background:rgba(139,111,255,.54);
-      animation:typingPulse .9s infinite ease-in-out;
-    }
-
-    .typing span:nth-child(2){animation-delay:.14s}
-    .typing span:nth-child(3){animation-delay:.28s}
-
-    @keyframes typingPulse{
-      0%,80%,100%{opacity:.22;transform:scale(1)}
-      40%{opacity:1;transform:scale(1.45)}
-    }
-
-    .status-row{
-      display:flex;gap:8px;flex-wrap:wrap;padding:14px 0 0 20px;width:100%;
+    .topbar-actions{
+      position:relative;
+      z-index:1;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
     }
 
     .status-pill{
-      font-size:11px;color:rgba(150,175,225,.42);padding:4px 10px;border-radius:999px;
-      background:rgba(50,65,110,.12);border:1px solid rgba(140,170,255,.05);letter-spacing:.02em;
-      transition:background .14s ease, color .14s ease, border-color .14s ease, transform .14s ease;
+      height:32px;
+      padding:0 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.045);
+      border:1px solid rgba(255,255,255,.07);
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:11px;
+      font-weight:600;
+      color:rgba(224,232,252,.82);
+      backdrop-filter:blur(14px);
     }
 
-    .msg-group:hover .status-pill{
-      color:rgba(162,184,228,.56);background:rgba(50,65,110,.16);
-      border-color:rgba(140,170,255,.08);transform:translateY(-1px);
+    .status-dot{
+      width:7px;height:7px;border-radius:50%;background:#60a5fa;box-shadow:0 0 10px currentColor;
+      color:#60a5fa;
     }
 
-    .customer-next{width:100%;display:flex;flex-wrap:wrap;gap:8px;padding:8px 0 0 15px}
+    .status-pill.ok .status-dot{color:#34d399;background:#34d399}
+    .status-pill.warn .status-dot{color:#f0c060;background:#f0c060}
+    .status-pill.error .status-dot{color:#f87171;background:#f87171}
 
-    .next-pill{
-      display:inline-flex;align-items:center;gap:8px;padding:6px 9px;border-radius:11px;
-      font-size:12px;font-weight:600;background:rgba(15,18,32,.55);border:1px solid rgba(255,255,255,.055);
-      color:rgba(185,205,242,.68);
-      transition:transform .12s ease, background .12s ease, border-color .12s ease, box-shadow .12s ease;
+    .workspace{
+      min-height:0;
+      display:grid;
+      grid-template-columns:minmax(0,1.34fr) minmax(324px,.78fr);
+      gap:16px;
+      overflow:hidden;
     }
 
-    .msg-group:hover .next-pill{
-      background:rgba(15,18,32,.66);border-color:rgba(255,255,255,.08);box-shadow:0 6px 16px rgba(0,0,0,.08);
+    .messages-shell{
+      position:relative;
+      min-width:0;
+      min-height:0;
+      border-radius:var(--radius-xl);
+      overflow:hidden;
+      display:grid;
+      grid-template-rows:minmax(0,1fr);
+      --cx:50%;
+      --cy:40%;
     }
 
-    .next-pill.primary{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.16);color:rgba(110,231,183,.84)}
-    .next-pill.warning{background:rgba(240,192,96,.08);border-color:rgba(240,192,96,.16);color:rgba(252,211,77,.84)}
-
-    .pill-label{opacity:.42;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:9px}
-
-    .msg-actions{
-      display:flex;align-items:center;gap:8px;padding:16px 0 0 20px;
-      opacity:.72;transform:none;pointer-events:auto;visibility:visible;
-      transition:opacity .18s ease, transform .18s cubic-bezier(.22,1,.36,1), visibility 0s linear 0s;
+    .messages-shell::before{
+      content:"";
+      position:absolute;
+      inset:1px;
+      border-radius:inherit;
+      pointer-events:none;
+      background:
+        radial-gradient(420px circle at var(--cx) var(--cy), rgba(139,111,255,.10), transparent 50%),
+        radial-gradient(320px circle at 78% 24%, rgba(90,160,255,.08), transparent 42%);
+      opacity:.95;
+      z-index:0;
+      transition:background-position .16s ease;
     }
 
-    .msg-group:hover .msg-actions,
-    .msg-group:focus-within .msg-actions,
-    .msg-group.assistant.show-actions .msg-actions{opacity:.96;transform:translateY(0)}
-
-    .act-btn{
-      display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:10px;
-      border:none;outline:none;cursor:pointer;font-size:12px;font-weight:500;font-family:inherit;
-      color:rgba(145,168,218,.40);background:transparent;letter-spacing:.01em;white-space:nowrap;
-      transition:background .11s ease, color .11s ease, transform .09s ease, opacity .11s ease, border-color .11s ease, box-shadow .11s ease;
-      -webkit-tap-highlight-color:transparent;
+    .messages-shell::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      border-radius:inherit;
+      pointer-events:none;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)),
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01) 18%, rgba(255,255,255,0) 42%);
+      z-index:0;
     }
 
-    .act-btn svg{width:10px;height:10px;flex:0 0 10px;opacity:.58;transition:opacity .11s ease, transform .11s ease}
-
-    .act-btn:hover{background:rgba(255,255,255,.05);color:rgba(205,220,252,.80)}
-    .act-btn:hover svg{opacity:.86;transform:translateY(-.5px)}
-    .act-btn:active{transform:scale(.92);opacity:.70}
-
-    .act-btn.send{
-      background:linear-gradient(135deg, rgba(139,111,255,.18), rgba(79,158,255,.12));
-      border:1px solid rgba(139,111,255,.24);color:rgba(208,195,255,.92);font-weight:600;
-      padding:0 9px;box-shadow:0 0 16px rgba(139,111,255,.09);
+    .messages-scroll{
+      position:relative;
+      z-index:1;
+      min-height:0;
+      height:100%;
+      padding:24px 26px 30px;
+      display:flex;
+      flex-direction:column;
+      gap:16px;
     }
 
-    .act-btn.send:hover{
-      background:linear-gradient(135deg, rgba(139,111,255,.28), rgba(79,158,255,.18));
-      border-color:rgba(139,111,255,.40);color:rgba(234,228,255,.99);box-shadow:0 0 24px rgba(139,111,255,.16);
+    .message{
+      max-width:min(1080px, 95%);
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      padding:16px 16px 14px;
+      border-radius:20px;
+      border:1px solid rgba(255,255,255,.07);
+      position:relative;
+      overflow:hidden;
+      animation:messageIn .22s ease;
+      transform-origin:left bottom;
     }
 
-    .act-btn.done,.act-btn.done:hover{
-      color:rgba(110,231,183,.74)!important;background:rgba(52,211,153,.08)!important;
-      border-color:rgba(52,211,153,.14)!important;transform:none;pointer-events:none;box-shadow:none!important;
+    @keyframes messageIn{
+      from{opacity:0;transform:translateY(8px) scale(.99)}
+      to{opacity:1;transform:translateY(0) scale(1)}
     }
 
-    .act-sep{width:1px;height:9px;background:rgba(255,255,255,.055);margin:0 2px;flex:0 0 1px}
-
-    .fb-btn{
-      width:22px;height:30px;border-radius:5px;border:none;outline:none;cursor:pointer;font-size:12px;
-      background:transparent;color:rgba(140,165,215,.26);
-      transition:background .11s ease, color .11s ease, transform .09s ease, box-shadow .11s ease;
-      display:flex;align-items:center;justify-content:center;font-family:inherit;
+    .message.user{
+      margin-left:auto;
+      background:
+        linear-gradient(180deg, rgba(90,120,255,.18), rgba(90,120,255,.10)),
+        rgba(255,255,255,.03);
+      border-color:rgba(125,145,255,.22);
+      box-shadow:0 14px 34px rgba(18,26,62,.20);
     }
 
-    .fb-btn:hover{background:rgba(255,255,255,.04);color:rgba(200,218,252,.70);transform:scale(1.12);box-shadow:0 4px 12px rgba(0,0,0,.10)}
-    .fb-btn:active{transform:scale(.85)}
-    .fb-btn.up{color:rgba(52,211,153,.68);background:rgba(52,211,153,.06)}
-    .fb-btn.down{color:rgba(248,113,113,.68);background:rgba(248,113,113,.06)}
+    .message.assistant{
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.038), rgba(255,255,255,.022)),
+        radial-gradient(circle at 84% 18%, rgba(139,111,255,.08), transparent 32%);
+      box-shadow:0 16px 40px rgba(0,0,0,.18);
+    }
 
-    .composer-wrap{display:grid;gap:8px;flex:0 0 auto}
+    .message-head{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:rgba(188,202,240,.58);font-weight:700;
+    }
 
-    .quick-actions{display:flex;gap:6px;flex-wrap:wrap}
+    .message-role{
+      display:flex;align-items:center;gap:8px;min-width:0;
+    }
 
+    .message-role-badge{
+      width:20px;height:20px;border-radius:7px;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
+      flex:0 0 20px;
+    }
+
+    .message-role-badge svg{width:11px;height:11px;opacity:.9}
+    .message-time{white-space:nowrap;color:rgba(175,191,233,.44)}
+    .message-body{
+      font-size:14.5px;
+      line-height:1.76;
+      color:rgba(239,244,255,.96);
+      word-break:break-word;
+    }
+
+    .message-meta{
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+      padding-top:2px;
+    }
+
+    .pill{
+      min-height:26px;padding:0 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.04);
+      display:inline-flex;align-items:center;gap:6px;
+      font-size:11px;color:rgba(213,224,250,.78);
+    }
+
+    .pill svg{width:11px;height:11px;opacity:.85}
+    .pill.success{background:rgba(116,228,184,.10);border-color:rgba(116,228,184,.18);color:rgba(216,255,234,.94)}
+    .pill.warning{background:rgba(255,198,92,.10);border-color:rgba(255,198,92,.20);color:rgba(255,239,204,.96)}
+    .pill.info{background:rgba(123,179,255,.10);border-color:rgba(123,179,255,.18);color:rgba(223,236,255,.95)}
+
+    .rail{
+      border-radius:var(--radius-xl);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .rail-scroll{height:100%;border-radius:inherit}
+
+    .rail-inner{
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+      min-height:100%;
+      flex:0 0 auto;
+    }
+
+    .rail-mount{display:grid;gap:16px}
+
+    .panel{
+      border-radius:24px;
+      padding:17px;
+      background:rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.06);
+      display:flex;
+      flex-direction:column;
+      gap:13px;
+      transition:border-color .16s ease, background .16s ease, transform .16s ease;
+    }
+
+    .panel:hover{
+      border-color:rgba(139,111,255,.10);
+      background:rgba(255,255,255,.035);
+      transform:translateY(-1px);
+    }
+
+    .panel-head{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+    }
+
+    .panel-title{
+      font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:rgba(190,204,240,.52);
+    }
+
+    .panel-copy{
+      font-size:12px;
+      line-height:1.68;
+      color:rgba(212,222,247,.72);
+    }
+
+    .stats-grid{
+      display:grid;grid-template-columns:1fr 1fr;gap:9px;
+    }
+
+    .stat{
+      border-radius:16px;
+      padding:12px 13px;
+      background:rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.05);
+      display:flex;
+      flex-direction:column;
+      gap:5px;
+    }
+
+    .stat-label{
+      font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(188,202,240,.44);font-weight:700;
+    }
+
+    .stat-value{
+      font-size:20px;
+      font-weight:800;
+      letter-spacing:-.02em;
+      color:rgba(245,248,255,.97);
+    }
+
+    .plan-block{display:flex;flex-direction:column;gap:9px}
+    .plan-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .plan-tier{
+      font-size:17px;font-weight:800;letter-spacing:-.02em;
+    }
+
+    .plan-usage{
+      font-size:12px;color:rgba(211,222,248,.74);
+    }
+
+    .bar{
+      width:100%;height:10px;border-radius:999px;overflow:hidden;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.05);
+      position:relative;
+    }
+
+    .bar::after{
+      content:"";
+      position:absolute;inset:0;
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
+      pointer-events:none;
+    }
+
+    .bar-fill{
+      width:0%;
+      height:100%;
+      border-radius:inherit;
+      background:linear-gradient(90deg, rgba(139,111,255,.96), rgba(79,158,255,.88));
+      box-shadow:0 0 22px rgba(139,111,255,.20);
+      transition:width .26s ease;
+    }
+
+    .plan-meta{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      font-size:11px;color:rgba(190,204,240,.62);
+    }
+
+    .chips{display:flex;flex-wrap:wrap;gap:8px}
     .chip{
-      padding:6px 10px;border-radius:999px;font-size:11px;
-      background:rgba(14,16,32,.48);border:1px solid rgba(139,111,255,.16);color:rgba(220,228,252,.90);
+      min-height:31px;
+      padding:0 11px;
+      border-radius:999px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      font-size:11px;
+      font-weight:600;
     }
 
-    .chip:hover{background:rgba(139,111,255,.11);border-color:rgba(139,111,255,.28)}
+    .chip svg{width:12px;height:12px;opacity:.88}
 
     .composer{
-      border-radius:18px;padding:7px;min-height:58px;display:flex;gap:8px;align-items:flex-end;
-      background:rgba(6,8,20,.40);border:1px solid rgba(255,255,255,.06);min-width:0;
-      transition:border-color .16s ease, box-shadow .16s ease, background .16s ease, transform .16s ease;
+      position:relative;
+      border-radius:var(--radius-xl);
+      padding:18px 20px 20px;
+      overflow:hidden;
     }
 
-    .composer:hover{border-color:rgba(255,255,255,.09);background:rgba(6,8,20,.46)}
+    .composer::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      background:
+        radial-gradient(circle at 14% 8%, rgba(139,111,255,.08), transparent 30%),
+        radial-gradient(circle at 88% 100%, rgba(79,158,255,.06), transparent 34%);
+    }
 
-    .composer:focus-within{
+    .composer-inner{
+      position:relative;
+      z-index:1;
+      display:flex;
+      flex-direction:column;
+      gap:13px;
+    }
+
+    .composer-top{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+    }
+
+    .composer-title{
+      display:flex;flex-direction:column;gap:4px;min-width:0;
+    }
+
+    .composer-title strong{
+      font-size:14px;font-weight:800;letter-spacing:-.01em;
+    }
+
+    .composer-title span{
+      font-size:12px;color:rgba(197,210,244,.66);line-height:1.5;
+    }
+
+    .composer-status{
+      height:30px;padding:0 11px;border-radius:999px;background:rgba(255,255,255,.045);
+      border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:8px;
+      white-space:nowrap;font-size:11px;font-weight:700;color:rgba(219,228,251,.82);
+    }
+
+    .composer-status-dot{
+      width:7px;height:7px;border-radius:50%;background:#60a5fa;box-shadow:0 0 10px currentColor;
+      color:#60a5fa;
+    }
+
+    .composer-field{
+      display:flex;
+      flex-direction:column;
+      gap:11px;
+    }
+
+    .composer-input-wrap{
+      position:relative;
+      display:flex;
+      align-items:flex-end;
+      gap:12px;
+      min-height:94px;
+      border-radius:24px;
+      border:1px solid rgba(255,255,255,.085);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.018)),
+        rgba(5,8,16,.34);
+      box-shadow:
+        0 18px 40px rgba(0,0,0,.22),
+        inset 0 1px 0 rgba(255,255,255,.03);
+      padding:18px 18px 18px 20px;
+      transition:border-color .18s ease, box-shadow .18s ease, background .18s ease, transform .16s ease;
+    }
+
+    .composer-input-wrap:focus-within{
       border-color:rgba(139,111,255,.22);
-      box-shadow:0 0 0 3px rgba(139,111,255,.08), 0 8px 26px rgba(0,0,0,.10);
-      background:rgba(6,8,20,.50);transform:translateY(-1px);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.042), rgba(255,255,255,.022)),
+        rgba(7,10,20,.42);
+      box-shadow:
+        0 24px 52px rgba(0,0,0,.26),
+        0 0 0 4px rgba(139,111,255,.07),
+        inset 0 1px 0 rgba(255,255,255,.04);
+      transform:translateY(-1px);
     }
 
-    .composer textarea{
-      flex:1;min-height:38px;max-height:120px;resize:none;border:none;outline:none;
-      background:transparent;color:var(--text);padding:9px 12px;font-size:14px;line-height:1.62;
-      min-width:0;overflow:auto;scrollbar-width:none;
+    .composer-input-wrap::after{
+      content:"";
+      position:absolute;
+      inset:1px;
+      border-radius:23px;
+      pointer-events:none;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(139,111,255,.08), transparent 24%),
+        radial-gradient(circle at 82% 82%, rgba(79,158,255,.07), transparent 28%);
+      opacity:.95;
     }
 
-    .composer textarea::-webkit-scrollbar{display:none}
-    .composer textarea::placeholder{color:rgba(230,237,255,.36)}
+    .textarea{
+      position:relative;
+      z-index:1;
+      width:100%;
+      min-height:50px;
+      max-height:240px;
+      resize:none;
+      overflow:auto;
+      border:none;
+      outline:none;
+      background:transparent;
+      color:var(--text);
+      font:inherit;
+      font-size:14.5px;
+      line-height:1.72;
+      padding:2px 0 0;
+      scrollbar-width:none;
+    }
+
+    .textarea::-webkit-scrollbar{display:none}
+    .textarea::placeholder{color:rgba(205,218,248,.38)}
 
     .send-btn{
-      min-width:118px;
-      height:44px;
-      padding:0 16px 0 15px;
-      border-radius:14px;
-      flex:0 0 auto;
+      position:relative;
+      z-index:1;
+      width:48px;
+      height:48px;
+      min-width:48px;
+      border-radius:17px;
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      gap:10px;
-      background:linear-gradient(135deg, rgba(139,111,255,.94), rgba(79,158,255,.86));
+      background:
+        linear-gradient(135deg, rgba(139,111,255,.92), rgba(79,158,255,.86));
       border:1px solid rgba(139,111,255,.34);
-      color:rgba(250,252,255,.98);
-      font-weight:800;
-      font-size:13px;
-      letter-spacing:.01em;
-      box-shadow:0 12px 28px rgba(95,73,214,.24), inset 0 1px 0 rgba(255,255,255,.18);
-      position:relative;
+      box-shadow:
+        0 12px 28px rgba(88,66,196,.28),
+        inset 0 1px 0 rgba(255,255,255,.18);
+      color:#fff;
       overflow:hidden;
     }
 
     .send-btn::before{
       content:"";
       position:absolute;
-      inset:1px;
-      border-radius:13px;
-      background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,0));
+      inset:0;
+      background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0));
       opacity:.9;
       pointer-events:none;
     }
 
     .send-btn svg{
-      width:16px;
-      height:16px;
-      flex:0 0 16px;
+      position:relative;
+      z-index:1;
+      width:18px;
+      height:18px;
       transform:translateX(1px);
-      position:relative;
-      z-index:1;
     }
 
-    .send-btn span{
-      position:relative;
-      z-index:1;
-    }
-
-    .send-btn:hover:not(:disabled){
-      transform:translateY(-1px);
-      box-shadow:0 16px 34px rgba(95,73,214,.32), 0 0 24px rgba(139,111,255,.18);
-      background:linear-gradient(135deg, rgba(148,121,255,.98), rgba(88,170,255,.90));
-    }
-
-    .send-btn:active:not(:disabled){
-      transform:translateY(0) scale(.98);
-      box-shadow:0 8px 18px rgba(95,73,214,.22);
+    .send-btn:hover{
+      transform:translateY(-1px) scale(1.02);
+      box-shadow:
+        0 18px 36px rgba(88,66,196,.34),
+        0 0 18px rgba(139,111,255,.18),
+        inset 0 1px 0 rgba(255,255,255,.18);
     }
 
     .send-btn:disabled{
-      opacity:.52;
+      opacity:.62;
       cursor:not-allowed;
+      filter:saturate(.8);
+      box-shadow:
+        0 10px 22px rgba(0,0,0,.18),
+        inset 0 1px 0 rgba(255,255,255,.12);
       transform:none;
-      box-shadow:none;
     }
 
-    .composer.highlight{
-      border-color:rgba(139,111,255,.55);
-      box-shadow:0 0 0 3px rgba(139,111,255,.12), 0 0 26px rgba(139,111,255,.12);
-      transition:border-color .15s ease, box-shadow .15s ease;
+    .composer-bottom{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
     }
 
-    .rail{display:flex;flex-direction:column;gap:12px;overflow:hidden;border-radius:28px}
-
-    .rail-scroll{
-      height:100%;border-radius:28px;padding-right:2px;
-      display:flex;flex-direction:column;gap:12px;
+    .composer-hint{
+      font-size:12px;
+      color:rgba(196,210,245,.64);
+      line-height:1.58;
     }
 
-    .rail-card{
-      border-radius:24px;padding:16px;
-      background:linear-gradient(180deg, rgba(8,10,24,.58), rgba(6,8,20,.65));
-      border:1px solid rgba(255,255,255,.12);flex:0 0 auto;position:relative;overflow:hidden;
-      transition:border-color .16s ease, transform .16s ease, background .16s ease, box-shadow .18s ease;
+    .message-ghost{
+      border:1px dashed rgba(255,255,255,.09);
+      background:rgba(255,255,255,.025);
+      color:rgba(204,216,248,.58);
+      border-radius:18px;
+      padding:20px 18px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      align-items:flex-start;
+      max-width:720px;
     }
 
-    .rail-card:hover{
-      border-color:rgba(139,111,255,.16);transform:translateY(-1px);
-      background:linear-gradient(180deg, rgba(10,12,28,.62), rgba(7,9,22,.68));
-      box-shadow:0 10px 24px rgba(0,0,0,.10);
+    .message-ghost strong{
+      font-size:13px;letter-spacing:.02em;color:rgba(242,246,255,.94)
     }
 
-    .rail-card.active{border-color:rgba(139,111,255,.22);box-shadow:inset 0 0 0 1px rgba(139,111,255,.06), 0 0 26px rgba(139,111,255,.08)}
-
-    .rail-card.active::after{
-      content:"";position:absolute;right:-24px;top:-24px;width:120px;height:120px;border-radius:50%;
-      background:radial-gradient(circle, rgba(139,111,255,.16), transparent 72%);
-      pointer-events:none;filter:blur(14px);
+    .message-ghost span{
+      font-size:13px;line-height:1.65;
     }
 
-    .rail-title{
-      font-size:11px;letter-spacing:.18em;text-transform:uppercase;
-      color:rgba(185,200,240,.82);font-weight:700;margin-bottom:12px;
+    .footer-note{
+      display:flex;align-items:center;justify-content:center;
+      position:fixed;left:50%;bottom:10px;transform:translateX(-50%);
+      z-index:4;
+      font-size:11px;color:rgba(195,208,244,.42);
+      letter-spacing:.08em;text-transform:uppercase;
+      pointer-events:none;
+      mix-blend-mode:screen;
     }
 
-    .stat-grid,.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 
-    .stat-box,.plan-box{
-      border-radius:24px;padding:14px;background:rgba(10,12,28,.50);border:1px solid rgba(255,255,255,.08);min-width:0;
-      transition:background .16s ease, border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+    @media (max-width: 1320px){
+      :root{
+        --sidebar:222px;
+        --rail:304px;
+      }
+
+      .workspace{
+        grid-template-columns:minmax(0,1.28fr) minmax(300px,.82fr);
+      }
     }
 
-    .stat-box:hover,.plan-box:hover{
-      background:rgba(14,16,34,.62);border-color:rgba(139,111,255,.18);
-      transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,0,0,.08);
-    }
-
-    .stat-value{font-size:29px;font-weight:800;letter-spacing:-.04em;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .plan-box .stat-value{font-size:clamp(14px,3.5vw,22px);letter-spacing:-.03em}
-    .stat-label{font-size:13px;color:rgba(215,225,250,.86);line-height:1.45;margin-top:6px}
-
-    .usage-block{display:flex;flex-direction:column;gap:10px}
-
-    .usage-line{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted)}
-
-    .usage-bar{height:10px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden;border:1px solid rgba(255,255,255,.06)}
-
-    .usage-bar > div{
-      height:100%;width:2%;
-      background:linear-gradient(90deg, rgba(124,92,252,.95), rgba(66,153,225,.95));
-      transition:width .25s ease;
-    }
-
-    .muted-copy{font-size:13px;color:rgba(215,225,250,.86);line-height:1.6}
-
-    .system-stack{display:flex;flex-direction:column;gap:10px}
-
-    @keyframes fadeUp{
-      from{opacity:0;transform:translateY(10px) scale(.99)}
-      to{opacity:1;transform:translateY(0) scale(1)}
-    }
-
-    @media (max-width:1280px){:root{--sidebar:270px;--rail:250px}}
-
-    @media (max-width:1180px){
-      .app{grid-template-columns:280px minmax(0,1fr)}
-      .rail{display:none}
-    }
-
-    @media (max-width:900px){
+    @media (max-width: 1180px){
       body{overflow:auto}
-      .app{height:auto;grid-template-columns:1fr}
+      .app{
+        min-height:100vh;
+        height:auto;
+        grid-template-columns:1fr;
+      }
       .sidebar,.main,.rail{height:auto}
-      .messages-shell{min-height:500px}
-      .empty-grid{grid-template-columns:1fr}
-      .empty-card{padding:22px}
-      .empty-card h1{font-size:28px}
-      .reply-text{font-size:15.75px;line-height:1.78}
-      .msg-group:hover{transform:none}
-      .msg-actions{opacity:1;transform:none;pointer-events:auto;visibility:visible}
-      .messages{padding:22px 18px 18px}
+      .workspace{grid-template-columns:1fr}
+      .rail{order:3}
+      .sidebar{order:1}
+      .main{order:2}
+      .footer-note{display:none}
+    }
+
+    @media (max-width: 720px){
+      .app{padding:10px;gap:10px}
+      .sidebar-inner,.rail-inner{padding:12px}
+      .topbar{padding:13px 14px}
+      .messages-scroll{padding:16px}
+      .message{max-width:100%}
+      .composer{padding:13px 14px 15px}
+      .composer-input-wrap{padding:14px 14px 14px 15px;min-height:78px}
+      .send-btn{width:44px;height:44px;min-width:44px;border-radius:15px}
+      .stats-grid{grid-template-columns:1fr 1fr}
     }
   </style>
 </head>
@@ -824,176 +951,282 @@
   <canvas id="fluid"></canvas>
 
   <div class="app">
-    <aside class="sidebar glass scroll-shell" id="sidebarShell" data-show-top="false" data-show-bottom="false">
-      <div class="sidebar-scroll scroll-area" id="sidebarScroll">
-        <div class="sidebar-inner">
+    <aside class="sidebar glass">
+      <div class="scroll-shell sidebar-scroll" id="sidebarShell">
+        <div class="scroll-area sidebar-scroll" id="sidebarScroll">
+          <div class="sidebar-inner">
+            <div class="brand">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                  <div style="width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg, rgba(139,111,255,.26), rgba(79,158,255,.18));border:1px solid rgba(139,111,255,.22);font-size:16px;font-weight:800;box-shadow:0 0 20px rgba(139,111,255,.14)">X</div>
+                  <div style="min-width:0">
+                    <div style="font-size:16px;font-weight:800;letter-spacing:-.02em;line-height:1.1">Xalvion</div>
+                    <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:rgba(190,204,240,.48);margin-top:3px">Operator Workspace</div>
+                  </div>
+                </div>
+                <button class="ghost-btn" id="newChatBtn" type="button" style="height:32px;padding:0 10px;font-size:11px">New</button>
+              </div>
+              <div class="brand-sub" id="brandSubcopy">Premium AI support engine with live action visibility, usage pressure, and operator-grade response handling.</div>
+            </div>
 
-          <div class="brand">
-            <svg width="200" height="36" viewBox="0 0 200 36">
-              <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="#ffffff" letter-spacing="-0.5">X</text>
-              <text x="26" y="19" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="300" fill="#ffffff" letter-spacing="4" opacity="0.9">ALVION</text>
-              <text x="27" y="29" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5" font-weight="400" fill="rgba(255,255,255,0.28)" letter-spacing="3">AI SUPPORT ENGINE</text>
-            </svg>
-            <div class="brand-sub" id="brandSubcopy">Fast, clear support responses with the right next step built in.</div>
-          </div>
+            <div class="notice info" id="notice">
+              <div class="notice-dot"></div>
+              <div class="notice-title" id="noticeTitle">Preview access</div>
+              <div class="notice-detail-wrap">
+                <div class="notice-detail" id="noticeDetail">Preview · response ready · service: checking · session: checking.</div>
+              </div>
+            </div>
 
-          <div class="section-label">Workspace notice</div>
-          <div id="notice" class="notice info">
-            <div class="notice-dot"></div>
-            <div id="noticeTitle" class="notice-title">Booting</div>
-            <div class="notice-detail-wrap">
-              <span id="noticeDetail" class="notice-detail">Preparing the response workspace...</span>
+            <div class="section-label">Account</div>
+            <div class="auth-card glass" id="accountCard">
+              <input class="input" id="usernameInput" type="text" placeholder="Username" autocomplete="username" />
+              <input class="input" id="passwordInput" type="password" placeholder="Password" autocomplete="current-password" />
+              <div class="btn-row">
+                <button class="btn" id="signupBtn" type="button">Sign up</button>
+                <button class="ghost-btn" id="loginBtn" type="button">Log in</button>
+              </div>
+              <div class="btn-row">
+                <button class="ghost-btn" id="devBtn" type="button">Dev access</button>
+                <button class="ghost-btn" id="logoutBtn" type="button">Logout</button>
+              </div>
+            </div>
+
+            <div class="section-label">Status</div>
+            <div class="panel" id="dashboardCard">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title">Live system</div>
+                  <div class="panel-copy" id="workspaceSubcopy">Backend, auth, and response pipeline status flow through this workspace.</div>
+                </div>
+              </div>
+
+              <div class="chips">
+                <div class="chip">
+                  <span style="width:7px;height:7px;border-radius:50%;background:#60a5fa;box-shadow:0 0 10px #60a5fa"></span>
+                  <span id="backendStatus">Service: checking</span>
+                </div>
+                <div class="chip">
+                  <span style="width:7px;height:7px;border-radius:50%;background:#f0c060;box-shadow:0 0 10px #f0c060"></span>
+                  <span id="authStatus">Session: checking</span>
+                </div>
+                <div class="chip">
+                  <span style="width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399"></span>
+                  <span id="streamStatus">Response: ready</span>
+                </div>
+              </div>
+
+              <div class="stats-grid">
+                <div class="stat">
+                  <div class="stat-label">Interactions</div>
+                  <div class="stat-value" id="statInteractions">0</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Actions</div>
+                  <div class="stat-value" id="statActions">0</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Quality</div>
+                  <div class="stat-value" id="statQuality">0.00</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Confidence</div>
+                  <div class="stat-value" id="statConfidence">0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-label">Usage</div>
+            <div class="tier-card glass" id="usageCard">
+              <div class="plan-block">
+                <div class="plan-row">
+                  <div class="plan-tier" id="planTier">Free</div>
+                  <div class="plan-usage mono" id="planUsage">0 / 50</div>
+                </div>
+                <div class="bar">
+                  <div class="bar-fill" id="planBar"></div>
+                </div>
+                <div class="plan-meta">
+                  <span id="planUsed">Used 0</span>
+                  <span id="planRemaining">Remaining 50</span>
+                </div>
+              </div>
+
+              <div class="panel-copy" id="usagePanelCopy">Usage becomes part of the product loop. Once free capacity runs out, upgrade pressure becomes visible inside the workspace.</div>
+
+              <div class="chips">
+                <button class="upgrade-btn" data-upgrade="pro" type="button">Upgrade to Pro <span>→</span></button>
+                <button class="upgrade-btn" data-upgrade="elite" type="button">Upgrade to Elite <span>→</span></button>
+              </div>
             </div>
           </div>
-
-          <div class="section-label">Access</div>
-          <div class="auth-card">
-            <input id="usernameInput" class="input" type="text" placeholder="Username" />
-            <input id="passwordInput" class="input" type="password" placeholder="Password" />
-            <div class="btn-row">
-              <button id="signupBtn" class="ghost-btn" type="button">Sign up</button>
-              <button id="loginBtn" class="btn" type="button">Log in</button>
-            </div>
-            <div class="btn-row">
-              <button id="devBtn" class="ghost-btn" type="button">Preview access</button>
-              <button id="logoutBtn" class="ghost-btn" type="button">Logout</button>
-            </div>
-          </div>
-
-          <div class="section-label">Plans</div>
-          <div class="tier-card">
-            <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Upgrade to Pro</span><span>→</span></button>
-            <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Upgrade to Elite</span><span>→</span></button>
-          </div>
-
         </div>
       </div>
     </aside>
 
     <main class="main">
-      <header class="topbar glass">
+      <div class="topbar glass">
         <div class="title">
-          <h1>Customer support</h1>
-          <p id="workspaceSubcopy">Preview · response ready</p>
+          <h1 id="workspaceHeadline">AI support that decides, acts, and explains itself</h1>
+          <p>Live operator surface for premium customer handling, decision visibility, and controlled action execution.</p>
         </div>
-        <div class="top-actions">
-          <button id="newChatBtn" class="icon-btn" type="button" title="New chat">+</button>
-          <a class="icon-btn" href="/landing" title="Open landing page">↗</a>
-        </div>
-      </header>
 
-      <section class="workspace glass">
-        <div class="workspace-intro">
-          <div class="workspace-intro-left">
-            <div class="section-label">Workspace</div>
-            <div class="headline" id="workspaceHeadline">Send a customer issue and get a clear reply with the next step built in.</div>
+        <div class="topbar-actions">
+          <div class="status-pill ok">
+            <span class="status-dot"></span>
+            <span class="mono">Xalvion live</span>
           </div>
-        </div>
-        <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
-          <div id="messages" class="messages scroll-area"></div>
-        </div>
-      </section>
-
-      <section class="composer-wrap">
-        <div class="quick-actions">
-          <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
-          <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
-          <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
-          <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
-        </div>
-        <div class="composer glass">
-          <textarea id="messageInput" placeholder="Paste a customer issue or type a support request..."></textarea>
-          <button id="sendBtn" class="send-btn" type="button">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 2.5L7 9M13.5 2.5L9 13.5 7 9l-4.5-2 11-5z"></path></svg>
-            <span>Send</span>
-          </button>
-        </div>
-      </section>
-    </main>
-
-    <aside class="rail scroll-shell" id="railShell" data-show-top="false" data-show-bottom="false">
-      <div class="rail-scroll scroll-area" id="railScroll">
-        <div class="rail-card" id="dashboardCard">
-          <div class="rail-title">Dashboard</div>
-          <div class="stat-grid">
-            <div class="stat-box">
-              <div id="statInteractions" class="stat-value">0</div>
-              <div class="stat-label">Tickets handled</div>
-            </div>
-            <div class="stat-box">
-              <div id="statActions" class="stat-value">0</div>
-              <div class="stat-label">Actions completed</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="rail-card" id="usageCard">
-          <div class="rail-title">Plan usage</div>
-          <div class="usage-block">
-            <div class="plan-grid">
-              <div class="plan-box">
-                <div id="planTier" class="stat-value">FREE</div>
-                <div class="stat-label">Current tier</div>
-              </div>
-              <div class="plan-box">
-                <div id="planUsed" class="stat-value">0</div>
-                <div class="stat-label">Used</div>
-              </div>
-            </div>
-            <div class="usage-line">
-              <span>Limit</span>
-              <span id="planUsage">50</span>
-            </div>
-            <div class="usage-line">
-              <span>Remaining</span>
-              <span id="planRemaining">50</span>
-            </div>
-            <div class="usage-bar"><div id="planBar"></div></div>
-            <div id="usagePanelCopy" class="muted-copy">Your plan sets the amount of support usage available each month.</div>
-          </div>
-        </div>
-
-        <div class="rail-card" id="accountCard">
-          <div class="rail-title">Account</div>
-          <div class="system-stack">
-            <div id="backendStatus" class="muted-copy">Service: checking...</div>
-            <div id="authStatus" class="muted-copy">Session: checking...</div>
-            <div id="streamStatus" class="muted-copy">Response: ready</div>
-          </div>
-          <div id="systemPanelCopy" class="muted-copy" style="margin-top:12px">
-            Clear request handling is active and ready for the next conversation.
+          <div class="status-pill">
+            <span class="status-dot"></span>
+            <span class="mono">Action visibility on</span>
           </div>
         </div>
       </div>
-    </aside>
+
+      <div class="workspace">
+        <section class="messages-shell glass scroll-shell" id="messagesShell">
+          <div class="scroll-area messages-scroll" id="messages">
+            <div class="message-ghost">
+              <strong>Workspace ready</strong>
+              <span>Run a support issue through the composer below. Responses will stream into this thread with action state, confidence, and business context.</span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="rail glass">
+          <div class="scroll-shell rail-scroll" id="railShell">
+            <div class="scroll-area rail-scroll" id="railScroll">
+              <div class="rail-inner">
+                <div class="panel">
+                  <div class="panel-head">
+                    <div>
+                      <div class="panel-title">System pressure</div>
+                      <div class="panel-copy" id="systemPanelCopy">This panel is meant to surface plan pressure, action readiness, and system credibility in one glance.</div>
+                    </div>
+                  </div>
+                  <div class="chips">
+                    <button class="chip" data-fill="A customer says: I was charged twice.">
+                      <span style="display:flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:50%;background:rgba(139,111,255,.18)">!</span>
+                      <span>Double charge</span>
+                    </button>
+                    <button class="chip" data-fill="A customer says: My package is late and I’m really annoyed.">
+                      <span style="display:flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:50%;background:rgba(79,158,255,.18)">↗</span>
+                      <span>Late order</span>
+                    </button>
+                    <button class="chip" data-fill="A customer says: My order arrived damaged and I want this fixed today.">
+                      <span style="display:flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:50%;background:rgba(255,198,92,.18)">✦</span>
+                      <span>Damaged item</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-head">
+                    <div>
+                      <div class="panel-title">Plan ladder</div>
+                      <div class="panel-copy">Visible upgrade pressure turns capability into revenue, not just a hidden backend feature.</div>
+                    </div>
+                  </div>
+                  <div class="chips" style="display:grid;gap:8px">
+                    <button class="upgrade-btn" data-upgrade="pro" type="button">Pro · higher limits <span>29</span></button>
+                    <button class="upgrade-btn" data-upgrade="elite" type="button">Elite · premium control <span>99</span></button>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-head">
+                    <div>
+                      <div class="panel-title">Operator note</div>
+                      <div class="panel-copy">The strongest version of this product is not “AI chat”. It is an AI operator visibly running support outcomes.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="rail-mount" id="opsRailMount"></div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <section class="composer glass">
+        <div class="composer-inner">
+          <div class="composer-top">
+            <div class="composer-title">
+              <strong>Run a support case</strong>
+              <span>Send a customer issue and let Xalvion stream a premium response with action context.</span>
+            </div>
+            <div class="composer-status">
+              <span class="composer-status-dot"></span>
+              <span id="streamStatusDuplicate" style="display:none"></span>
+              <span>Ready</span>
+            </div>
+          </div>
+
+          <div class="composer-field">
+            <div class="composer-input-wrap">
+              <textarea
+                class="textarea"
+                id="messageInput"
+                placeholder="A customer says: I was charged twice and I want this resolved today."
+                spellcheck="false"
+              ></textarea>
+              <button class="send-btn" id="sendBtn" type="button" aria-label="Send message">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M13.5 2.5L7 9"></path>
+                  <path d="M13.5 2.5L9 13.5 7 9l-4.5-2 11-4.5Z"></path>
+                </svg>
+              </button>
+            </div>
+
+            <input
+              class="input"
+              id="paymentIntentInput"
+              type="text"
+              placeholder="Optional payment intent or charge id"
+              autocomplete="off"
+              style="height:38px"
+            />
+          </div>
+
+          <div class="composer-bottom">
+            <div class="composer-hint">Customer-safe copy, action visibility, and business-state awareness all stay inside the same response loop.</div>
+            <div class="chips">
+              <div class="chip">
+                <span style="width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399"></span>
+                <span>Streaming enabled</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
+
+  <div class="footer-note mono">Xalvion sovereign workspace</div>
 
   <script>
     (() => {
       const scrollConfigs = [
-        { areaId: "sidebarScroll", shellId: "sidebarShell", key: "xalvion-scroll-sidebar" },
-        { areaId: "messages", shellId: "messagesShell", key: "xalvion-scroll-messages" },
-        { areaId: "railScroll", shellId: "railShell", key: "xalvion-scroll-rail" }
+        { areaId: "sidebarScroll", shellId: "sidebarShell", key: "xalvion_scroll_sidebar" },
+        { areaId: "railScroll", shellId: "railShell", key: "xalvion_scroll_rail" },
+        { areaId: "messages", shellId: "messagesShell", key: "xalvion_scroll_messages" }
       ];
 
-      function updateFade(area, shell) {
-        if (!area || !shell) return;
-        const max = area.scrollHeight - area.clientHeight;
-        const atTop = area.scrollTop <= 2;
-        const atBottom = area.scrollTop >= max - 2 || max <= 0;
-        shell.dataset.showTop = (!atTop).toString();
-        shell.dataset.showBottom = (!atBottom).toString();
+      function saveScroll(area, key) {
+        try { sessionStorage.setItem(key, String(area.scrollTop || 0)); } catch {}
       }
 
       function restoreScroll(area, key) {
         try {
-          const stored = sessionStorage.getItem(key);
-          if (stored !== null) area.scrollTop = Number(stored) || 0;
+          const value = Number(sessionStorage.getItem(key) || 0);
+          if (Number.isFinite(value)) area.scrollTop = value;
         } catch {}
       }
 
-      function saveScroll(area, key) {
-        try { sessionStorage.setItem(key, String(area.scrollTop || 0)); } catch {}
+      function updateFade(area, shell) {
+        const max = Math.max(0, area.scrollHeight - area.clientHeight);
+        shell.dataset.showTop = area.scrollTop > 8 ? "true" : "false";
+        shell.dataset.showBottom = area.scrollTop < max - 8 ? "true" : "false";
       }
 
       function bindScrollMemory() {
