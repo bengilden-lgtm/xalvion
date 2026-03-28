@@ -42,6 +42,8 @@
     usageCard: document.getElementById("usageCard"),
     accountCard: document.getElementById("accountCard"),
     paymentIntentInput: document.getElementById("paymentIntentInput"),
+    railInner: document.querySelector(".rail-inner"),
+    messagesShell: document.getElementById("messagesShell"),
     upgradeButtons: Array.from(document.querySelectorAll("[data-upgrade]")),
     fillButtons: Array.from(document.querySelectorAll("[data-fill]"))
   };
@@ -59,7 +61,8 @@
     actionsCount: 0,
     totalInteractions: 0,
     avgConfidence: 0,
-    avgQuality: 0
+    avgQuality: 0,
+    latestRun: null
   };
 
   const ICONS = {
@@ -162,6 +165,24 @@
         <path d="M8 6v3.5"></path>
         <path d="M8 11.5h.01"></path>
       </svg>
+    `,
+    clock: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="8" cy="8" r="5.5"></circle>
+        <path d="M8 5v3.4l2.2 1.2"></path>
+      </svg>
+    `,
+    memory: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="10" height="8" rx="1.8"></rect>
+        <path d="M5 2.5v2M8 2.5v2M11 2.5v2M5 12v1.5M8 12v1.5M11 12v1.5M1.5 6h1.5M1.5 10h1.5M13 6h1.5M13 10h1.5"></path>
+      </svg>
+    `,
+    ticket: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M2.5 5.2V4A1.5 1.5 0 014 2.5h8A1.5 1.5 0 0113.5 4v1.2a1.7 1.7 0 010 5.6V12A1.5 1.5 0 0112 13.5H4A1.5 1.5 0 012.5 12v-1.2a1.7 1.7 0 010-5.6Z"></path>
+        <path d="M8 5v6"></path>
+      </svg>
     `
   };
 
@@ -186,12 +207,12 @@
       }
 
       .msg-card{
-        width:min(860px, 100%);
-        max-width:min(860px, 100%);
-        border-radius:18px;
+        width:min(920px, 100%);
+        max-width:min(920px, 100%);
+        border-radius:20px;
         border:1px solid rgba(255,255,255,.07);
         overflow:hidden;
-        box-shadow:0 16px 40px rgba(0,0,0,.16);
+        box-shadow:0 18px 44px rgba(0,0,0,.16);
         position:relative;
       }
 
@@ -256,7 +277,7 @@
       }
 
       .msg-body{
-        padding:14px 14px 12px;
+        padding:15px 15px 13px;
         display:flex;
         flex-direction:column;
         gap:12px;
@@ -264,7 +285,7 @@
 
       .reply-text{
         font-size:14px;
-        line-height:1.74;
+        line-height:1.76;
         color:rgba(239,244,255,.96);
         word-break:break-word;
       }
@@ -285,7 +306,7 @@
         flex-direction:column;
         gap:8px;
         align-items:flex-start;
-        max-width:660px;
+        max-width:720px;
       }
 
       .empty-state strong{
@@ -483,6 +504,32 @@
         color:rgba(225,233,252,.82);
         font-size:11px;
         line-height:1.3;
+      }
+
+      .run-summary{
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+      }
+
+      .run-chip{
+        display:inline-flex;
+        align-items:center;
+        gap:7px;
+        min-height:28px;
+        padding:0 10px;
+        border-radius:999px;
+        border:1px solid rgba(255,255,255,.07);
+        background:rgba(255,255,255,.035);
+        color:rgba(220,230,252,.84);
+        font-size:11px;
+        font-weight:700;
+      }
+
+      .run-chip svg{
+        width:11px;
+        height:11px;
+        opacity:.86;
       }
 
       .action-visibility{
@@ -733,7 +780,7 @@
         40%{transform:translateY(-3px);opacity:1;}
       }
 
-      .rev-card{
+      .rev-card,.ops-card{
         border-radius:22px;
         padding:14px;
         background:rgba(255,255,255,.03);
@@ -743,19 +790,19 @@
         transition:border-color .16s ease, background .16s ease, transform .16s ease;
       }
 
-      .rev-card:hover{
+      .rev-card:hover,.ops-card:hover{
         border-color:rgba(139,111,255,.10);
         background:rgba(255,255,255,.035);
         transform:translateY(-1px);
       }
 
-      .rev-grid{
+      .rev-grid,.ops-grid{
         display:grid;
         grid-template-columns:1fr 1fr;
         gap:8px;
       }
 
-      .rev-metric{
+      .rev-metric,.ops-metric{
         border-radius:14px;
         border:1px solid rgba(255,255,255,.06);
         background:rgba(255,255,255,.028);
@@ -764,7 +811,7 @@
         gap:4px;
       }
 
-      .rev-metric-label{
+      .rev-metric-label,.ops-metric-label{
         font-size:10px;
         letter-spacing:.12em;
         text-transform:uppercase;
@@ -772,7 +819,7 @@
         color:rgba(188,201,238,.46);
       }
 
-      .rev-metric-value{
+      .rev-metric-value,.ops-metric-value{
         font-size:18px;
         font-weight:800;
         color:rgba(244,247,255,.96);
@@ -796,9 +843,50 @@
         transition:width .25s ease;
       }
 
+      .ops-run-line{
+        display:flex;
+        align-items:flex-start;
+        gap:8px;
+        min-height:28px;
+        color:rgba(220,230,252,.82);
+        font-size:12px;
+        line-height:1.55;
+      }
+
+      .ops-run-line svg{
+        width:12px;
+        height:12px;
+        margin-top:2px;
+        opacity:.82;
+        flex:0 0 12px;
+      }
+
+      .notice-detail.ticker{
+        animation:xalvionNoticeTicker linear infinite;
+      }
+
+      @keyframes xalvionNoticeTicker{
+        0%{transform:translateX(0)}
+        100%{transform:translateX(-50%)}
+      }
+
+      .composer-live{
+        box-shadow:0 0 0 1px rgba(96,165,250,.20), 0 0 26px rgba(96,165,250,.10);
+      }
+
+      .shell-live{
+        animation:xalvionShellPulse 1.6s ease;
+      }
+
+      @keyframes xalvionShellPulse{
+        0%{box-shadow:0 30px 80px rgba(0,0,0,.34)}
+        40%{box-shadow:0 30px 80px rgba(0,0,0,.34), 0 0 0 1px rgba(139,111,255,.16), 0 0 26px rgba(139,111,255,.12)}
+        100%{box-shadow:0 30px 80px rgba(0,0,0,.34)}
+      }
+
       @media (max-width: 720px){
         .msg-card{width:100%;}
-        .impact-grid,.rev-grid{grid-template-columns:1fr;}
+        .impact-grid,.rev-grid,.ops-grid{grid-template-columns:1fr;}
       }
     `;
     document.head.appendChild(style);
@@ -890,12 +978,35 @@
     }
   }
 
+  function refreshMessageShellGlow() {
+    if (!els.messagesShell) return;
+    els.messagesShell.classList.remove("shell-live");
+    void els.messagesShell.offsetWidth;
+    els.messagesShell.classList.add("shell-live");
+    window.setTimeout(() => {
+      els.messagesShell?.classList.remove("shell-live");
+    }, 1700);
+  }
+
   function setNotice(kind, title, detail) {
     if (!els.notice) return;
     els.notice.classList.remove("success", "warning", "error", "info");
     els.notice.classList.add(kind || "info");
     setText(els.noticeTitle, title);
     setText(els.noticeDetail, detail);
+
+    if (els.noticeDetail) {
+      els.noticeDetail.classList.remove("ticker");
+      const text = String(detail || "");
+      const shouldTicker = text.length > 96;
+      if (shouldTicker) {
+        els.noticeDetail.classList.add("ticker");
+        const duration = Math.max(10, Math.ceil(text.length / 7));
+        els.noticeDetail.style.animationDuration = `${duration}s`;
+      } else {
+        els.noticeDetail.style.animationDuration = "";
+      }
+    }
   }
 
   function updateBackendStatus(ok) {
@@ -912,6 +1023,7 @@
 
   function updateStreamStatus(text = "Response: ready") {
     setText(els.streamStatus, text);
+    state.latestStatus = text;
   }
 
   function updatePlanUI(tier = state.tier, usage = state.usage, limit = state.limit, remaining = state.remaining) {
@@ -944,9 +1056,14 @@
     }
 
     if (els.workspaceSubcopy) {
-      els.workspaceSubcopy.textContent = state.username
-        ? `${formatTier(state.tier)} plan · live response loop · action visibility · decision confidence.`
-        : "Guest preview · response ready · action visibility and monetization pressure in one workspace.";
+      if (state.latestRun) {
+        els.workspaceSubcopy.textContent =
+          `${formatTier(state.tier)} plan · ${actionLabel(state.latestRun)} · ${queueLabel(state.latestRun?.decision?.queue || "new")} queue · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
+      } else {
+        els.workspaceSubcopy.textContent = state.username
+          ? `${formatTier(state.tier)} plan · live response loop · action visibility · decision confidence.`
+          : "Guest preview · response ready · action visibility and monetization pressure in one workspace.";
+      }
     }
 
     if (els.brandSubcopy) {
@@ -956,6 +1073,27 @@
     }
 
     updateAuthStatus();
+  }
+
+  function updateSystemNarrative(data = null) {
+    if (!els.systemPanelCopy) return;
+
+    if (!data) {
+      els.systemPanelCopy.textContent =
+        "This panel is meant to surface plan pressure, action readiness, and system credibility in one glance.";
+      return;
+    }
+
+    const decision = data.decision || {};
+    const triage = data.triage || {};
+    const parts = [
+      `${actionLabel(data)} was selected`,
+      `${queueLabel(decision.queue || "new")} queue`,
+      `${String(decision.risk_level || triage.risk_level || "medium")} risk`,
+      `${decision.requires_approval ? "manual approval required" : "safe to continue"}`
+    ];
+
+    els.systemPanelCopy.textContent = parts.join(" · ");
   }
 
   function scrollMessagesToBottom(force = false) {
@@ -1042,6 +1180,7 @@
     const row = createMessageGroup("user", escapeHtml(text).replace(/\n/g, "<br>"));
     els.messages?.appendChild(row);
     scrollMessagesToBottom(true);
+    refreshMessageShellGlow();
     return row;
   }
 
@@ -1053,6 +1192,7 @@
     const row = createMessageGroup("assistant", initial, true);
     els.messages?.appendChild(row);
     scrollMessagesToBottom(true);
+    refreshMessageShellGlow();
     return row;
   }
 
@@ -1190,6 +1330,26 @@
       </div>
     `;
     return card;
+  }
+
+  function createRunSummary(data = {}) {
+    const wrap = document.createElement("div");
+    wrap.className = "run-summary";
+
+    const action = actionLabel(data);
+    const confidence = formatMetric(data.confidence || 0, 2);
+    const queue = queueLabel(data?.decision?.queue || "new");
+    const usedMemory = data.history && Object.keys(data.history).length > 0;
+
+    const chips = [
+      `${ICONS.ticket}<span>${escapeHtml(queue)}</span>`,
+      `${ICONS.spark}<span>${escapeHtml(action)}</span>`,
+      `${ICONS.pulse}<span>${escapeHtml(confidence)} conf.</span>`,
+      `${usedMemory ? ICONS.memory : ICONS.clock}<span>${usedMemory ? "memory used" : "first-touch run"}</span>`
+    ];
+
+    wrap.innerHTML = chips.map((chip) => `<div class="run-chip">${chip}</div>`).join("");
+    return wrap;
   }
 
   function createImpactGrid(data = {}) {
@@ -1372,10 +1532,13 @@
       els.sendBtn.disabled = state.sending;
       els.sendBtn.classList.toggle("busy", state.sending);
       els.sendBtn.innerHTML = state.sending ? ICONS.status : ICONS.send;
+      els.sendBtn.setAttribute("aria-label", state.sending ? "Sending" : "Send message");
     }
 
     if (els.messageInput) {
       els.messageInput.disabled = state.sending;
+      const wrap = els.messageInput.closest(".composer-input-wrap");
+      wrap?.classList.toggle("composer-live", state.sending);
     }
 
     updateStreamStatus(state.sending ? "Response: streaming" : "Response: ready");
@@ -1459,6 +1622,7 @@
             if (stage === "reviewing") advanceStreamStep(stepsEl, 0);
             else if (stage === "routing") advanceStreamStep(stepsEl, 1);
             else if (stage === "acting" || stage === "responding") advanceStreamStep(stepsEl, 2);
+            else if (stage === "finalizing") advanceStreamStep(stepsEl, 3);
             updateStreamStatus(`Response: ${state.latestStatus || "streaming"}`);
           }
 
@@ -1500,6 +1664,74 @@
     }
   }
 
+  function ensureOpsCard() {
+    let card = document.getElementById("xalvionOpsCard");
+    if (card) return card;
+
+    card = document.createElement("div");
+    card.id = "xalvionOpsCard";
+    card.className = "ops-card";
+    card.innerHTML = `
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Latest run</div>
+          <div class="panel-copy">Make the AI’s operational output visible, not hidden behind the reply.</div>
+        </div>
+      </div>
+      <div class="ops-grid">
+        <div class="ops-metric">
+          <div class="ops-metric-label">Action</div>
+          <div class="ops-metric-value" id="opsLatestAction">—</div>
+        </div>
+        <div class="ops-metric">
+          <div class="ops-metric-label">Queue</div>
+          <div class="ops-metric-value" id="opsLatestQueue">—</div>
+        </div>
+        <div class="ops-metric">
+          <div class="ops-metric-label">Confidence</div>
+          <div class="ops-metric-value" id="opsLatestConfidence">0.00</div>
+        </div>
+        <div class="ops-metric">
+          <div class="ops-metric-label">Protected</div>
+          <div class="ops-metric-value" id="opsLatestValue">$0</div>
+        </div>
+      </div>
+      <div class="ops-run-line" id="opsRunNarrative">${ICONS.spark}<span>Waiting for the next support run.</span></div>
+    `;
+
+    if (els.railInner) {
+      els.railInner.appendChild(card);
+    } else if (els.usageCard?.parentElement) {
+      els.usageCard.parentElement.appendChild(card);
+    }
+
+    return card;
+  }
+
+  function updateLatestRunCard(data = {}) {
+    ensureOpsCard();
+
+    const latestAction = document.getElementById("opsLatestAction");
+    const latestQueue = document.getElementById("opsLatestQueue");
+    const latestConfidence = document.getElementById("opsLatestConfidence");
+    const latestValue = document.getElementById("opsLatestValue");
+    const latestNarrative = document.getElementById("opsRunNarrative");
+
+    const decision = data.decision || {};
+    const triage = data.triage || {};
+    const impact = data.impact || {};
+
+    if (latestAction) latestAction.textContent = actionLabel(data);
+    if (latestQueue) latestQueue.textContent = queueLabel(decision.queue || "new");
+    if (latestConfidence) latestConfidence.textContent = formatMetric(data.confidence || 0, 2);
+    if (latestValue) latestValue.textContent = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
+    if (latestNarrative) {
+      latestNarrative.innerHTML = `${ICONS.spark}<span>${escapeHtml(
+        `${data.reason || "No explicit reasoning returned."} · ${decision.requires_approval ? "Approval gate active" : "Automated flow complete"} · ${String(decision.risk_level || triage.risk_level || "medium")} risk.`
+      )}</span>`;
+    }
+  }
+
   function updateRevenueCard(data = {}) {
     let card = document.getElementById("xalvionRevenueCard");
 
@@ -1536,7 +1768,9 @@
         <div class="panel-copy" id="revRoiLabel">Processing first tickets…</div>
       `;
 
-      if (els.usageCard?.parentElement) {
+      if (els.railInner) {
+        els.railInner.appendChild(card);
+      } else if (els.usageCard?.parentElement) {
         els.usageCard.parentElement.appendChild(card);
       }
     }
@@ -1615,6 +1849,8 @@
 
       if (!data) throw new Error("No response returned.");
 
+      state.latestRun = data;
+
       const replyText = data.reply || data.response || data.final || "No response returned.";
       setAssistantCopy(row, replyText);
 
@@ -1627,6 +1863,8 @@
 
       const actionNode = getAssistantActionsNode(row);
       if (actionNode) {
+        actionNode.appendChild(createRunSummary(data));
+
         const memCard = memorySummary(data.history || {});
         if (memCard) actionNode.appendChild(memCard);
 
@@ -1638,6 +1876,8 @@
 
       updateStatsFromResult(data);
       updateRevenueCard(data);
+      updateLatestRunCard(data);
+      updateSystemNarrative(data);
 
       if (data.tier) {
         updatePlanUI(
@@ -1667,6 +1907,7 @@
     } finally {
       setSending(false);
       scrollMessagesToBottom(true);
+      refreshMessageShellGlow();
     }
   }
 
@@ -1730,6 +1971,7 @@
       updateTopbarStatus();
       setNotice("success", "Logged in", `Welcome back, ${username}. Your workspace is synced.`);
       await hydrateMe();
+      await loadDashboardSummary();
     } catch (error) {
       clearAuth();
       updateTopbarStatus();
@@ -1744,6 +1986,7 @@
     updateTopbarStatus();
     setNotice("success", "Logged out", "Guest workspace restored.");
     await hydrateMe();
+    await loadDashboardSummary();
   }
 
   function activatePreviewAccess() {
@@ -1836,7 +2079,6 @@
       persistAuth();
       updateTopbarStatus();
     } catch {
-      // keep existing auth state if /me is not available
       updateTopbarStatus();
     }
   }
@@ -1890,7 +2132,10 @@
   function resetWorkspaceThread() {
     if (!els.messages) return;
     els.messages.innerHTML = "";
+    state.latestRun = null;
     addEmptyState();
+    updateSystemNarrative(null);
+    updateTopbarStatus();
     scrollMessagesToBottom(true);
   }
 
@@ -2099,6 +2344,7 @@
   async function init() {
     ensureInjectedStyles();
     buildKeyboardOverlay();
+    ensureOpsCard();
     bindEvents();
 
     const draft = loadDraft();
@@ -2109,6 +2355,7 @@
     autoResizeTextarea();
     updateTopbarStatus();
     updatePlanUI(state.tier, state.usage, state.limit, state.remaining);
+    updateSystemNarrative(null);
     updateStreamStatus("Response: ready");
     updateAuthStatus();
     addEmptyState();
