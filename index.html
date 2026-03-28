@@ -13,27 +13,27 @@
     :root{
       color-scheme: dark;
 
-      --bg-0:#02050b;
-      --bg-1:#050914;
-      --bg-2:#08101c;
-      --bg-3:#0c1525;
+      --bg-0:#03060d;
+      --bg-1:#060b15;
+      --bg-2:#0a1120;
+      --bg-3:#0e1627;
 
-      --surface-0:rgba(7,11,19,.48);
+      --surface-0:rgba(8,12,21,.46);
       --surface-1:rgba(10,15,26,.62);
-      --surface-2:rgba(12,18,30,.78);
+      --surface-2:rgba(12,18,31,.78);
 
+      --panel-0:rgba(255,255,255,.014);
       --panel-1:rgba(255,255,255,.022);
-      --panel-2:rgba(255,255,255,.032);
-      --panel-3:rgba(255,255,255,.05);
+      --panel-2:rgba(255,255,255,.034);
 
       --line-1:rgba(255,255,255,.05);
-      --line-2:rgba(255,255,255,.07);
-      --line-3:rgba(255,255,255,.095);
+      --line-2:rgba(255,255,255,.075);
+      --line-3:rgba(255,255,255,.11);
 
       --text-1:rgba(246,248,255,.98);
-      --text-2:rgba(210,220,242,.78);
-      --text-3:rgba(172,188,219,.54);
-      --text-4:rgba(142,158,188,.34);
+      --text-2:rgba(211,221,243,.78);
+      --text-3:rgba(173,189,220,.56);
+      --text-4:rgba(144,160,190,.34);
 
       --accent-violet:#8d95ff;
       --accent-blue:#68a7ff;
@@ -44,13 +44,16 @@
       --shadow-app:
         0 28px 84px rgba(0,0,0,.34),
         0 12px 28px rgba(0,0,0,.2);
+
       --shadow-card:
         0 16px 40px rgba(0,0,0,.22),
         0 4px 10px rgba(0,0,0,.12),
         inset 0 1px 0 rgba(255,255,255,.025);
+
       --shadow-soft:
         0 10px 24px rgba(0,0,0,.16),
         inset 0 1px 0 rgba(255,255,255,.018);
+
       --shadow-float:
         0 18px 38px rgba(0,0,0,.22),
         0 6px 14px rgba(0,0,0,.12),
@@ -62,8 +65,9 @@
       --radius-lg:24px;
       --radius-xl:30px;
 
-      --sidebar:188px;
-      --rail:252px;
+      --sidebar:112px;
+      --rail:280px;
+      --content-max:860px;
 
       --blur:20px;
       --fade-top:72px;
@@ -82,9 +86,9 @@
       font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       color:var(--text-1);
       background:
-        radial-gradient(900px 520px at 12% -8%, rgba(141,149,255,.065), transparent 62%),
-        radial-gradient(760px 460px at 103% 10%, rgba(104,167,255,.05), transparent 60%),
-        radial-gradient(900px 700px at 50% 120%, rgba(90,118,255,.028), transparent 72%),
+        radial-gradient(900px 540px at 12% -10%, rgba(141,149,255,.045), transparent 62%),
+        radial-gradient(820px 480px at 103% 10%, rgba(104,167,255,.04), transparent 60%),
+        radial-gradient(920px 720px at 50% 120%, rgba(90,118,255,.02), transparent 72%),
         linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 24%, var(--bg-2) 100%);
       overflow:hidden;
       letter-spacing:-.01em;
@@ -97,9 +101,19 @@
       z-index:1;
       pointer-events:none;
       background:
-        linear-gradient(180deg, rgba(255,255,255,.014), rgba(255,255,255,0) 18%),
-        radial-gradient(900px 420px at 50% -8%, rgba(255,255,255,.012), transparent 52%);
-      opacity:.78;
+        linear-gradient(180deg, rgba(255,255,255,.012), rgba(255,255,255,0) 18%),
+        linear-gradient(180deg, rgba(2,5,12,.08), rgba(2,5,12,.26) 60%, rgba(2,5,12,.56) 100%);
+      opacity:.9;
+    }
+
+    body::after{
+      content:"";
+      position:fixed;
+      inset:0;
+      z-index:1;
+      pointer-events:none;
+      background:radial-gradient(900px 520px at 50% 18%, rgba(4,9,18,.02), rgba(4,9,18,.4) 72%);
+      mix-blend-mode:normal;
     }
 
     #fluid{
@@ -110,15 +124,15 @@
       display:block;
       z-index:0;
       pointer-events:none;
-      opacity:.55;
-      filter:brightness(.5) saturate(.7) contrast(1.02);
+      opacity:.28;
+      filter:brightness(.42) saturate(.64) contrast(1.02);
     }
 
     .glass{
       position:relative;
       overflow:hidden;
       background:
-        linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.01)),
+        linear-gradient(180deg, rgba(255,255,255,.024), rgba(255,255,255,.008)),
         linear-gradient(180deg, var(--surface-0), var(--surface-1));
       border:1px solid var(--line-1);
       backdrop-filter:blur(var(--blur)) saturate(118%);
@@ -132,8 +146,8 @@
       inset:0;
       pointer-events:none;
       background:
-        linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,0) 18%),
-        radial-gradient(500px 140px at 50% 0%, rgba(255,255,255,.02), transparent 78%);
+        linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,0) 16%),
+        radial-gradient(460px 120px at 50% 0%, rgba(255,255,255,.018), transparent 74%);
       opacity:.9;
     }
 
@@ -173,7 +187,7 @@
     .main{
       min-height:0;
       display:grid;
-      grid-template-rows:auto minmax(0,1fr) auto;
+      grid-template-rows:auto auto minmax(0,1fr);
       gap:18px;
     }
 
@@ -264,6 +278,12 @@
       padding:14px;
     }
 
+    .sidebar-inner{
+      gap:14px;
+      align-items:stretch;
+      padding:14px 12px;
+    }
+
     .section-label{
       padding:4px 4px 0;
       font-size:10px;
@@ -295,11 +315,11 @@
     }
 
     .brand{
-      border-radius:22px;
-      padding:14px;
+      border-radius:24px;
+      padding:14px 12px;
       background:
         linear-gradient(180deg, rgba(255,255,255,.024), rgba(255,255,255,.008)),
-        rgba(255,255,255,.014);
+        rgba(255,255,255,.012);
       border:1px solid var(--line-1);
       box-shadow:var(--shadow-soft);
       display:flex;
@@ -312,32 +332,32 @@
       transform:translateY(-1px);
       border-color:rgba(255,255,255,.08);
       box-shadow:var(--shadow-card);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.012)),
-        rgba(255,255,255,.018);
     }
 
     .brand-top{
       display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
       gap:10px;
     }
 
     .brand-left{
       display:flex;
+      flex-direction:column;
       align-items:center;
-      gap:10px;
+      gap:12px;
       min-width:0;
+      text-align:center;
     }
 
     .brand-icon{
-      width:40px;
-      height:40px;
-      border-radius:14px;
+      width:52px;
+      height:52px;
+      border-radius:18px;
       display:grid;
       place-items:center;
-      flex:0 0 40px;
+      flex:0 0 52px;
       background:
         linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.012)),
         linear-gradient(135deg, rgba(141,149,255,.1), rgba(104,167,255,.08));
@@ -347,45 +367,42 @@
         0 8px 18px rgba(0,0,0,.18);
     }
 
-    .brand-icon svg{
-      width:18px;
-      height:18px;
-      display:block;
-    }
-
+    .brand-icon svg{width:20px;height:20px;display:block}
     .brand-name{
       font-size:16px;
-      line-height:1.04;
+      line-height:1;
       font-weight:820;
       letter-spacing:-.045em;
     }
 
     .brand-kicker{
-      margin-top:4px;
-      font-size:9.5px;
-      line-height:1;
+      margin-top:5px;
+      font-size:9px;
+      line-height:1.15;
       font-weight:800;
-      letter-spacing:.2em;
+      letter-spacing:.18em;
       text-transform:uppercase;
       color:var(--text-4);
     }
 
     .brand-sub{
-      font-size:11.5px;
-      line-height:1.58;
-      color:var(--text-2);
+      font-size:11px;
+      line-height:1.55;
+      color:var(--text-3);
+      text-align:center;
     }
 
     .notice{
-      border-radius:15px;
+      border-radius:18px;
       padding:11px 12px;
       display:flex;
-      align-items:center;
-      gap:9px;
+      flex-direction:column;
+      align-items:flex-start;
+      gap:8px;
       overflow:hidden;
       background:
-        linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,.008)),
-        rgba(255,255,255,.014);
+        linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,.006)),
+        rgba(255,255,255,.012);
       border:1px solid var(--line-1);
       box-shadow:var(--shadow-soft);
       transition:transform .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
@@ -396,58 +413,47 @@
       border-color:rgba(255,255,255,.08);
     }
 
-    .notice.success{background:linear-gradient(180deg, rgba(81,209,182,.11), rgba(81,209,182,.045));border-color:rgba(81,209,182,.14)}
-    .notice.warning{background:linear-gradient(180deg, rgba(239,195,109,.11), rgba(239,195,109,.045));border-color:rgba(239,195,109,.15)}
-    .notice.error{background:linear-gradient(180deg, rgba(238,127,143,.11), rgba(238,127,143,.045));border-color:rgba(238,127,143,.15)}
-    .notice.info{background:linear-gradient(180deg, rgba(104,167,255,.11), rgba(104,167,255,.045));border-color:rgba(104,167,255,.14)}
-
-    .notice-dot{
-      width:7px;
-      height:7px;
-      border-radius:50%;
-      flex:0 0 7px;
-      background:currentColor;
-      box-shadow:0 0 0 4px rgba(255,255,255,.02), 0 0 12px currentColor;
+    .notice.info{
+      background:linear-gradient(180deg, rgba(104,167,255,.1), rgba(104,167,255,.04));
+      border-color:rgba(104,167,255,.14);
     }
 
-    .notice.success .notice-dot{color:var(--accent-teal)}
-    .notice.warning .notice-dot{color:var(--accent-amber)}
-    .notice.error .notice-dot{color:var(--accent-red)}
-    .notice.info .notice-dot{color:var(--accent-blue)}
+    .notice-dot{
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      flex:0 0 8px;
+      background:var(--accent-teal);
+      box-shadow:0 0 0 4px rgba(81,209,182,.03), 0 0 12px rgba(81,209,182,.7);
+    }
 
     .notice-title{
-      font-size:11.5px;
+      font-size:11px;
       font-weight:780;
-      white-space:nowrap;
-      flex:0 0 auto;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--text-2);
     }
 
     .notice-detail-wrap{
-      flex:1;
       min-width:0;
       overflow:hidden;
     }
 
     .notice-detail{
-      display:inline-block;
-      white-space:nowrap;
+      display:block;
       font-size:11px;
-      color:var(--text-2);
-    }
-
-    .notice-detail.ticker{animation:noticeTicker linear infinite}
-    @keyframes noticeTicker{
-      0%{transform:translateX(0)}
-      100%{transform:translateX(-50%)}
+      line-height:1.5;
+      color:var(--text-3);
     }
 
     .shell-card,
     .panel{
-      border-radius:20px;
+      border-radius:22px;
       padding:14px;
       background:
-        linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,.008)),
-        rgba(255,255,255,.012);
+        linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,.006)),
+        rgba(255,255,255,.01);
       border:1px solid var(--line-1);
       box-shadow:var(--shadow-soft);
       display:flex;
@@ -461,18 +467,13 @@
       transform:translateY(-1px);
       border-color:rgba(255,255,255,.08);
       background:
-        linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.01)),
-        rgba(255,255,255,.016);
+        linear-gradient(180deg, rgba(255,255,255,.024), rgba(255,255,255,.009)),
+        rgba(255,255,255,.014);
       box-shadow:var(--shadow-card);
     }
 
-    .panel{
-      opacity:.78;
-    }
-
-    .panel:hover{
-      opacity:1;
-    }
+    .panel{opacity:.84}
+    .panel:hover{opacity:1}
 
     .account-top{
       display:flex;
@@ -488,7 +489,7 @@
     }
 
     .account-title strong{
-      font-size:13.5px;
+      font-size:13px;
       line-height:1.18;
       font-weight:790;
       letter-spacing:-.02em;
@@ -496,7 +497,7 @@
 
     .account-title span{
       font-size:11px;
-      line-height:1.58;
+      line-height:1.55;
       color:var(--text-3);
     }
 
@@ -507,7 +508,7 @@
       border:1px solid var(--line-1);
       background:
         linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,.006)),
-        rgba(2,5,12,.2);
+        rgba(2,5,12,.18);
       color:var(--text-1);
       padding:0 13px;
       font-size:13px;
@@ -522,8 +523,8 @@
       transform:translateY(-1px);
       border-color:rgba(141,149,255,.2);
       background:
-        linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,.01)),
-        rgba(4,8,16,.28);
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.009)),
+        rgba(4,8,16,.24);
       box-shadow:
         0 0 0 4px rgba(141,149,255,.05),
         inset 0 1px 0 rgba(255,255,255,.02);
@@ -531,7 +532,7 @@
 
     .btn-row{
       display:grid;
-      grid-template-columns:1fr 1fr;
+      grid-template-columns:1fr;
       gap:8px;
     }
 
@@ -585,14 +586,14 @@
     .status-pill,
     .pill{
       background:
-        linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,.008)),
-        rgba(255,255,255,.014);
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.008)),
+        rgba(255,255,255,.012);
       border:1px solid var(--line-1);
       box-shadow:var(--shadow-soft);
     }
 
     .ghost-btn{
-      height:38px;
+      height:36px;
       border-radius:12px;
       font-size:12px;
       font-weight:740;
@@ -602,8 +603,8 @@
     .ghost-btn:hover,.upgrade-btn:hover,.chip:hover,.status-chip:hover,.status-pill:hover{
       border-color:rgba(255,255,255,.086);
       background:
-        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)),
-        rgba(255,255,255,.02);
+        linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.01)),
+        rgba(255,255,255,.018);
       box-shadow:var(--shadow-float);
       color:var(--text-1);
     }
@@ -640,25 +641,26 @@
 
     .stats-grid{
       display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:9px;
+      grid-template-columns:1fr;
+      gap:8px;
     }
 
     .stat{
       border-radius:16px;
       padding:12px;
       background:
-        linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,.006)),
-        rgba(255,255,255,.01);
+        linear-gradient(180deg, rgba(255,255,255,.016), rgba(255,255,255,.005)),
+        rgba(255,255,255,.008);
       border:1px solid rgba(255,255,255,.04);
       box-shadow:inset 0 1px 0 rgba(255,255,255,.016);
       display:flex;
       flex-direction:column;
       gap:6px;
+      text-align:center;
     }
 
     .stat-label{
-      font-size:9.5px;
+      font-size:9px;
       line-height:1;
       letter-spacing:.14em;
       text-transform:uppercase;
@@ -682,14 +684,14 @@
     }
 
     .plan-tier{
-      font-size:17px;
+      font-size:16px;
       line-height:1;
       font-weight:820;
       letter-spacing:-.04em;
     }
 
     .plan-usage{
-      font-size:11.5px;
+      font-size:11px;
       color:var(--text-2);
     }
 
@@ -714,16 +716,16 @@
 
     .plan-meta{
       display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
+      flex-direction:column;
+      align-items:flex-start;
+      gap:4px;
       font-size:10.5px;
       color:var(--text-3);
     }
 
     .mini-note{
-      font-size:11.5px;
-      line-height:1.62;
+      font-size:11px;
+      line-height:1.55;
       color:var(--text-2);
     }
 
@@ -745,35 +747,35 @@
       color:var(--text-2);
     }
 
-    .topbar{
+    .hero{
       border-radius:var(--radius-xl);
       min-height:128px;
-      padding:20px 22px;
+      padding:24px 28px;
       display:grid;
       grid-template-columns:minmax(0,1fr) auto;
-      gap:18px;
+      gap:20px;
       align-items:start;
     }
 
-    .topbar::before{
+    .hero::before{
       content:"";
       position:absolute;
-      inset:auto -14% -34% auto;
-      width:380px;
-      height:220px;
-      background:radial-gradient(circle, rgba(141,149,255,.11), transparent 68%);
+      inset:auto -12% -46% auto;
+      width:400px;
+      height:240px;
+      background:radial-gradient(circle, rgba(141,149,255,.08), transparent 68%);
       filter:blur(28px);
-      opacity:.72;
+      opacity:.62;
     }
 
-    .title{
+    .hero-copy{
       position:relative;
       z-index:1;
       min-width:0;
-      max-width:860px;
+      max-width:720px;
       display:flex;
       flex-direction:column;
-      gap:10px;
+      gap:12px;
     }
 
     .eyebrow{
@@ -796,23 +798,23 @@
       box-shadow:0 0 0 4px rgba(81,209,182,.04), 0 0 10px rgba(81,209,182,.64);
     }
 
-    .title h1{
-      font-size:34px;
-      line-height:.98;
+    .hero-copy h1{
+      font-size:44px;
+      line-height:.94;
       font-weight:860;
-      letter-spacing:-.06em;
-      max-width:760px;
+      letter-spacing:-.07em;
+      max-width:720px;
       text-wrap:balance;
     }
 
-    .title p{
+    .hero-copy p{
       font-size:14px;
       line-height:1.72;
       color:var(--text-2);
-      max-width:560px;
+      max-width:580px;
     }
 
-    .topbar-actions{
+    .hero-actions{
       position:relative;
       z-index:1;
       display:flex;
@@ -820,7 +822,7 @@
       justify-content:flex-end;
       gap:8px;
       flex-wrap:wrap;
-      max-width:260px;
+      max-width:250px;
       padding-top:2px;
     }
 
@@ -854,12 +856,260 @@
     .status-pill.warn .status-dot{background:var(--accent-amber)}
     .status-pill.error .status-dot{background:var(--accent-red)}
 
-    .workspace{
+    .main-shell{
       min-height:0;
-      overflow:hidden;
       display:grid;
-      grid-template-columns:minmax(0,1.58fr) minmax(228px,.62fr);
+      grid-template-columns:minmax(0,1fr) 280px;
       gap:18px;
+    }
+
+    .core{
+      min-width:0;
+      min-height:0;
+      display:grid;
+      grid-template-rows:auto auto minmax(0,1fr);
+      gap:18px;
+      max-width:var(--content-max);
+      width:100%;
+      margin:0 auto;
+    }
+
+    .composer{
+      border-radius:32px;
+      padding:22px;
+      overflow:hidden;
+      box-shadow:
+        0 26px 80px rgba(0,0,0,.3),
+        0 10px 24px rgba(0,0,0,.18);
+    }
+
+    .composer::before{
+      content:"";
+      position:absolute;
+      inset:-8% -8% auto -8%;
+      height:200px;
+      pointer-events:none;
+      background:
+        radial-gradient(560px 180px at 50% 0%, rgba(141,149,255,.09), transparent 74%),
+        radial-gradient(360px 200px at 86% 16%, rgba(104,167,255,.045), transparent 72%);
+      opacity:.72;
+    }
+
+    .composer::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    }
+
+    .composer-inner{
+      position:relative;
+      z-index:1;
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+
+    .composer-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:16px;
+    }
+
+    .composer-title{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      min-width:0;
+      max-width:720px;
+    }
+
+    .composer-title strong{
+      font-size:24px;
+      line-height:1;
+      font-weight:850;
+      letter-spacing:-.055em;
+    }
+
+    .composer-title span{
+      font-size:13px;
+      line-height:1.68;
+      color:var(--text-2);
+      max-width:640px;
+    }
+
+    .composer-status{
+      min-height:34px;
+      padding:0 12px;
+      border-radius:999px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      white-space:nowrap;
+      font-size:11px;
+      font-weight:780;
+      color:var(--text-2);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,.008)),
+        rgba(255,255,255,.012);
+      border:1px solid var(--line-1);
+      box-shadow:var(--shadow-soft);
+    }
+
+    .composer-status-dot{
+      width:7px;
+      height:7px;
+      border-radius:50%;
+      background:var(--accent-teal);
+      box-shadow:0 0 0 4px rgba(81,209,182,.04), 0 0 10px rgba(81,209,182,.65);
+    }
+
+    .composer-field{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .composer-input-wrap{
+      display:flex;
+      align-items:flex-end;
+      gap:14px;
+      min-height:128px;
+      padding:20px 20px 20px 22px;
+      border-radius:30px;
+      border:1px solid rgba(255,255,255,.075);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.032), rgba(255,255,255,.012)),
+        rgba(6,10,18,.44);
+      box-shadow:
+        0 24px 62px rgba(0,0,0,.28),
+        0 10px 24px rgba(0,0,0,.16),
+        inset 0 1px 0 rgba(255,255,255,.03);
+      transition:
+        transform .18s var(--ease),
+        border-color .18s var(--ease),
+        background .18s var(--ease),
+        box-shadow .18s var(--ease);
+    }
+
+    .composer-input-wrap::after{
+      content:"";
+      position:absolute;
+      inset:1px;
+      border-radius:29px;
+      pointer-events:none;
+      background:
+        radial-gradient(560px 180px at 50% 50%, rgba(139,146,255,.08), transparent 70%),
+        radial-gradient(320px 160px at 80% 80%, rgba(104,168,255,.04), transparent 72%);
+      opacity:.92;
+    }
+
+    .composer-input-wrap:focus-within{
+      transform:translateY(-1px);
+      border-color:rgba(141,149,255,.16);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015)),
+        rgba(7,11,20,.5);
+      box-shadow:
+        0 28px 70px rgba(0,0,0,.32),
+        0 0 0 4px rgba(141,149,255,.048),
+        inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .textarea{
+      position:relative;
+      z-index:1;
+      width:100%;
+      min-height:72px;
+      max-height:260px;
+      resize:none;
+      overflow:auto;
+      border:none;
+      outline:none;
+      background:transparent;
+      color:var(--text-1);
+      font:inherit;
+      font-size:18px;
+      line-height:1.72;
+      padding:2px 0 0;
+      scrollbar-width:none;
+    }
+
+    .textarea::-webkit-scrollbar{display:none}
+    .textarea::placeholder{color:rgba(205,218,248,.42)}
+
+    .send-btn{
+      position:relative;
+      z-index:1;
+      width:56px;
+      height:56px;
+      min-width:56px;
+      border-radius:18px;
+      display:grid;
+      place-items:center;
+      color:#fff;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.022)),
+        linear-gradient(135deg, rgba(141,149,255,.88), rgba(104,167,255,.82));
+      border:1px solid rgba(255,255,255,.11);
+      box-shadow:
+        0 18px 38px rgba(52,65,144,.26),
+        inset 0 1px 0 rgba(255,255,255,.18);
+      overflow:hidden;
+    }
+
+    .send-btn::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0));
+      pointer-events:none;
+    }
+
+    .send-btn svg{
+      position:relative;
+      z-index:1;
+      width:18px;
+      height:18px;
+      transform:translateX(1px);
+    }
+
+    .send-btn:hover{
+      transform:translateY(-2px);
+      box-shadow:
+        0 22px 48px rgba(52,65,144,.32),
+        0 0 18px rgba(141,149,255,.1),
+        inset 0 1px 0 rgba(255,255,255,.2);
+      filter:saturate(1.03);
+    }
+
+    .send-btn:active{transform:translateY(0) scale(.97)}
+
+    .send-btn:disabled{
+      opacity:.62;
+      cursor:not-allowed;
+      filter:saturate(.84);
+      transform:none;
+      box-shadow:
+        0 10px 24px rgba(0,0,0,.16),
+        inset 0 1px 0 rgba(255,255,255,.11);
+    }
+
+    .composer-bottom{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .composer-hint{
+      max-width:720px;
+      font-size:12px;
+      line-height:1.68;
+      color:var(--text-3);
     }
 
     .messages-shell{
@@ -881,8 +1131,8 @@
       z-index:0;
       pointer-events:none;
       background:
-        radial-gradient(420px circle at var(--cx) var(--cy), rgba(141,149,255,.06), transparent 50%),
-        radial-gradient(280px circle at 84% 18%, rgba(104,167,255,.045), transparent 42%);
+        radial-gradient(420px circle at var(--cx) var(--cy), rgba(141,149,255,.045), transparent 50%),
+        radial-gradient(280px circle at 84% 18%, rgba(104,167,255,.035), transparent 42%);
     }
 
     .messages-shell::after{
@@ -892,7 +1142,7 @@
       border-radius:inherit;
       z-index:0;
       pointer-events:none;
-      background:linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,0));
+      background:linear-gradient(180deg, rgba(255,255,255,.012), rgba(255,255,255,0));
     }
 
     .messages-scroll{
@@ -900,7 +1150,7 @@
       z-index:1;
       min-height:0;
       height:100%;
-      padding:22px 22px 24px;
+      padding:18px 18px 20px;
       display:flex;
       flex-direction:column;
       gap:16px;
@@ -911,13 +1161,13 @@
       grid-template-columns:minmax(0,1fr) auto;
       gap:16px;
       align-items:start;
-      padding:20px;
+      padding:18px 18px;
       border-radius:24px;
       background:
-        linear-gradient(180deg, rgba(255,255,255,.024), rgba(255,255,255,.008)),
-        rgba(255,255,255,.01);
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.008)),
+        rgba(255,255,255,.008);
       border:1px solid var(--line-1);
-      box-shadow:var(--shadow-card);
+      box-shadow:var(--shadow-soft);
     }
 
     .thread-intro-copy{
@@ -928,17 +1178,17 @@
     }
 
     .thread-intro-copy strong{
-      font-size:20px;
+      font-size:18px;
       line-height:1.03;
       font-weight:840;
-      letter-spacing:-.045em;
+      letter-spacing:-.04em;
     }
 
     .thread-intro-copy span{
-      font-size:14px;
+      font-size:13px;
       line-height:1.72;
       color:var(--text-2);
-      max-width:660px;
+      max-width:620px;
     }
 
     .thread-intro-badges{
@@ -948,122 +1198,8 @@
       gap:8px;
     }
 
-    .message{
-      max-width:min(900px, 92%);
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      padding:18px 18px 16px;
-      border-radius:24px;
-      border:1px solid var(--line-1);
-      position:relative;
-      overflow:hidden;
-      box-shadow:var(--shadow-card);
-      animation:messageIn .24s var(--ease);
-      transform-origin:left bottom;
-    }
-
-    @keyframes messageIn{
-      from{opacity:0;transform:translateY(10px) scale(.992)}
-      to{opacity:1;transform:translateY(0) scale(1)}
-    }
-
-    .message.user{
-      margin-left:auto;
-      background:
-        linear-gradient(180deg, rgba(104,127,255,.1), rgba(104,127,255,.045)),
-        rgba(255,255,255,.012);
-      border-color:rgba(150,164,255,.1);
-    }
-
-    .message.assistant{
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.024), rgba(255,255,255,.01)),
-        radial-gradient(circle at 84% 12%, rgba(141,149,255,.04), transparent 30%);
-    }
-
-    .message-head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      font-size:10px;
-      letter-spacing:.16em;
-      text-transform:uppercase;
-      font-weight:800;
-      color:var(--text-4);
-    }
-
-    .message-role{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      min-width:0;
-    }
-
-    .message-role-badge{
-      width:22px;
-      height:22px;
-      border-radius:8px;
-      display:grid;
-      place-items:center;
-      flex:0 0 22px;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.024), rgba(255,255,255,.008)),
-        rgba(255,255,255,.012);
-      border:1px solid rgba(255,255,255,.055);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.016);
-    }
-
-    .message-role-badge svg{width:12px;height:12px;opacity:.9}
-    .message-time{white-space:nowrap;color:var(--text-4)}
-
-    .message-body{
-      font-size:15px;
-      line-height:1.78;
-      color:var(--text-1);
-      word-break:break-word;
-    }
-
-    .message-meta{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      flex-wrap:wrap;
-      padding-top:2px;
-    }
-
-    .pill{
-      min-height:27px;
-      padding:0 10px;
-      border-radius:999px;
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      font-size:10.5px;
-      font-weight:760;
-      color:var(--text-2);
-    }
-
-    .pill svg{width:11px;height:11px;opacity:.85}
-    .pill.success{
-      background:linear-gradient(180deg, rgba(81,209,182,.11), rgba(81,209,182,.045));
-      border-color:rgba(81,209,182,.13);
-      color:rgba(225,255,245,.94);
-    }
-    .pill.warning{
-      background:linear-gradient(180deg, rgba(239,195,109,.11), rgba(239,195,109,.045));
-      border-color:rgba(239,195,109,.14);
-      color:rgba(255,242,210,.95);
-    }
-    .pill.info{
-      background:linear-gradient(180deg, rgba(104,167,255,.11), rgba(104,167,255,.045));
-      border-color:rgba(104,167,255,.13);
-      color:rgba(228,240,255,.95);
-    }
-
     .message-ghost{
-      max-width:620px;
+      max-width:640px;
       display:flex;
       flex-direction:column;
       gap:8px;
@@ -1072,8 +1208,8 @@
       border-radius:22px;
       border:1px dashed rgba(255,255,255,.08);
       background:
-        linear-gradient(180deg, rgba(255,255,255,.016), rgba(255,255,255,.006)),
-        rgba(255,255,255,.008);
+        linear-gradient(180deg, rgba(255,255,255,.014), rgba(255,255,255,.006)),
+        rgba(255,255,255,.006);
       color:var(--text-2);
       box-shadow:var(--shadow-soft);
     }
@@ -1090,9 +1226,7 @@
       line-height:1.66;
     }
 
-    .rail-inner{
-      gap:12px;
-    }
+    .rail-inner{gap:12px}
 
     .panel-head{
       display:flex;
@@ -1132,7 +1266,7 @@
     }
 
     .chip{
-      min-height:32px;
+      min-height:34px;
       padding:0 11px;
       border-radius:999px;
       display:inline-flex;
@@ -1157,8 +1291,8 @@
       padding:11px 12px;
       border-radius:14px;
       background:
-        linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,.006)),
-        rgba(255,255,255,.008);
+        linear-gradient(180deg, rgba(255,255,255,.016), rgba(255,255,255,.006)),
+        rgba(255,255,255,.006);
       border:1px solid rgba(255,255,255,.038);
     }
 
@@ -1173,246 +1307,30 @@
       color:var(--text-1);
     }
 
-    .rail-mount{
-      display:grid;
-      gap:12px;
-    }
+    .rail-mount{display:grid;gap:12px}
 
-    .composer{
-      border-radius:var(--radius-xl);
-      padding:18px;
-      overflow:hidden;
-    }
-
-    .composer::before{
-      content:"";
-      position:absolute;
-      inset:-10% -6% auto -6%;
-      height:180px;
-      pointer-events:none;
-      background:
-        radial-gradient(520px 180px at 50% 0%, rgba(141,149,255,.095), transparent 74%),
-        radial-gradient(320px 180px at 80% 18%, rgba(104,167,255,.055), transparent 72%);
-      opacity:.72;
-    }
-
-    .composer::after{
-      content:"";
-      position:absolute;
-      inset:0;
-      pointer-events:none;
-      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
-    }
-
-    .composer-inner{
-      position:relative;
-      z-index:1;
-      display:flex;
-      flex-direction:column;
-      gap:14px;
-    }
-
-    .composer-top{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:16px;
-    }
-
-    .composer-title{
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-      min-width:0;
-      max-width:820px;
-    }
-
-    .composer-title strong{
-      font-size:20px;
-      line-height:1.04;
-      font-weight:840;
-      letter-spacing:-.045em;
-    }
-
-    .composer-title span{
-      font-size:13px;
-      line-height:1.68;
-      color:var(--text-2);
-      max-width:720px;
-    }
-
-    .composer-status{
-      min-height:34px;
-      padding:0 12px;
+    .pill{
+      min-height:27px;
+      padding:0 10px;
       border-radius:999px;
-      display:flex;
+      display:inline-flex;
       align-items:center;
-      gap:8px;
-      white-space:nowrap;
-      font-size:11px;
-      font-weight:780;
+      gap:6px;
+      font-size:10.5px;
+      font-weight:760;
       color:var(--text-2);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,.008)),
-        rgba(255,255,255,.012);
-      border:1px solid var(--line-1);
-      box-shadow:var(--shadow-soft);
     }
 
-    .composer-status-dot{
-      width:7px;
-      height:7px;
-      border-radius:50%;
-      background:var(--accent-blue);
-      box-shadow:0 0 0 4px rgba(104,167,255,.04), 0 0 10px rgba(104,167,255,.65);
+    .pill.success{
+      background:linear-gradient(180deg, rgba(81,209,182,.11), rgba(81,209,182,.045));
+      border-color:rgba(81,209,182,.13);
+      color:rgba(225,255,245,.94);
     }
 
-    .composer-field{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-
-    .composer-input-wrap{
-      display:flex;
-      align-items:flex-end;
-      gap:12px;
-      min-height:106px;
-      padding:18px 18px 18px 20px;
-      border-radius:28px;
-      border:1px solid rgba(255,255,255,.075);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.014)),
-        rgba(6,10,18,.46);
-      box-shadow:
-        0 24px 62px rgba(0,0,0,.28),
-        0 10px 24px rgba(0,0,0,.16),
-        inset 0 1px 0 rgba(255,255,255,.03);
-      transition:
-        transform .18s var(--ease),
-        border-color .18s var(--ease),
-        background .18s var(--ease),
-        box-shadow .18s var(--ease);
-    }
-
-    .composer-input-wrap::after{
-      content:"";
-      position:absolute;
-      inset:1px;
-      border-radius:27px;
-      pointer-events:none;
-      background:
-        radial-gradient(500px 180px at 50% 50%, rgba(139,146,255,.12), transparent 70%),
-        radial-gradient(320px 160px at 80% 80%, rgba(104,168,255,.06), transparent 72%);
-      opacity:.96;
-    }
-
-    .composer-input-wrap:focus-within{
-      transform:translateY(-1px);
-      border-color:rgba(141,149,255,.16);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.042), rgba(255,255,255,.018)),
-        rgba(7,11,20,.54);
-      box-shadow:
-        0 28px 70px rgba(0,0,0,.32),
-        0 0 0 4px rgba(141,149,255,.048),
-        inset 0 1px 0 rgba(255,255,255,.04);
-    }
-
-    .textarea{
-      position:relative;
-      z-index:1;
-      width:100%;
-      min-height:56px;
-      max-height:240px;
-      resize:none;
-      overflow:auto;
-      border:none;
-      outline:none;
-      background:transparent;
-      color:var(--text-1);
-      font:inherit;
-      font-size:16px;
-      line-height:1.74;
-      padding:2px 0 0;
-      scrollbar-width:none;
-    }
-
-    .textarea::-webkit-scrollbar{display:none}
-    .textarea::placeholder{color:rgba(205,218,248,.4)}
-
-    .send-btn{
-      position:relative;
-      z-index:1;
-      width:54px;
-      height:54px;
-      min-width:54px;
-      border-radius:18px;
-      display:grid;
-      place-items:center;
-      color:#fff;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.022)),
-        linear-gradient(135deg, rgba(141,149,255,.9), rgba(104,167,255,.84));
-      border:1px solid rgba(255,255,255,.1);
-      box-shadow:
-        0 18px 38px rgba(52,65,144,.28),
-        inset 0 1px 0 rgba(255,255,255,.18);
-      overflow:hidden;
-    }
-
-    .send-btn::before{
-      content:"";
-      position:absolute;
-      inset:0;
-      background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0));
-      pointer-events:none;
-    }
-
-    .send-btn svg{
-      position:relative;
-      z-index:1;
-      width:18px;
-      height:18px;
-      transform:translateX(1px);
-    }
-
-    .send-btn:hover{
-      transform:translateY(-2px);
-      box-shadow:
-        0 22px 48px rgba(52,65,144,.34),
-        0 0 18px rgba(141,149,255,.12),
-        inset 0 1px 0 rgba(255,255,255,.2);
-      filter:saturate(1.04);
-    }
-
-    .send-btn:active{
-      transform:translateY(0) scale(.97);
-    }
-
-    .send-btn:disabled{
-      opacity:.62;
-      cursor:not-allowed;
-      filter:saturate(.84);
-      transform:none;
-      box-shadow:
-        0 10px 24px rgba(0,0,0,.16),
-        inset 0 1px 0 rgba(255,255,255,.11);
-    }
-
-    .composer-bottom{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-
-    .composer-hint{
-      max-width:760px;
-      font-size:12px;
-      line-height:1.66;
-      color:var(--text-3);
+    .pill.info{
+      background:linear-gradient(180deg, rgba(104,167,255,.11), rgba(104,167,255,.045));
+      border-color:rgba(104,167,255,.13);
+      color:rgba(228,240,255,.95);
     }
 
     .footer-note{
@@ -1425,80 +1343,121 @@
       font-weight:740;
       letter-spacing:.16em;
       text-transform:uppercase;
-      color:rgba(195,208,244,.3);
+      color:rgba(195,208,244,.26);
       pointer-events:none;
       mix-blend-mode:screen;
     }
 
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 
-    @media (max-width: 1440px){
+    @media (max-width: 1480px){
       :root{
-        --sidebar:180px;
-        --rail:238px;
-      }
-      .workspace{
-        grid-template-columns:minmax(0,1.56fr) minmax(216px,.6fr);
+        --sidebar:108px;
+        --rail:268px;
+        --content-max:820px;
       }
     }
 
     @media (max-width: 1280px){
       :root{
-        --sidebar:174px;
-        --rail:228px;
+        --sidebar:102px;
+        --rail:248px;
+        --content-max:100%;
       }
+
       .app{
         gap:14px;
         padding:14px;
       }
+
       .sidebar,.main,.rail{
         height:calc(100vh - 28px);
       }
-      .title h1{font-size:31px}
-      .title p{font-size:13.5px}
+
+      .hero-copy h1{font-size:38px}
     }
 
     @media (max-width: 1140px){
       body{overflow:auto}
+
       .app{
         min-height:100vh;
         height:auto;
         grid-template-columns:1fr;
       }
+
       .sidebar,.main,.rail{height:auto}
-      .workspace{grid-template-columns:1fr}
+      .main-shell{grid-template-columns:1fr}
       .rail{order:3}
-      .sidebar{order:1}
-      .main{order:2}
+      .sidebar{order:2}
+      .main{order:1}
       .footer-note{display:none}
+
+      .sidebar-inner{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0,1fr));
+        align-items:start;
+      }
+
+      .stats-grid{
+        grid-template-columns:repeat(4,1fr);
+      }
     }
 
-    @media (max-width: 760px){
+    @media (max-width: 860px){
       .app{padding:10px;gap:10px}
       .sidebar-inner,.rail-inner{padding:12px}
-      .topbar{
+
+      .hero{
         grid-template-columns:1fr;
-        padding:16px;
+        padding:18px;
         gap:14px;
       }
-      .title h1{font-size:27px}
-      .title p{font-size:14px;max-width:none}
-      .messages-scroll{padding:16px}
-      .thread-intro{grid-template-columns:1fr}
-      .message{max-width:100%}
-      .composer{padding:14px}
-      .composer-top{flex-direction:column;align-items:flex-start}
-      .composer-title strong{font-size:18px}
-      .composer-input-wrap{
-        min-height:92px;
-        padding:14px 14px 14px 16px;
+
+      .hero-copy h1{font-size:30px}
+      .hero-copy p{font-size:14px;max-width:none}
+
+      .composer{
+        padding:16px;
+        border-radius:26px;
       }
-      .textarea{font-size:15px}
+
+      .composer-top{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+
+      .composer-title strong{font-size:20px}
+
+      .composer-input-wrap{
+        min-height:108px;
+        padding:16px;
+      }
+
+      .textarea{font-size:16px}
+
+      .thread-intro{grid-template-columns:1fr}
+
+      .sidebar-inner{
+        grid-template-columns:1fr;
+      }
+
+      .stats-grid{
+        grid-template-columns:1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px){
+      .messages-scroll{padding:14px}
       .send-btn{
-        width:48px;
-        height:48px;
-        min-width:48px;
+        width:50px;
+        height:50px;
+        min-width:50px;
         border-radius:16px;
+      }
+
+      .stats-grid{
+        grid-template-columns:1fr;
       }
     }
   </style>
@@ -1530,27 +1489,28 @@
                     <div class="brand-kicker">Operator Workspace</div>
                   </div>
                 </div>
-                <button class="ghost-btn" id="newChatBtn" type="button" style="height:34px;padding:0 10px;font-size:11px">New</button>
+                <button class="ghost-btn" id="newChatBtn" type="button" style="height:34px;padding:0 12px;font-size:11px">New run</button>
               </div>
               <div class="brand-sub" id="brandSubcopy">
-                Premium AI support operations with live case handling, visible decisions, and a cleaner customer-ready surface.
+                Focused support operations with visible decisions, cleaner output, and a customer-ready surface.
               </div>
             </div>
 
             <div class="notice info" id="notice">
-              <div class="notice-dot"></div>
-              <div class="notice-title" id="noticeTitle">Workspace live</div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="notice-dot"></div>
+                <div class="notice-title" id="noticeTitle">Workspace live</div>
+              </div>
               <div class="notice-detail-wrap">
-                <div class="notice-detail" id="noticeDetail">System online · response channel ready · service: checking · session: checking.</div>
+                <div class="notice-detail" id="noticeDetail">System online · session checking · response channel ready.</div>
               </div>
             </div>
 
-            <div class="section-label">Account</div>
             <div class="shell-card glass" id="accountCard">
               <div class="account-top">
                 <div class="account-title">
-                  <strong>Secure access</strong>
-                  <span>Sign in to preserve workspace state, plan status, and support history across sessions.</span>
+                  <strong>Account</strong>
+                  <span>Sign in to keep plan state, usage, and case history synced across sessions.</span>
                 </div>
               </div>
 
@@ -1558,21 +1518,17 @@
               <input class="input" id="passwordInput" type="password" placeholder="Password" autocomplete="current-password" />
 
               <div class="btn-row">
-                <button class="btn" id="signupBtn" type="button">Sign up</button>
+                <button class="btn" id="signupBtn" type="button">Create account</button>
                 <button class="ghost-btn" id="loginBtn" type="button">Log in</button>
-              </div>
-
-              <div class="btn-row">
                 <button class="ghost-btn" id="devBtn" type="button">Dev access</button>
                 <button class="ghost-btn" id="logoutBtn" type="button">Logout</button>
               </div>
             </div>
 
-            <div class="section-label">System</div>
             <div class="shell-card glass" id="dashboardCard">
               <div class="account-title" style="gap:5px">
-                <strong>Live workspace state</strong>
-                <span id="workspaceSubcopy">Backend availability, authentication state, and response handling update inside the same operator view.</span>
+                <strong>System state</strong>
+                <span id="workspaceSubcopy">Live backend, auth, and response health inside the same operator view.</span>
               </div>
 
               <div class="status-strip">
@@ -1610,7 +1566,6 @@
               </div>
             </div>
 
-            <div class="section-label">Plan</div>
             <div class="shell-card glass" id="usageCard">
               <div class="plan-block">
                 <div class="plan-row">
@@ -1629,7 +1584,7 @@
               </div>
 
               <div class="mini-note" id="usagePanelCopy">
-                Capacity, restrictions, and upgrade value should feel clear and premium — not hidden or confusing.
+                Capacity and upgrade value should feel clear, immediate, and easy to trust.
               </div>
 
               <div class="upgrade-stack">
@@ -1649,19 +1604,19 @@
     </aside>
 
     <main class="main">
-      <div class="topbar glass">
-        <div class="title">
+      <section class="hero glass">
+        <div class="hero-copy">
           <div class="eyebrow">
             <span class="eyebrow-dot"></span>
             <span>Premium support operations</span>
           </div>
           <h1 id="workspaceHeadline">AI support operator for precise, customer-ready case resolution</h1>
           <p>
-            A refined operator surface for handling real support issues with clarity, confidence, and action visibility — built to feel premium, calm, and production-ready.
+            Handle real support issues with strong readability, clear action context, and calmer visual hierarchy — without the clutter of a generic dashboard.
           </p>
         </div>
 
-        <div class="topbar-actions">
+        <div class="hero-actions">
           <div class="status-pill ok">
             <span class="status-dot"></span>
             <span class="mono">Xalvion live</span>
@@ -1671,30 +1626,86 @@
             <span class="mono">Action visibility on</span>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="workspace">
-        <section class="messages-shell glass scroll-shell" id="messagesShell">
-          <div class="scroll-area messages-scroll" id="messages">
-            <div class="thread-intro">
-              <div class="thread-intro-copy">
-                <strong>Workspace ready</strong>
-                <span>
-                  Run a support case below and stream the response into this thread. The goal is fast readability, strong customer-safe copy, and visible operational context without clutter.
-                </span>
+      <div class="main-shell">
+        <div class="core">
+          <section class="composer glass">
+            <div class="composer-inner">
+              <div class="composer-top">
+                <div class="composer-title">
+                  <strong>Run a support case</strong>
+                  <span>Describe the issue and let Xalvion produce polished support copy with visible action context, strong readability, and premium restraint.</span>
+                </div>
+                <div class="composer-status">
+                  <span class="composer-status-dot"></span>
+                  <span id="streamStatusDuplicate" style="display:none"></span>
+                  <span>Ready</span>
+                </div>
               </div>
-              <div class="thread-intro-badges">
-                <div class="pill info">Operator thread</div>
-                <div class="pill success">Streaming ready</div>
+
+              <div class="composer-field">
+                <div class="composer-input-wrap">
+                  <textarea
+                    class="textarea"
+                    id="messageInput"
+                    placeholder="A customer says: I was charged twice and I want this resolved today."
+                    spellcheck="false"
+                  ></textarea>
+                  <button class="send-btn" id="sendBtn" type="button" aria-label="Send message">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M13.5 2.5L7 9"></path>
+                      <path d="M13.5 2.5L9 13.5 7 9l-4.5-2 11-4.5Z"></path>
+                    </svg>
+                  </button>
+                </div>
+
+                <input
+                  class="input"
+                  id="paymentIntentInput"
+                  type="text"
+                  placeholder="Optional payment intent or charge id"
+                  autocomplete="off"
+                  style="height:40px"
+                />
+              </div>
+
+              <div class="composer-bottom">
+                <div class="composer-hint">
+                  Keep the output customer-safe, the thread readable, and the operational layer visible without making the interface feel technical or unfinished.
+                </div>
+                <div class="chips">
+                  <div class="chip">
+                    <span style="width:8px;height:8px;border-radius:50%;background:#51d1b6;box-shadow:0 0 10px #51d1b6"></span>
+                    <span>Streaming enabled</span>
+                  </div>
+                </div>
               </div>
             </div>
+          </section>
 
-            <div class="message-ghost">
-              <strong>Start with a real issue</strong>
-              <span>Charge disputes, delivery delays, damaged orders, refund escalation, subscription issues, or any other support case you want Xalvion to handle.</span>
+          <section class="messages-shell glass scroll-shell" id="messagesShell">
+            <div class="scroll-area messages-scroll" id="messages">
+              <div class="thread-intro">
+                <div class="thread-intro-copy">
+                  <strong>Operator thread</strong>
+                  <span>
+                    Cases stream here with cleaner hierarchy: issue in, action context visible, customer-safe reply out.
+                  </span>
+                </div>
+                <div class="thread-intro-badges">
+                  <div class="pill info">Focused thread</div>
+                  <div class="pill success">Response ready</div>
+                </div>
+              </div>
+
+              <div class="message-ghost">
+                <strong>Start with a real issue</strong>
+                <span>Charge disputes, delivery delays, damaged orders, refund escalation, subscription billing problems, or any other case you want Xalvion to handle.</span>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
         <aside class="rail glass">
           <div class="scroll-shell rail-scroll" id="railShell">
@@ -1704,7 +1715,7 @@
                   <div class="panel-head">
                     <div>
                       <div class="panel-title">Case presets</div>
-                      <div class="panel-hero">Fast ways to start a support run</div>
+                      <div class="panel-hero">Fast starts for realistic support runs</div>
                       <div class="panel-copy" id="systemPanelCopy">
                         Use a common case type to prefill the composer and test response quality quickly.
                       </div>
@@ -1734,8 +1745,8 @@
                 <div class="panel">
                   <div class="panel-head">
                     <div>
-                      <div class="panel-title">Operator signals</div>
-                      <div class="panel-hero">What this workspace should communicate instantly</div>
+                      <div class="panel-title">Signals</div>
+                      <div class="panel-hero">What the workspace should communicate immediately</div>
                     </div>
                   </div>
 
@@ -1762,10 +1773,10 @@
                 <div class="panel">
                   <div class="panel-head">
                     <div>
-                      <div class="panel-title">Plan ladder</div>
-                      <div class="panel-hero">Monetization should feel built-in</div>
+                      <div class="panel-title">Plans</div>
+                      <div class="panel-hero">Monetization should feel built in</div>
                       <div class="panel-copy">
-                        Premium tiers should feel like greater operating power, not just a hidden number increase.
+                        Premium tiers should feel like more operating power, not just a hidden number change.
                       </div>
                     </div>
                   </div>
@@ -1788,7 +1799,7 @@
                       <div class="panel-title">Positioning</div>
                       <div class="panel-hero">This should feel like an AI operator, not a generic chat box</div>
                       <div class="panel-copy">
-                        The strongest impression is fast, confident support execution with readable context and minimal noise.
+                        The strongest impression should be fast, confident support execution with readable context and minimal noise.
                       </div>
                     </div>
                   </div>
@@ -1800,60 +1811,6 @@
           </div>
         </aside>
       </div>
-
-      <section class="composer glass">
-        <div class="composer-inner">
-          <div class="composer-top">
-            <div class="composer-title">
-              <strong>Run a support case</strong>
-              <span>Describe the issue and let Xalvion produce a polished support response with clear action context and premium readability.</span>
-            </div>
-            <div class="composer-status">
-              <span class="composer-status-dot"></span>
-              <span id="streamStatusDuplicate" style="display:none"></span>
-              <span>Ready</span>
-            </div>
-          </div>
-
-          <div class="composer-field">
-            <div class="composer-input-wrap">
-              <textarea
-                class="textarea"
-                id="messageInput"
-                placeholder="A customer says: I was charged twice and I want this resolved today."
-                spellcheck="false"
-              ></textarea>
-              <button class="send-btn" id="sendBtn" type="button" aria-label="Send message">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M13.5 2.5L7 9"></path>
-                  <path d="M13.5 2.5L9 13.5 7 9l-4.5-2 11-4.5Z"></path>
-                </svg>
-              </button>
-            </div>
-
-            <input
-              class="input"
-              id="paymentIntentInput"
-              type="text"
-              placeholder="Optional payment intent or charge id"
-              autocomplete="off"
-              style="height:40px"
-            />
-          </div>
-
-          <div class="composer-bottom">
-            <div class="composer-hint">
-              Keep the thread readable, the customer-safe copy polished, and the operational layer visible without making the interface feel technical or unfinished.
-            </div>
-            <div class="chips">
-              <div class="chip">
-                <span style="width:8px;height:8px;border-radius:50%;background:#51d1b6;box-shadow:0 0 10px #51d1b6"></span>
-                <span>Streaming enabled</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
   </div>
 
