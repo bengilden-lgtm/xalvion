@@ -700,6 +700,18 @@
         flex:0 0 12px;
       }
 
+      .composer-input-wrap{
+        transition:
+          box-shadow .18s ease,
+          border-color .18s ease,
+          background .18s ease,
+          transform .18s ease !important;
+      }
+
+      .composer-input-wrap:focus-within{
+        transform:translateY(-1px);
+      }
+
       .composer-live{
         box-shadow:0 0 0 1px rgba(96,165,250,.20), 0 0 26px rgba(96,165,250,.10);
       }
@@ -712,18 +724,6 @@
         0%{box-shadow:0 30px 80px rgba(0,0,0,.34)}
         40%{box-shadow:0 30px 80px rgba(0,0,0,.34), 0 0 0 1px rgba(139,111,255,.16), 0 0 26px rgba(139,111,255,.12)}
         100%{box-shadow:0 30px 80px rgba(0,0,0,.34)}
-      }
-
-      .composer-input-wrap{
-        transition:
-          box-shadow .18s ease,
-          border-color .18s ease,
-          background .18s ease,
-          transform .18s ease !important;
-      }
-
-      .composer-input-wrap:focus-within{
-        transform:translateY(-1px);
       }
 
       .send-btn{
@@ -955,6 +955,34 @@
     return String(decision.risk_level || triage.risk_level || "medium");
   }
 
+  function displayActionLabel(data = {}) {
+    const rawAction = String(data.action || "none").toLowerCase();
+    if (rawAction === "review") return "Billing review started";
+    return actionLabel(data);
+  }
+
+  function displayQueueLabel(data = {}) {
+    const rawQueue = String(data?.decision?.queue || "new").toLowerCase();
+    if (rawQueue === "refund_risk") return "Billing check";
+    if (rawQueue === "waiting") return "In progress";
+    return queueLabel(rawQueue);
+  }
+
+  function displayRiskLabel(data = {}) {
+    const rawRisk = String(riskLabel(data) || "medium").toLowerCase();
+    const rawAction = String(data.action || "none").toLowerCase();
+    if (rawRisk === "medium" && rawAction === "review") return "Needs review";
+    return `${rawRisk} risk`;
+  }
+
+  function noticeTitleForResult(data = {}) {
+    const rawAction = String(data.action || "none").toLowerCase();
+    if (rawAction === "review") return "Billing review started";
+    if (rawAction === "refund") return "Refund processed";
+    if (rawAction === "credit") return "Credit applied";
+    return "Case processed";
+  }
+
   function updateTopbarStatus() {
     if (els.workspaceHeadline) {
       els.workspaceHeadline.textContent = state.username
@@ -966,7 +994,7 @@
       if (state.latestRun) {
         const decision = state.latestRun.decision || {};
         els.workspaceSubcopy.textContent =
-          `${formatTier(state.tier)} plan · ${actionLabel(state.latestRun)} · ${queueLabel(decision.queue || "new")} queue · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
+          `${formatTier(state.tier)} plan · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
       } else {
         els.workspaceSubcopy.textContent = state.username
           ? `${formatTier(state.tier)} plan · live response loop · action visibility · premium support execution.`
@@ -995,8 +1023,8 @@
     const decision = data.decision || {};
     const triage = data.triage || {};
     const parts = [
-      `${actionLabel(data)} selected`,
-      `${queueLabel(decision.queue || "new")} queue`,
+      `${displayActionLabel(data)} selected`,
+      `${displayQueueLabel({ decision })}`,
       `${String(decision.risk_level || triage.risk_level || "medium")} risk`,
       `${decision.requires_approval ? "approval gate active" : "safe to continue"}`
     ];
@@ -1142,7 +1170,6 @@
     meta.className = "assistant-meta";
 
     const confidence = Number(data.confidence || 0);
-    const decision = data.decision || {};
 
     meta.appendChild(createMetaChip({
       icon: ICONS.pulse,
@@ -1152,17 +1179,17 @@
 
     meta.appendChild(createMetaChip({
       icon: ICONS.spark,
-      text: actionLabel(data)
+      text: displayActionLabel(data)
     }));
 
     meta.appendChild(createMetaChip({
       icon: ICONS.ticket,
-      text: queueLabel(decision.queue || "new")
+      text: displayQueueLabel(data)
     }));
 
     meta.appendChild(createMetaChip({
       icon: ICONS.shield,
-      text: `${riskLabel(data)} risk`
+      text: displayRiskLabel(data)
     }));
 
     return meta;
@@ -1205,7 +1232,6 @@
     details.className = "details-wrap";
 
     const decision = data.decision || {};
-    const triage = data.triage || {};
     const output = data.output || {};
     const impact = data.impact || {};
     const toolStatus = String(data.tool_status || "resolved");
@@ -1468,8 +1494,8 @@
     const triage = data.triage || {};
     const impact = data.impact || {};
 
-    if (latestAction) latestAction.textContent = actionLabel(data);
-    if (latestQueue) latestQueue.textContent = queueLabel(decision.queue || "new");
+    if (latestAction) latestAction.textContent = displayActionLabel(data);
+    if (latestQueue) latestQueue.textContent = displayQueueLabel({ decision });
     if (latestConfidence) latestConfidence.textContent = formatMetric(data.confidence || 0, 2);
     if (latestValue) latestValue.textContent = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
 
@@ -1709,7 +1735,7 @@
       updateTopbarStatus();
       setNotice(
         data.action === "review" ? "warning" : "success",
-        data.action === "review" ? "Manual review triggered" : "Case processed",
+        noticeTitleForResult(data),
         replyText
       );
     } catch (error) {
