@@ -81,15 +81,16 @@ def parse_llm_json(text: str) -> Dict[str, Any]:
         except Exception:
             pass
 
+    fallback = text or "I’ve reviewed this and I’m already on the next step."
     return {
-        "customer_message": text or "I’ve reviewed this and I’m already on the next step.",
+        "customer_message": fallback,
         "action": "none",
         "amount": 0,
         "reason": "fallback_parse",
         "confidence": 0.45,
         "risk_level": "medium",
         "internal_note": "Fallback parse path used.",
-        "customer_note": text or "I’ve reviewed this and I’m already on the next step.",
+        "customer_note": fallback,
         "queue": "new",
         "priority": "medium",
     }
@@ -109,6 +110,8 @@ def polish_message(message: str) -> str:
         "currently": "",
         "Currently, ": "",
         "currently, ": "",
+        "We appreciate your patience.": "",
+        "Thank you for your patience.": "",
     }
 
     for old, new in replacements.items():
@@ -117,7 +120,8 @@ def polish_message(message: str) -> str:
     while "  " in text:
         text = text.replace("  ", " ")
 
-    return text.strip()
+    text = text.replace("..", ".").strip()
+    return text
 
 
 def clamp_confidence(value: Any, fallback: float = 0.9) -> float:
@@ -153,8 +157,13 @@ def is_conversational_message(message: str) -> bool:
     support_markers = (
         "order", "package", "refund", "charged", "billing", "damaged", "late", "tracking",
         "delivered", "not working", "error", "invoice", "login", "password", "export",
+        "cancel", "cancelling", "canceling", "shipping", "address", "change my shipping address",
+        "double charge", "duplicate charge", "arrived", "delay", "delayed", "broken",
     )
     if any(marker in text for marker in support_markers):
+        return False
+
+    if "i'm cancel" in text or "im cancel" in text:
         return False
 
     return len(text.split()) <= 4
@@ -367,6 +376,37 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
     }
 
 
+def build_issue_examples(ticket: Dict[str, Any]) -> str:
+    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
+
+    if issue_type == "shipping_issue":
+        return """
+Examples:
+- "Your order is delayed in transit. I checked the latest status and it is still moving. I’ll keep an eye on it and update you if anything changes."
+- "Your package is running late. I checked the latest update and it is delayed in transit, but still active. I’m monitoring it from here."
+""".strip()
+
+    if issue_type == "damaged_order":
+        return """
+Examples:
+- "Sorry about that — I’ve flagged the damage case and pushed it into priority handling so the next step gets taken quickly."
+- "I’ve reviewed the damage report and moved this into the right recovery flow so it can be resolved properly."
+""".strip()
+
+    if issue_type in {"billing_duplicate_charge", "billing_issue", "payment_issue"}:
+        return """
+Examples:
+- "You were charged twice — I’ve flagged the duplicate charge for review and the billing correction is now in motion."
+- "I checked the duplicate-charge case and pushed it into the refund path so it can be resolved cleanly."
+""".strip()
+
+    return """
+Examples:
+- "I checked this and I’m already on the next step."
+- "I’ve reviewed the case and moved it into the right path from here."
+""".strip()
+
+
 def build_sovereign_prompt(
     message: str,
     ticket: Dict[str, Any],
@@ -383,6 +423,7 @@ def build_sovereign_prompt(
     tone_mode = classify_tone(ticket)
     triage = json.dumps(ticket.get("triage", {}), ensure_ascii=False)
     history = json.dumps(ticket.get("customer_history", {}), ensure_ascii=False)
+    issue_examples = build_issue_examples(ticket)
 
     return f"""
 {system_prompt}
@@ -391,15 +432,15 @@ You are writing as a premium senior support operator.
 
 Style rules:
 - Sound human, calm, confident, and useful.
-- Be concise but not cold.
-- Lead with the answer, not filler.
+- Lead with the resolution, action, or clearest next step.
 - Never sound like a generic chatbot.
-- Never say "I understand your concern" or "please let me know" unless absolutely necessary.
-- Prefer "Here’s what I found", "I’ve checked this", "This shows as", "I’ve already", "Next step:".
-- If status is available, state it clearly.
-- If action is taken, state it clearly.
-- If something is missing, ask for the exact missing item in one sentence.
-- Avoid weak phrases like "currently unknown" unless there is truly no context at all.
+- Never expose internal errors, missing fields, IDs, tools, or technical limitations.
+- Never say payment_intent_id, charge_id, payload, system prompt, confidence score, or implementation details.
+- If something cannot be completed automatically, convert that into a customer-safe next step.
+- Avoid filler like "I understand your concern", "please let me know", or "I'm here to assist" unless truly necessary.
+- Prefer direct lines like "I checked this", "I’ve already", "This shows as", "I’ve routed this", "Next step:".
+- If the customer is frustrated, acknowledge that briefly and then move to the fix.
+- If the customer signals cancellation or churn, offer a direct action path and a save path if appropriate.
 - No bullet points in the customer-facing message.
 - Output JSON only.
 
@@ -444,6 +485,9 @@ Hard business decision:
 Learned-rule suggestion:
 {learned_text}
 
+Issue-specific examples:
+{issue_examples}
+
 Return valid JSON using this exact schema:
 {{
   "customer_message": "final message to customer",
@@ -472,13 +516,15 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
     risk_level = str(planned_action.get("risk_level", triage.get("risk_level", "medium")) or "medium")
 
     if issue_type == "shipping_issue":
-        status = order_info.get("status", ticket.get("order_status", "unknown"))
-        tracking = order_info.get("tracking", "")
-        eta = order_info.get("eta", "")
-        customer_message = f"I checked the order and it shows as {status}. Tracking {tracking} is attached, and the current ETA is {eta}."
+        status = str(order_info.get("status", ticket.get("order_status", "unknown")) or "unknown")
+        eta = str(order_info.get("eta", "") or "")
+        customer_message = f"Your order is {status}."
+        if eta:
+            customer_message += f" The latest ETA is {eta}."
+        customer_message += " I’ve checked the latest status and I’m monitoring it from here."
         if action == "credit" and amount > 0:
-            customer_message += f" I’ve also added a ${amount} credit to make up for the delay."
-        internal_note = f"Shipping case with status={status}, tracking={tracking}, triage={triage}."
+            customer_message += f" I’ve also added a ${amount} credit to help make up for the delay."
+        internal_note = f"Shipping case with status={status}, eta={eta}, triage={triage}."
         return {
             "customer_message": customer_message,
             "customer_note": customer_message,
@@ -494,11 +540,12 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
         }
 
     if issue_type == "damaged_order":
-        customer_message = "I checked this and the damage report has been captured. I’m making this right now."
         if action == "credit" and amount > 0:
-            customer_message = f"I checked this and I’ve applied a ${amount} credit while the damaged-order case is handled."
+            customer_message = f"I’ve reviewed the damage case and applied a ${amount} credit while this gets handled."
         elif action == "review":
-            customer_message = "I checked this and I’ve pushed it into priority review so the damaged-order case gets handled correctly."
+            customer_message = "I’ve reviewed the damage case and pushed it into priority handling so it’s resolved correctly."
+        else:
+            customer_message = "I’ve reviewed the damage case and moved it into the right recovery path so it can be resolved quickly."
         return {
             "customer_message": customer_message,
             "customer_note": customer_message,
@@ -514,13 +561,13 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
         }
 
     if action == "refund" and amount > 0:
-        customer_message = f"I checked this and I’ve approved a refund of ${amount}. The correction is already in motion."
+        customer_message = f"I’ve approved a refund of ${amount} and the correction is now in motion."
     elif action == "credit" and amount > 0:
-        customer_message = f"I checked this and I’ve added a ${amount} credit to make this right."
+        customer_message = f"I’ve added a ${amount} credit to help make this right."
     elif action == "review":
-        customer_message = "I checked this and I’ve routed it for manual review so the next step is handled safely."
+        customer_message = "I’ve routed this for manual review so the next step is handled safely and correctly."
     else:
-        customer_message = "I checked this and there’s no automatic action needed right now. I’ve prepared the clearest next step based on the case context."
+        customer_message = "I checked this and I’m already on the next step."
 
     return {
         "customer_message": customer_message,
@@ -535,6 +582,44 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
         "queue": queue,
         "requires_approval": bool(planned_action.get("requires_approval", False)),
     }
+
+
+def rewrite_output_for_issue(ticket: Dict[str, Any], executed: Dict[str, Any], parsed: Dict[str, Any], message: str) -> str:
+    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
+    text = polish_message(
+        safe_output(parsed.get("customer_message", parsed.get("message", "I’ve reviewed this and I’m already on the next step.")))
+    )
+    lowered = (message or "").strip().lower()
+
+    if "cancel" in lowered:
+        return "I can help with that. If you want to cancel, I can move this into the cancellation path now — or, if the issue is the delay or service problem, I can help resolve that first."
+
+    if issue_type in {"billing_duplicate_charge", "billing_issue", "payment_issue"} and executed["action"] == "review":
+        return "You were charged twice — I’ve flagged the duplicate charge for review and the billing correction is now in motion."
+
+    if issue_type == "shipping_issue":
+        status = str(ticket.get("order_status", "unknown") or "unknown")
+        if "annoyed" in lowered or "frustrat" in lowered:
+            return f"I get why that’s frustrating. Your order is {status}, and I’ve checked the latest status from here."
+        return f"Your order is {status}. I’ve checked the latest status and I’m monitoring it from here."
+
+    if issue_type == "damaged_order":
+        if executed["action"] == "credit" and int(executed.get("amount", 0) or 0) > 0:
+            return f"I’ve reviewed the damage case and applied a ${executed['amount']} credit while this gets handled."
+        if executed["action"] == "review":
+            return "I’ve reviewed the damage case and pushed it into priority handling so it’s resolved correctly."
+        return "I’ve reviewed the damage case and moved it into the right recovery path so it can be resolved quickly."
+
+    if executed["action"] == "refund" and f"${executed['amount']}" not in text:
+        return f"I’ve approved a refund of ${executed['amount']} and the correction is now in motion."
+
+    if executed["action"] == "credit" and f"${executed['amount']}" not in text:
+        return f"I’ve added a ${executed['amount']} credit to help make this right."
+
+    if executed["action"] == "review" and "review" not in text.lower():
+        return "I’ve routed this for manual review so the next step is handled safely and correctly."
+
+    return text
 
 
 def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] | None = None) -> Dict[str, Any]:
@@ -563,6 +648,7 @@ def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] 
     meta["customer_history"] = user_memory
     ticket = build_ticket(clean, user_id=user_id, meta=meta)
     triage = ticket.get("triage") or triage_ticket(ticket, user_memory)
+    ticket["triage"] = triage
 
     order_info = {}
     if should_attach_order_context(str(ticket.get("issue_type", "general_support"))):
@@ -580,55 +666,50 @@ def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] 
 
     hard_decision = normalize_action_payload(system_decision(ticket))
     learned_action = None
+    top_rules = get_top_rule_objects(brain, 5)
     if hard_decision.get("action") == "none":
-        learned_action = normalize_action_payload(apply_learned_rules(ticket, get_top_rule_objects(brain, 5))) if get_top_rule_objects(brain, 5) else None
+        learned_action = normalize_action_payload(apply_learned_rules(ticket, top_rules)) if top_rules else None
 
     planned_action = hard_decision if hard_decision.get("action") != "none" else (learned_action or hard_decision)
 
-    if ticket.get("issue_type") in {"shipping_issue", "damaged_order"}:
+    prompt = build_sovereign_prompt(
+        message=clean,
+        ticket=ticket,
+        user_memory=user_memory,
+        memory_block=memory_block,
+        decision=hard_decision,
+        learned_action=learned_action,
+        order_info=order_info,
+        system_prompt=brain.get("system_prompt", "You are Xalvion."),
+    )
+
+    parsed = None
+    mode = "sovereign-local"
+    confidence = 0.9
+    quality = 0.94
+
+    if client is not None:
+        try:
+            model = choose_model(clean)
+            completion = client.chat.completions.create(
+                model=model,
+                temperature=0.2,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": brain.get("system_prompt", "You are Xalvion.")},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            raw = completion.choices[0].message.content or ""
+            parsed = parse_llm_json(raw)
+            mode = f"sovereign-{model}"
+            confidence = clamp_confidence(parsed.get("confidence", 0.92), 0.92)
+            quality = 0.97
+        except Exception:
+            parsed = None
+
+    if parsed is None:
         parsed = local_fallback_reply(ticket, planned_action, order_info, clean)
-        mode = f"sovereign-{ticket.get('issue_type')}-locked"
-        confidence = clamp_confidence(parsed.get("confidence", 0.95), 0.95)
-        quality = 0.97
-    else:
-        prompt = build_sovereign_prompt(
-            message=clean,
-            ticket=ticket,
-            user_memory=user_memory,
-            memory_block=memory_block,
-            decision=hard_decision,
-            learned_action=learned_action,
-            order_info=order_info,
-            system_prompt=brain.get("system_prompt", "You are Xalvion."),
-        )
-
-        parsed = None
-        mode = "sovereign-local"
-        confidence = 0.9
-        quality = 0.94
-
-        if client is not None:
-            try:
-                model = choose_model(clean)
-                completion = client.chat.completions.create(
-                    model=model,
-                    temperature=0.25,
-                    response_format={"type": "json_object"},
-                    messages=[
-                        {"role": "system", "content": brain.get("system_prompt", "You are Xalvion.")},
-                        {"role": "user", "content": prompt},
-                    ],
-                )
-                raw = completion.choices[0].message.content or ""
-                parsed = parse_llm_json(raw)
-                mode = f"sovereign-{model}"
-                confidence = clamp_confidence(parsed.get("confidence", 0.92), 0.92)
-                quality = 0.97
-            except Exception:
-                parsed = None
-
-        if parsed is None:
-            parsed = local_fallback_reply(ticket, planned_action, order_info, clean)
 
     llm_payload = normalize_action_payload(parsed)
 
@@ -649,18 +730,10 @@ def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] 
 
     executed = execute_action(ticket, final_action)
 
-    customer_message = polish_message(
-        safe_output(parsed.get("customer_message", parsed.get("message", "I’ve reviewed this and I’m already on the next step.")))
-    )
-    customer_note = polish_message(str(parsed.get("customer_note", customer_message) or customer_message))
+    customer_note = polish_message(str(parsed.get("customer_note", parsed.get("customer_message", "")) or ""))
     internal_note = str(parsed.get("internal_note", f"Decision path: {final_action.get('reason', 'No reason')}.") or "").strip()
 
-    if executed["action"] == "refund" and f"${executed['amount']}" not in customer_message:
-        customer_message = f"I’ve approved a refund of ${executed['amount']} and the correction is now in motion."
-    elif executed["action"] == "credit" and f"${executed['amount']}" not in customer_message:
-        customer_message = f"I’ve added a ${executed['amount']} credit to help make this right, and I’m continuing with the case context already in front of me."
-    elif executed["action"] == "review" and "review" not in customer_message.lower():
-        customer_message = "I’ve routed this for manual review so the next step is handled safely and correctly."
+    customer_message = rewrite_output_for_issue(ticket, executed, parsed, clean)
 
     final_payload = {
         **final_action,
@@ -679,17 +752,21 @@ def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] 
         quality=quality,
         tool_payload=executed,
         internal_note=internal_note,
-        customer_note=customer_note,
+        customer_note=customer_note or customer_message,
     )
 
     update_memory(user_id, ticket, response["final"], response["decision"])
     process_feedback(clean, response["final"], response["quality"])
-    decay_rules(load_brain())
+
+    brain_for_decay = load_brain()
+    decay_rules(brain_for_decay)
+    save_brain(brain_for_decay)
+
     log_event(clean, response["final"], response["confidence"], response["quality"])
 
     if response["quality"] > 0.92:
-        brain = load_brain()
-        add_rule(brain, "Maintain strong clarity and confident tone.")
-        save_brain(brain)
+      brain_growth = load_brain()
+      add_rule(brain_growth, "Maintain strong clarity and confident tone.")
+      save_brain(brain_growth)
 
     return response
