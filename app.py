@@ -87,6 +87,9 @@ MAX_AUTO_REFUND = float(os.getenv("MAX_AUTO_REFUND", "50"))
 APPROVAL_THRESHOLD = float(os.getenv("APPROVAL_THRESHOLD", "25.00"))
 LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
 
+GUEST_MESSAGE_LIMIT = int(os.getenv("GUEST_MESSAGE_LIMIT", "3"))
+GUEST_WINDOW_SECONDS = int(os.getenv("GUEST_WINDOW_SECONDS", str(60 * 60 * 24 * 30)))
+
 REFUND_RULES: dict[str, Any] = {
     "enabled": True,
     "allowed_tiers": {"pro", "elite"},
@@ -207,6 +210,7 @@ Base = declarative_base()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 _rate_log: dict[str, list[float]] = {}
+_guest_usage_log: dict[str, list[float]] = {}
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,64}$")
 
 
@@ -549,6 +553,67 @@ def check_rate_limit(user_id: str) -> bool:
     _rate_log[key].append(now)
     return True
 
+
+def get_client_identifier(request: Request | None, username: str = "guest") -> str:
+    if username and username != "guest":
+        return username
+
+    if request is not None:
+        forwarded = (request.headers.get("x-forwarded-for", "") or "").split(",")[0].strip()
+        real_ip = (request.headers.get("x-real-ip", "") or "").strip()
+        client_host = getattr(getattr(request, "client", None), "host", "") or ""
+
+        identifier = forwarded or real_ip or client_host
+        if identifier:
+            return f"guest:{identifier}"
+
+    return "guest:anonymous"
+
+
+def _prune_guest_usage(client_id: str) -> list[float]:
+    now = time.time()
+    _guest_usage_log.setdefault(client_id, [])
+    _guest_usage_log[client_id] = [
+        ts for ts in _guest_usage_log[client_id]
+        if now - ts < GUEST_WINDOW_SECONDS
+    ]
+    return _guest_usage_log[client_id]
+
+
+def get_guest_usage_summary(client_id: str) -> dict[str, int]:
+    entries = _prune_guest_usage(client_id)
+    used = len(entries)
+    remaining = max(0, GUEST_MESSAGE_LIMIT - used)
+    return {
+        "used": used,
+        "limit": GUEST_MESSAGE_LIMIT,
+        "remaining": remaining,
+    }
+
+
+def enforce_guest_limit(client_id: str) -> None:
+    if not check_rate_limit(client_id):
+        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
+
+    usage = get_guest_usage_summary(client_id)
+    if usage["used"] >= usage["limit"]:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Guest limit reached. Used {usage['used']}/{usage['limit']} messages. Create an account to continue.",
+            headers={
+                "X-Xalvion-Plan": "free",
+                "X-Xalvion-Limit": str(usage["limit"]),
+                "X-Xalvion-Guest": "true",
+            },
+        )
+
+
+def increment_guest_usage(client_id: str) -> dict[str, int]:
+    entries = _prune_guest_usage(client_id)
+    entries.append(time.time())
+    _guest_usage_log[client_id] = entries
+    return get_guest_usage_summary(client_id)
+
 # =============================================================================
 # 7. PLAN & USAGE HELPERS
 # =============================================================================
@@ -838,8 +903,22 @@ def serialize_ticket_with_log(ticket: Ticket, db: Session) -> dict[str, Any]:
     return base
 
 
-def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, Any]:
-    usage_summary = get_usage_summary(user)
+def serialize_support_result(result: dict[str, Any], user: User, client_id: str = "") -> dict[str, Any]:
+    is_guest = getattr(user, "username", "") == "guest"
+
+    if is_guest:
+        guest_summary = get_guest_usage_summary(client_id or "guest:anonymous")
+        tier = "free"
+        limit = guest_summary["limit"]
+        usage = guest_summary["used"]
+        remaining = guest_summary["remaining"]
+    else:
+        usage_summary = get_usage_summary(user)
+        tier = usage_summary["tier"]
+        limit = usage_summary["limit"]
+        usage = usage_summary["usage"]
+        remaining = max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage)
+
     tool_result = result.get("tool_result") or {}
     impact = result.get("impact") or {}
 
@@ -861,10 +940,10 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "meta": result.get("meta", {}),
         "triage": result.get("triage", {}),
         "history": result.get("history", {}),
-        "tier": usage_summary["tier"],
-        "plan_limit": usage_summary["limit"],
-        "usage": usage_summary["usage"],
-        "remaining": max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"]),
+        "tier": tier,
+        "plan_limit": limit,
+        "usage": usage,
+        "remaining": remaining,
     }
 
 # =============================================================================
@@ -890,10 +969,24 @@ def dollars_from_cents(cents: int) -> float:
 
 
 def rewrite_refund_failure_message(reason: str) -> str:
+    text = (reason or "").strip().lower()
+
+    if any(term in text for term in ["payment_intent_id", "charge_id", "missing_payment_reference", "required"]):
+        return (
+            "I’ve flagged the duplicate charge for billing review and the correction is now in motion. "
+            "You’ll get an update shortly."
+        )
+
+    if "no refundable balance" in text:
+        return (
+            "I’ve opened this for billing review so the charge can be checked and corrected properly. "
+            "You’ll get an update shortly."
+        )
+
     return (
-        "I've opened this for manual review because I couldn't complete the refund automatically. "
-        + reason
-    ).strip()
+        "I’ve opened this for billing review and the correction is now in motion. "
+        "You’ll get an update shortly."
+    )
 
 
 def get_charge_context(*, payment_intent_id: str | None, charge_id: str | None) -> dict[str, Any]:
@@ -1117,6 +1210,17 @@ def apply_real_actions(result: dict[str, Any], req: SupportRequest, user: User) 
     result["impact"] = {"type": "saved", "amount": 0}
     result["response"] = rewrite_refund_failure_message(failure)
     result["final"] = result["response"]
+    result["reply"] = result["response"]
+
+    decision = dict(result.get("decision") or {})
+    decision["action"] = "review"
+    decision["amount"] = 0
+    decision["requires_approval"] = True
+    decision["queue"] = "refund_risk"
+    decision["priority"] = "high"
+    decision["risk_level"] = "medium"
+    result["decision"] = decision
+
     return result
 
 
@@ -1196,8 +1300,14 @@ def check_requires_approval(action: str, amount: float) -> bool:
     return action == "refund" and float(amount or 0) > APPROVAL_THRESHOLD
 
 
-def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
-    enforce_plan_limits(user)
+def run_support(req: SupportRequest, user: User, db: Session, client_id: str = "guest:anonymous") -> dict[str, Any]:
+    is_guest = getattr(user, "username", "") == "guest"
+
+    if is_guest:
+        enforce_guest_limit(client_id)
+    else:
+        enforce_plan_limits(user)
+
     ticket = create_ticket_record(db, user, req)
 
     try:
@@ -1258,14 +1368,17 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
             approved=False,
         )
 
-        if hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
+        if is_guest:
+            increment_guest_usage(client_id)
+        elif hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user"}:
             user.usage = int(getattr(user, "usage", 0) or 0) + 1
             db.commit()
             db.refresh(user)
 
-        serialized = serialize_support_result(result, user)
+        serialized = serialize_support_result(result, user, client_id=client_id)
         serialized["ticket"] = serialize_ticket(ticket)
         serialized["operator_mode"] = get_operator_mode(db)
+        serialized["is_guest"] = is_guest
         return serialized
 
     except HTTPException:
@@ -1281,11 +1394,18 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         except Exception:
             pass
 
+        if is_guest:
+            increment_guest_usage(client_id)
+
+        plan = "free" if is_guest else get_plan_name(user)
+        remaining = get_guest_usage_summary(client_id)["remaining"] if is_guest else max(
+            0, get_plan_config(plan)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)
+        )
+
         fallback = (
             "I encountered an issue processing your request. "
             "Our team has been notified and will follow up shortly."
         )
-        plan = get_plan_name(user)
         return {
             "reply": fallback,
             "final": fallback,
@@ -1307,15 +1427,16 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
             "confidence": 0.0,
             "quality": 0.0,
             "tier": plan,
-            "plan_limit": get_plan_config(plan)["monthly_limit"],
-            "usage": int(getattr(user, "usage", 0) or 0),
-            "remaining": max(0, get_plan_config(plan)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)),
+            "plan_limit": GUEST_MESSAGE_LIMIT if is_guest else get_plan_config(plan)["monthly_limit"],
+            "usage": get_guest_usage_summary(client_id)["used"] if is_guest else int(getattr(user, "usage", 0) or 0),
+            "remaining": remaining,
             "ticket": serialize_ticket(ticket),
             "operator_mode": "balanced",
+            "is_guest": is_guest,
         }
 
 
-def run_support_for_username(req: SupportRequest, username: str) -> dict[str, Any]:
+def run_support_for_username(req: SupportRequest, username: str, client_id: str = "guest:anonymous") -> dict[str, Any]:
     with db_session() as db:
         if username and username != "guest":
             user = db.query(User).filter(User.username == username).first()
@@ -1323,7 +1444,7 @@ def run_support_for_username(req: SupportRequest, username: str) -> dict[str, An
                 user = User(username="guest", password="", usage=0, tier="free")
         else:
             user = User(username="guest", password="", usage=0, tier="free")
-        return run_support(req, user, db)
+        return run_support(req, user, db, client_id=client_id)
 
 # =============================================================================
 # 12. STREAMING HELPERS
@@ -2081,19 +2202,23 @@ def update_operator_mode(
 @app.post("/support")
 def support(
     req: SupportRequest,
+    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return run_support(req, user, db)
+    client_id = get_client_identifier(request, getattr(user, "username", "guest"))
+    return run_support(req, user, db, client_id=client_id)
 
 
 @app.post("/support/stream")
 async def support_stream(
     req: SupportRequest,
+    request: Request,
     authorization: str | None = Header(None),
 ):
     username = get_current_username_from_header(authorization)
-    result = await run_in_threadpool(run_support_for_username, req, username)
+    client_id = get_client_identifier(request, username)
+    result = await run_in_threadpool(run_support_for_username, req, username, client_id)
     return StreamingResponse(
         stream_support_events(result),
         media_type="text/event-stream",
