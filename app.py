@@ -21,6 +21,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, AsyncIterator, Generator
+from urllib.parse import quote_plus
 
 import stripe
 import uvicorn
@@ -1567,12 +1568,26 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
 
 
 @app.get("/integrations/status")
-def integrations_status(user: User = Depends(get_current_user)):
+def integration_status(
+    user: User = Depends(require_authenticated_user),
+):
+    connected = bool(getattr(user, "stripe_connected", 0))
+    livemode = bool(getattr(user, "stripe_livemode", 0))
+    scope = str(getattr(user, "stripe_scope", "") or "").strip()
+
+    mode_label = ""
+    if connected:
+        mode_label = "Live" if livemode else "Test"
+        if scope:
+            mode_label = f"{mode_label} · {scope}"
+
     return {
-        "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
+        "stripe_connected": connected,
         "stripe_account_id": getattr(user, "stripe_account_id", None),
-        "stripe_livemode": bool(getattr(user, "stripe_livemode", 0)),
-        "stripe_scope": getattr(user, "stripe_scope", None),
+        "stripe_livemode": livemode,
+        "stripe_scope": scope,
+        "mode": mode_label,
+        "stripe_mode": mode_label,
     }
 
 
@@ -1594,34 +1609,63 @@ def integrations_stripe_connect(user: User = Depends(require_authenticated_user)
 
 
 @app.get("/integrations/stripe/callback")
-def integrations_stripe_callback(code: str | None = None, state: str | None = None, error: str | None = None, error_description: str | None = None, db: Session = Depends(get_db)):
+def stripe_connect_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    error_description: str | None = None,
+    db: Session = Depends(get_db),
+):
     if error:
-        detail = (error_description or error or "Stripe connection failed.").replace(" ", "%20")
-        return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connect_error&detail={detail}")
+        detail = error_description or error or "Stripe connection was not completed."
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}?stripe=error&detail={quote_plus(detail)}",
+            status_code=303,
+        )
 
-    username = decode_stripe_state(state or "")
-    if not username or not code:
-        return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connect_error&detail=Invalid%20Stripe%20callback")
+    if not code or not state:
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}?stripe=error&detail={quote_plus('Missing Stripe callback parameters.')}",
+            status_code=303,
+        )
+
+    username = decode_stripe_state(state)
+    if not username:
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}?stripe=error&detail={quote_plus('Invalid or expired Stripe connect state.')}",
+            status_code=303,
+        )
 
     user = db.query(User).filter(User.username == username).first()
     if not user:
-        return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connect_error&detail=User%20not%20found")
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}?stripe=error&detail={quote_plus('User not found for Stripe connection.')}",
+            status_code=303,
+        )
 
     try:
         token_response = stripe.OAuth.token(
             grant_type="authorization_code",
             code=code,
         )
+
         user.stripe_connected = 1
         user.stripe_account_id = token_response.get("stripe_user_id")
-        user.stripe_livemode = int(bool(token_response.get("livemode", False)))
-        user.stripe_scope = token_response.get("scope")
-        db.commit()
-    except Exception as exc:
-        detail = str(exc).replace(" ", "%20")
-        return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connect_error&detail={detail}")
+        user.stripe_livemode = 1 if token_response.get("livemode") else 0
+        user.stripe_scope = str(token_response.get("scope", "") or "")
 
-    return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connected")
+        db.commit()
+
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}?stripe=success&detail={quote_plus('Stripe connected successfully.')}",
+            status_code=303,
+        )
+    except Exception as exc:
+        db.rollback()
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}?stripe=error&detail={quote_plus(str(exc))}",
+            status_code=303,
+        )
 
 
 @app.post("/integrations/stripe/disconnect")

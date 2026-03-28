@@ -938,7 +938,22 @@
 
       state.stripeConnected = Boolean(data.stripe_connected);
       state.stripeAccountId = String(data.stripe_account_id || "");
-      state.stripeMode = String(data.mode || data.stripe_mode || "");
+
+      const livemode =
+        typeof data.stripe_livemode === "boolean"
+          ? data.stripe_livemode
+          : Boolean(data.stripe_livemode);
+
+      const scope = String(data.stripe_scope || "").trim();
+
+      state.stripeMode = String(
+        data.mode ||
+        data.stripe_mode ||
+        (state.stripeConnected
+          ? `${livemode ? "Live" : "Test"}${scope ? ` · ${scope}` : ""}`
+          : "")
+      );
+
       updateStripeUI();
     } catch (error) {
       state.stripeConnected = false;
@@ -1004,17 +1019,39 @@
 
       if (!stripe) return;
 
-      if (stripe === "success") {
-        setNotice("success", "Stripe connected", detail || "Refund execution is now live for this workspace.");
+      if (stripe === "success" || stripe === "connected") {
+        setNotice(
+          "success",
+          "Stripe connected",
+          detail || "Refund execution is now live for this workspace."
+        );
       } else if (stripe === "cancel") {
-        setNotice("warning", "Stripe connection canceled", detail || "Stripe was not connected.");
-      } else if (stripe === "error") {
-        setNotice("error", "Stripe connection failed", detail || "Could not complete Stripe connection.");
+        setNotice(
+          "warning",
+          "Stripe connection canceled",
+          detail || "Stripe was not connected."
+        );
+      } else if (stripe === "error" || stripe === "connect_error") {
+        setNotice(
+          "error",
+          "Stripe connection failed",
+          detail || "Could not complete Stripe connection."
+        );
+      } else if (stripe === "disconnected") {
+        setNotice(
+          "success",
+          "Stripe disconnected",
+          detail || "Stripe has been disconnected from this workspace."
+        );
       }
 
       url.searchParams.delete("stripe");
       url.searchParams.delete("detail");
-      window.history.replaceState({}, document.title, url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : "") + url.hash);
+      window.history.replaceState(
+        {},
+        document.title,
+        url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : "") + url.hash
+      );
     } catch {}
   }
 
