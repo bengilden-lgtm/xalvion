@@ -10,8 +10,8 @@
       --bg:#06080f;
       --bg-2:#0b1020;
       --text:rgba(245,248,255,.98);
-      --muted:rgba(204,214,236,.76);
-      --muted-2:rgba(190,203,232,.48);
+      --muted:rgba(210,220,245,.82);
+      --muted-2:rgba(198,210,235,.58);
       --glass-top:rgba(17,22,35,.52);
       --glass-bottom:rgba(9,13,24,.68);
       --line:rgba(255,255,255,.07);
@@ -235,15 +235,16 @@
     }
 
     .notice{
-      border-radius:15px;
-      padding:11px 12px;
+      border-radius:16px;
+      padding:13px 14px;
       background:rgba(255,255,255,.035);
       border:1px solid rgba(255,255,255,.06);
       display:flex;
-      align-items:center;
-      gap:8px;
-      overflow:hidden;
-      transition:border-color .16s ease, background .16s ease, transform .16s ease;
+      flex-direction:column;
+      align-items:stretch;
+      gap:10px;
+      overflow:visible;
+      transition:border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .18s ease;
     }
 
     .notice:hover{transform:translateY(-1px)}
@@ -252,9 +253,16 @@
     .notice.error{background:rgba(255,114,114,.10);border-color:rgba(255,114,114,.22)}
     .notice.info{background:rgba(123,179,255,.10);border-color:rgba(123,179,255,.22)}
 
+    .notice-header{
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      min-width:0;
+    }
+
     .notice-dot{
-      width:7px;height:7px;border-radius:50%;flex:0 0 7px;
-      background:currentColor;opacity:.8;box-shadow:0 0 10px currentColor;
+      width:8px;height:8px;border-radius:50%;flex:0 0 8px;margin-top:3px;
+      background:currentColor;opacity:.85;box-shadow:0 0 12px currentColor;
     }
 
     .notice.success .notice-dot{color:#34d399}
@@ -262,20 +270,24 @@
     .notice.error .notice-dot{color:#f87171}
     .notice.info .notice-dot{color:#60a5fa}
 
-    .notice-title{font-size:12px;font-weight:800;letter-spacing:.01em;white-space:nowrap;flex:0 0 auto}
-    .notice-detail-wrap{flex:1;overflow:hidden;min-width:0}
+    .notice-title{
+      font-size:13px;font-weight:800;letter-spacing:.01em;line-height:1.35;
+      flex:1;min-width:0;white-space:normal;word-break:break-word;
+    }
+    .notice-detail-wrap{
+      width:100%;min-width:0;padding-left:18px;margin:0;
+      border-left:2px solid rgba(255,255,255,.1);
+    }
     .notice-detail{
-      font-size:11.5px;color:rgba(224,233,252,.84);
-      white-space:nowrap;
-      display:inline-block;
+      font-size:12.5px;line-height:1.58;
+      color:rgba(237,242,255,.93);
+      white-space:normal;word-break:break-word;overflow-wrap:anywhere;
+      display:block;
     }
-    .notice-detail.ticker{
-      animation:noticeTicker linear infinite;
-    }
-    @keyframes noticeTicker{
-      0%{transform:translateX(0)}
-      100%{transform:translateX(-50%)}
-    }
+    .notice.success .notice-detail{color:rgba(220,255,245,.95)}
+    .notice.warning .notice-detail{color:rgba(255,241,214,.95)}
+    .notice.error .notice-detail{color:rgba(255,232,232,.96)}
+    .notice.info .notice-detail{color:rgba(226,236,255,.94)}
 
     .auth-card,.tier-card{
       border-radius:24px;padding:13px;
@@ -289,17 +301,17 @@
     }
 
     .input{
-      width:100%;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,.08);
-      background:rgba(0,0,0,.2);color:var(--text);padding:0 12px;font-size:13px;outline:none;
+      width:100%;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.14);
+      background:rgba(6,10,22,.55);color:var(--text);padding:0 14px;font-size:13.5px;outline:none;
       transition:border-color .16s ease,background .16s ease, box-shadow .16s ease;
     }
 
     .input:focus{
-      border-color:rgba(139,111,255,.30);background:rgba(0,0,0,.28);
-      box-shadow:0 0 0 3px rgba(139,111,255,.08);
+      border-color:rgba(139,111,255,.38);background:rgba(8,12,28,.72);
+      box-shadow:0 0 0 3px rgba(139,111,255,.12);
     }
 
-    .input::placeholder{color:rgba(200,215,245,.35)}
+    .input::placeholder{color:rgba(198,212,245,.62)}
 
     .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 
@@ -356,9 +368,9 @@
     .title{min-width:0;position:relative;z-index:1}
     .title h1{font-size:20px;font-weight:800;letter-spacing:-.032em;line-height:1.12}
     .title p{
-      margin-top:4px;font-size:12px;color:rgba(196,208,240,.74);line-height:1.4;
+      margin-top:6px;font-size:12.5px;color:rgba(205,218,248,.88);line-height:1.55;
       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.01em;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      white-space:normal;overflow:visible;word-break:break-word;
     }
 
     .top-actions{display:flex;gap:10px;position:relative;z-index:1}
@@ -383,17 +395,17 @@
     }
 
     .workspace-intro{
-      padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);
-      display:flex;align-items:center;justify-content:space-between;gap:12px;
-      flex:0 0 auto;min-height:42px;
+      padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.06);
+      display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+      flex:0 0 auto;min-height:auto;
       background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
     }
 
-    .workspace-intro-left{display:flex;align-items:center;gap:8px;min-width:0}
+    .workspace-intro-left{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;flex:1}
     .workspace-intro .section-label{margin:0;padding:0;flex:0 0 auto}
     .workspace-intro .headline{
-      font-size:13px;font-weight:700;color:rgba(222,232,252,.9);
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      font-size:14px;font-weight:700;color:rgba(232,240,255,.95);line-height:1.5;
+      white-space:normal;overflow:visible;word-break:break-word;
     }
 
     .messages-shell{
@@ -415,8 +427,13 @@
     }
 
     .empty-state{
-      min-height:100%;display:flex;align-items:flex-start;justify-content:center;
-      padding:24px 18px 24px;animation:fadeUp .28s cubic-bezier(.22,1,.36,1) both;
+      width:100%;min-height:100%;display:flex;align-items:flex-start;justify-content:center;
+      padding:20px 12px 28px;animation:fadeUp .28s cubic-bezier(.22,1,.36,1) both;
+      box-sizing:border-box;
+    }
+
+    .empty-state .empty-card{
+      width:min(940px,100%);
     }
 
     .empty-card{
@@ -682,7 +699,7 @@
     }
 
     .composer textarea::-webkit-scrollbar{display:none}
-    .composer textarea::placeholder{color:rgba(230,237,255,.36)}
+    .composer textarea::placeholder{color:rgba(210,222,250,.58)}
 
     .send-btn{
       min-width:92px;height:42px;border-radius:13px;padding:0 15px;
@@ -953,8 +970,10 @@
 
           <div class="section-label">Workspace notice</div>
           <div id="notice" class="notice info">
-            <div class="notice-dot"></div>
-            <div id="noticeTitle" class="notice-title">Booting</div>
+            <div class="notice-header">
+              <div class="notice-dot" aria-hidden="true"></div>
+              <div id="noticeTitle" class="notice-title">Booting</div>
+            </div>
             <div class="notice-detail-wrap">
               <span id="noticeDetail" class="notice-detail">Preparing the response workspace...</span>
             </div>

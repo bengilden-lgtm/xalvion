@@ -605,27 +605,31 @@
       }
 
       .empty-state{
-        border:1px dashed rgba(255,255,255,.09);
-        background:rgba(255,255,255,.025);
-        color:rgba(204,216,248,.58);
-        border-radius:18px;
-        padding:20px 18px;
+        width:100%;
+        min-height:100%;
+        margin:0;
+        padding:20px 12px 28px;
         display:flex;
         flex-direction:column;
-        gap:8px;
-        align-items:flex-start;
-        max-width:720px;
+        align-items:center;
+        justify-content:flex-start;
+        box-sizing:border-box;
       }
 
-      .empty-state strong{
-        font-size:13px;
-        letter-spacing:.02em;
-        color:rgba(242,246,255,.94);
+      .empty-state .empty-card{
+        width:min(940px,100%);
       }
 
-      .empty-state span{
-        font-size:13px;
-        line-height:1.65;
+      .empty-state .empty-card h1{
+        margin-top:14px;
+      }
+
+      .empty-state .empty-card p{
+        margin-top:14px;
+        color:rgba(220,232,252,.92);
+        font-size:14.5px;
+        line-height:1.72;
+        max-width:none;
       }
 
       .rev-card,.ops-card{
@@ -1281,8 +1285,14 @@
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.innerHTML = `
-      <strong>Workspace ready</strong>
-      <span>Run a support case below and stream the response into this thread with readable action context and premium presentation.</span>
+      <div class="empty-card">
+        <div class="empty-eyebrow">
+          <div class="empty-eyebrow-dot" aria-hidden="true"></div>
+          Workspace
+        </div>
+        <h1>Workspace ready</h1>
+        <p>Run a support case below and stream the response into this thread with readable action context and premium presentation.</p>
+      </div>
     `;
     els.messages.appendChild(empty);
   }
