@@ -660,19 +660,67 @@
     .composer textarea::placeholder{color:rgba(230,237,255,.36)}
 
     .send-btn{
-      min-width:88px;height:38px;border-radius:12px;padding:0 14px;
-      background:linear-gradient(135deg, rgba(139,111,255,.76), rgba(79,158,255,.70));
-      border:1px solid rgba(139,111,255,.28);font-weight:700;flex:0 0 auto;font-size:13px;
-      box-shadow:0 0 14px rgba(139,111,255,.14);
+      min-width:118px;
+      height:44px;
+      padding:0 16px 0 15px;
+      border-radius:14px;
+      flex:0 0 auto;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      background:linear-gradient(135deg, rgba(139,111,255,.94), rgba(79,158,255,.86));
+      border:1px solid rgba(139,111,255,.34);
+      color:rgba(250,252,255,.98);
+      font-weight:800;
+      font-size:13px;
+      letter-spacing:.01em;
+      box-shadow:0 12px 28px rgba(95,73,214,.24), inset 0 1px 0 rgba(255,255,255,.18);
+      position:relative;
+      overflow:hidden;
+    }
+
+    .send-btn::before{
+      content:"";
+      position:absolute;
+      inset:1px;
+      border-radius:13px;
+      background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,0));
+      opacity:.9;
+      pointer-events:none;
+    }
+
+    .send-btn svg{
+      width:16px;
+      height:16px;
+      flex:0 0 16px;
+      transform:translateX(1px);
+      position:relative;
+      z-index:1;
+    }
+
+    .send-btn span{
+      position:relative;
+      z-index:1;
     }
 
     .send-btn:hover:not(:disabled){
-      box-shadow:0 0 24px rgba(139,111,255,.22);
-      background:linear-gradient(135deg, rgba(139,111,255,.88), rgba(79,158,255,.78));
+      transform:translateY(-1px);
+      box-shadow:0 16px 34px rgba(95,73,214,.32), 0 0 24px rgba(139,111,255,.18);
+      background:linear-gradient(135deg, rgba(148,121,255,.98), rgba(88,170,255,.90));
     }
 
-    .send-btn:active:not(:disabled){transform:scale(.97);box-shadow:0 0 10px rgba(139,111,255,.12)}
-    .send-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+    .send-btn:active:not(:disabled){
+      transform:translateY(0) scale(.98);
+      box-shadow:0 8px 18px rgba(95,73,214,.22);
+    }
+
+    .send-btn:disabled{
+      opacity:.52;
+      cursor:not-allowed;
+      transform:none;
+      box-shadow:none;
+    }
 
     .composer.highlight{
       border-color:rgba(139,111,255,.55);
@@ -855,7 +903,10 @@
         </div>
         <div class="composer glass">
           <textarea id="messageInput" placeholder="Paste a customer issue or type a support request..."></textarea>
-          <button id="sendBtn" class="send-btn" type="button">Send</button>
+          <button id="sendBtn" class="send-btn" type="button">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 2.5L7 9M13.5 2.5L9 13.5 7 9l-4.5-2 11-5z"></path></svg>
+            <span>Send</span>
+          </button>
         </div>
       </section>
     </main>
