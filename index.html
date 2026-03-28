@@ -410,9 +410,8 @@
     .messages-shell:hover::after{opacity:1}
 
     .messages{
-      min-height:0;height:100%;padding:18px 22px 14px;
-      display:flex;flex-direction:column;gap:14px;overflow-y:auto;position:relative;z-index:1;
-      scroll-padding-bottom:12px;
+      min-height:0;height:100%;padding:36px 30px 24px;
+      display:flex;flex-direction:column;gap:22px;overflow-y:auto;position:relative;z-index:1;
     }
 
     .empty-state{
@@ -478,7 +477,7 @@
     .msg-group{
       display:flex;flex-direction:column;gap:0;max-width:100%;width:100%;
       animation:fadeUp .22s cubic-bezier(.22,1,.36,1) both;
-      border-radius:22px;padding:18px 20px 15px;position:relative;
+      border-radius:24px;padding:24px 24px 20px;position:relative;
       transition:background .18s ease,box-shadow .18s ease,transform .18s ease,border-color .18s ease,opacity .18s ease;
       border:1px solid transparent;cursor:default;will-change:transform, opacity;
     }
@@ -512,7 +511,7 @@
       to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
     }
 
-    .msg-group-header{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+    .msg-group-header{display:flex;align-items:center;gap:6px;margin-bottom:12px}
 
     .msg-who{
       font-size:12px;font-weight:800;color:rgba(145,165,210,.40);letter-spacing:.02em;
@@ -522,7 +521,7 @@
     .msg-group.assistant .msg-who{color:rgba(167,147,255,.58)}
     .msg-group:hover .msg-who{color:rgba(198,210,242,.72)}
 
-    .reply-body{padding:0 0 0 20px;position:relative}
+    .reply-body{padding:0 0 0 14px;position:relative}
 
     .reply-body::before{
       content:'';position:absolute;left:0;top:2px;bottom:2px;width:2px;border-radius:999px;
@@ -541,7 +540,7 @@
     }
 
     .reply-text{
-      font-size:16.5px;line-height:1.72;color:rgba(239,244,255,.97);
+      font-size:18px;line-height:1.9;color:rgba(239,244,255,.97);
       white-space:pre-wrap;word-break:break-word;
       transition:color .16s ease, opacity .16s ease;max-width:100%;
     }
@@ -565,7 +564,7 @@
     }
 
     .status-row{
-      display:flex;gap:8px;flex-wrap:wrap;padding:10px 0 0 20px;width:100%;
+      display:flex;gap:8px;flex-wrap:wrap;padding:14px 0 0 20px;width:100%;
     }
 
     .status-pill{
@@ -579,7 +578,7 @@
       border-color:rgba(140,170,255,.08);transform:translateY(-1px);
     }
 
-    .customer-next{width:100%;display:flex;flex-wrap:wrap;gap:8px;padding:6px 0 0 15px}
+    .customer-next{width:100%;display:flex;flex-wrap:wrap;gap:8px;padding:8px 0 0 15px}
 
     .next-pill{
       display:inline-flex;align-items:center;gap:8px;padding:6px 9px;border-radius:11px;
@@ -598,7 +597,7 @@
     .pill-label{opacity:.42;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:9px}
 
     .msg-actions{
-      display:flex;align-items:center;gap:8px;padding:12px 0 0 20px;
+      display:flex;align-items:center;gap:8px;padding:16px 0 0 20px;
       opacity:.72;transform:none;pointer-events:auto;visibility:visible;
       transition:opacity .18s ease, transform .18s cubic-bezier(.22,1,.36,1), visibility 0s linear 0s;
     }
@@ -651,9 +650,9 @@
     .fb-btn.up{color:rgba(52,211,153,.68);background:rgba(52,211,153,.06)}
     .fb-btn.down{color:rgba(248,113,113,.68);background:rgba(248,113,113,.06)}
 
-    .composer-wrap{display:grid;gap:8px;flex:0 0 auto}
+    .composer-wrap{display:grid;gap:9px;flex:0 0 auto}
 
-    .quick-actions{display:flex;gap:6px;flex-wrap:wrap}
+    .quick-actions{display:flex;gap:7px;flex-wrap:wrap}
 
     .chip{
       padding:6px 11px;border-radius:999px;font-size:11px;font-weight:700;
@@ -663,7 +662,7 @@
     .chip:hover{background:rgba(139,111,255,.11);border-color:rgba(139,111,255,.28)}
 
     .composer{
-      border-radius:18px;padding:7px 7px 7px 10px;min-height:58px;display:flex;gap:8px;align-items:flex-end;
+      border-radius:18px;padding:8px;min-height:64px;display:flex;gap:10px;align-items:flex-end;
       background:rgba(6,8,20,.44);border:1px solid rgba(255,255,255,.065);min-width:0;
       transition:border-color .16s ease, box-shadow .16s ease, background .16s ease, transform .16s ease;
     }
@@ -678,7 +677,7 @@
 
     .composer textarea{
       flex:1;min-height:38px;max-height:132px;resize:none;border:none;outline:none;
-      background:transparent;color:var(--text);padding:10px 10px 10px 12px;font-size:14.5px;line-height:1.58;
+      background:transparent;color:var(--text);padding:11px 13px;font-size:14.5px;line-height:1.64;
       min-width:0;overflow:auto;scrollbar-width:none;
     }
 
@@ -686,29 +685,19 @@
     .composer textarea::placeholder{color:rgba(230,237,255,.36)}
 
     .send-btn{
-      min-width:58px;width:58px;height:44px;border-radius:14px;padding:0;
-      background:linear-gradient(135deg, rgba(145,118,255,.88), rgba(92,166,255,.8));
-      border:1px solid rgba(139,111,255,.30);font-weight:800;flex:0 0 auto;font-size:0;letter-spacing:0;
-      box-shadow:0 0 18px rgba(139,111,255,.18), 0 8px 20px rgba(31,43,94,.18);
-      display:flex;align-items:center;justify-content:center;
+      min-width:92px;height:42px;border-radius:13px;padding:0 15px;
+      background:linear-gradient(135deg, rgba(145,118,255,.82), rgba(92,166,255,.76));
+      border:1px solid rgba(139,111,255,.30);font-weight:800;flex:0 0 auto;font-size:13px;letter-spacing:.01em;
+      box-shadow:0 0 16px rgba(139,111,255,.16), 0 8px 20px rgba(31,43,94,.16);
     }
 
     .send-btn:hover:not(:disabled){
-      box-shadow:0 0 30px rgba(139,111,255,.26), 0 10px 24px rgba(31,43,94,.2);
-      background:linear-gradient(135deg, rgba(150,124,255,.94), rgba(102,173,255,.86));
-      transform:translateY(-1px);
+      box-shadow:0 0 28px rgba(139,111,255,.24), 0 10px 24px rgba(31,43,94,.18);
+      background:linear-gradient(135deg, rgba(148,122,255,.9), rgba(98,171,255,.82));
     }
 
     .send-btn:active:not(:disabled){transform:scale(.97);box-shadow:0 0 10px rgba(139,111,255,.12)}
     .send-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
-
-    .send-btn svg{
-      width:22px;
-      height:22px;
-      display:block;
-      transform:translateX(1px);
-      filter:drop-shadow(0 1px 0 rgba(255,255,255,.08));
-    }
 
     .composer.highlight{
       border-color:rgba(139,111,255,.55);
@@ -801,11 +790,147 @@
       .empty-grid{grid-template-columns:1fr}
       .empty-card{padding:22px}
       .empty-card h1{font-size:28px}
-      .reply-text{font-size:15px;line-height:1.72}
+      .reply-text{font-size:16px;line-height:1.82}
       .msg-group:hover{transform:none}
       .msg-actions{opacity:1;transform:none;pointer-events:auto;visibility:visible}
       .messages{padding:22px 18px 18px}
     }
+  
+
+    /* Compact reply rendering only */
+    .messages > .msg-group { margin-bottom: 0; }
+    .messages > .msg-group .status-pill,
+    .messages > .msg-group .next-pill {
+      font-size: 10.5px;
+      padding: 4px 8px;
+      border-radius: 999px;
+    }
+
+    .msg-card{
+      width:100% !important;
+      max-width:100% !important;
+      border-radius:18px !important;
+      box-shadow:0 12px 26px rgba(0,0,0,.14) !important;
+    }
+
+    .msg-head{
+      padding:10px 12px 8px !important;
+    }
+
+    .msg-body{
+      padding:10px 12px 10px !important;
+      gap:8px !important;
+    }
+
+    .assistant-tools{
+      gap:6px !important;
+    }
+
+    .mini-btn{
+      min-height:30px !important;
+      padding:0 10px !important;
+      border-radius:10px !important;
+      font-size:11px !important;
+    }
+
+    .copy-btn{
+      width:30px !important;
+      min-width:30px !important;
+    }
+
+    .stream-steps{
+      gap:6px !important;
+      margin-bottom:2px !important;
+    }
+
+    .stream-step{
+      min-height:28px !important;
+      padding:0 9px !important;
+      border-radius:10px !important;
+      font-size:10px !important;
+    }
+
+    .run-summary{
+      gap:6px !important;
+    }
+
+    .run-chip{
+      min-height:24px !important;
+      padding:0 8px !important;
+      font-size:10px !important;
+    }
+
+    .memory-card{
+      gap:8px !important;
+      padding:10px !important;
+      border-radius:14px !important;
+    }
+
+    .memory-pill{
+      min-height:24px !important;
+      padding:0 8px !important;
+      font-size:10.5px !important;
+    }
+
+    .action-visibility{
+      gap:8px !important;
+      margin-top:0 !important;
+      padding:10px !important;
+      border-radius:14px !important;
+    }
+
+    .action-visibility-head{
+      gap:8px !important;
+    }
+
+    .action-visibility-kicker{
+      font-size:11px !important;
+    }
+
+    .action-visibility-line{
+      font-size:13px !important;
+      line-height:1.5 !important;
+    }
+
+    .action-visibility-sub{
+      font-size:11px !important;
+      line-height:1.45 !important;
+      display:none !important;
+    }
+
+    .action-visibility-meta{
+      gap:6px !important;
+    }
+
+    .action-visibility-pill{
+      min-height:24px !important;
+      padding:0 8px !important;
+      font-size:10px !important;
+    }
+
+    .impact-grid{
+      grid-template-columns:repeat(4, minmax(0,1fr)) !important;
+      gap:6px !important;
+    }
+
+    .impact-box{
+      gap:2px !important;
+      padding:8px !important;
+      border-radius:10px !important;
+    }
+
+    .impact-label{
+      font-size:9px !important;
+    }
+
+    .impact-value{
+      font-size:12px !important;
+    }
+
+    @media (max-width:900px){
+      .impact-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
+    }
+
   </style>
 </head>
 <body>
@@ -891,12 +1016,7 @@
         </div>
         <div class="composer glass">
           <textarea id="messageInput" placeholder="Paste a customer issue or type a support request..."></textarea>
-          <button id="sendBtn" class="send-btn" type="button" aria-label="Send">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M22 2L11 13"></path>
-              <path d="M22 2L15 22 11 13 2 9 22 2Z"></path>
-            </svg>
-          </button>
+          <button id="sendBtn" class="send-btn" type="button">Send</button>
         </div>
       </section>
     </main>
@@ -1012,39 +1132,11 @@
         }, { passive: true });
       }
 
-      function bindConversationAutoscroll() {
-        const area = document.getElementById("messages");
-        if (!area) return;
-
-        let stickToBottom = true;
-
-        const updateStickiness = () => {
-          const distanceFromBottom = area.scrollHeight - area.clientHeight - area.scrollTop;
-          stickToBottom = distanceFromBottom < 120;
-        };
-
-        const scrollToBottom = (behavior = "auto") => {
-          area.scrollTo({ top: area.scrollHeight, behavior });
-        };
-
-        area.addEventListener("scroll", updateStickiness, { passive: true });
-
-        const observer = new MutationObserver(() => {
-          if (stickToBottom || area.children.length <= 2) {
-            requestAnimationFrame(() => scrollToBottom("auto"));
-          }
-        });
-
-        observer.observe(area, { childList: true, subtree: true, characterData: true });
-        requestAnimationFrame(() => scrollToBottom("auto"));
-      }
-
       if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", () => { bindScrollMemory(); bindCursorGlow(); bindConversationAutoscroll(); }, { once: true });
+        document.addEventListener("DOMContentLoaded", () => { bindScrollMemory(); bindCursorGlow(); }, { once: true });
       } else {
         bindScrollMemory();
         bindCursorGlow();
-        bindConversationAutoscroll();
       }
     })();
   </script>
