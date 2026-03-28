@@ -785,6 +785,41 @@
 
     .muted-copy{font-size:13px;color:rgba(215,225,250,.88);line-height:1.64}
 
+    .stripe-card{gap:10px}
+    .stripe-card-head{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+      min-width:0;
+    }
+    .stripe-card-title{min-width:0;flex:1}
+    .stripe-brand{
+      font-size:13px;font-weight:800;letter-spacing:-.01em;display:block;margin-bottom:4px;
+    }
+    .stripe-card-desc{
+      font-size:12px;line-height:1.55;margin:0;color:rgba(215,225,250,.88);
+      white-space:normal;overflow-wrap:anywhere;word-break:break-word;
+    }
+    .stripe-status-pill{
+      flex-shrink:0;align-self:flex-start;height:28px;padding:0 10px;border-radius:999px;
+      font-size:11px;font-weight:700;display:inline-flex;align-items:center;
+      background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+      color:rgba(205,218,248,.88);
+    }
+    .stripe-status-pill.is-connected{
+      background:rgba(116,228,184,.12);border-color:rgba(116,228,184,.28);
+      color:rgba(200,255,230,.95);
+    }
+    .stripe-meta{
+      display:flex;flex-direction:column;gap:4px;padding-top:8px;margin-top:2px;
+      border-top:1px solid rgba(255,255,255,.06);
+    }
+    .stripe-meta .usage-line{font-size:12px}
+    .stripe-meta-value{
+      color:var(--text);font-weight:600;text-align:right;
+      max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    }
+    .stripe-actions-col{display:flex;flex-direction:column;gap:6px;width:100%}
+    .stripe-disconnect-full{height:36px;border-radius:12px}
+
     .system-stack{display:flex;flex-direction:column;gap:10px}
 
     @keyframes fadeUp{
@@ -994,42 +1029,35 @@
           </div>
 
           <div class="section-label">Integrations</div>
-          <div class="tier-card" id="stripeCard">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
-              <div style="min-width:0;">
-                <div style="font-size:13px;font-weight:800;letter-spacing:-.01em;">Stripe</div>
-                <div
-                  id="stripeIntegrationCopy"
-                  class="muted-copy"
-                  style="font-size:12px;line-height:1.55;margin-top:4px;"
-                >
+          <div class="tier-card stripe-card" id="stripeCard">
+            <div class="stripe-card-head">
+              <div class="stripe-card-title">
+                <span class="stripe-brand">Stripe</span>
+                <p id="stripeIntegrationCopy" class="stripe-card-desc">
                   Connect Stripe to execute refunds instead of only preparing them.
-                </div>
+                </p>
               </div>
-
-              <div
-                id="stripeStatus"
-                class="ghost-btn"
-                style="height:30px;padding:0 10px;cursor:default;white-space:nowrap;"
-              >
-                Not connected
-              </div>
+              <span id="stripeStatus" class="stripe-status-pill" aria-live="polite">Not connected</span>
             </div>
 
-            <div style="display:grid;gap:6px;">
-              <div class="usage-line">
+            <div class="stripe-meta">
+              <div class="usage-line stripe-meta-line">
                 <span>Account</span>
-                <span id="stripeAccountPill">No account linked</span>
+                <span id="stripeAccountPill" class="stripe-meta-value">No account linked</span>
               </div>
-              <div class="usage-line">
+              <div class="usage-line stripe-meta-line">
                 <span>Mode</span>
-                <span id="stripeModePill">Awaiting connection</span>
+                <span id="stripeModePill" class="stripe-meta-value">Awaiting connection</span>
               </div>
             </div>
 
-            <div class="btn-row">
-              <button id="stripeConnectBtn" class="btn" type="button">Connect Stripe</button>
-              <button id="stripeDisconnectBtn" class="ghost-btn" type="button" hidden>Disconnect</button>
+            <div class="stripe-actions-col">
+              <button id="stripeConnectBtn" class="upgrade-btn stripe-connect-btn" type="button">
+                <span class="stripe-connect-label">Connect Stripe</span><span aria-hidden="true">→</span>
+              </button>
+              <button id="stripeDisconnectBtn" class="ghost-btn stripe-disconnect-full" type="button" hidden>
+                Disconnect Stripe
+              </button>
             </div>
           </div>
 

@@ -79,10 +79,15 @@ ALLOW_DIRECT_BILLING_BYPASS = (
 )
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:8001").rstrip("/")
+# Public URL of this FastAPI app (OAuth callback must land on the API, not only a static host).
+APP_ORIGIN = os.getenv("APP_ORIGIN", "").strip().rstrip("/") or FRONTEND_URL
 CHECKOUT_SUCCESS_URL = os.getenv("CHECKOUT_SUCCESS_URL", f"{FRONTEND_URL}?checkout=success")
 CHECKOUT_CANCEL_URL = os.getenv("CHECKOUT_CANCEL_URL", f"{FRONTEND_URL}?checkout=cancel")
 STRIPE_CONNECT_CLIENT_ID = os.getenv("STRIPE_CONNECT_CLIENT_ID", "").strip()
-STRIPE_CONNECT_REDIRECT_URI = os.getenv("STRIPE_CONNECT_REDIRECT_URI", f"{FRONTEND_URL}/integrations/stripe/callback").strip()
+STRIPE_CONNECT_REDIRECT_URI = os.getenv(
+    "STRIPE_CONNECT_REDIRECT_URI",
+    f"{APP_ORIGIN}/integrations/stripe/callback",
+).strip()
 
 STREAM_CHUNK_SIZE = int(os.getenv("STREAM_CHUNK_SIZE", "18"))
 STREAM_CHUNK_DELAY = float(os.getenv("STREAM_CHUNK_DELAY", "0.02"))
@@ -181,7 +186,7 @@ _ALLOWED_ORIGINS = [
     "https://xalvion.tech",
 ]
 
-for origin in [FRONTEND_URL] + [
+for origin in [FRONTEND_URL, APP_ORIGIN] + [
     x.strip().rstrip("/")
     for x in os.getenv("ALLOWED_ORIGINS", "").split(",")
     if x.strip()
@@ -523,7 +528,11 @@ def create_token(username: str) -> str:
 
 def create_stripe_state(username: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=15)
-    payload = {"sub": username, "exp": expire, "purpose": "stripe_connect"}
+    payload = {
+        "sub": username,
+        "exp": int(expire.timestamp()),
+        "purpose": "stripe_connect",
+    }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -564,7 +573,10 @@ def get_current_user(
 
     user = db.query(User).filter(User.username == username).first()
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(
+            status_code=401,
+            detail="User not found — this token no longer matches an account. Log in again.",
+        )
     return user
 
 
@@ -1558,6 +1570,7 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
     usage_summary = get_usage_summary(user)
     return {
         "token": token,
+        "username": user.username,
         "tier": usage_summary["tier"],
         "usage": usage_summary["usage"],
         "limit": usage_summary["limit"],
@@ -1639,7 +1652,7 @@ def stripe_connect_callback(
     user = db.query(User).filter(User.username == username).first()
     if not user:
         return RedirectResponse(
-            url=f"{FRONTEND_URL}?stripe=error&detail={quote_plus('User not found for Stripe connection.')}",
+            url=f"{FRONTEND_URL}?stripe=error&detail={quote_plus('No account matches this Stripe session. Log in again and reconnect.')}",
             status_code=303,
         )
 

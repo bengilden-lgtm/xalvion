@@ -843,6 +843,21 @@
     persistAuth();
   }
 
+  function invalidateSessionFrom401() {
+    clearAuth();
+    updatePlanUI("free", 0, 50, 50);
+    updateAuthStatus();
+    updateTopbarStatus();
+    updateStripeUI();
+  }
+
+  function detailFromApiBody(data) {
+    const d = data && data.detail;
+    if (typeof d === "string") return d;
+    if (Array.isArray(d) && d.length && typeof d[0]?.msg === "string") return d[0].msg;
+    return "";
+  }
+
   function loadDraft() {
     try {
       return localStorage.getItem(DRAFT_KEY) || "";
@@ -898,7 +913,12 @@
     }
 
     if (els.stripeConnectBtn) {
-      els.stripeConnectBtn.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
+      const label = els.stripeConnectBtn.querySelector(".stripe-connect-label");
+      if (label) {
+        label.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
+      } else {
+        els.stripeConnectBtn.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
+      }
       els.stripeConnectBtn.disabled = false;
     }
 
@@ -938,7 +958,11 @@
     try {
       const res = await fetch(`${API}/integrations/status`, { headers: headers(false) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "Could not load integrations.");
+      if (res.status === 401) {
+        invalidateSessionFrom401();
+        throw new Error(detailFromApiBody(data) || "Session expired.");
+      }
+      if (!res.ok) throw new Error(detailFromApiBody(data) || "Could not load integrations.");
 
       state.stripeConnected = Boolean(data.stripe_connected);
       state.stripeAccountId = String(data.stripe_account_id || "");
@@ -978,7 +1002,14 @@
     try {
       const res = await fetch(`${API}/integrations/stripe/connect`, { headers: headers(false) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "Could not start Stripe connection.");
+      if (res.status === 401) {
+        invalidateSessionFrom401();
+        const msg =
+          detailFromApiBody(data) ||
+          "Sign in again. Your saved session does not match an account on this server.";
+        throw new Error(msg);
+      }
+      if (!res.ok) throw new Error(detailFromApiBody(data) || "Could not start Stripe connection.");
       if (!data.url) throw new Error("Missing Stripe connection URL.");
       window.location.href = data.url;
     } catch (error) {
@@ -1001,7 +1032,11 @@
         headers: headers()
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "Could not disconnect Stripe.");
+      if (res.status === 401) {
+        invalidateSessionFrom401();
+        throw new Error(detailFromApiBody(data) || "Sign in again to disconnect Stripe.");
+      }
+      if (!res.ok) throw new Error(detailFromApiBody(data) || "Could not disconnect Stripe.");
 
       state.stripeConnected = false;
       state.stripeAccountId = "";
@@ -1987,7 +2022,7 @@
       if (!res.ok) throw new Error(data.detail || "Invalid credentials.");
 
       state.token = data.token || "";
-      state.username = username;
+      state.username = data.username || username;
       updatePlanUI(
         data.tier || "free",
         Number(data.usage || 0),
@@ -2087,14 +2122,19 @@
   async function hydrateMe() {
     if (!state.token) {
       updateAuthStatus();
-      return;
+      return { ok: true, staleCleared: false };
     }
 
     try {
       const res = await fetch(`${API}/me`, { headers: headers(false) });
-      if (!res.ok) throw new Error("me failed");
-
       const data = await res.json().catch(() => ({}));
+
+      if (res.status === 401) {
+        invalidateSessionFrom401();
+        return { ok: false, staleCleared: true };
+      }
+
+      if (!res.ok) throw new Error("me failed");
 
       state.username = data.username || state.username;
       updatePlanUI(
@@ -2106,8 +2146,10 @@
 
       persistAuth();
       updateTopbarStatus();
+      return { ok: true, staleCleared: false };
     } catch {
       updateTopbarStatus();
+      return { ok: false, staleCleared: false };
     }
   }
 
@@ -2325,11 +2367,17 @@
     setSending(false);
 
     await healthCheck();
-    await hydrateMe();
+    const meResult = await hydrateMe();
     await loadDashboardSummary();
     await loadIntegrations();
 
-    if (!state.username) {
+    if (meResult?.staleCleared) {
+      setNotice(
+        "warning",
+        "Session reset",
+        "Your saved login no longer matches an account on this server. Log in again to use billing and Stripe."
+      );
+    } else if (!state.username) {
       setNotice("info", "Preview access", "Preview ready. Run a customer issue or create an account.");
     } else {
       setNotice("success", "Workspace synced", `Signed in as ${state.username}. The operator workspace is ready.`);
