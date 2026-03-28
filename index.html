@@ -124,7 +124,7 @@
       position:absolute;
       left:0;
       right:0;
-      pointer-events:none;
+      pointer-events:none !important;
       z-index:3;
       opacity:0;
       transition:opacity .18s ease;
@@ -937,7 +937,8 @@
   <canvas id="fluid"></canvas>
 
   <div class="app">
-    <aside class="sidebar glass scroll-shell" id="sidebarShell" data-show-top="false" data-show-bottom="false">
+    <!-- Sidebar omits scroll-shell so bottom/top fade pseudo-elements cannot intercept clicks on Integrations / Stripe controls. -->
+    <aside class="sidebar glass" id="sidebarShell" data-show-top="false" data-show-bottom="false">
       <div class="sidebar-scroll scroll-area" id="sidebarScroll">
         <div class="sidebar-inner">
 
