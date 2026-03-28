@@ -56,8 +56,6 @@
     limit: 50,
     remaining: 50,
     sending: false,
-    latestAction: "",
-    latestStatus: "",
     actionsCount: 0,
     totalInteractions: 0,
     avgConfidence: 0,
@@ -72,15 +70,27 @@
         <path d="M3 11V3a1 1 0 011-1h8"></path>
       </svg>
     `,
+    check: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 8l3.5 3.5L13 4"></path>
+      </svg>
+    `,
     send: `
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M13.5 2.5L7 9"></path>
         <path d="M13.5 2.5L9 13.5 7 9l-4.5-2 11-5z"></path>
       </svg>
     `,
-    check: `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 8l3.5 3.5L13 4"></path>
+    spark: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 1.8l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2 1.2-3Z"></path>
+        <path d="M12.4 10.8l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6Z"></path>
+      </svg>
+    `,
+    person: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="8" cy="5.5" r="2.5"></circle>
+        <path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5"></path>
       </svg>
     `,
     refund: `
@@ -113,21 +123,14 @@
         <path d="M11.5 10V7.5"></path>
       </svg>
     `,
-    spark: `
+    shield: `
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M8 1.8l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2 1.2-3Z"></path>
-        <path d="M12.4 10.8l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6Z"></path>
+        <path d="M8 2L3 4v4c0 3 2.5 5.5 5 6 2.5-.5 5-3 5-6V4L8 2z"></path>
       </svg>
     `,
-    crown: `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M2 12.5h12"></path>
-        <path d="M3 12.5 2.2 5.5l3.4 2.4L8 3l2.4 4.9 3.4-2.4-.8 7"></path>
-      </svg>
-    `,
-    bolt: `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M8.8 1.5 3.5 8h3.2L6.1 14.5 12.5 7.2H9.2l-.4-5.7Z"></path>
+    pulse: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M1 8h2.5l2-4.5 2.5 9L10 6l1.5 2H15"></path>
       </svg>
     `,
     money: `
@@ -137,33 +140,17 @@
         <path d="M4.5 9h-.5M12 9h-.5"></path>
       </svg>
     `,
-    shield: `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M8 2L3 4v4c0 3 2.5 5.5 5 6 2.5-.5 5-3 5-6V4L8 2z"></path>
-      </svg>
-    `,
-    search: `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="6.5" cy="6.5" r="4"></circle>
-        <path d="M13 13l-3-3"></path>
-      </svg>
-    `,
-    person: `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="8" cy="5.5" r="2.5"></circle>
-        <path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5"></path>
-      </svg>
-    `,
-    pulse: `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M1 8h2.5l2-4.5 2.5 9L10 6l1.5 2H15"></path>
-      </svg>
-    `,
     warn: `
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M8 2L1.5 13h13L8 2z"></path>
         <path d="M8 6v3.5"></path>
         <path d="M8 11.5h.01"></path>
+      </svg>
+    `,
+    ticket: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M2.5 5.2V4A1.5 1.5 0 014 2.5h8A1.5 1.5 0 0113.5 4v1.2a1.7 1.7 0 010 5.6V12A1.5 1.5 0 0112 13.5H4A1.5 1.5 0 012.5 12v-1.2a1.7 1.7 0 010-5.6Z"></path>
+        <path d="M8 5v6"></path>
       </svg>
     `,
     clock: `
@@ -176,12 +163,6 @@
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="4" width="10" height="8" rx="1.8"></rect>
         <path d="M5 2.5v2M8 2.5v2M11 2.5v2M5 12v1.5M8 12v1.5M11 12v1.5M1.5 6h1.5M1.5 10h1.5M13 6h1.5M13 10h1.5"></path>
-      </svg>
-    `,
-    ticket: `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M2.5 5.2V4A1.5 1.5 0 014 2.5h8A1.5 1.5 0 0113.5 4v1.2a1.7 1.7 0 010 5.6V12A1.5 1.5 0 0112 13.5H4A1.5 1.5 0 012.5 12v-1.2a1.7 1.7 0 010-5.6Z"></path>
-        <path d="M8 5v6"></path>
       </svg>
     `
   };
@@ -198,18 +179,19 @@
         gap:10px;
         animation:xalvionIn .22s cubic-bezier(.22,1,.36,1) both;
       }
-      .msg-group.user{align-items:flex-end;}
-      .msg-group.assistant{align-items:flex-start;}
+
+      .msg-group.user{align-items:flex-end}
+      .msg-group.assistant{align-items:flex-start}
 
       @keyframes xalvionIn{
-        from{opacity:0;transform:translateY(10px) scale(.99);}
-        to{opacity:1;transform:translateY(0) scale(1);}
+        from{opacity:0;transform:translateY(10px) scale(.99)}
+        to{opacity:1;transform:translateY(0) scale(1)}
       }
 
       .msg-card{
-        width:min(920px, 100%);
-        max-width:min(920px, 100%);
-        border-radius:20px;
+        width:min(920px,100%);
+        max-width:min(920px,100%);
+        border-radius:22px;
         border:1px solid rgba(255,255,255,.07);
         overflow:hidden;
         box-shadow:0 18px 44px rgba(0,0,0,.16);
@@ -234,7 +216,7 @@
         align-items:center;
         justify-content:space-between;
         gap:10px;
-        padding:12px 14px 10px;
+        padding:13px 15px 11px;
         border-bottom:1px solid rgba(255,255,255,.05);
       }
 
@@ -247,25 +229,25 @@
         text-transform:uppercase;
         letter-spacing:.12em;
         color:rgba(188,202,240,.58);
-        font-weight:700;
+        font-weight:800;
       }
 
       .msg-badge{
-        width:20px;
-        height:20px;
-        border-radius:7px;
+        width:22px;
+        height:22px;
+        border-radius:8px;
         display:flex;
         align-items:center;
         justify-content:center;
         background:rgba(255,255,255,.05);
         border:1px solid rgba(255,255,255,.07);
-        flex:0 0 20px;
+        flex:0 0 22px;
       }
 
       .msg-badge svg{
-        width:11px;
-        height:11px;
-        opacity:.9;
+        width:12px;
+        height:12px;
+        opacity:.92;
       }
 
       .msg-time{
@@ -277,16 +259,16 @@
       }
 
       .msg-body{
-        padding:15px 15px 13px;
+        padding:16px 16px 14px;
         display:flex;
         flex-direction:column;
         gap:12px;
       }
 
       .reply-text{
-        font-size:14px;
-        line-height:1.76;
-        color:rgba(239,244,255,.96);
+        font-size:15px;
+        line-height:1.8;
+        color:rgba(239,244,255,.97);
         word-break:break-word;
       }
 
@@ -296,36 +278,11 @@
         gap:10px;
       }
 
-      .empty-state{
-        border:1px dashed rgba(255,255,255,.09);
-        background:rgba(255,255,255,.025);
-        color:rgba(204,216,248,.58);
-        border-radius:18px;
-        padding:20px 18px;
-        display:flex;
-        flex-direction:column;
-        gap:8px;
-        align-items:flex-start;
-        max-width:720px;
-      }
-
-      .empty-state strong{
-        font-size:13px;
-        letter-spacing:.02em;
-        color:rgba(242,246,255,.94);
-      }
-
-      .empty-state span{
-        font-size:13px;
-        line-height:1.65;
-      }
-
       .assistant-tools{
         display:flex;
         align-items:center;
         gap:8px;
         flex-wrap:wrap;
-        margin-top:2px;
       }
 
       .mini-btn{
@@ -420,7 +377,7 @@
         font-size:11px;
         letter-spacing:.08em;
         text-transform:uppercase;
-        font-weight:700;
+        font-weight:800;
         transition:all .18s ease;
       }
 
@@ -453,6 +410,54 @@
       .stream-step.done .stream-step-dot{
         background:#34d399;
         box-shadow:0 0 10px rgba(52,211,153,.55);
+      }
+
+      .typing{
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+      }
+
+      .typing-dot{
+        width:6px;
+        height:6px;
+        border-radius:50%;
+        background:rgba(220,232,255,.52);
+        animation:xalvionTyping 1s infinite ease-in-out;
+      }
+
+      .typing-dot:nth-child(2){animation-delay:.12s}
+      .typing-dot:nth-child(3){animation-delay:.24s}
+
+      @keyframes xalvionTyping{
+        0%,80%,100%{transform:translateY(0);opacity:.4}
+        40%{transform:translateY(-3px);opacity:1}
+      }
+
+      .run-summary{
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+      }
+
+      .run-chip{
+        display:inline-flex;
+        align-items:center;
+        gap:7px;
+        min-height:28px;
+        padding:0 10px;
+        border-radius:999px;
+        border:1px solid rgba(255,255,255,.07);
+        background:rgba(255,255,255,.035);
+        color:rgba(220,230,252,.84);
+        font-size:11px;
+        font-weight:700;
+      }
+
+      .run-chip svg{
+        width:11px;
+        height:11px;
+        opacity:.86;
       }
 
       .memory-card{
@@ -504,32 +509,6 @@
         color:rgba(225,233,252,.82);
         font-size:11px;
         line-height:1.3;
-      }
-
-      .run-summary{
-        display:flex;
-        flex-wrap:wrap;
-        gap:8px;
-      }
-
-      .run-chip{
-        display:inline-flex;
-        align-items:center;
-        gap:7px;
-        min-height:28px;
-        padding:0 10px;
-        border-radius:999px;
-        border:1px solid rgba(255,255,255,.07);
-        background:rgba(255,255,255,.035);
-        color:rgba(220,230,252,.84);
-        font-size:11px;
-        font-weight:700;
-      }
-
-      .run-chip svg{
-        width:11px;
-        height:11px;
-        opacity:.86;
       }
 
       .action-visibility{
@@ -706,7 +685,7 @@
 
       .impact-grid{
         display:grid;
-        grid-template-columns:repeat(2, minmax(0, 1fr));
+        grid-template-columns:repeat(2,minmax(0,1fr));
         gap:8px;
       }
 
@@ -758,26 +737,28 @@
         height:12px;
       }
 
-      .typing{
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
+      .empty-state{
+        border:1px dashed rgba(255,255,255,.09);
+        background:rgba(255,255,255,.025);
+        color:rgba(204,216,248,.58);
+        border-radius:18px;
+        padding:20px 18px;
+        display:flex;
+        flex-direction:column;
+        gap:8px;
+        align-items:flex-start;
+        max-width:720px;
       }
 
-      .typing-dot{
-        width:6px;
-        height:6px;
-        border-radius:50%;
-        background:rgba(220,232,255,.52);
-        animation:xalvionTyping 1s infinite ease-in-out;
+      .empty-state strong{
+        font-size:13px;
+        letter-spacing:.02em;
+        color:rgba(242,246,255,.94);
       }
 
-      .typing-dot:nth-child(2){animation-delay:.12s;}
-      .typing-dot:nth-child(3){animation-delay:.24s;}
-
-      @keyframes xalvionTyping{
-        0%,80%,100%{transform:translateY(0);opacity:.4;}
-        40%{transform:translateY(-3px);opacity:1;}
+      .empty-state span{
+        font-size:13px;
+        line-height:1.65;
       }
 
       .rev-card,.ops-card{
@@ -861,15 +842,6 @@
         flex:0 0 12px;
       }
 
-      .notice-detail.ticker{
-        animation:xalvionNoticeTicker linear infinite;
-      }
-
-      @keyframes xalvionNoticeTicker{
-        0%{transform:translateX(0)}
-        100%{transform:translateX(-50%)}
-      }
-
       .composer-live{
         box-shadow:0 0 0 1px rgba(96,165,250,.20), 0 0 26px rgba(96,165,250,.10);
       }
@@ -885,8 +857,8 @@
       }
 
       @media (max-width: 720px){
-        .msg-card{width:100%;}
-        .impact-grid,.rev-grid,.ops-grid{grid-template-columns:1fr;}
+        .msg-card{width:100%}
+        .impact-grid,.rev-grid,.ops-grid{grid-template-columns:1fr}
       }
     `;
     document.head.appendChild(style);
@@ -942,9 +914,7 @@
     try {
       if (value) localStorage.setItem(DRAFT_KEY, value);
       else localStorage.removeItem(DRAFT_KEY);
-    } catch {
-      // ignore storage errors
-    }
+    } catch {}
   }
 
   function formatTier(value) {
@@ -970,11 +940,11 @@
   function planCopy(tier) {
     switch (String(tier || "free").toLowerCase()) {
       case "pro":
-        return "Priority routing, larger history, and stronger support throughput for real ticket volume.";
+        return "Priority handling, larger usage limits, and a more serious operating surface for real support volume.";
       case "elite":
-        return "Maximum capacity, premium routing, and the strongest Xalvion workspace controls.";
+        return "Maximum capacity, premium control, and the strongest Xalvion operator environment.";
       default:
-        return "Starter capacity with visible pressure so the product sells its own upgrade path.";
+        return "Entry access with clear capacity limits and a visible upgrade path when usage pressure builds.";
     }
   }
 
@@ -994,19 +964,6 @@
     els.notice.classList.add(kind || "info");
     setText(els.noticeTitle, title);
     setText(els.noticeDetail, detail);
-
-    if (els.noticeDetail) {
-      els.noticeDetail.classList.remove("ticker");
-      const text = String(detail || "");
-      const shouldTicker = text.length > 96;
-      if (shouldTicker) {
-        els.noticeDetail.classList.add("ticker");
-        const duration = Math.max(10, Math.ceil(text.length / 7));
-        els.noticeDetail.style.animationDuration = `${duration}s`;
-      } else {
-        els.noticeDetail.style.animationDuration = "";
-      }
-    }
   }
 
   function updateBackendStatus(ok) {
@@ -1023,7 +980,6 @@
 
   function updateStreamStatus(text = "Response: ready") {
     setText(els.streamStatus, text);
-    state.latestStatus = text;
   }
 
   function updatePlanUI(tier = state.tier, usage = state.usage, limit = state.limit, remaining = state.remaining) {
@@ -1036,6 +992,7 @@
     setText(els.planUsage, `${state.usage} / ${state.limit}`);
     setText(els.planUsed, `Used ${state.usage}`);
     setText(els.planRemaining, `Remaining ${state.remaining}`);
+
     if (els.planBar) {
       const width = Math.min(100, Math.max(0, (state.usage / Math.max(1, state.limit)) * 100));
       els.planBar.style.width = `${width}%`;
@@ -1048,28 +1005,64 @@
     persistAuth();
   }
 
+  function actionIcon(action) {
+    switch (String(action || "none").toLowerCase()) {
+      case "refund":
+        return ICONS.refund;
+      case "credit":
+        return ICONS.credit;
+      case "review":
+        return ICONS.review;
+      default:
+        return ICONS.status;
+    }
+  }
+
+  function actionTone(data) {
+    if (String(data?.action || "").toLowerCase() === "review") return "warning";
+    if (String(data?.tool_status || "").toLowerCase().includes("error")) return "warning";
+    if (String(data?.action || "").toLowerCase() === "none") return "info";
+    return "success";
+  }
+
+  function actionLabel(data) {
+    const action = String(data?.action || "none").toLowerCase();
+    const amount = Number(data?.amount || 0);
+
+    if (action === "refund") return amount > 0 ? `Refunded ${formatMoney(amount)}` : "Refund processed";
+    if (action === "credit") return amount > 0 ? `Credited ${formatMoney(amount)}` : "Credit applied";
+    if (action === "review") return "Escalated to review";
+    return "Response only";
+  }
+
+  function queueLabel(value) {
+    const label = String(value || "new").replaceAll("_", " ");
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
   function updateTopbarStatus() {
     if (els.workspaceHeadline) {
       els.workspaceHeadline.textContent = state.username
         ? `AI support operator for ${state.username}`
-        : "AI support that decides, acts, and explains itself";
+        : "AI support that resolves cases with visible reasoning and controlled action flow";
     }
 
     if (els.workspaceSubcopy) {
       if (state.latestRun) {
+        const decision = state.latestRun.decision || {};
         els.workspaceSubcopy.textContent =
-          `${formatTier(state.tier)} plan · ${actionLabel(state.latestRun)} · ${queueLabel(state.latestRun?.decision?.queue || "new")} queue · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
+          `${formatTier(state.tier)} plan · ${actionLabel(state.latestRun)} · ${queueLabel(decision.queue || "new")} queue · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
       } else {
         els.workspaceSubcopy.textContent = state.username
-          ? `${formatTier(state.tier)} plan · live response loop · action visibility · decision confidence.`
-          : "Guest preview · response ready · action visibility and monetization pressure in one workspace.";
+          ? `${formatTier(state.tier)} plan · live response loop · action visibility · premium support execution.`
+          : "Guest preview · response ready · visible action handling and premium support presentation.";
       }
     }
 
     if (els.brandSubcopy) {
       els.brandSubcopy.textContent = state.username
-        ? `Signed in as ${state.username}. The workspace is keeping plan state and support history persistent.`
-        : "Fast, clear support responses with the right next step built in.";
+        ? `Signed in as ${state.username}. Workspace state, plan data, and support activity stay persistent.`
+        : "Premium AI support operations with visible action handling and a cleaner customer-ready surface.";
     }
 
     updateAuthStatus();
@@ -1080,17 +1073,17 @@
 
     if (!data) {
       els.systemPanelCopy.textContent =
-        "This panel is meant to surface plan pressure, action readiness, and system credibility in one glance.";
+        "Use a common case type to prefill the composer and test response quality quickly.";
       return;
     }
 
     const decision = data.decision || {};
     const triage = data.triage || {};
     const parts = [
-      `${actionLabel(data)} was selected`,
+      `${actionLabel(data)} selected`,
       `${queueLabel(decision.queue || "new")} queue`,
       `${String(decision.risk_level || triage.risk_level || "medium")} risk`,
-      `${decision.requires_approval ? "manual approval required" : "safe to continue"}`
+      `${decision.requires_approval ? "approval gate active" : "safe to continue"}`
     ];
 
     els.systemPanelCopy.textContent = parts.join(" · ");
@@ -1150,10 +1143,7 @@
       </div>
     `;
 
-    if (isPlaceholder) {
-      card.dataset.placeholder = "true";
-    }
-
+    if (isPlaceholder) card.dataset.placeholder = "true";
     wrapper.appendChild(card);
     return wrapper;
   }
@@ -1166,7 +1156,7 @@
     empty.className = "empty-state";
     empty.innerHTML = `
       <strong>Workspace ready</strong>
-      <span>Run a support issue through the composer below. Responses will stream into this thread with action state, confidence, and business context.</span>
+      <span>Run a support case below and stream the response into this thread with readable action context and premium presentation.</span>
     `;
     els.messages.appendChild(empty);
   }
@@ -1225,7 +1215,6 @@
 
   function createConfidenceBadge(confidence) {
     const value = Number(confidence || 0);
-
     let cls = "safe";
     if (value < 0.5) cls = "risky";
     else if (value < 0.75) cls = "review";
@@ -1264,43 +1253,7 @@
   }
 
   function removeStreamSteps(el) {
-    if (!el) return;
-    el.remove();
-  }
-
-  function actionIcon(action) {
-    switch (String(action || "none").toLowerCase()) {
-      case "refund":
-        return ICONS.refund;
-      case "credit":
-        return ICONS.credit;
-      case "review":
-        return ICONS.review;
-      default:
-        return ICONS.status;
-    }
-  }
-
-  function actionTone(data) {
-    if (String(data?.action || "").toLowerCase() === "review") return "warning";
-    if (String(data?.tool_status || "").toLowerCase().includes("error")) return "warning";
-    if (String(data?.action || "").toLowerCase() === "none") return "info";
-    return "success";
-  }
-
-  function actionLabel(data) {
-    const action = String(data?.action || "none").toLowerCase();
-    const amount = Number(data?.amount || 0);
-
-    if (action === "refund") return amount > 0 ? `Refunded ${formatMoney(amount)}` : "Refund triggered";
-    if (action === "credit") return amount > 0 ? `Credited ${formatMoney(amount)}` : "Credit applied";
-    if (action === "review") return "Escalated to review";
-    return "Response only";
-  }
-
-  function queueLabel(value) {
-    const label = String(value || "new").replaceAll("_", " ");
-    return label.charAt(0).toUpperCase() + label.slice(1);
+    if (el) el.remove();
   }
 
   function memorySummary(history = {}) {
@@ -1386,7 +1339,7 @@
       </div>
       <div class="impact-box">
         <div class="impact-label">Saved</div>
-        <div class="impact-value">${formatMoney(impact.money_saved || impact.amount || 0)}</div>
+        <div class="impact-value">${formatMoney(impact.money_saved || impact.amount || data.amount || 0)}</div>
       </div>
       <div class="impact-box">
         <div class="impact-label">Tool status</div>
@@ -1407,9 +1360,9 @@
     const impact = data.impact || {};
 
     const bodyLine = (() => {
-      if (data.action === "refund") return `The AI approved a refund for ${formatMoney(data.amount || 0)} and drafted the customer-ready answer.`;
-      if (data.action === "credit") return `The AI issued a credit for ${formatMoney(data.amount || 0)} and positioned it as a retention move.`;
-      if (data.action === "review") return `The AI escalated this case for manual review instead of automating a risky action.`;
+      if (data.action === "refund") return `The AI approved a refund for ${formatMoney(data.amount || 0)} and prepared the customer-safe response.`;
+      if (data.action === "credit") return `The AI issued a credit for ${formatMoney(data.amount || 0)} and framed it as a retention move.`;
+      if (data.action === "review") return `The AI escalated this case for manual review instead of taking a risky automated action.`;
       return `The AI drafted a response without taking a direct monetary action.`;
     })();
 
@@ -1448,27 +1401,14 @@
     const refundLikelihood = Number(triage.refund_likelihood || 0);
     const abuseLikelihood = Number(triage.abuse_likelihood || 0);
 
-    if (action === "review") {
-      chips.push({ icon: ICONS.review, text: "Manual approval next" });
-    } else if (action === "refund") {
-      chips.push({ icon: ICONS.refund, text: "Confirm refund notification" });
-    } else if (action === "credit") {
-      chips.push({ icon: ICONS.credit, text: "Watch retention response" });
-    } else {
-      chips.push({ icon: ICONS.spark, text: "Reply sent cleanly" });
-    }
+    if (action === "review") chips.push({ icon: ICONS.review, text: "Manual approval next" });
+    else if (action === "refund") chips.push({ icon: ICONS.refund, text: "Refund notification next" });
+    else if (action === "credit") chips.push({ icon: ICONS.credit, text: "Retention follow-up next" });
+    else chips.push({ icon: ICONS.spark, text: "Reply sent cleanly" });
 
-    if (decision.priority === "high") {
-      chips.push({ icon: ICONS.warn, text: "High priority ticket" });
-    }
-
-    if (refundLikelihood >= 60) {
-      chips.push({ icon: ICONS.money, text: "Refund pressure elevated" });
-    }
-
-    if (abuseLikelihood >= 50) {
-      chips.push({ icon: ICONS.shield, text: "Fraud caution active" });
-    }
+    if (decision.priority === "high") chips.push({ icon: ICONS.warn, text: "High priority case" });
+    if (refundLikelihood >= 60) chips.push({ icon: ICONS.money, text: "Refund pressure elevated" });
+    if (abuseLikelihood >= 50) chips.push({ icon: ICONS.shield, text: "Fraud caution active" });
 
     if (!chips.length) return null;
 
@@ -1497,9 +1437,7 @@
         await navigator.clipboard.writeText(replyText || "");
         copyBtn.innerHTML = ICONS.check;
         window.setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 1200);
-      } catch {
-        // ignore clipboard failures
-      }
+      } catch {}
     });
 
     tools.appendChild(copyBtn);
@@ -1522,7 +1460,7 @@
   function autoResizeTextarea() {
     if (!els.messageInput) return;
     els.messageInput.style.height = "auto";
-    els.messageInput.style.height = `${Math.min(220, Math.max(44, els.messageInput.scrollHeight))}px`;
+    els.messageInput.style.height = `${Math.min(240, Math.max(50, els.messageInput.scrollHeight))}px`;
   }
 
   function setSending(value) {
@@ -1530,8 +1468,12 @@
 
     if (els.sendBtn) {
       els.sendBtn.disabled = state.sending;
-      els.sendBtn.classList.toggle("busy", state.sending);
-      els.sendBtn.innerHTML = state.sending ? ICONS.status : ICONS.send;
+      els.sendBtn.innerHTML = state.sending ? ICONS.status : `
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13.5 2.5L7 9"></path>
+          <path d="M13.5 2.5L9 13.5 7 9l-4.5-2 11-4.5Z"></path>
+        </svg>
+      `;
       els.sendBtn.setAttribute("aria-label", state.sending ? "Sending" : "Send message");
     }
 
@@ -1563,9 +1505,7 @@
 
       try {
         events.push({ event: eventName, data: JSON.parse(dataValue) });
-      } catch {
-        // ignore malformed chunks
-      }
+      } catch {}
     }
 
     return events;
@@ -1618,12 +1558,14 @@
 
           if (item.event === "status") {
             const stage = String(item.data.stage || "");
-            state.latestStatus = item.data.label || stage || "";
+            const label = item.data.label || stage || "streaming";
+
             if (stage === "reviewing") advanceStreamStep(stepsEl, 0);
             else if (stage === "routing") advanceStreamStep(stepsEl, 1);
             else if (stage === "acting" || stage === "responding") advanceStreamStep(stepsEl, 2);
             else if (stage === "finalizing") advanceStreamStep(stepsEl, 3);
-            updateStreamStatus(`Response: ${state.latestStatus || "streaming"}`);
+
+            updateStreamStatus(`Response: ${label}`);
           }
 
           if (item.event === "result") {
@@ -1636,9 +1578,7 @@
     if (buffer.trim()) {
       const parsedEvents = parseSseEvents(buffer);
       for (const item of parsedEvents) {
-        if (item.event === "result") {
-          finalData = item.data;
-        }
+        if (item.event === "result") finalData = item.data;
       }
     }
 
@@ -1650,6 +1590,7 @@
     state.avgConfidence = state.totalInteractions === 1
       ? Number(data.confidence || 0)
       : ((state.avgConfidence * (state.totalInteractions - 1)) + Number(data.confidence || 0)) / state.totalInteractions;
+
     state.avgQuality = state.totalInteractions === 1
       ? Number(data.quality || 0)
       : ((state.avgQuality * (state.totalInteractions - 1)) + Number(data.quality || 0)) / state.totalInteractions;
@@ -1675,7 +1616,7 @@
       <div class="panel-head">
         <div>
           <div class="panel-title">Latest run</div>
-          <div class="panel-copy">Make the AI’s operational output visible, not hidden behind the reply.</div>
+          <div class="panel-copy">Visible operating output makes the product feel real, not hidden behind a reply.</div>
         </div>
       </div>
       <div class="ops-grid">
@@ -1699,11 +1640,8 @@
       <div class="ops-run-line" id="opsRunNarrative">${ICONS.spark}<span>Waiting for the next support run.</span></div>
     `;
 
-    if (els.railInner) {
-      els.railInner.appendChild(card);
-    } else if (els.usageCard?.parentElement) {
-      els.usageCard.parentElement.appendChild(card);
-    }
+    if (els.railInner) els.railInner.appendChild(card);
+    else if (els.usageCard?.parentElement) els.usageCard.parentElement.appendChild(card);
 
     return card;
   }
@@ -1725,10 +1663,12 @@
     if (latestQueue) latestQueue.textContent = queueLabel(decision.queue || "new");
     if (latestConfidence) latestConfidence.textContent = formatMetric(data.confidence || 0, 2);
     if (latestValue) latestValue.textContent = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
+
     if (latestNarrative) {
-      latestNarrative.innerHTML = `${ICONS.spark}<span>${escapeHtml(
-        `${data.reason || "No explicit reasoning returned."} · ${decision.requires_approval ? "Approval gate active" : "Automated flow complete"} · ${String(decision.risk_level || triage.risk_level || "medium")} risk.`
-      )}</span>`;
+      const reason = data.reason || "No explicit reasoning returned.";
+      const approval = decision.requires_approval ? "Approval gate active" : "Automated flow complete";
+      const risk = String(decision.risk_level || triage.risk_level || "medium");
+      latestNarrative.innerHTML = `${ICONS.spark}<span>${escapeHtml(`${reason} · ${approval} · ${risk} risk.`)}</span>`;
     }
   }
 
@@ -1743,7 +1683,7 @@
         <div class="panel-head">
           <div>
             <div class="panel-title">Revenue layer</div>
-            <div class="panel-copy">Make the business effect of every AI decision visible in the workspace.</div>
+            <div class="panel-copy">The business effect of each decision should be visible inside the workspace.</div>
           </div>
         </div>
         <div class="rev-grid">
@@ -1768,11 +1708,8 @@
         <div class="panel-copy" id="revRoiLabel">Processing first tickets…</div>
       `;
 
-      if (els.railInner) {
-        els.railInner.appendChild(card);
-      } else if (els.usageCard?.parentElement) {
-        els.usageCard.parentElement.appendChild(card);
-      }
+      if (els.railInner) els.railInner.appendChild(card);
+      else if (els.usageCard?.parentElement) els.usageCard.parentElement.appendChild(card);
     }
 
     const impact = data.impact || {};
@@ -1798,11 +1735,82 @@
     if (revRefunds) revRefunds.textContent = formatMoney(refundTotal);
     if (revChurn) revChurn.textContent = String(churnSaved ? 1 : 0);
     if (revBar) revBar.style.width = `${Math.min(100, autoRate)}%`;
+
     if (revRoiLabel) {
       revRoiLabel.textContent = moneySaved > 0
         ? `${formatMoney(moneySaved)} of visible value was protected on this case.`
-        : "The workspace is collecting action value as tickets are processed.";
+        : "The workspace is collecting business impact as support runs complete.";
     }
+  }
+
+  function buildKeyboardOverlay() {
+    if (document.getElementById("xalvionShortcutOverlay")) return;
+
+    const overlay = document.createElement("div");
+    overlay.id = "xalvionShortcutOverlay";
+    overlay.style.cssText = `
+      position:fixed;
+      inset:0;
+      background:rgba(6,8,15,.66);
+      backdrop-filter:blur(16px);
+      z-index:99;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    `;
+
+    overlay.innerHTML = `
+      <div style="
+        width:min(560px,100%);
+        border-radius:24px;
+        border:1px solid rgba(255,255,255,.08);
+        background:linear-gradient(180deg, rgba(18,22,34,.88), rgba(9,13,25,.92));
+        box-shadow:0 30px 80px rgba(0,0,0,.34);
+        padding:20px;
+        color:rgba(245,248,255,.97);
+      ">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;">
+          <div style="font-size:16px;font-weight:800;letter-spacing:-.02em;">Workspace shortcuts</div>
+          <button id="xalvionShortcutClose" type="button" style="
+            width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.08);
+            background:rgba(255,255,255,.04);color:#fff;cursor:pointer;
+          ">×</button>
+        </div>
+        <div style="display:grid;gap:10px;">
+          ${[
+            ["?", "Open this shortcut panel"],
+            ["/", "Focus the composer"],
+            ["Ctrl/Cmd + Enter", "Send current message"],
+            ["N", "Start a fresh thread"],
+            ["D", "Load preview access demo"],
+            ["E", "Export current thread"]
+          ].map(([key, desc]) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);">
+              <div style="font-size:13px;color:rgba(224,234,255,.9);">${escapeHtml(desc)}</div>
+              <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:rgba(196,211,248,.74);">${escapeHtml(key)}</div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const closeBtn = document.getElementById("xalvionShortcutClose");
+    closeBtn?.addEventListener("click", () => {
+      overlay.style.display = "none";
+    });
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) overlay.style.display = "none";
+    });
+  }
+
+  function toggleKeyboardOverlay(show) {
+    const overlay = document.getElementById("xalvionShortcutOverlay");
+    if (!overlay) return;
+    overlay.style.display = show ? "flex" : "none";
   }
 
   async function sendMessage() {
@@ -1826,7 +1834,7 @@
     if (replyNode) replyNode.parentElement.insertBefore(stepsEl, replyNode);
 
     setSending(true);
-    setNotice("info", "Running support case", "Streaming action states from the support pipeline.");
+    setNotice("info", "Running support case", "Streaming live action states from the support pipeline.");
 
     const stepTimers = [
       window.setTimeout(() => advanceStreamStep(stepsEl, 1), 600),
@@ -1896,7 +1904,7 @@
       updateTopbarStatus();
       setNotice(
         data.action === "review" ? "warning" : "success",
-        data.action === "review" ? "Manual review triggered" : "Ticket processed",
+        data.action === "review" ? "Manual review triggered" : "Case processed",
         replyText
       );
     } catch (error) {
@@ -1930,7 +1938,7 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "Signup failed.");
 
-      setNotice("success", "Account created", "Now log in to keep usage and workspace state persistent.");
+      setNotice("success", "Account created", "Log in to keep usage, plan status, and workspace state persistent.");
       state.tier = data.tier || "free";
       updatePlanUI(state.tier, 0, 50, 50);
       updateTopbarStatus();
@@ -2047,9 +2055,7 @@
       }
 
       const data = await res.json().catch(() => ({}));
-      if (data?.status === "ok") {
-        updateBackendStatus(true);
-      }
+      if (data?.status === "ok") updateBackendStatus(true);
     } catch {
       updateBackendStatus(false);
       setNotice("error", "Backend unavailable", "The API is not responding right now. Reload when the deployment is live.");
@@ -2146,9 +2152,7 @@
     els.messages.querySelectorAll(".msg-card").forEach((card) => {
       const who = card.querySelector(".msg-who span:last-child")?.textContent || "Message";
       const text = card.querySelector(".js-reply-text")?.textContent || "";
-      if (text.trim()) {
-        lines.push(`${who}: ${text.trim()}`);
-      }
+      if (text.trim()) lines.push(`${who}: ${text.trim()}`);
     });
 
     if (!lines.length) {
@@ -2167,78 +2171,6 @@
     URL.revokeObjectURL(url);
 
     setNotice("success", "Thread exported", "The current workspace thread was downloaded as a text file.");
-  }
-
-  function buildKeyboardOverlay() {
-    if (document.getElementById("xalvionShortcutOverlay")) return;
-
-    const overlay = document.createElement("div");
-    overlay.id = "xalvionShortcutOverlay";
-    overlay.style.cssText = `
-      position:fixed;
-      inset:0;
-      background:rgba(6,8,15,.66);
-      backdrop-filter:blur(16px);
-      z-index:99;
-      display:none;
-      align-items:center;
-      justify-content:center;
-      padding:20px;
-    `;
-
-    overlay.innerHTML = `
-      <div style="
-        width:min(560px,100%);
-        border-radius:24px;
-        border:1px solid rgba(255,255,255,.08);
-        background:linear-gradient(180deg, rgba(18,22,34,.88), rgba(9,13,25,.92));
-        box-shadow:0 30px 80px rgba(0,0,0,.34);
-        padding:20px;
-        color:rgba(245,248,255,.97);
-      ">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;">
-          <div style="font-size:16px;font-weight:800;letter-spacing:-.02em;">Workspace shortcuts</div>
-          <button id="xalvionShortcutClose" type="button" style="
-            width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.08);
-            background:rgba(255,255,255,.04);color:#fff;cursor:pointer;
-          ">×</button>
-        </div>
-        <div style="display:grid;gap:10px;">
-          ${[
-            ["?", "Open this shortcut panel"],
-            ["/", "Focus the composer"],
-            ["Ctrl/Cmd + Enter", "Send current message"],
-            ["N", "Start a fresh thread"],
-            ["D", "Load preview access demo"],
-            ["E", "Export current thread"]
-          ].map(([key, desc]) => `
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);">
-              <div style="font-size:13px;color:rgba(224,234,255,.9);">${escapeHtml(desc)}</div>
-              <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:rgba(196,211,248,.74);">${escapeHtml(key)}</div>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    const closeBtn = document.getElementById("xalvionShortcutClose");
-    closeBtn?.addEventListener("click", () => {
-      overlay.style.display = "none";
-    });
-
-    overlay.addEventListener("click", (event) => {
-      if (event.target === overlay) {
-        overlay.style.display = "none";
-      }
-    });
-  }
-
-  function toggleKeyboardOverlay(show) {
-    const overlay = document.getElementById("xalvionShortcutOverlay");
-    if (!overlay) return;
-    overlay.style.display = show ? "flex" : "none";
   }
 
   function bindEvents() {
@@ -2333,6 +2265,7 @@
       if (!typingInField && (event.key === "e" || event.key === "E")) {
         event.preventDefault();
         exportThread();
+        return;
       }
 
       if (event.key === "Escape") {
@@ -2367,7 +2300,7 @@
     await loadDashboardSummary();
 
     if (!state.username) {
-      setNotice("info", "Preview access", "Preview · response ready · service checking completed. Run a customer issue or create an account.");
+      setNotice("info", "Preview access", "Preview ready. Run a customer issue or create an account.");
     } else {
       setNotice("success", "Workspace synced", `Signed in as ${state.username}. The operator workspace is ready.`);
     }
