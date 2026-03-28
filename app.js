@@ -45,7 +45,13 @@
     railInner: document.querySelector(".rail-inner"),
     messagesShell: document.getElementById("messagesShell"),
     upgradeButtons: Array.from(document.querySelectorAll("[data-upgrade]")),
-    fillButtons: Array.from(document.querySelectorAll("[data-fill]"))
+    fillButtons: Array.from(document.querySelectorAll("[data-fill]")),
+    stripeStatus: document.getElementById("stripeStatus"),
+    stripeConnectBtn: document.getElementById("stripeConnectBtn"),
+    stripeDisconnectBtn: document.getElementById("stripeDisconnectBtn"),
+    stripeAccountPill: document.getElementById("stripeAccountPill"),
+    stripeModePill: document.getElementById("stripeModePill"),
+    stripeIntegrationCopy: document.getElementById("stripeIntegrationCopy")
   };
 
   const state = {
@@ -61,7 +67,10 @@
     avgConfidence: 0,
     avgQuality: 0,
     latestRun: null,
-    stickToBottom: true
+    stickToBottom: true,
+    stripeConnected: false,
+    stripeAccountId: "",
+    stripeMode: ""
   };
 
   const ICONS = {
@@ -874,6 +883,139 @@
       default:
         return "Entry access with clear capacity limits and a visible upgrade path when usage pressure builds.";
     }
+  }
+
+  function updateStripeUI() {
+    const connected = Boolean(state.stripeConnected);
+
+    if (els.stripeStatus) {
+      els.stripeStatus.textContent = connected ? "Connected" : "Not connected";
+      els.stripeStatus.classList.toggle("is-connected", connected);
+    }
+
+    if (els.stripeConnectBtn) {
+      els.stripeConnectBtn.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
+      els.stripeConnectBtn.disabled = false;
+    }
+
+    if (els.stripeDisconnectBtn) {
+      els.stripeDisconnectBtn.hidden = !connected;
+      els.stripeDisconnectBtn.disabled = !connected;
+    }
+
+    if (els.stripeAccountPill) {
+      els.stripeAccountPill.textContent = connected && state.stripeAccountId
+        ? state.stripeAccountId
+        : "No account linked";
+    }
+
+    if (els.stripeModePill) {
+      els.stripeModePill.textContent = connected
+        ? (state.stripeMode || "Connected")
+        : "Awaiting connection";
+    }
+
+    if (els.stripeIntegrationCopy) {
+      els.stripeIntegrationCopy.textContent = connected
+        ? "Stripe is connected. Refund execution is now live for this workspace."
+        : "Connect Stripe to execute refunds instead of only preparing them.";
+    }
+  }
+
+  async function loadIntegrations() {
+    if (!state.token) {
+      state.stripeConnected = false;
+      state.stripeAccountId = "";
+      state.stripeMode = "";
+      updateStripeUI();
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/integrations/status`, { headers: headers(false) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Could not load integrations.");
+
+      state.stripeConnected = Boolean(data.stripe_connected);
+      state.stripeAccountId = String(data.stripe_account_id || "");
+      state.stripeMode = String(data.mode || data.stripe_mode || "");
+      updateStripeUI();
+    } catch (error) {
+      state.stripeConnected = false;
+      state.stripeAccountId = "";
+      state.stripeMode = "";
+      updateStripeUI();
+    }
+  }
+
+  async function connectStripe() {
+    if (!state.token || !state.username) {
+      setNotice("warning", "Authentication required", "Log in before connecting Stripe.");
+      return;
+    }
+
+    if (els.stripeConnectBtn) els.stripeConnectBtn.disabled = true;
+
+    try {
+      const res = await fetch(`${API}/integrations/stripe/connect`, { headers: headers(false) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Could not start Stripe connection.");
+      if (!data.url) throw new Error("Missing Stripe connection URL.");
+      window.location.href = data.url;
+    } catch (error) {
+      if (els.stripeConnectBtn) els.stripeConnectBtn.disabled = false;
+      setNotice("error", "Stripe connection failed", error.message || "Could not connect Stripe.");
+    }
+  }
+
+  async function disconnectStripe() {
+    if (!state.token || !state.username) {
+      setNotice("warning", "Authentication required", "Log in before disconnecting Stripe.");
+      return;
+    }
+
+    if (els.stripeDisconnectBtn) els.stripeDisconnectBtn.disabled = true;
+
+    try {
+      const res = await fetch(`${API}/integrations/stripe/disconnect`, {
+        method: "POST",
+        headers: headers()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Could not disconnect Stripe.");
+
+      state.stripeConnected = false;
+      state.stripeAccountId = "";
+      state.stripeMode = "";
+      updateStripeUI();
+      setNotice("success", "Stripe disconnected", "Refund execution has been disabled until Stripe is connected again.");
+    } catch (error) {
+      setNotice("error", "Disconnect failed", error.message || "Could not disconnect Stripe.");
+    } finally {
+      if (els.stripeDisconnectBtn) els.stripeDisconnectBtn.disabled = false;
+    }
+  }
+
+  function hydrateStripeCallbackState() {
+    try {
+      const url = new URL(window.location.href);
+      const stripe = url.searchParams.get("stripe");
+      const detail = url.searchParams.get("detail");
+
+      if (!stripe) return;
+
+      if (stripe === "success") {
+        setNotice("success", "Stripe connected", detail || "Refund execution is now live for this workspace.");
+      } else if (stripe === "cancel") {
+        setNotice("warning", "Stripe connection canceled", detail || "Stripe was not connected.");
+      } else if (stripe === "error") {
+        setNotice("error", "Stripe connection failed", detail || "Could not complete Stripe connection.");
+      }
+
+      url.searchParams.delete("stripe");
+      url.searchParams.delete("detail");
+      window.history.replaceState({}, document.title, url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : "") + url.hash);
+    } catch {}
   }
 
   function refreshMessageShellGlow() {
@@ -1808,6 +1950,7 @@
 
       persistAuth();
       updateTopbarStatus();
+      await loadIntegrations();
       setNotice("success", "Logged in", `Welcome back, ${username}. Your workspace is synced.`);
       await hydrateMe();
       await loadDashboardSummary();
@@ -1826,6 +1969,7 @@
     setNotice("success", "Logged out", "Guest workspace restored.");
     await hydrateMe();
     await loadDashboardSummary();
+    await loadIntegrations();
   }
 
   function activatePreviewAccess() {
@@ -2047,6 +2191,9 @@
       });
     });
 
+    els.stripeConnectBtn?.addEventListener("click", connectStripe);
+    els.stripeDisconnectBtn?.addEventListener("click", disconnectStripe);
+
     els.fillButtons.forEach((button) => {
       button.addEventListener("click", () => {
         const fill = button.dataset.fill || "";
@@ -2109,6 +2256,7 @@
 
   async function init() {
     ensureInjectedStyles();
+    hydrateStripeCallbackState();
     buildKeyboardOverlay();
     ensureOpsCard();
     bindEvents();
@@ -2124,6 +2272,7 @@
     updateSystemNarrative(null);
     updateStreamStatus("Response: ready");
     updateAuthStatus();
+    updateStripeUI();
     addEmptyState();
     scrollMessagesToBottom(true);
     setSending(false);
@@ -2131,6 +2280,7 @@
     await healthCheck();
     await hydrateMe();
     await loadDashboardSummary();
+    await loadIntegrations();
 
     if (!state.username) {
       setNotice("info", "Preview access", "Preview ready. Run a customer issue or create an account.");

@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -42,6 +42,8 @@ from sqlalchemy import (
     Text,
     create_engine,
     func,
+    inspect,
+    text,
 )
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
@@ -78,6 +80,8 @@ ALLOW_DIRECT_BILLING_BYPASS = (
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:8001").rstrip("/")
 CHECKOUT_SUCCESS_URL = os.getenv("CHECKOUT_SUCCESS_URL", f"{FRONTEND_URL}?checkout=success")
 CHECKOUT_CANCEL_URL = os.getenv("CHECKOUT_CANCEL_URL", f"{FRONTEND_URL}?checkout=cancel")
+STRIPE_CONNECT_CLIENT_ID = os.getenv("STRIPE_CONNECT_CLIENT_ID", "").strip()
+STRIPE_CONNECT_REDIRECT_URI = os.getenv("STRIPE_CONNECT_REDIRECT_URI", f"{FRONTEND_URL}/integrations/stripe/callback").strip()
 
 STREAM_CHUNK_SIZE = int(os.getenv("STREAM_CHUNK_SIZE", "18"))
 STREAM_CHUNK_DELAY = float(os.getenv("STREAM_CHUNK_DELAY", "0.02"))
@@ -86,9 +90,6 @@ MAX_AUTO_REFUND = float(os.getenv("MAX_AUTO_REFUND", "50"))
 
 APPROVAL_THRESHOLD = float(os.getenv("APPROVAL_THRESHOLD", "25.00"))
 LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
-
-GUEST_MESSAGE_LIMIT = int(os.getenv("GUEST_MESSAGE_LIMIT", "3"))
-GUEST_WINDOW_SECONDS = int(os.getenv("GUEST_WINDOW_SECONDS", str(60 * 60 * 24 * 30)))
 
 REFUND_RULES: dict[str, Any] = {
     "enabled": True,
@@ -210,7 +211,6 @@ Base = declarative_base()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 _rate_log: dict[str, list[float]] = {}
-_guest_usage_log: dict[str, list[float]] = {}
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,64}$")
 
 
@@ -238,6 +238,10 @@ class User(Base):
     password = Column(String, nullable=False)
     usage = Column(Integer, default=0, nullable=False)
     tier = Column(String, default="free", nullable=False)
+    stripe_connected = Column(Integer, default=0, nullable=False)
+    stripe_account_id = Column(String, nullable=True)
+    stripe_livemode = Column(Integer, default=0, nullable=False)
+    stripe_scope = Column(String, nullable=True)
 
 
 class ActionLog(Base):
@@ -322,6 +326,30 @@ class ProcessedWebhook(Base):
 
 
 Base.metadata.create_all(bind=engine)
+
+
+def ensure_user_columns() -> None:
+    try:
+        inspector = inspect(engine)
+        columns = {col["name"] for col in inspector.get_columns("users")}
+        additions = []
+        if "stripe_connected" not in columns:
+            additions.append("ALTER TABLE users ADD COLUMN stripe_connected INTEGER DEFAULT 0 NOT NULL")
+        if "stripe_account_id" not in columns:
+            additions.append("ALTER TABLE users ADD COLUMN stripe_account_id VARCHAR")
+        if "stripe_livemode" not in columns:
+            additions.append("ALTER TABLE users ADD COLUMN stripe_livemode INTEGER DEFAULT 0 NOT NULL")
+        if "stripe_scope" not in columns:
+            additions.append("ALTER TABLE users ADD COLUMN stripe_scope VARCHAR")
+        if additions:
+            with engine.begin() as conn:
+                for statement in additions:
+                    conn.execute(text(statement))
+    except Exception:
+        pass
+
+
+ensure_user_columns()
 
 # =============================================================================
 # 4. ENUM CONSTANTS & VALIDATORS
@@ -492,6 +520,23 @@ def create_token(username: str) -> str:
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_stripe_state(username: str) -> str:
+    expire = datetime.utcnow() + timedelta(minutes=15)
+    payload = {"sub": username, "exp": expire, "purpose": "stripe_connect"}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_stripe_state(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("purpose") != "stripe_connect":
+            return None
+        sub = payload.get("sub")
+        return sub if isinstance(sub, str) and sub.strip() else None
+    except JWTError:
+        return None
+
+
 def decode_token(token: str) -> str | None:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -552,67 +597,6 @@ def check_rate_limit(user_id: str) -> bool:
         return False
     _rate_log[key].append(now)
     return True
-
-
-def get_client_identifier(request: Request | None, username: str = "guest") -> str:
-    if username and username != "guest":
-        return username
-
-    if request is not None:
-        forwarded = (request.headers.get("x-forwarded-for", "") or "").split(",")[0].strip()
-        real_ip = (request.headers.get("x-real-ip", "") or "").strip()
-        client_host = getattr(getattr(request, "client", None), "host", "") or ""
-
-        identifier = forwarded or real_ip or client_host
-        if identifier:
-            return f"guest:{identifier}"
-
-    return "guest:anonymous"
-
-
-def _prune_guest_usage(client_id: str) -> list[float]:
-    now = time.time()
-    _guest_usage_log.setdefault(client_id, [])
-    _guest_usage_log[client_id] = [
-        ts for ts in _guest_usage_log[client_id]
-        if now - ts < GUEST_WINDOW_SECONDS
-    ]
-    return _guest_usage_log[client_id]
-
-
-def get_guest_usage_summary(client_id: str) -> dict[str, int]:
-    entries = _prune_guest_usage(client_id)
-    used = len(entries)
-    remaining = max(0, GUEST_MESSAGE_LIMIT - used)
-    return {
-        "used": used,
-        "limit": GUEST_MESSAGE_LIMIT,
-        "remaining": remaining,
-    }
-
-
-def enforce_guest_limit(client_id: str) -> None:
-    if not check_rate_limit(client_id):
-        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
-
-    usage = get_guest_usage_summary(client_id)
-    if usage["used"] >= usage["limit"]:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Guest limit reached. Used {usage['used']}/{usage['limit']} messages. Create an account to continue.",
-            headers={
-                "X-Xalvion-Plan": "free",
-                "X-Xalvion-Limit": str(usage["limit"]),
-                "X-Xalvion-Guest": "true",
-            },
-        )
-
-
-def increment_guest_usage(client_id: str) -> dict[str, int]:
-    entries = _prune_guest_usage(client_id)
-    entries.append(time.time())
-    _guest_usage_log[client_id] = entries
-    return get_guest_usage_summary(client_id)
 
 # =============================================================================
 # 7. PLAN & USAGE HELPERS
@@ -903,22 +887,8 @@ def serialize_ticket_with_log(ticket: Ticket, db: Session) -> dict[str, Any]:
     return base
 
 
-def serialize_support_result(result: dict[str, Any], user: User, client_id: str = "") -> dict[str, Any]:
-    is_guest = getattr(user, "username", "") == "guest"
-
-    if is_guest:
-        guest_summary = get_guest_usage_summary(client_id or "guest:anonymous")
-        tier = "free"
-        limit = guest_summary["limit"]
-        usage = guest_summary["used"]
-        remaining = guest_summary["remaining"]
-    else:
-        usage_summary = get_usage_summary(user)
-        tier = usage_summary["tier"]
-        limit = usage_summary["limit"]
-        usage = usage_summary["usage"]
-        remaining = max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage)
-
+def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, Any]:
+    usage_summary = get_usage_summary(user)
     tool_result = result.get("tool_result") or {}
     impact = result.get("impact") or {}
 
@@ -940,10 +910,12 @@ def serialize_support_result(result: dict[str, Any], user: User, client_id: str 
         "meta": result.get("meta", {}),
         "triage": result.get("triage", {}),
         "history": result.get("history", {}),
-        "tier": tier,
-        "plan_limit": limit,
-        "usage": usage,
-        "remaining": remaining,
+        "tier": usage_summary["tier"],
+        "plan_limit": usage_summary["limit"],
+        "usage": usage_summary["usage"],
+        "remaining": max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"]),
+        "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
+        "stripe_account_id": getattr(user, "stripe_account_id", None),
     }
 
 # =============================================================================
@@ -970,31 +942,20 @@ def dollars_from_cents(cents: int) -> float:
 
 def rewrite_refund_failure_message(reason: str) -> str:
     text = (reason or "").strip().lower()
-
-    if any(term in text for term in ["payment_intent_id", "charge_id", "missing_payment_reference", "required"]):
-        return (
-            "I’ve flagged the duplicate charge for billing review and the correction is now in motion. "
-            "You’ll get an update shortly."
-        )
-
-    if "no refundable balance" in text:
-        return (
-            "I’ve opened this for billing review so the charge can be checked and corrected properly. "
-            "You’ll get an update shortly."
-        )
-
+    if "stripe account not connected" in text or "connect stripe" in text or "stripe_not_connected" in text:
+        return "Refund ready — connect Stripe to execute it from your account."
     return (
-        "I’ve opened this for billing review and the correction is now in motion. "
-        "You’ll get an update shortly."
-    )
+        "I've opened this for manual review because I couldn't complete the refund automatically. "
+        + reason
+    ).strip()
 
 
-def get_charge_context(*, payment_intent_id: str | None, charge_id: str | None) -> dict[str, Any]:
+def get_charge_context(*, payment_intent_id: str | None, charge_id: str | None, stripe_account_id: str | None = None) -> dict[str, Any]:
     pi = (payment_intent_id or "").strip()
     cid = (charge_id or "").strip()
 
     if pi:
-        intent = stripe.PaymentIntent.retrieve(pi)
+        intent = stripe.PaymentIntent.retrieve(pi, stripe_account=stripe_account_id) if stripe_account_id else stripe.PaymentIntent.retrieve(pi)
         charges = (intent.get("charges") or {}).get("data") or []
         if not charges:
             raise Exception("No charge found for this payment_intent.")
@@ -1010,7 +971,7 @@ def get_charge_context(*, payment_intent_id: str | None, charge_id: str | None) 
         }
 
     if cid:
-        charge = stripe.Charge.retrieve(cid)
+        charge = stripe.Charge.retrieve(cid, stripe_account=stripe_account_id) if stripe_account_id else stripe.Charge.retrieve(cid)
         return {
             "payment_intent_id": str(charge.get("payment_intent", "") or ""),
             "charge_id": cid,
@@ -1093,6 +1054,8 @@ def execute_real_refund(
 
     if not STRIPE_KEY:
         return {"ok": False, "status": "stripe_not_configured", "detail": "Stripe not configured."}
+    if not getattr(user, "stripe_connected", 0) or not getattr(user, "stripe_account_id", ""):
+        return {"ok": False, "status": "stripe_not_connected", "detail": "Stripe account not connected. Connect Stripe to execute refunds."}
     if not pi and not cid:
         return {"ok": False, "status": "missing_payment_reference", "detail": "payment_intent_id or charge_id required."}
 
@@ -1101,7 +1064,7 @@ def execute_real_refund(
         return {"ok": False, "status": "invalid_refund_amount", "detail": "Refund amount must be > 0."}
 
     try:
-        ctx = get_charge_context(payment_intent_id=pi, charge_id=cid)
+        ctx = get_charge_context(payment_intent_id=pi, charge_id=cid, stripe_account_id=getattr(user, "stripe_account_id", None))
         charge_amount = int(ctx["charge_amount"])
         already_refunded = int(ctx.get("amount_refunded", 0) or 0)
         remaining = max(0, charge_amount - already_refunded)
@@ -1144,6 +1107,8 @@ def execute_real_refund(
             payload["payment_intent"] = pi
         else:
             payload["charge"] = cid
+        if getattr(user, "stripe_account_id", None):
+            payload["stripe_account"] = user.stripe_account_id
 
         refund = stripe.Refund.create(**payload)
         refund_amount = int(getattr(refund, "amount", refund_cents) or refund_cents) / 100
@@ -1210,17 +1175,6 @@ def apply_real_actions(result: dict[str, Any], req: SupportRequest, user: User) 
     result["impact"] = {"type": "saved", "amount": 0}
     result["response"] = rewrite_refund_failure_message(failure)
     result["final"] = result["response"]
-    result["reply"] = result["response"]
-
-    decision = dict(result.get("decision") or {})
-    decision["action"] = "review"
-    decision["amount"] = 0
-    decision["requires_approval"] = True
-    decision["queue"] = "refund_risk"
-    decision["priority"] = "high"
-    decision["risk_level"] = "medium"
-    result["decision"] = decision
-
     return result
 
 
@@ -1300,14 +1254,8 @@ def check_requires_approval(action: str, amount: float) -> bool:
     return action == "refund" and float(amount or 0) > APPROVAL_THRESHOLD
 
 
-def run_support(req: SupportRequest, user: User, db: Session, client_id: str = "guest:anonymous") -> dict[str, Any]:
-    is_guest = getattr(user, "username", "") == "guest"
-
-    if is_guest:
-        enforce_guest_limit(client_id)
-    else:
-        enforce_plan_limits(user)
-
+def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
+    enforce_plan_limits(user)
     ticket = create_ticket_record(db, user, req)
 
     try:
@@ -1368,17 +1316,14 @@ def run_support(req: SupportRequest, user: User, db: Session, client_id: str = "
             approved=False,
         )
 
-        if is_guest:
-            increment_guest_usage(client_id)
-        elif hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user"}:
+        if hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
             user.usage = int(getattr(user, "usage", 0) or 0) + 1
             db.commit()
             db.refresh(user)
 
-        serialized = serialize_support_result(result, user, client_id=client_id)
+        serialized = serialize_support_result(result, user)
         serialized["ticket"] = serialize_ticket(ticket)
         serialized["operator_mode"] = get_operator_mode(db)
-        serialized["is_guest"] = is_guest
         return serialized
 
     except HTTPException:
@@ -1394,18 +1339,11 @@ def run_support(req: SupportRequest, user: User, db: Session, client_id: str = "
         except Exception:
             pass
 
-        if is_guest:
-            increment_guest_usage(client_id)
-
-        plan = "free" if is_guest else get_plan_name(user)
-        remaining = get_guest_usage_summary(client_id)["remaining"] if is_guest else max(
-            0, get_plan_config(plan)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)
-        )
-
         fallback = (
             "I encountered an issue processing your request. "
             "Our team has been notified and will follow up shortly."
         )
+        plan = get_plan_name(user)
         return {
             "reply": fallback,
             "final": fallback,
@@ -1427,16 +1365,15 @@ def run_support(req: SupportRequest, user: User, db: Session, client_id: str = "
             "confidence": 0.0,
             "quality": 0.0,
             "tier": plan,
-            "plan_limit": GUEST_MESSAGE_LIMIT if is_guest else get_plan_config(plan)["monthly_limit"],
-            "usage": get_guest_usage_summary(client_id)["used"] if is_guest else int(getattr(user, "usage", 0) or 0),
-            "remaining": remaining,
+            "plan_limit": get_plan_config(plan)["monthly_limit"],
+            "usage": int(getattr(user, "usage", 0) or 0),
+            "remaining": max(0, get_plan_config(plan)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)),
             "ticket": serialize_ticket(ticket),
             "operator_mode": "balanced",
-            "is_guest": is_guest,
         }
 
 
-def run_support_for_username(req: SupportRequest, username: str, client_id: str = "guest:anonymous") -> dict[str, Any]:
+def run_support_for_username(req: SupportRequest, username: str) -> dict[str, Any]:
     with db_session() as db:
         if username and username != "guest":
             user = db.query(User).filter(User.username == username).first()
@@ -1444,7 +1381,7 @@ def run_support_for_username(req: SupportRequest, username: str, client_id: str 
                 user = User(username="guest", password="", usage=0, tier="free")
         else:
             user = User(username="guest", password="", usage=0, tier="free")
-        return run_support(req, user, db, client_id=client_id)
+        return run_support(req, user, db)
 
 # =============================================================================
 # 12. STREAMING HELPERS
@@ -1581,6 +1518,8 @@ def me(user: User = Depends(get_current_user)):
         "priority_routing": public_plan["priority_routing"],
         "is_dev": usage_summary["tier"] == "dev" and user.username == ADMIN_USERNAME,
         "is_admin": user.username == ADMIN_USERNAME,
+        "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
+        "stripe_account_id": getattr(user, "stripe_account_id", None),
     }
 
 
@@ -1624,6 +1563,79 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
         "remaining": usage_summary["remaining"],
         "is_admin": user.username == ADMIN_USERNAME,
     }
+
+
+
+@app.get("/integrations/status")
+def integrations_status(user: User = Depends(get_current_user)):
+    return {
+        "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
+        "stripe_account_id": getattr(user, "stripe_account_id", None),
+        "stripe_livemode": bool(getattr(user, "stripe_livemode", 0)),
+        "stripe_scope": getattr(user, "stripe_scope", None),
+    }
+
+
+@app.get("/integrations/stripe/connect")
+def integrations_stripe_connect(user: User = Depends(require_authenticated_user)):
+    if not STRIPE_KEY or not STRIPE_CONNECT_CLIENT_ID:
+        raise HTTPException(status_code=500, detail="Stripe Connect is not configured.")
+
+    state = create_stripe_state(user.username)
+    url = (
+        "https://connect.stripe.com/oauth/authorize"
+        f"?response_type=code"
+        f"&client_id={STRIPE_CONNECT_CLIENT_ID}"
+        f"&scope=read_write"
+        f"&state={state}"
+        f"&redirect_uri={STRIPE_CONNECT_REDIRECT_URI}"
+    )
+    return {"url": url}
+
+
+@app.get("/integrations/stripe/callback")
+def integrations_stripe_callback(code: str | None = None, state: str | None = None, error: str | None = None, error_description: str | None = None, db: Session = Depends(get_db)):
+    if error:
+        detail = (error_description or error or "Stripe connection failed.").replace(" ", "%20")
+        return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connect_error&detail={detail}")
+
+    username = decode_stripe_state(state or "")
+    if not username or not code:
+        return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connect_error&detail=Invalid%20Stripe%20callback")
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connect_error&detail=User%20not%20found")
+
+    try:
+        token_response = stripe.OAuth.token(
+            grant_type="authorization_code",
+            code=code,
+        )
+        user.stripe_connected = 1
+        user.stripe_account_id = token_response.get("stripe_user_id")
+        user.stripe_livemode = int(bool(token_response.get("livemode", False)))
+        user.stripe_scope = token_response.get("scope")
+        db.commit()
+    except Exception as exc:
+        detail = str(exc).replace(" ", "%20")
+        return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connect_error&detail={detail}")
+
+    return RedirectResponse(url=f"{FRONTEND_URL}?stripe=connected")
+
+
+@app.post("/integrations/stripe/disconnect")
+def integrations_stripe_disconnect(user: User = Depends(require_authenticated_user), db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_user.stripe_connected = 0
+    db_user.stripe_account_id = None
+    db_user.stripe_livemode = 0
+    db_user.stripe_scope = None
+    db.commit()
+    return {"ok": True, "stripe_connected": False}
 
 # =============================================================================
 # 16. ROUTES — BILLING & PLANS
@@ -2202,23 +2214,19 @@ def update_operator_mode(
 @app.post("/support")
 def support(
     req: SupportRequest,
-    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    client_id = get_client_identifier(request, getattr(user, "username", "guest"))
-    return run_support(req, user, db, client_id=client_id)
+    return run_support(req, user, db)
 
 
 @app.post("/support/stream")
 async def support_stream(
     req: SupportRequest,
-    request: Request,
     authorization: str | None = Header(None),
 ):
     username = get_current_username_from_header(authorization)
-    client_id = get_client_identifier(request, username)
-    result = await run_in_threadpool(run_support_for_username, req, username, client_id)
+    result = await run_in_threadpool(run_support_for_username, req, username)
     return StreamingResponse(
         stream_support_events(result),
         media_type="text/event-stream",
