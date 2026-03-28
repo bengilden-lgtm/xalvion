@@ -148,15 +148,15 @@
         <path d="M8 5v6"></path>
       </svg>
     `,
-    clock: `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="8" cy="8" r="5.5"></circle>
-        <path d="M8 5v3.4l2.2 1.2"></path>
-      </svg>
-    `,
     chevron: `
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4.5 6.5L8 10l3.5-3.5"></path>
+      </svg>
+    `,
+    send: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M13.5 2.5L7 9"></path>
+        <path d="M13.5 2.5L9 13.5 7 9l-4.5-2 11-4.5Z"></path>
       </svg>
     `
   };
@@ -196,6 +196,17 @@
         overflow:hidden;
         position:relative;
         box-shadow:0 8px 20px rgba(0,0,0,.10);
+        transition:
+          transform .16s cubic-bezier(.22,1,.36,1),
+          border-color .16s ease,
+          box-shadow .16s ease,
+          background .16s ease;
+      }
+
+      .msg-card:hover{
+        transform:translateY(-1px);
+        border-color:rgba(255,255,255,.09);
+        box-shadow:0 12px 24px rgba(0,0,0,.14);
       }
 
       .msg-card.user{
@@ -305,6 +316,18 @@
         font-size:9px;
         font-weight:700;
         letter-spacing:.02em;
+        transition:
+          transform .14s ease,
+          background .14s ease,
+          border-color .14s ease,
+          color .14s ease;
+      }
+
+      .meta-chip:hover{
+        transform:translateY(-1px);
+        background:rgba(255,255,255,.04);
+        border-color:rgba(255,255,255,.10);
+        color:rgba(232,239,255,.90);
       }
 
       .meta-chip svg{
@@ -349,7 +372,12 @@
         border:1px solid rgba(255,255,255,.07);
         background:rgba(255,255,255,.035);
         color:rgba(232,238,255,.88);
-        transition:transform .14s ease, background .14s ease, border-color .14s ease;
+        transition:
+          transform .14s ease,
+          background .14s ease,
+          border-color .14s ease,
+          color .14s ease,
+          box-shadow .14s ease;
         cursor:pointer;
         font-size:10px;
         font-weight:700;
@@ -359,6 +387,8 @@
         transform:translateY(-1px);
         background:rgba(255,255,255,.055);
         border-color:rgba(255,255,255,.10);
+        color:rgba(245,248,255,.96);
+        box-shadow:0 6px 16px rgba(0,0,0,.12);
       }
 
       .mini-btn svg{
@@ -391,7 +421,11 @@
         font-weight:700;
         cursor:pointer;
         user-select:none;
-        transition:transform .14s ease, background .14s ease, border-color .14s ease;
+        transition:
+          transform .14s ease,
+          background .14s ease,
+          border-color .14s ease,
+          color .14s ease;
       }
 
       .details-toggle::-webkit-details-marker{display:none}
@@ -400,6 +434,7 @@
         transform:translateY(-1px);
         background:rgba(255,255,255,.04);
         border-color:rgba(255,255,255,.10);
+        color:rgba(236,242,255,.94);
       }
 
       .details-wrap[open] .details-toggle{
@@ -427,6 +462,12 @@
           linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,.010)),
           radial-gradient(circle at 88% 18%, rgba(139,111,255,.045), transparent 28%);
         padding:8px;
+        animation:xalvionDetailsIn .16s ease;
+      }
+
+      @keyframes xalvionDetailsIn{
+        from{opacity:0;transform:translateY(-2px)}
+        to{opacity:1;transform:translateY(0)}
       }
 
       .details-grid{
@@ -442,6 +483,13 @@
         border-radius:10px;
         border:1px solid rgba(255,255,255,.045);
         background:rgba(255,255,255,.018);
+        transition:background .14s ease,border-color .14s ease,transform .14s ease;
+      }
+
+      .details-box:hover{
+        transform:translateY(-1px);
+        background:rgba(255,255,255,.028);
+        border-color:rgba(255,255,255,.08);
       }
 
       .details-label{
@@ -666,10 +714,79 @@
         100%{box-shadow:0 30px 80px rgba(0,0,0,.34)}
       }
 
+      .composer-input-wrap{
+        transition:
+          box-shadow .18s ease,
+          border-color .18s ease,
+          background .18s ease,
+          transform .18s ease !important;
+      }
+
+      .composer-input-wrap:focus-within{
+        transform:translateY(-1px);
+      }
+
+      .send-btn{
+        width:38px !important;
+        height:38px !important;
+        min-width:38px !important;
+        max-width:38px !important;
+        flex:0 0 38px !important;
+        align-self:flex-end !important;
+        display:inline-flex !important;
+        align-items:center !important;
+        justify-content:center !important;
+        padding:0 !important;
+        border-radius:10px !important;
+        border:1px solid rgba(255,255,255,.08) !important;
+        background:rgba(255,255,255,.04) !important;
+        box-shadow:
+          0 8px 18px rgba(0,0,0,.12),
+          inset 0 1px 0 rgba(255,255,255,.05) !important;
+        transition:
+          transform .14s ease,
+          background .14s ease,
+          border-color .14s ease,
+          box-shadow .14s ease,
+          filter .14s ease !important;
+      }
+
+      .send-btn:hover{
+        transform:translateY(-1px) scale(1.02) !important;
+        background:rgba(255,255,255,.075) !important;
+        border-color:rgba(255,255,255,.13) !important;
+        box-shadow:
+          0 12px 22px rgba(0,0,0,.16),
+          0 0 0 1px rgba(255,255,255,.02),
+          inset 0 1px 0 rgba(255,255,255,.07) !important;
+      }
+
+      .send-btn:active{
+        transform:translateY(0) scale(.97) !important;
+      }
+
+      .send-btn:disabled{
+        opacity:.68;
+        transform:none !important;
+      }
+
+      .send-btn svg{
+        width:15px !important;
+        height:15px !important;
+        transform:none !important;
+      }
+
       @media (max-width: 720px){
         .msg-card{width:100%}
         .details-grid,.rev-grid,.ops-grid{grid-template-columns:1fr}
         .messages{padding:10px 10px 8px !important}
+        .send-btn{
+          width:36px !important;
+          height:36px !important;
+          min-width:36px !important;
+          max-width:36px !important;
+          flex:0 0 36px !important;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -1165,14 +1282,7 @@
 
     if (els.sendBtn) {
       els.sendBtn.disabled = state.sending;
-      els.sendBtn.innerHTML = state.sending
-        ? ICONS.status
-        : `
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M13.5 2.5L7 9"></path>
-            <path d="M13.5 2.5L9 13.5 7 9l-4.5-2 11-4.5Z"></path>
-          </svg>
-        `;
+      els.sendBtn.innerHTML = state.sending ? ICONS.status : ICONS.send;
       els.sendBtn.setAttribute("aria-label", state.sending ? "Sending" : "Send message");
     }
 
