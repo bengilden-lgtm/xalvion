@@ -1663,9 +1663,9 @@ def stripe_connect_callback(
         )
 
         user.stripe_connected = 1
-        user.stripe_account_id = token_response.get("stripe_user_id")
-        user.stripe_livemode = 1 if token_response.get("livemode") else 0
-        user.stripe_scope = str(token_response.get("scope", "") or "")
+        user.stripe_account_id = token_response["stripe_user_id"]
+        user.stripe_livemode = 1 if bool(token_response["livemode"]) else 0
+        user.stripe_scope = str(token_response["scope"]) if token_response["scope"] else ""
 
         db.commit()
 
