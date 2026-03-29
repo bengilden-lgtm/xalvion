@@ -69,10 +69,6 @@ TOKEN_EXPIRE_MINUTES = int(os.getenv("TOKEN_EXPIRE_MINUTES", "120"))
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
 
-TEMP_ADMIN_BYPASS_EMAIL = os.getenv("TEMP_ADMIN_BYPASS_EMAIL", "ben.gilden@gmail.com").strip().lower()
-TEMP_ADMIN_BYPASS_PASSWORD = os.getenv("TEMP_ADMIN_BYPASS_PASSWORD", "admin123").strip()
-TEMP_ADMIN_BYPASS_ENABLED = os.getenv("TEMP_ADMIN_BYPASS_ENABLED", "true").strip().lower() == "true"
-
 STRIPE_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 STRIPE_PRICE_PRO = os.getenv("STRIPE_PRICE_PRO", "").strip()
@@ -100,6 +96,7 @@ MAX_AUTO_REFUND = float(os.getenv("MAX_AUTO_REFUND", "50"))
 
 APPROVAL_THRESHOLD = float(os.getenv("APPROVAL_THRESHOLD", "25.00"))
 LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
+DEBUG_ROUTES_ENABLED = os.getenv("DEBUG_ROUTES_ENABLED", "false").strip().lower() == "true"
 
 REFUND_RULES: dict[str, Any] = {
     "enabled": True,
@@ -586,19 +583,6 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid auth header")
 
     token = authorization.split(" ", 1)[1].strip()
-
-    if TEMP_ADMIN_BYPASS_ENABLED and token == "debug-admin":
-        return User(
-            username=TEMP_ADMIN_BYPASS_EMAIL,
-            password="",
-            usage=0,
-            tier="elite",
-            stripe_connected=0,
-            stripe_account_id=None,
-            stripe_livemode=0,
-            stripe_scope=None,
-        )
-
     username = decode_token(token)
     if not username:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -618,8 +602,6 @@ def get_current_username_from_header(authorization: str | None) -> str:
     if not authorization.startswith("Bearer "):
         return "guest"
     token = authorization.split(" ", 1)[1].strip()
-    if TEMP_ADMIN_BYPASS_ENABLED and token == "debug-admin":
-        return TEMP_ADMIN_BYPASS_EMAIL or "guest"
     return decode_token(token) or "guest"
 
 
@@ -1744,7 +1726,9 @@ def serve_index():
 
 
 @app.get("/debug/refund-mode")
-def debug_refund_mode():
+def debug_refund_mode(user: User = Depends(require_admin)):
+    if not DEBUG_ROUTES_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
     return {
         "mode": "platform-fallback-v2-latest-charge",
         "has_stripe_key": bool(STRIPE_KEY),
@@ -1752,7 +1736,12 @@ def debug_refund_mode():
 
 
 @app.get("/debug/payment-intent/{payment_intent_id}")
-def debug_payment_intent(payment_intent_id: str):
+def debug_payment_intent(
+    payment_intent_id: str,
+    user: User = Depends(require_admin),
+):
+    if not DEBUG_ROUTES_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
     try:
         intent = stripe.PaymentIntent.retrieve(
             payment_intent_id,
@@ -1887,22 +1876,6 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
 
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password required")
-
-    if (
-        TEMP_ADMIN_BYPASS_ENABLED
-        and username.lower() == TEMP_ADMIN_BYPASS_EMAIL
-        and password == TEMP_ADMIN_BYPASS_PASSWORD
-    ):
-        return {
-            "token": "debug-admin",
-            "username": TEMP_ADMIN_BYPASS_EMAIL,
-            "tier": "elite",
-            "usage": 0,
-            "limit": get_plan_config("elite")["monthly_limit"],
-            "remaining": get_plan_config("elite")["monthly_limit"],
-            "is_admin": True,
-            "temporary_bypass": True,
-        }
 
     user = db.query(User).filter(User.username == username).first()
     if not user or not verify_password(password, user.password):
@@ -2053,12 +2026,12 @@ def actions_refund(
         charge_id=req.charge_id,
         refund_reason=req.refund_reason,
         username=str(getattr(user, "username", "unknown") or "unknown"),
-        issue_type="billing_issue",
+        issue_type="manual_refund",
         user=user,
         result={
             "action": "refund",
             "amount": float(req.amount or 0),
-            "issue_type": "billing_issue",
+            "issue_type": "manual_refund",
             "order_status": "unknown",
             "confidence": 0.99,
             "quality": 0.99,
