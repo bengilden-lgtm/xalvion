@@ -1068,7 +1068,7 @@ def evaluate_refund_rules(
 
 def execute_real_refund(
     *,
-    amount: int,
+    amount: float | int,
     payment_intent_id: str | None,
     charge_id: str | None,
     refund_reason: str | None,
@@ -1088,8 +1088,7 @@ def execute_real_refund(
         return {"ok": False, "status": "missing_payment_reference", "detail": "payment_intent_id or charge_id required."}
 
     cents_requested = cents_from_dollars(amount)
-    if cents_requested <= 0:
-        return {"ok": False, "status": "invalid_refund_amount", "detail": "Refund amount must be > 0."}
+    full_refund = cents_requested <= 0
 
     try:
         ctx = get_charge_context(payment_intent_id=pi, charge_id=cid, stripe_account_id=getattr(user, "stripe_account_id", None))
@@ -1100,12 +1099,18 @@ def execute_real_refund(
         if remaining <= 0:
             return {"ok": False, "status": "no_refundable_balance", "detail": "No refundable balance remaining.", "charge_context": ctx}
 
-        refund_cents = min(cents_requested, remaining)
+        if full_refund:
+            refund_cents = remaining
+            rules_requested_cents = remaining
+        else:
+            refund_cents = min(cents_requested, remaining)
+            rules_requested_cents = cents_requested
+
         rules_summary = evaluate_refund_rules(
             result=result,
             user=user,
             charge_context=ctx,
-            requested_cents=cents_requested,
+            requested_cents=rules_requested_cents,
             refund_cents=refund_cents,
         )
 
@@ -1119,26 +1124,29 @@ def execute_real_refund(
                 "charge_context": ctx,
             }
 
-        payload: dict[str, Any] = {
-            "amount": refund_cents,
+        meta_requested = str(rules_requested_cents if full_refund else cents_requested)
+        refund_data: dict[str, Any] = {
             "reason": safe_refund_reason(refund_reason),
             "metadata": {
                 "source": "xalvion",
                 "username": username,
                 "issue_type": issue_type,
-                "requested_refund_cents": str(cents_requested),
+                "requested_refund_cents": meta_requested,
                 "charge_amount_cents": str(charge_amount),
                 "rule_tier": rules_summary["tier"],
             },
         }
         if pi:
-            payload["payment_intent"] = pi
+            refund_data["payment_intent"] = pi
         else:
-            payload["charge"] = cid
+            refund_data["charge"] = cid
         if getattr(user, "stripe_account_id", None):
-            payload["stripe_account"] = user.stripe_account_id
+            refund_data["stripe_account"] = user.stripe_account_id
 
-        refund = stripe.Refund.create(**payload)
+        if not full_refund and refund_cents > 0:
+            refund_data["amount"] = refund_cents
+
+        refund = stripe.Refund.create(**refund_data)
         refund_amount = int(getattr(refund, "amount", refund_cents) or refund_cents) / 100
 
         return {
@@ -1149,10 +1157,10 @@ def execute_real_refund(
             "currency": ctx["currency"],
             "payment_intent_id": ctx["payment_intent_id"] or pi,
             "charge_id": ctx["charge_id"] or cid,
-            "requested_amount": cents_requested / 100,
+            "requested_amount": rules_requested_cents / 100,
             "charge_amount": charge_amount / 100,
             "remaining_refundable_amount": remaining / 100,
-            "capped": refund_cents < cents_requested,
+            "capped": (not full_refund) and refund_cents < cents_requested,
             "rules_summary": rules_summary,
             "charge_context": ctx,
         }
