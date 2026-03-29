@@ -983,6 +983,7 @@ def get_charge_context(
     payment_intent_id: str | None,
     charge_id: str | None,
     stripe_account_id: str | None = None,
+    platform_only: bool = False,
 ) -> dict[str, Any]:
     pi = (payment_intent_id or "").strip()
     cid = (charge_id or "").strip()
@@ -1020,10 +1021,13 @@ def get_charge_context(
         except Exception:
             return {}
 
-    accounts_to_try: list[str | None] = []
-    if stripe_account_id:
-        accounts_to_try.append(stripe_account_id)
-    accounts_to_try.append(None)
+    if platform_only:
+        accounts_to_try: list[str | None] = [None]
+    else:
+        accounts_to_try = []
+        if stripe_account_id:
+            accounts_to_try.append(stripe_account_id)
+        accounts_to_try.append(None)
 
     last_error: Exception | None = None
 
@@ -1072,29 +1076,6 @@ def get_charge_context(
 
         raise Exception(str(last_error) if last_error else "Payment intent not found.")
 
-    if cid:
-        for acct in accounts_to_try:
-            try:
-                charge_obj, resolved_account = _retrieve_charge(cid, acct)
-                charge = _as_dict(charge_obj)
-
-                return {
-                    "payment_intent_id": str(charge.get("payment_intent", "") or ""),
-                    "charge_id": cid,
-                    "charge_amount": int(charge.get("amount", 0) or 0),
-                    "currency": str(charge.get("currency", "usd") or "usd").upper(),
-                    "captured": bool(charge.get("captured", True)),
-                    "refunded": bool(charge.get("refunded", False)),
-                    "amount_refunded": int(charge.get("amount_refunded", 0) or 0),
-                    "status": "succeeded" if bool(charge.get("paid", False)) else str(charge.get("status", "") or ""),
-                    "resolved_stripe_account_id": resolved_account,
-                }
-            except Exception as exc:
-                last_error = exc
-
-        raise Exception(str(last_error) if last_error else "Charge not found.")
-
-    raise Exception("A payment_intent_id or charge_id is required for an automatic refund.")
     if cid:
         for acct in accounts_to_try:
             try:
@@ -1189,20 +1170,44 @@ def execute_real_refund(
 
     if not STRIPE_KEY:
         return {"ok": False, "status": "stripe_not_configured", "detail": "Stripe not configured."}
-    if not getattr(user, "stripe_connected", 0) or not getattr(user, "stripe_account_id", ""):
-        return {"ok": False, "status": "stripe_not_connected", "detail": "Stripe account not connected. Connect Stripe to execute refunds."}
     if not pi and not cid:
         return {"ok": False, "status": "missing_payment_reference", "detail": "payment_intent_id or charge_id required."}
 
     cents_requested = cents_from_dollars(amount)
     full_refund = cents_requested <= 0
 
+    connected_account_id = str(getattr(user, "stripe_account_id", "") or "").strip()
+    connected_enabled = bool(getattr(user, "stripe_connected", 0)) and bool(connected_account_id)
+
+    lookup_attempts: list[tuple[str, dict[str, Any] | None]] = []
+
     try:
-        ctx = get_charge_context(
-            payment_intent_id=pi,
-            charge_id=cid,
-            stripe_account_id=getattr(user, "stripe_account_id", None),
-        )
+        ctx: dict[str, Any] | None = None
+
+        if connected_enabled:
+            try:
+                ctx = get_charge_context(
+                    payment_intent_id=pi,
+                    charge_id=cid,
+                    stripe_account_id=connected_account_id,
+                    platform_only=False,
+                )
+                lookup_attempts.append(("connected_or_fallback", ctx))
+            except Exception as exc:
+                lookup_attempts.append(("connected_or_fallback_error", {"detail": str(exc)}))
+
+        if ctx is None:
+            try:
+                ctx = get_charge_context(
+                    payment_intent_id=pi,
+                    charge_id=cid,
+                    stripe_account_id=None,
+                    platform_only=True,
+                )
+                lookup_attempts.append(("platform_only", ctx))
+            except Exception as exc:
+                lookup_attempts.append(("platform_only_error", {"detail": str(exc)}))
+                raise exc
 
         payment_status = str(ctx.get("status", "") or "").lower()
         if payment_status and payment_status != "succeeded":
@@ -1211,6 +1216,7 @@ def execute_real_refund(
                 "status": "payment_not_refundable",
                 "detail": f"Cannot refund payment with status: {payment_status}",
                 "charge_context": ctx,
+                "lookup_attempts": lookup_attempts,
             }
 
         charge_amount = int(ctx["charge_amount"])
@@ -1223,6 +1229,7 @@ def execute_real_refund(
                 "status": "no_refundable_balance",
                 "detail": "No refundable balance remaining.",
                 "charge_context": ctx,
+                "lookup_attempts": lookup_attempts,
             }
 
         if full_refund:
@@ -1248,6 +1255,7 @@ def execute_real_refund(
                 "detail": blocked_details or "Blocked by rules.",
                 "rules_summary": rules_summary,
                 "charge_context": ctx,
+                "lookup_attempts": lookup_attempts,
             }
 
         meta_requested = str(rules_requested_cents if full_refund else cents_requested)
@@ -1292,20 +1300,24 @@ def execute_real_refund(
             "capped": (not full_refund) and refund_cents < cents_requested,
             "rules_summary": rules_summary,
             "charge_context": ctx,
+            "lookup_attempts": lookup_attempts,
         }
     except Exception as exc:
-        return {"ok": False, "status": "stripe_refund_failed", "detail": str(exc)}
+        return {
+            "ok": False,
+            "status": "stripe_refund_failed",
+            "detail": str(exc),
+            "lookup_attempts": lookup_attempts,
+        }
 
 
 def require_connected_stripe_account(user: User) -> str:
     if not STRIPE_KEY:
         raise HTTPException(status_code=500, detail="Stripe not configured.")
-    if not getattr(user, "stripe_connected", 0):
-        raise HTTPException(status_code=400, detail="Stripe not connected.")
     stripe_account_id = str(getattr(user, "stripe_account_id", "") or "").strip()
-    if not stripe_account_id:
-        raise HTTPException(status_code=400, detail="Missing connected Stripe account.")
-    return stripe_account_id
+    if stripe_account_id:
+        return stripe_account_id
+    raise HTTPException(status_code=400, detail="Missing connected Stripe account.")
 
 
 def execute_manual_charge(
