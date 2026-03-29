@@ -1077,12 +1077,17 @@
     amount = null,
     refundReason = "requested_by_customer"
   }) {
-    return apiPost("/actions/refund", {
+    const payload = {
       payment_intent_id: paymentIntentId || null,
       charge_id: chargeId || null,
-      amount,
       refund_reason: refundReason
-    });
+    };
+
+    if (typeof amount === "number" && Number.isFinite(amount) && amount > 0) {
+      payload.amount = amount;
+    }
+
+    return apiPost("/actions/refund", payload);
   }
 
   async function executeStripeCharge({
