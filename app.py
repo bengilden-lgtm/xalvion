@@ -1061,7 +1061,7 @@ def get_charge_context(
                         charge = latest_charge
                     elif latest_charge:
                         latest_charge_id = str(latest_charge).strip()
-                        if latest_charge_id:
+                        if latest_charge_id.startswith("ch_"):
                             charge_obj, resolved_account = _retrieve_charge(latest_charge_id, acct)
                             charge = _as_dict(charge_obj)
 
@@ -1997,18 +1997,22 @@ def actions_refund(
     req: RefundActionRequest,
     user: User = Depends(require_authenticated_user),
 ):
+    current_tier = get_plan_name(user)
+    if current_tier not in {"pro", "elite"}:
+        raise HTTPException(status_code=403, detail="Upgrade required to process refunds")
+
     result = execute_real_refund(
         amount=float(req.amount or 0),
         payment_intent_id=req.payment_intent_id,
         charge_id=req.charge_id,
         refund_reason=req.refund_reason,
         username=str(getattr(user, "username", "unknown") or "unknown"),
-        issue_type="manual_refund",
+        issue_type="billing_issue",
         user=user,
         result={
             "action": "refund",
             "amount": float(req.amount or 0),
-            "issue_type": "manual_refund",
+            "issue_type": "billing_issue",
             "order_status": "unknown",
             "confidence": 0.99,
             "quality": 0.99,
