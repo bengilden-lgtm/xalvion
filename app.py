@@ -1001,6 +1001,13 @@ def get_charge_context(
         obj = stripe.Charge.retrieve(charge_id_value)
         return obj, None
 
+    def _list_charges_for_payment_intent(intent_id: str, acct: str | None):
+        if acct:
+            obj = stripe.Charge.list(payment_intent=intent_id, limit=1, stripe_account=acct)
+            return obj, acct
+        obj = stripe.Charge.list(payment_intent=intent_id, limit=1)
+        return obj, None
+
     def _as_dict(obj: Any) -> dict[str, Any]:
         if obj is None:
             return {}
@@ -1026,18 +1033,28 @@ def get_charge_context(
                 intent_obj, resolved_account = _retrieve_payment_intent(pi, acct)
                 intent = _as_dict(intent_obj)
 
+                charge: dict[str, Any] | None = None
+
                 charges_block = intent.get("charges") or {}
                 charges = charges_block.get("data") or []
+                if charges:
+                    charge = charges[0] if isinstance(charges[0], dict) else _as_dict(charges[0])
 
-                if not charges:
+                if not charge:
                     latest_charge_id = str(intent.get("latest_charge") or "").strip()
                     if latest_charge_id:
                         charge_obj, resolved_account = _retrieve_charge(latest_charge_id, acct)
                         charge = _as_dict(charge_obj)
-                    else:
-                        raise Exception("No charge found for this payment_intent.")
-                else:
-                    charge = charges[0] if isinstance(charges[0], dict) else _as_dict(charges[0])
+
+                if not charge:
+                    charge_list_obj, resolved_account = _list_charges_for_payment_intent(pi, acct)
+                    charge_list = _as_dict(charge_list_obj)
+                    listed = charge_list.get("data") or []
+                    if listed:
+                        charge = listed[0] if isinstance(listed[0], dict) else _as_dict(listed[0])
+
+                if not charge:
+                    raise Exception("No charge found for this payment_intent.")
 
                 return {
                     "payment_intent_id": pi,
@@ -1055,6 +1072,29 @@ def get_charge_context(
 
         raise Exception(str(last_error) if last_error else "Payment intent not found.")
 
+    if cid:
+        for acct in accounts_to_try:
+            try:
+                charge_obj, resolved_account = _retrieve_charge(cid, acct)
+                charge = _as_dict(charge_obj)
+
+                return {
+                    "payment_intent_id": str(charge.get("payment_intent", "") or ""),
+                    "charge_id": cid,
+                    "charge_amount": int(charge.get("amount", 0) or 0),
+                    "currency": str(charge.get("currency", "usd") or "usd").upper(),
+                    "captured": bool(charge.get("captured", True)),
+                    "refunded": bool(charge.get("refunded", False)),
+                    "amount_refunded": int(charge.get("amount_refunded", 0) or 0),
+                    "status": "succeeded" if bool(charge.get("paid", False)) else str(charge.get("status", "") or ""),
+                    "resolved_stripe_account_id": resolved_account,
+                }
+            except Exception as exc:
+                last_error = exc
+
+        raise Exception(str(last_error) if last_error else "Charge not found.")
+
+    raise Exception("A payment_intent_id or charge_id is required for an automatic refund.")
     if cid:
         for acct in accounts_to_try:
             try:
