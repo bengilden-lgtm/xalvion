@@ -1041,8 +1041,16 @@ def get_charge_context(
 
                 charge: dict[str, Any] | None = None
 
-                charges_block = intent.get("charges") or {}
-                charges = charges_block.get("data") or []
+                charges_block = intent.get("charges")
+                charges: list[Any] = []
+
+                if isinstance(charges_block, dict):
+                    charges = charges_block.get("data") or []
+                elif isinstance(charges_block, list):
+                    charges = charges_block
+                else:
+                    charges = []
+
                 if charges:
                     first_charge = charges[0]
                     charge = first_charge if isinstance(first_charge, dict) else _as_dict(first_charge)
@@ -1725,7 +1733,13 @@ def debug_payment_intent(payment_intent_id: str):
 
         intent_dict = _as_dict(intent) or {}
         latest_charge = intent_dict.get("latest_charge")
-        charges = ((intent_dict.get("charges") or {}).get("data") or [])
+        charges_raw = intent_dict.get("charges")
+        if isinstance(charges_raw, dict):
+            charges = charges_raw.get("data") or []
+        elif isinstance(charges_raw, list):
+            charges = charges_raw
+        else:
+            charges = []
 
         return {
             "id": intent_dict.get("id"),
