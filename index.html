@@ -827,7 +827,42 @@
       to{opacity:1;transform:translateY(0) scale(1)}
     }
 
-    @media (max-width:1280px){:root{--sidebar:270px;--rail:250px}}
+    
+    .refund-card{display:grid;gap:12px}
+    .refund-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .refund-metric{border-radius:16px;padding:12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.028);display:grid;gap:4px}
+    .refund-metric-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(188,201,238,.46);font-weight:800}
+    .refund-metric-value{font-size:20px;font-weight:800;letter-spacing:-.03em}
+    .refund-copy{font-size:12.5px;line-height:1.6;color:rgba(220,230,252,.86)}
+    .refund-actions{display:grid;gap:8px}
+    .refund-list{display:grid;gap:8px}
+    .refund-item{border-radius:16px;padding:11px 12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.024);display:grid;gap:6px}
+    .refund-item-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .refund-item-title{font-size:12.5px;font-weight:700;color:rgba(240,245,255,.96);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .refund-pill{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;border:1px solid rgba(255,255,255,.08);font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;white-space:nowrap}
+    .refund-pill.success{background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.18);color:rgba(210,255,232,.96)}
+    .refund-pill.error{background:rgba(248,113,113,.10);border-color:rgba(248,113,113,.18);color:rgba(255,222,222,.96)}
+    .refund-pill.pending{background:rgba(96,165,250,.10);border-color:rgba(96,165,250,.18);color:rgba(223,236,255,.96)}
+    .refund-item-meta{display:flex;flex-wrap:wrap;gap:8px;color:rgba(194,208,242,.72);font-size:11px;line-height:1.5}
+    .refund-empty{border-radius:16px;padding:14px;border:1px dashed rgba(255,255,255,.08);color:rgba(194,208,242,.68);font-size:12px;line-height:1.6;background:rgba(255,255,255,.018)}
+    .refund-modal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(5,8,15,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .refund-modal.open{display:flex}
+    .refund-dialog{width:min(560px,100%);border-radius:28px;padding:18px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg, rgba(18,24,38,.92), rgba(9,13,24,.94));box-shadow:0 36px 100px rgba(0,0,0,.42);display:grid;gap:14px;position:relative;overflow:hidden}
+    .refund-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .refund-dialog-title{display:grid;gap:6px}
+    .refund-dialog-title h3{font-size:22px;line-height:1.08;letter-spacing:-.04em}
+    .refund-dialog-title p{color:rgba(210,222,250,.82);font-size:13px;line-height:1.65}
+    .refund-close{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--text);font-size:18px;cursor:pointer}
+    .refund-form-grid{display:grid;gap:10px}
+    .refund-field{display:grid;gap:6px}
+    .refund-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:rgba(188,201,238,.46)}
+    .refund-select,.refund-input{width:100%;height:42px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(6,10,22,.55);color:var(--text);padding:0 14px;font-size:13.5px;outline:none}
+    .refund-inline-note{border-radius:14px;padding:10px 12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.028);color:rgba(220,230,252,.84);font-size:12.5px;line-height:1.6}
+    .refund-footer{display:flex;gap:8px;justify-content:flex-end}
+    .refund-disabled{opacity:.6;pointer-events:none}
+
+
+@media (max-width:1280px){:root{--sidebar:270px;--rail:250px}}
 
     @media (max-width:1180px){
       .app{grid-template-columns:280px minmax(0,1fr)}
@@ -1125,6 +1160,28 @@
           </div>
         </div>
 
+        <div class="rail-card refund-card" id="refundCenterCard">
+          <div class="rail-title">Refund center</div>
+          <div class="refund-summary">
+            <div class="refund-metric">
+              <div class="refund-metric-label">Tier access</div>
+              <div id="refundTierAccess" class="refund-metric-value">Locked</div>
+            </div>
+            <div class="refund-metric">
+              <div class="refund-metric-label">Recent refunds</div>
+              <div id="refundHistoryCount" class="refund-metric-value">0</div>
+            </div>
+          </div>
+          <div id="refundCenterCopy" class="refund-copy">Connect Stripe, paste a payment intent or charge ID, and execute refunds from the workspace without using the browser console.</div>
+          <div class="refund-actions">
+            <button id="openRefundModalBtn" class="btn" type="button">Open refund UI</button>
+            <button id="refreshRefundHistoryBtn" class="ghost-btn" type="button">Refresh refund history</button>
+          </div>
+          <div id="refundHistoryList" class="refund-list">
+            <div class="refund-empty">No refund activity yet. When a refund runs, it will appear here with status and timestamp.</div>
+          </div>
+        </div>
+
         <div class="rail-card" id="usageCard">
           <div class="rail-title">Plan usage</div>
           <div class="usage-block">
@@ -1164,6 +1221,52 @@
         </div>
       </div>
     </aside>
+  </div>
+
+
+  <div class="refund-modal" id="refundModal" aria-hidden="true">
+    <div class="refund-dialog glass">
+      <div class="refund-dialog-head">
+        <div class="refund-dialog-title">
+          <h3>Refund UI</h3>
+          <p>Paste a PaymentIntent or Charge ID, optionally set a partial amount, and run a live refund from the workspace.</p>
+        </div>
+        <button id="closeRefundModalBtn" class="refund-close" type="button" aria-label="Close refund UI">×</button>
+      </div>
+
+      <div id="refundModalNote" class="refund-inline-note">Refund execution is locked until your plan allows live billing actions.</div>
+
+      <div class="refund-form-grid">
+        <label class="refund-field">
+          <span class="refund-label">PaymentIntent ID</span>
+          <input id="refundPaymentIntentInput" class="refund-input" type="text" placeholder="pi_..." />
+        </label>
+
+        <label class="refund-field">
+          <span class="refund-label">Charge ID</span>
+          <input id="refundChargeInput" class="refund-input" type="text" placeholder="ch_..." />
+        </label>
+
+        <label class="refund-field">
+          <span class="refund-label">Amount (optional)</span>
+          <input id="refundAmountInput" class="refund-input" type="number" min="0" step="0.01" placeholder="Leave blank for full refund" />
+        </label>
+
+        <label class="refund-field">
+          <span class="refund-label">Reason</span>
+          <select id="refundReasonSelect" class="refund-select">
+            <option value="requested_by_customer">Requested by customer</option>
+            <option value="duplicate">Duplicate</option>
+            <option value="fraudulent">Fraudulent</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="refund-footer">
+        <button id="cancelRefundModalBtn" class="ghost-btn" type="button">Cancel</button>
+        <button id="executeRefundBtn" class="btn" type="button">Run refund</button>
+      </div>
+    </div>
   </div>
 
   <script>

@@ -51,7 +51,23 @@
     stripeDisconnectBtn: document.getElementById("stripeDisconnectBtn"),
     stripeAccountPill: document.getElementById("stripeAccountPill"),
     stripeModePill: document.getElementById("stripeModePill"),
-    stripeIntegrationCopy: document.getElementById("stripeIntegrationCopy")
+    stripeIntegrationCopy: document.getElementById("stripeIntegrationCopy"),
+    refundCenterCard: document.getElementById("refundCenterCard"),
+    refundTierAccess: document.getElementById("refundTierAccess"),
+    refundHistoryCount: document.getElementById("refundHistoryCount"),
+    refundCenterCopy: document.getElementById("refundCenterCopy"),
+    openRefundModalBtn: document.getElementById("openRefundModalBtn"),
+    refreshRefundHistoryBtn: document.getElementById("refreshRefundHistoryBtn"),
+    refundHistoryList: document.getElementById("refundHistoryList"),
+    refundModal: document.getElementById("refundModal"),
+    closeRefundModalBtn: document.getElementById("closeRefundModalBtn"),
+    cancelRefundModalBtn: document.getElementById("cancelRefundModalBtn"),
+    executeRefundBtn: document.getElementById("executeRefundBtn"),
+    refundModalNote: document.getElementById("refundModalNote"),
+    refundPaymentIntentInput: document.getElementById("refundPaymentIntentInput"),
+    refundChargeInput: document.getElementById("refundChargeInput"),
+    refundAmountInput: document.getElementById("refundAmountInput"),
+    refundReasonSelect: document.getElementById("refundReasonSelect")
   };
 
   const state = {
@@ -70,7 +86,8 @@
     stickToBottom: true,
     stripeConnected: false,
     stripeAccountId: "",
-    stripeMode: ""
+    stripeMode: "",
+    refundHistory: []
   };
 
   const ICONS = {
@@ -870,6 +887,8 @@
     updateAuthStatus();
     updateTopbarStatus();
     updateStripeUI();
+    updateRefundUI();
+    renderRefundHistory([]);
   }
 
   function detailFromApiBody(data) {
@@ -901,7 +920,7 @@
 
   function formatMetric(value, digits = 0) {
     const num = Number(value || 0);
-    return Number.isFinite(num) ? num.toFixed(digits) : (digits ? (0).toFixed(digits) : "0");
+    return Number.isFinite(num) ? num.toFixed(digits) : digits ? (0).toFixed(digits) : "0";
   }
 
   function formatMoney(value) {
@@ -922,6 +941,225 @@
         return "Maximum capacity, premium control, and the strongest Xalvion operator environment.";
       default:
         return "Entry access with clear capacity limits and a visible upgrade path when usage pressure builds.";
+    }
+  }
+
+  function canUseRefundCenter() {
+    const tier = String(state.tier || "free").toLowerCase();
+    return tier === "pro" || tier === "elite";
+  }
+
+  function refundStatusTone(status) {
+    const value = String(status || "").toLowerCase();
+    if (value.includes("refund") || value === "executed" || value === "succeeded" || value === "success") return "success";
+    if (value.includes("fail") || value.includes("error") || value.includes("blocked")) return "error";
+    return "pending";
+  }
+
+  function formatRefundTimestamp(value) {
+    if (!value) return "Just now";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  function renderRefundHistory(logs = []) {
+    state.refundHistory = Array.isArray(logs) ? logs.slice() : [];
+
+    if (els.refundHistoryCount) {
+      setText(els.refundHistoryCount, String(state.refundHistory.length));
+    }
+
+    if (!els.refundHistoryList) return;
+
+    if (!state.refundHistory.length) {
+      els.refundHistoryList.innerHTML = '<div class="refund-empty">No refund activity yet. When a refund runs, it will appear here with status and timestamp.</div>';
+      return;
+    }
+
+    els.refundHistoryList.innerHTML = state.refundHistory.map((log) => {
+      const status = String(log.status || "pending");
+      const tone = refundStatusTone(status);
+      const amount = Number(log.amount || 0);
+      const title = amount > 0 ? `Refunded ${formatMoney(amount)}` : "Refund activity";
+      const reason = log.reason ? escapeHtml(log.reason) : "No reason provided";
+      const timestamp = formatRefundTimestamp(log.timestamp);
+      const username = log.username ? escapeHtml(log.username) : "workspace";
+      return `
+        <div class="refund-item">
+          <div class="refund-item-head">
+            <div class="refund-item-title">${escapeHtml(title)}</div>
+            <div class="refund-pill ${tone}">${escapeHtml(status)}</div>
+          </div>
+          <div class="refund-item-meta">
+            <span>${escapeHtml(timestamp)}</span>
+            <span>·</span>
+            <span>${username}</span>
+          </div>
+          <div class="refund-item-meta">
+            <span>${reason}</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function updateRefundUI() {
+    const allowed = canUseRefundCenter();
+    const accessLabel = allowed ? "Ready" : "Locked";
+
+    if (els.refundTierAccess) {
+      setText(els.refundTierAccess, accessLabel);
+    }
+
+    if (els.refundCenterCard) {
+      els.refundCenterCard.classList.toggle("refund-disabled", !allowed);
+    }
+
+    if (els.openRefundModalBtn) {
+      els.openRefundModalBtn.disabled = !allowed;
+    }
+
+    if (els.executeRefundBtn) {
+      els.executeRefundBtn.disabled = !allowed;
+    }
+
+    if (els.refundModalNote) {
+      els.refundModalNote.textContent = allowed
+        ? "Live refund execution is available on this plan. Use a PaymentIntent or Charge ID from Stripe."
+        : "Refund execution is locked until your plan allows live billing actions.";
+    }
+
+    if (els.refundCenterCopy) {
+      els.refundCenterCopy.textContent = allowed
+        ? "Open the refund UI, paste a PaymentIntent or Charge ID, and run a refund from the workspace."
+        : "Upgrade to Pro or Elite to unlock live refund execution from the workspace.";
+    }
+  }
+
+  function openRefundModal() {
+    updateRefundUI();
+    if (!canUseRefundCenter()) {
+      setNotice("warning", "Refunds locked", "Upgrade to Pro or Elite to unlock live refund execution.");
+      return;
+    }
+    if (els.refundModal) {
+      els.refundModal.classList.add("open");
+      els.refundModal.setAttribute("aria-hidden", "false");
+    }
+  }
+
+  function closeRefundModal() {
+    if (els.refundModal) {
+      els.refundModal.classList.remove("open");
+      els.refundModal.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  async function loadRefundHistory() {
+    updateRefundUI();
+
+    if (!state.token || !state.username) {
+      renderRefundHistory([]);
+      return;
+    }
+
+    try {
+      const query = new URLSearchParams({
+        action: "refund",
+        username: state.username,
+        limit: "8",
+        offset: "0"
+      });
+      const res = await fetch(`${API}/admin/action-logs?${query.toString()}`, {
+        headers: headers(false)
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 401) {
+        invalidateSessionFrom401();
+        renderRefundHistory([]);
+        return;
+      }
+
+      if (res.status === 403) {
+        renderRefundHistory([]);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(detailFromApiBody(data) || "Could not load refund history.");
+      }
+
+      renderRefundHistory(Array.isArray(data.logs) ? data.logs : []);
+    } catch (error) {
+      renderRefundHistory([]);
+    }
+  }
+
+  async function executeRefundFromModal() {
+    updateRefundUI();
+
+    if (!state.token || !state.username) {
+      setNotice("warning", "Authentication required", "Log in before running a live refund.");
+      return;
+    }
+
+    if (!canUseRefundCenter()) {
+      setNotice("warning", "Refunds locked", "Upgrade to Pro or Elite to unlock live refund execution.");
+      return;
+    }
+
+    const paymentIntentId = String(els.refundPaymentIntentInput?.value || "").trim();
+    const chargeId = String(els.refundChargeInput?.value || "").trim();
+    const amountRaw = String(els.refundAmountInput?.value || "").trim();
+    const refundReason = String(els.refundReasonSelect?.value || "requested_by_customer").trim();
+
+    if (!paymentIntentId && !chargeId) {
+      setNotice("warning", "Payment reference required", "Paste a PaymentIntent ID or Charge ID before running a refund.");
+      return;
+    }
+
+    const amount = amountRaw ? Number(amountRaw) : null;
+    if (amountRaw && (!Number.isFinite(amount) || amount <= 0)) {
+      setNotice("warning", "Invalid amount", "Enter a valid refund amount or leave it blank for a full refund.");
+      return;
+    }
+
+    if (els.executeRefundBtn) els.executeRefundBtn.disabled = true;
+
+    try {
+      const result = await executeStripeRefund({
+        paymentIntentId,
+        chargeId,
+        amount,
+        refundReason
+      });
+
+      const amountLabel = Number(result.amount || 0) > 0 ? ` ${formatMoney(result.amount)}` : "";
+
+      setNotice(
+        "success",
+        "Refund processed",
+        `Live refund${amountLabel} completed${result.refund_id ? ` · ${result.refund_id}` : ""}.`
+      );
+
+      if (els.refundPaymentIntentInput) els.refundPaymentIntentInput.value = "";
+      if (els.refundChargeInput) els.refundChargeInput.value = "";
+      if (els.refundAmountInput) els.refundAmountInput.value = "";
+
+      closeRefundModal();
+      await loadRefundHistory();
+    } catch (error) {
+      setNotice("error", "Refund failed", error.message || "Could not execute refund.");
+    } finally {
+      if (els.executeRefundBtn) els.executeRefundBtn.disabled = !canUseRefundCenter();
     }
   }
 
@@ -949,15 +1187,11 @@
     }
 
     if (els.stripeAccountPill) {
-      els.stripeAccountPill.textContent = connected && state.stripeAccountId
-        ? state.stripeAccountId
-        : "No account linked";
+      els.stripeAccountPill.textContent = connected && state.stripeAccountId ? state.stripeAccountId : "No account linked";
     }
 
     if (els.stripeModePill) {
-      els.stripeModePill.textContent = connected
-        ? (state.stripeMode || "Connected")
-        : "Awaiting connection";
+      els.stripeModePill.textContent = connected ? state.stripeMode || "Connected" : "Awaiting connection";
     }
 
     if (els.stripeIntegrationCopy) {
@@ -997,10 +1231,8 @@
 
       state.stripeMode = String(
         data.mode ||
-        data.stripe_mode ||
-        (state.stripeConnected
-          ? `${livemode ? "Live" : "Test"}${scope ? ` · ${scope}` : ""}`
-          : "")
+          data.stripe_mode ||
+          (state.stripeConnected ? `${livemode ? "Live" : "Test"}${scope ? ` · ${scope}` : ""}` : "")
       );
 
       updateStripeUI();
@@ -1132,11 +1364,7 @@
         `Refund ${result.refund_id} completed in ${result.currency || "USD"}.`
       );
     } catch (error) {
-      setNotice(
-        "error",
-        "Refund failed",
-        error.message || "Could not execute refund."
-      );
+      setNotice("error", "Refund failed", error.message || "Could not execute refund.");
     }
   }
 
@@ -1155,23 +1383,11 @@
           detail || "Refund execution is now live for this workspace."
         );
       } else if (stripe === "cancel") {
-        setNotice(
-          "warning",
-          "Stripe connection canceled",
-          detail || "Stripe was not connected."
-        );
+        setNotice("warning", "Stripe connection canceled", detail || "Stripe was not connected.");
       } else if (stripe === "error" || stripe === "connect_error") {
-        setNotice(
-          "error",
-          "Stripe connection failed",
-          detail || "Could not complete Stripe connection."
-        );
+        setNotice("error", "Stripe connection failed", detail || "Could not complete Stripe connection.");
       } else if (stripe === "disconnected") {
-        setNotice(
-          "success",
-          "Stripe disconnected",
-          detail || "Stripe has been disconnected from this workspace."
-        );
+        setNotice("success", "Stripe disconnected", detail || "Stripe has been disconnected from this workspace.");
       }
 
       url.searchParams.delete("stripe");
@@ -1232,6 +1448,7 @@
     }
 
     if (els.usagePanelCopy) els.usagePanelCopy.textContent = planCopy(state.tier);
+    updateRefundUI();
     persistAuth();
   }
 
@@ -1301,8 +1518,7 @@
     if (els.workspaceSubcopy) {
       if (state.latestRun) {
         const decision = state.latestRun.decision || {};
-        els.workspaceSubcopy.textContent =
-          `${formatTier(state.tier)} plan · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
+        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} plan · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
       } else {
         els.workspaceSubcopy.textContent = state.username
           ? `${formatTier(state.tier)} plan · live response loop · action visibility · premium support execution.`
@@ -1323,8 +1539,7 @@
     if (!els.systemPanelCopy) return;
 
     if (!data) {
-      els.systemPanelCopy.textContent =
-        "Use a common case type to prefill the composer and test response quality quickly.";
+      els.systemPanelCopy.textContent = "Use a common case type to prefill the composer and test response quality quickly.";
       return;
     }
 
@@ -1437,9 +1652,7 @@
 
   function addAssistantMessage(initialText = "") {
     clearEmptyState();
-    const initial = initialText
-      ? escapeHtml(initialText).replace(/\n/g, "<br>")
-      : createTypingMarkup();
+    const initial = initialText ? escapeHtml(initialText).replace(/\n/g, "<br>") : createTypingMarkup();
     const row = createMessageGroup("assistant", initial, true);
     els.messages?.appendChild(row);
     scrollMessagesToBottom(true);
@@ -1485,26 +1698,34 @@
 
     const confidence = Number(data.confidence || 0);
 
-    meta.appendChild(createMetaChip({
-      icon: ICONS.pulse,
-      text: `${formatMetric(confidence, 2)} conf`,
-      tone: confidenceTone(confidence)
-    }));
+    meta.appendChild(
+      createMetaChip({
+        icon: ICONS.pulse,
+        text: `${formatMetric(confidence, 2)} conf`,
+        tone: confidenceTone(confidence)
+      })
+    );
 
-    meta.appendChild(createMetaChip({
-      icon: ICONS.spark,
-      text: displayActionLabel(data)
-    }));
+    meta.appendChild(
+      createMetaChip({
+        icon: ICONS.spark,
+        text: displayActionLabel(data)
+      })
+    );
 
-    meta.appendChild(createMetaChip({
-      icon: ICONS.ticket,
-      text: displayQueueLabel(data)
-    }));
+    meta.appendChild(
+      createMetaChip({
+        icon: ICONS.ticket,
+        text: displayQueueLabel(data)
+      })
+    );
 
-    meta.appendChild(createMetaChip({
-      icon: ICONS.shield,
-      text: displayRiskLabel(data)
-    }));
+    meta.appendChild(
+      createMetaChip({
+        icon: ICONS.shield,
+        text: displayRiskLabel(data)
+      })
+    );
 
     return meta;
   }
@@ -1523,7 +1744,9 @@
       try {
         await navigator.clipboard.writeText(replyText || "");
         copyBtn.innerHTML = ICONS.check;
-        window.setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 1200);
+        window.setTimeout(() => {
+          copyBtn.innerHTML = ICONS.copy;
+        }, 1200);
       } catch {}
     });
 
@@ -1736,13 +1959,15 @@
 
   function updateStatsFromResult(data = {}) {
     state.totalInteractions += 1;
-    state.avgConfidence = state.totalInteractions === 1
-      ? Number(data.confidence || 0)
-      : ((state.avgConfidence * (state.totalInteractions - 1)) + Number(data.confidence || 0)) / state.totalInteractions;
+    state.avgConfidence =
+      state.totalInteractions === 1
+        ? Number(data.confidence || 0)
+        : (state.avgConfidence * (state.totalInteractions - 1) + Number(data.confidence || 0)) / state.totalInteractions;
 
-    state.avgQuality = state.totalInteractions === 1
-      ? Number(data.quality || 0)
-      : ((state.avgQuality * (state.totalInteractions - 1)) + Number(data.quality || 0)) / state.totalInteractions;
+    state.avgQuality =
+      state.totalInteractions === 1
+        ? Number(data.quality || 0)
+        : (state.avgQuality * (state.totalInteractions - 1) + Number(data.quality || 0)) / state.totalInteractions;
 
     setText(els.statInteractions, formatMetric(state.totalInteractions, 0));
     setText(els.statConfidence, formatMetric(state.avgConfidence, 2));
@@ -1867,9 +2092,7 @@
 
     const moneySaved = Number(impact.money_saved || impact.amount || data.amount || 0);
     const refundTotal = String(data.action || "").toLowerCase() === "refund" ? Number(data.amount || 0) : 0;
-    const autoRate = state.totalInteractions > 0
-      ? Math.round((state.actionsCount / state.totalInteractions) * 100)
-      : 0;
+    const autoRate = state.totalInteractions > 0 ? Math.round((state.actionsCount / state.totalInteractions) * 100) : 0;
     const churnSaved = Number(decision.priority === "high" && toolStatus !== "error");
 
     const revMoneySaved = document.getElementById("revMoneySaved");
@@ -1934,12 +2157,16 @@
             ["N", "Start a fresh thread"],
             ["D", "Load preview access demo"],
             ["E", "Export current thread"]
-          ].map(([key, desc]) => `
+          ]
+            .map(
+              ([key, desc]) => `
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);">
               <div style="font-size:13px;color:rgba(224,234,255,.9);">${escapeHtml(desc)}</div>
               <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:rgba(196,211,248,.74);">${escapeHtml(key)}</div>
             </div>
-          `).join("")}
+          `
+            )
+            .join("")}
         </div>
       </div>
     `;
@@ -2047,11 +2274,7 @@
       }
 
       updateTopbarStatus();
-      setNotice(
-        data.action === "review" ? "warning" : "success",
-        noticeTitleForResult(data),
-        replyText
-      );
+      setNotice(data.action === "review" ? "warning" : "success", noticeTitleForResult(data), replyText);
     } catch (error) {
       stepTimers.forEach((timer) => window.clearTimeout(timer));
       removeStreamSteps(stepsEl);
@@ -2126,6 +2349,7 @@
       setNotice("success", "Logged in", `Welcome back, ${username}. Your workspace is synced.`);
       await hydrateMe();
       await loadDashboardSummary();
+      await loadRefundHistory();
     } catch (error) {
       clearAuth();
       updateTopbarStatus();
@@ -2142,6 +2366,7 @@
     await hydrateMe();
     await loadDashboardSummary();
     await loadIntegrations();
+    await loadRefundHistory();
   }
 
   function activatePreviewAccess() {
@@ -2197,7 +2422,11 @@
       updateBackendStatus(res.ok);
 
       if (!res.ok) {
-        setNotice("warning", "Backend delayed", "The API is responding slowly or partially. The workspace will retry automatically.");
+        setNotice(
+          "warning",
+          "Backend delayed",
+          "The API is responding slowly or partially. The workspace will retry automatically."
+        );
         return;
       }
 
@@ -2372,6 +2601,14 @@
 
     els.stripeConnectBtn?.addEventListener("click", connectStripe);
     els.stripeDisconnectBtn?.addEventListener("click", disconnectStripe);
+    els.openRefundModalBtn?.addEventListener("click", openRefundModal);
+    els.refreshRefundHistoryBtn?.addEventListener("click", loadRefundHistory);
+    els.closeRefundModalBtn?.addEventListener("click", closeRefundModal);
+    els.cancelRefundModalBtn?.addEventListener("click", closeRefundModal);
+    els.executeRefundBtn?.addEventListener("click", executeRefundFromModal);
+    els.refundModal?.addEventListener("click", (event) => {
+      if (event.target === els.refundModal) closeRefundModal();
+    });
 
     els.fillButtons.forEach((button) => {
       button.addEventListener("click", () => {
@@ -2438,6 +2675,7 @@
 
       if (event.key === "Escape") {
         toggleKeyboardOverlay(false);
+        closeRefundModal();
       }
     });
   }
@@ -2461,6 +2699,8 @@
     updateStreamStatus("Response: ready");
     updateAuthStatus();
     updateStripeUI();
+    updateRefundUI();
+    renderRefundHistory([]);
     addEmptyState();
     scrollMessagesToBottom(true);
     setSending(false);
@@ -2469,6 +2709,7 @@
     const meResult = await hydrateMe();
     await loadDashboardSummary();
     await loadIntegrations();
+    await loadRefundHistory();
 
     if (meResult?.staleCleared) {
       setNotice(
