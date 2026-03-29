@@ -1719,21 +1719,34 @@ def debug_payment_intent(payment_intent_id: str):
             expand=["latest_charge", "charges"],
         )
 
-        def _as_dict(obj):
+        def _safe_dict(obj):
             if obj is None:
                 return None
-            if hasattr(obj, "to_dict_recursive"):
-                return obj.to_dict_recursive()
             if isinstance(obj, dict):
                 return obj
+            if hasattr(obj, "to_dict_recursive"):
+                try:
+                    return obj.to_dict_recursive()
+                except Exception:
+                    pass
             try:
                 return dict(obj)
             except Exception:
-                return str(obj)
+                return None
 
-        intent_dict = _as_dict(intent) or {}
+        intent_dict = _safe_dict(intent)
+
+        if not isinstance(intent_dict, dict):
+            return {
+                "intent_type": str(type(intent)),
+                "intent_repr": str(intent),
+                "intent_dict_type": str(type(intent_dict)),
+                "intent_dict_repr": str(intent_dict),
+            }
+
         latest_charge = intent_dict.get("latest_charge")
         charges_raw = intent_dict.get("charges")
+
         if isinstance(charges_raw, dict):
             charges = charges_raw.get("data") or []
         elif isinstance(charges_raw, list):
@@ -1742,17 +1755,19 @@ def debug_payment_intent(payment_intent_id: str):
             charges = []
 
         return {
+            "intent_type": str(type(intent)),
             "id": intent_dict.get("id"),
             "status": intent_dict.get("status"),
             "amount": intent_dict.get("amount"),
             "currency": intent_dict.get("currency"),
-            "latest_charge_type": type(latest_charge).__name__,
-            "latest_charge": latest_charge,
+            "latest_charge_type": str(type(latest_charge)),
+            "latest_charge_repr": str(latest_charge),
+            "charges_raw_type": str(type(charges_raw)),
             "charges_count": len(charges),
-            "charges": charges,
+            "charges_preview": [str(c) for c in charges[:3]],
         }
     except Exception as exc:
-        return {"error": str(exc)}
+        return {"error": str(exc), "error_type": str(type(exc))}
 
 @app.get("/app.js")
 def serve_app_js():
