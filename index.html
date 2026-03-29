@@ -1439,11 +1439,30 @@
           if (els.tierAccess) els.tierAccess.textContent = canRefund ? tier.toUpperCase() : 'Locked';
           if (els.accessNote) els.accessNote.textContent = canRefund ? `${tier.toUpperCase()} access confirmed. Live refunds will run against your configured Stripe account.` : `Your current tier is ${tier.toUpperCase()}. Upgrade to Pro or Elite to execute live refunds.`;
           if (els.centerCopy) els.centerCopy.textContent = canRefund ? 'Paste a payment intent or charge ID, confirm the refund, and track the result in the history feed below.' : 'Refund execution is locked on Free. Upgrade to Pro or Elite to unlock live billing actions.';
+          if (els.openBtn) els.openBtn.disabled = !canRefund;
+          if (els.executeBtn) els.executeBtn.disabled = !canRefund;
+          const noticeTitle = document.getElementById('noticeTitle');
+          if (!canRefund && noticeTitle && String(noticeTitle.textContent || '').toLowerCase().includes('refund processed')) {
+            safeNotice('warning', 'Refund access locked', `Your ${tier.toUpperCase()} access does not include live refunds. Upgrade to Pro or Elite to unlock refund execution.`);
+          }
         } catch (error) {
           if (els.tierAccess) els.tierAccess.textContent = 'Unknown';
         }
       }
       async function executeRefund() {
+        let me = null;
+        try {
+          const meRes = await fetch(`${API}/me`, { headers: authHeaders(false) });
+          me = await meRes.json().catch(() => ({}));
+        } catch (error) {
+          me = null;
+        }
+        const currentTier = String((me && me.tier) || 'free').toLowerCase();
+        const canRefund = currentTier === 'pro' || currentTier === 'elite';
+        if (!canRefund) {
+          safeNotice('warning', 'Refund access locked', `Your ${currentTier.toUpperCase()} access does not include live refunds. Upgrade to Pro or Elite to unlock refund execution.`);
+          return;
+        }
         const payment_intent_id = (els.paymentIntentInput?.value || '').trim();
         const charge_id = (els.chargeInput?.value || '').trim();
         const amountRaw = (els.amountInput?.value || '').trim();
