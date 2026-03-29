@@ -99,7 +99,7 @@ LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
 
 REFUND_RULES: dict[str, Any] = {
     "enabled": True,
-    "allowed_tiers": {"free", "pro", "elite"},
+    "allowed_tiers": {"pro", "elite"},
     "max_auto_refund_amount": 50.00,
     "allowed_issue_types": {
         "duplicate_charge",
@@ -109,7 +109,6 @@ REFUND_RULES: dict[str, Any] = {
         "refund_request",
         "billing_duplicate_charge",
         "general_support",
-        "manual_refund",
     },
     "blocked_order_statuses": set(),
     "min_confidence": 0.50,
@@ -2019,12 +2018,12 @@ def actions_refund(
         charge_id=req.charge_id,
         refund_reason=req.refund_reason,
         username=str(getattr(user, "username", "unknown") or "unknown"),
-        issue_type="manual_refund",
+        issue_type="billing_issue",
         user=user,
         result={
             "action": "refund",
             "amount": float(req.amount or 0),
-            "issue_type": "manual_refund",
+            "issue_type": "billing_issue",
             "order_status": "unknown",
             "confidence": 0.99,
             "quality": 0.99,
