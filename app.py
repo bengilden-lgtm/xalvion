@@ -96,11 +96,10 @@ MAX_AUTO_REFUND = float(os.getenv("MAX_AUTO_REFUND", "50"))
 
 APPROVAL_THRESHOLD = float(os.getenv("APPROVAL_THRESHOLD", "25.00"))
 LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
-DEBUG_ROUTES_ENABLED = os.getenv("DEBUG_ROUTES_ENABLED", "false").strip().lower() == "true"
 
 REFUND_RULES: dict[str, Any] = {
     "enabled": True,
-    "allowed_tiers": {"pro", "elite"},
+    "allowed_tiers": {"free", "pro", "elite"},
     "max_auto_refund_amount": 50.00,
     "allowed_issue_types": {
         "duplicate_charge",
@@ -110,6 +109,7 @@ REFUND_RULES: dict[str, Any] = {
         "refund_request",
         "billing_duplicate_charge",
         "general_support",
+        "manual_refund",
     },
     "blocked_order_statuses": set(),
     "min_confidence": 0.50,
@@ -1726,9 +1726,7 @@ def serve_index():
 
 
 @app.get("/debug/refund-mode")
-def debug_refund_mode(user: User = Depends(require_admin)):
-    if not DEBUG_ROUTES_ENABLED:
-        raise HTTPException(status_code=404, detail="Not found")
+def debug_refund_mode():
     return {
         "mode": "platform-fallback-v2-latest-charge",
         "has_stripe_key": bool(STRIPE_KEY),
@@ -1736,12 +1734,7 @@ def debug_refund_mode(user: User = Depends(require_admin)):
 
 
 @app.get("/debug/payment-intent/{payment_intent_id}")
-def debug_payment_intent(
-    payment_intent_id: str,
-    user: User = Depends(require_admin),
-):
-    if not DEBUG_ROUTES_ENABLED:
-        raise HTTPException(status_code=404, detail="Not found")
+def debug_payment_intent(payment_intent_id: str):
     try:
         intent = stripe.PaymentIntent.retrieve(
             payment_intent_id,

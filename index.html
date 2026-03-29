@@ -827,6 +827,45 @@
       to{opacity:1;transform:translateY(0) scale(1)}
     }
 
+
+
+    .refund-card{display:grid;gap:12px}
+    .refund-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .refund-metric{border-radius:16px;padding:12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.028);display:grid;gap:4px}
+    .refund-metric-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(188,201,238,.46);font-weight:800}
+    .refund-metric-value{font-size:20px;font-weight:800;letter-spacing:-.03em}
+    .refund-copy{font-size:12.5px;line-height:1.6;color:rgba(220,230,252,.86)}
+    .refund-actions{display:grid;gap:8px}
+    .refund-list{display:grid;gap:8px}
+    .refund-item{border-radius:16px;padding:11px 12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.024);display:grid;gap:6px;transition:border-color .16s ease, background .16s ease, transform .16s ease}
+    .refund-item:hover{border-color:rgba(139,111,255,.14);background:rgba(255,255,255,.04);transform:translateY(-1px)}
+    .refund-item-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .refund-item-title{font-size:12.5px;font-weight:700;color:rgba(240,245,255,.96);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .refund-pill{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;border:1px solid rgba(255,255,255,.08);font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;white-space:nowrap}
+    .refund-pill.success{background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.18);color:rgba(210,255,232,.96)}
+    .refund-pill.error{background:rgba(248,113,113,.10);border-color:rgba(248,113,113,.18);color:rgba(255,222,222,.96)}
+    .refund-pill.pending{background:rgba(96,165,250,.10);border-color:rgba(96,165,250,.18);color:rgba(223,236,255,.96)}
+    .refund-item-meta{display:flex;flex-wrap:wrap;gap:8px;color:rgba(194,208,242,.72);font-size:11px;line-height:1.5}
+    .refund-empty{border-radius:16px;padding:14px;border:1px dashed rgba(255,255,255,.08);color:rgba(194,208,242,.68);font-size:12px;line-height:1.6;background:rgba(255,255,255,.018)}
+    .refund-modal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(5,8,15,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .refund-modal.open{display:flex}
+    .refund-dialog{width:min(560px,100%);border-radius:28px;padding:18px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg, rgba(18,24,38,.92), rgba(9,13,24,.94));box-shadow:0 36px 100px rgba(0,0,0,.42);display:grid;gap:14px;position:relative;overflow:hidden}
+    .refund-dialog::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 84% 10%, rgba(139,111,255,.14), transparent 28%)}
+    .refund-dialog > *{position:relative;z-index:1}
+    .refund-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .refund-dialog-title{display:grid;gap:6px}
+    .refund-dialog-title h3{font-size:22px;line-height:1.08;letter-spacing:-.04em}
+    .refund-dialog-title p{color:rgba(210,222,250,.82);font-size:13px;line-height:1.65}
+    .refund-close{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--text);font-size:18px;cursor:pointer}
+    .refund-form-grid{display:grid;gap:10px}
+    .refund-field{display:grid;gap:6px}
+    .refund-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:rgba(188,201,238,.46)}
+    .refund-field textarea{min-height:100px;resize:vertical;padding:12px 14px;border-radius:16px;border:1px solid rgba(255,255,255,.14);background:rgba(6,10,22,.55);color:var(--text);font-size:13.5px;line-height:1.6;outline:none}
+    .refund-field textarea:focus,.refund-field .input:focus{border-color:rgba(139,111,255,.38);box-shadow:0 0 0 3px rgba(139,111,255,.12)}
+    .refund-helper{color:rgba(194,208,242,.68);font-size:12px;line-height:1.55}
+    .refund-inline-note{border-radius:14px;padding:10px 12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.028);color:rgba(220,230,252,.84);font-size:12.5px;line-height:1.6}
+    @media (max-width: 720px){.refund-summary{grid-template-columns:1fr}.refund-dialog{padding:16px;border-radius:22px}}
+
     @media (max-width:1280px){:root{--sidebar:270px;--rail:250px}}
 
     @media (max-width:1180px){
@@ -1125,6 +1164,28 @@
           </div>
         </div>
 
+        <div class="rail-card refund-card" id="refundCenterCard">
+          <div class="rail-title">Refund center</div>
+          <div class="refund-summary">
+            <div class="refund-metric">
+              <div class="refund-metric-label">Tier access</div>
+              <div id="refundTierAccess" class="refund-metric-value">Locked</div>
+            </div>
+            <div class="refund-metric">
+              <div class="refund-metric-label">Recent refunds</div>
+              <div id="refundHistoryCount" class="refund-metric-value">0</div>
+            </div>
+          </div>
+          <div id="refundCenterCopy" class="refund-copy">Connect Stripe, paste a payment intent, and execute refunds from the workspace without using the browser console.</div>
+          <div class="refund-actions">
+            <button id="openRefundModalBtn" class="btn" type="button">Open refund UI</button>
+            <button id="refreshRefundHistoryBtn" class="ghost-btn" type="button">Refresh refund history</button>
+          </div>
+          <div id="refundHistoryList" class="refund-list">
+            <div class="refund-empty">No refund activity yet. When a refund runs, it will appear here with status and timestamp.</div>
+          </div>
+        </div>
+
         <div class="rail-card" id="usageCard">
           <div class="rail-title">Plan usage</div>
           <div class="usage-block">
@@ -1229,7 +1290,200 @@
     })();
   </script>
 
+  <div id="refundModal" class="refund-modal" aria-hidden="true">
+    <div class="refund-dialog">
+      <div class="refund-dialog-head">
+        <div class="refund-dialog-title">
+          <h3>Execute refund</h3>
+          <p>Paste a PaymentIntent or Charge ID, choose an optional amount, and run a live refund with a proper confirmation flow.</p>
+        </div>
+        <button id="closeRefundModalBtn" class="refund-close" type="button" aria-label="Close refund dialog">×</button>
+      </div>
+      <div class="refund-inline-note" id="refundAccessNote">Refund execution is available on paid tiers and uses your existing Stripe integration.</div>
+      <div class="refund-form-grid">
+        <div class="refund-field">
+          <label for="refundPaymentIntentInput" class="refund-label">PaymentIntent ID</label>
+          <input id="refundPaymentIntentInput" class="input" type="text" placeholder="pi_..." />
+          <div class="refund-helper">Use a fresh payment if you want to test a successful live refund.</div>
+        </div>
+        <div class="refund-field">
+          <label for="refundChargeInput" class="refund-label">Charge ID (optional)</label>
+          <input id="refundChargeInput" class="input" type="text" placeholder="ch_..." />
+        </div>
+        <div class="refund-field">
+          <label for="refundAmountInput" class="refund-label">Amount in major currency units (optional)</label>
+          <input id="refundAmountInput" class="input" type="number" min="0" step="0.01" placeholder="Leave blank for full remaining refund" />
+        </div>
+        <div class="refund-field">
+          <label for="refundReasonSelect" class="refund-label">Refund reason</label>
+          <select id="refundReasonSelect" class="input">
+            <option value="requested_by_customer">Requested by customer</option>
+            <option value="duplicate">Duplicate</option>
+            <option value="fraudulent">Fraudulent</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button id="refundExecuteBtn" class="btn" type="button">Run refund</button>
+        <button id="refundCancelBtn" class="ghost-btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/fluid/script.js"></script>
   <script src="/app.js"></script>
+  <script>
+    (() => {
+      const TOKEN_KEY = "xalvion_token";
+      const API = "";
+      const els = {
+        modal: document.getElementById("refundModal"),
+        openBtn: document.getElementById("openRefundModalBtn"),
+        closeBtn: document.getElementById("closeRefundModalBtn"),
+        cancelBtn: document.getElementById("refundCancelBtn"),
+        executeBtn: document.getElementById("refundExecuteBtn"),
+        refreshBtn: document.getElementById("refreshRefundHistoryBtn"),
+        paymentIntentInput: document.getElementById("refundPaymentIntentInput"),
+        chargeInput: document.getElementById("refundChargeInput"),
+        amountInput: document.getElementById("refundAmountInput"),
+        reasonSelect: document.getElementById("refundReasonSelect"),
+        accessNote: document.getElementById("refundAccessNote"),
+        centerCopy: document.getElementById("refundCenterCopy"),
+        tierAccess: document.getElementById("refundTierAccess"),
+        historyCount: document.getElementById("refundHistoryCount"),
+        historyList: document.getElementById("refundHistoryList")
+      };
+
+      function token() { return localStorage.getItem(TOKEN_KEY) || ""; }
+      function authHeaders(json = false) {
+        const headers = {};
+        if (json) headers["Content-Type"] = "application/json";
+        const t = token();
+        if (t) headers.Authorization = `Bearer ${t}`;
+        return headers;
+      }
+      function setModal(open) {
+        if (!els.modal) return;
+        els.modal.classList.toggle("open", Boolean(open));
+        els.modal.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.style.overflow = open ? "hidden" : "";
+      }
+      function safeNotice(kind, title, detail) {
+        const notice = document.getElementById("notice");
+        if (notice) {
+          notice.classList.remove("success", "warning", "error", "info");
+          notice.classList.add(kind || "info");
+        }
+        const titleEl = document.getElementById("noticeTitle");
+        const detailEl = document.getElementById("noticeDetail");
+        if (titleEl) titleEl.textContent = title;
+        if (detailEl) detailEl.textContent = detail;
+      }
+      function formatDate(value) {
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return "Unknown time";
+        return d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      }
+      function formatAmount(value) {
+        const n = Number(value || 0);
+        return Number.isFinite(n) ? `$${n.toFixed(2)}` : "$0.00";
+      }
+      function statusTone(status) {
+        const s = String(status || "").toLowerCase();
+        if (s.includes("refund") || s === "refunded") return "success";
+        if (s.includes("failed") || s.includes("blocked") || s.includes("error")) return "error";
+        return "pending";
+      }
+      function escapeHtml(value) {
+        return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+      }
+      function renderHistory(items) {
+        if (!els.historyList) return;
+        if (!Array.isArray(items) || !items.length) {
+          els.historyList.innerHTML = '<div class="refund-empty">No refund activity yet. When a refund runs, it will appear here with status and timestamp.</div>';
+          if (els.historyCount) els.historyCount.textContent = '0';
+          return;
+        }
+        if (els.historyCount) els.historyCount.textContent = String(items.length);
+        els.historyList.innerHTML = items.map((item) => {
+          const ref = escapeHtml(String(item.message_snippet || '').trim() || `Refund #${item.id}`);
+          const status = escapeHtml(String(item.status || 'pending').replace(/_/g, ' '));
+          const tone = statusTone(status);
+          return `<div class="refund-item"><div class="refund-item-head"><div class="refund-item-title">${ref}</div><span class="refund-pill ${tone}">${status}</span></div><div class="refund-item-meta"><span>${formatAmount(item.amount)}</span><span>${formatDate(item.timestamp)}</span><span>${escapeHtml(String(item.reason || 'Manual refund'))}</span></div></div>`;
+        }).join('');
+      }
+      async function loadRefundHistory() {
+        if (!token()) { renderHistory([]); return; }
+        try {
+          const res = await fetch(`${API}/billing/refund-history?limit=8`, { headers: authHeaders(false) });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error((data && data.detail) || 'Could not load refund history.');
+          renderHistory(data.items || []);
+        } catch (error) {
+          renderHistory([]);
+          if (els.centerCopy) els.centerCopy.textContent = error.message || 'Could not load refund history.';
+        }
+      }
+      async function loadRefundAccess() {
+        if (!token()) {
+          if (els.tierAccess) els.tierAccess.textContent = 'Sign in';
+          if (els.accessNote) els.accessNote.textContent = 'Sign in to execute refunds and view your recent refund activity.';
+          return;
+        }
+        try {
+          const res = await fetch(`${API}/me`, { headers: authHeaders(false) });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error((data && data.detail) || 'Could not load account access.');
+          const tier = String(data.tier || 'free').toLowerCase();
+          const canRefund = tier === 'pro' || tier === 'elite';
+          if (els.tierAccess) els.tierAccess.textContent = canRefund ? tier.toUpperCase() : 'Locked';
+          if (els.accessNote) els.accessNote.textContent = canRefund ? `${tier.toUpperCase()} access confirmed. Live refunds will run against your configured Stripe account.` : `Your current tier is ${tier.toUpperCase()}. Upgrade to Pro or Elite to execute live refunds.`;
+          if (els.centerCopy) els.centerCopy.textContent = canRefund ? 'Paste a payment intent or charge ID, confirm the refund, and track the result in the history feed below.' : 'Refund execution is locked on Free. Upgrade to Pro or Elite to unlock live billing actions.';
+        } catch (error) {
+          if (els.tierAccess) els.tierAccess.textContent = 'Unknown';
+        }
+      }
+      async function executeRefund() {
+        const payment_intent_id = (els.paymentIntentInput?.value || '').trim();
+        const charge_id = (els.chargeInput?.value || '').trim();
+        const amountRaw = (els.amountInput?.value || '').trim();
+        const refund_reason = els.reasonSelect?.value || 'requested_by_customer';
+        if (!payment_intent_id && !charge_id) {
+          safeNotice('warning', 'Payment reference required', 'Paste a PaymentIntent ID or Charge ID before running a refund.');
+          return;
+        }
+        const payload = { payment_intent_id: payment_intent_id || null, charge_id: charge_id || null, refund_reason };
+        if (amountRaw) payload.amount = Number(amountRaw);
+        const original = els.executeBtn?.textContent || 'Run refund';
+        if (els.executeBtn) { els.executeBtn.disabled = true; els.executeBtn.textContent = 'Processing...'; }
+        try {
+          const res = await fetch(`${API}/actions/refund`, { method: 'POST', headers: authHeaders(true), body: JSON.stringify(payload) });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error((data && data.detail) || 'Refund failed.');
+          safeNotice('success', 'Refund processed', `Refund ${data.refund_id || ''} completed successfully.`.trim());
+          setModal(false);
+          if (els.paymentIntentInput) els.paymentIntentInput.value = '';
+          if (els.chargeInput) els.chargeInput.value = '';
+          if (els.amountInput) els.amountInput.value = '';
+          await loadRefundHistory();
+          await loadRefundAccess();
+        } catch (error) {
+          safeNotice('error', 'Refund failed', error.message || 'Could not execute refund.');
+        } finally {
+          if (els.executeBtn) { els.executeBtn.disabled = false; els.executeBtn.textContent = original; }
+        }
+      }
+      function bind() {
+        els.openBtn?.addEventListener('click', () => setModal(true));
+        els.closeBtn?.addEventListener('click', () => setModal(false));
+        els.cancelBtn?.addEventListener('click', () => setModal(false));
+        els.refreshBtn?.addEventListener('click', () => { loadRefundHistory(); loadRefundAccess(); });
+        els.executeBtn?.addEventListener('click', executeRefund);
+        els.modal?.addEventListener('click', (event) => { if (event.target === els.modal) setModal(false); });
+        window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && els.modal?.classList.contains('open')) setModal(false); });
+      }
+      window.addEventListener('load', () => { bind(); loadRefundAccess(); loadRefundHistory(); });
+    })();
+  </script>
 </body>
 </html>
