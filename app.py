@@ -1674,6 +1674,14 @@ def serve_index():
     return JSONResponse({"status": "ok", "service": "xalvion-sovereign-brain", "warning": "index.html not found"})
 
 
+@app.get("/debug/refund-mode")
+def debug_refund_mode():
+    return {
+        "mode": "platform-fallback-v1",
+        "has_stripe_key": bool(STRIPE_KEY),
+    }
+
+
 @app.get("/app.js")
 def serve_app_js():
     if os.path.exists(APP_JS_PATH):
