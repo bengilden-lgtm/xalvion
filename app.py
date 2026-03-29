@@ -988,40 +988,96 @@ def get_charge_context(
     pi = (payment_intent_id or "").strip()
     cid = (charge_id or "").strip()
 
-    def _retrieve_payment_intent(intent_id: str, acct: str | None):
-        kwargs: dict[str, Any] = {
-            "expand": ["latest_charge", "charges"],
-        }
-        if acct:
-            kwargs["stripe_account"] = acct
-        obj = stripe.PaymentIntent.retrieve(intent_id, **kwargs)
-        return obj, acct if acct else None
+    def _stripe_kwargs(acct: str | None) -> dict[str, Any]:
+        return {"stripe_account": acct} if acct else {}
 
-    def _retrieve_charge(charge_id_value: str, acct: str | None):
-        if acct:
-            obj = stripe.Charge.retrieve(charge_id_value, stripe_account=acct)
-            return obj, acct
-        obj = stripe.Charge.retrieve(charge_id_value)
-        return obj, None
+    def _obj_get(obj: Any, key: str, default: Any = None) -> Any:
+        if obj is None:
+            return default
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        try:
+            value = getattr(obj, key)
+            return default if value is None else value
+        except Exception:
+            pass
+        try:
+            return obj[key]
+        except Exception:
+            return default
 
-    def _list_charges_for_payment_intent(intent_id: str, acct: str | None):
-        if acct:
-            obj = stripe.Charge.list(payment_intent=intent_id, limit=10, stripe_account=acct)
-            return obj, acct
-        obj = stripe.Charge.list(payment_intent=intent_id, limit=10)
-        return obj, None
-
-    def _as_dict(obj: Any) -> dict[str, Any]:
+    def _obj_to_dict(obj: Any) -> dict[str, Any]:
         if obj is None:
             return {}
-        if hasattr(obj, "to_dict_recursive"):
-            return obj.to_dict_recursive()
         if isinstance(obj, dict):
             return obj
+        if hasattr(obj, "to_dict_recursive"):
+            try:
+                data = obj.to_dict_recursive()
+                if isinstance(data, dict):
+                    return data
+            except Exception:
+                pass
         try:
-            return dict(obj)
+            data = dict(obj)
+            if isinstance(data, dict):
+                return data
         except Exception:
+            pass
+        return {}
+
+    def _charge_payload(charge_obj: Any) -> dict[str, Any]:
+        charge = _obj_to_dict(charge_obj)
+        if not charge:
             return {}
+        return {
+            "charge_id": str(charge.get("id", "") or ""),
+            "charge_amount": int(charge.get("amount", 0) or 0),
+            "currency": str(charge.get("currency", "usd") or "usd").upper(),
+            "captured": bool(charge.get("captured", True)),
+            "refunded": bool(charge.get("refunded", False)),
+            "amount_refunded": int(charge.get("amount_refunded", 0) or 0),
+            "payment_intent_id": str(charge.get("payment_intent", "") or ""),
+        }
+
+    def _find_charge_for_intent(intent_id: str, acct: str | None) -> tuple[dict[str, Any] | None, str | None, dict[str, Any]]:
+        kwargs = _stripe_kwargs(acct)
+        intent_obj = stripe.PaymentIntent.retrieve(intent_id, expand=["latest_charge"], **kwargs)
+        intent_status = str(_obj_get(intent_obj, "status", "") or "")
+        intent_amount = int(_obj_get(intent_obj, "amount", 0) or 0)
+        intent_currency = str(_obj_get(intent_obj, "currency", "usd") or "usd").upper()
+
+        latest_charge = _obj_get(intent_obj, "latest_charge")
+        if latest_charge:
+            if isinstance(latest_charge, str):
+                latest_charge = stripe.Charge.retrieve(latest_charge, **kwargs)
+            charge_info = _charge_payload(latest_charge)
+            if charge_info.get("charge_id"):
+                if not charge_info.get("payment_intent_id"):
+                    charge_info["payment_intent_id"] = intent_id
+                return charge_info, acct if acct else None, {
+                    "status": intent_status,
+                    "amount": intent_amount,
+                    "currency": intent_currency,
+                }
+
+        listed = stripe.Charge.list(payment_intent=intent_id, limit=10, **kwargs)
+        for item in list(getattr(listed, "data", None) or []):
+            charge_info = _charge_payload(item)
+            if charge_info.get("charge_id"):
+                if not charge_info.get("payment_intent_id"):
+                    charge_info["payment_intent_id"] = intent_id
+                return charge_info, acct if acct else None, {
+                    "status": intent_status,
+                    "amount": intent_amount,
+                    "currency": intent_currency,
+                }
+
+        return None, acct if acct else None, {
+            "status": intent_status,
+            "amount": intent_amount,
+            "currency": intent_currency,
+        }
 
     if platform_only:
         accounts_to_try: list[str | None] = [None]
@@ -1036,66 +1092,30 @@ def get_charge_context(
     if pi:
         for acct in accounts_to_try:
             try:
-                intent_obj, resolved_account = _retrieve_payment_intent(pi, acct)
-                intent = _as_dict(intent_obj)
-
-                charge: dict[str, Any] | None = None
-
-                charges_block = intent.get("charges")
-                charges: list[Any] = []
-
-                if isinstance(charges_block, dict):
-                    charges = charges_block.get("data") or []
-                elif isinstance(charges_block, list):
-                    charges = charges_block
-                else:
-                    charges = []
-
-                if charges:
-                    first_charge = charges[0]
-                    charge = first_charge if isinstance(first_charge, dict) else _as_dict(first_charge)
-
-                if not charge:
-                    latest_charge = intent.get("latest_charge")
-                    if isinstance(latest_charge, dict):
-                        charge = latest_charge
-                    elif latest_charge:
-                        latest_charge_id = str(latest_charge).strip()
-                        if latest_charge_id:
-                            charge_obj, resolved_account = _retrieve_charge(latest_charge_id, acct)
-                            charge = _as_dict(charge_obj)
-
-                if not charge:
-                    charge_list_obj, resolved_account = _list_charges_for_payment_intent(pi, acct)
-                    charge_list = _as_dict(charge_list_obj)
-                    listed = charge_list.get("data") or []
-                    if listed:
-                        first_listed = listed[0]
-                        charge = first_listed if isinstance(first_listed, dict) else _as_dict(first_listed)
-
-                if charge:
+                charge_info, resolved_account, intent_meta = _find_charge_for_intent(pi, acct)
+                if charge_info:
                     return {
-                        "payment_intent_id": pi,
-                        "charge_id": str(charge.get("id", "") or ""),
-                        "charge_amount": int(charge.get("amount", intent.get("amount", 0)) or 0),
-                        "currency": str(charge.get("currency", intent.get("currency", "usd")) or "usd").upper(),
-                        "captured": bool(charge.get("captured", True)),
-                        "refunded": bool(charge.get("refunded", False)),
-                        "amount_refunded": int(charge.get("amount_refunded", 0) or 0),
-                        "status": str(intent.get("status", "") or ""),
+                        "payment_intent_id": charge_info.get("payment_intent_id") or pi,
+                        "charge_id": charge_info.get("charge_id", ""),
+                        "charge_amount": int(charge_info.get("charge_amount", intent_meta.get("amount", 0)) or 0),
+                        "currency": str(charge_info.get("currency", intent_meta.get("currency", "USD")) or "USD").upper(),
+                        "captured": bool(charge_info.get("captured", True)),
+                        "refunded": bool(charge_info.get("refunded", False)),
+                        "amount_refunded": int(charge_info.get("amount_refunded", 0) or 0),
+                        "status": str(intent_meta.get("status", "") or ""),
                         "resolved_stripe_account_id": resolved_account,
                     }
 
-                if str(intent.get("status", "") or "").lower() == "succeeded":
+                if str(intent_meta.get("status", "") or "").lower() == "succeeded":
                     return {
                         "payment_intent_id": pi,
                         "charge_id": "",
-                        "charge_amount": int(intent.get("amount", 0) or 0),
-                        "currency": str(intent.get("currency", "usd") or "usd").upper(),
+                        "charge_amount": int(intent_meta.get("amount", 0) or 0),
+                        "currency": str(intent_meta.get("currency", "USD") or "USD").upper(),
                         "captured": True,
                         "refunded": False,
                         "amount_refunded": 0,
-                        "status": str(intent.get("status", "") or ""),
+                        "status": str(intent_meta.get("status", "") or ""),
                         "resolved_stripe_account_id": resolved_account,
                     }
 
@@ -1108,19 +1128,20 @@ def get_charge_context(
     if cid:
         for acct in accounts_to_try:
             try:
-                charge_obj, resolved_account = _retrieve_charge(cid, acct)
-                charge = _as_dict(charge_obj)
+                kwargs = _stripe_kwargs(acct)
+                charge_obj = stripe.Charge.retrieve(cid, **kwargs)
+                charge_info = _charge_payload(charge_obj)
 
                 return {
-                    "payment_intent_id": str(charge.get("payment_intent", "") or ""),
+                    "payment_intent_id": charge_info.get("payment_intent_id", ""),
                     "charge_id": cid,
-                    "charge_amount": int(charge.get("amount", 0) or 0),
-                    "currency": str(charge.get("currency", "usd") or "usd").upper(),
-                    "captured": bool(charge.get("captured", True)),
-                    "refunded": bool(charge.get("refunded", False)),
-                    "amount_refunded": int(charge.get("amount_refunded", 0) or 0),
-                    "status": "succeeded" if bool(charge.get("paid", False)) else str(charge.get("status", "") or ""),
-                    "resolved_stripe_account_id": resolved_account,
+                    "charge_amount": int(charge_info.get("charge_amount", 0) or 0),
+                    "currency": str(charge_info.get("currency", "USD") or "USD").upper(),
+                    "captured": bool(charge_info.get("captured", True)),
+                    "refunded": bool(charge_info.get("refunded", False)),
+                    "amount_refunded": int(charge_info.get("amount_refunded", 0) or 0),
+                    "status": "succeeded" if bool(_obj_get(charge_obj, "paid", False)) else str(_obj_get(charge_obj, "status", "") or ""),
+                    "resolved_stripe_account_id": acct if acct else None,
                 }
             except Exception as exc:
                 last_error = exc
@@ -1719,55 +1740,34 @@ def debug_payment_intent(payment_intent_id: str):
             expand=["latest_charge", "charges"],
         )
 
-        def _safe_dict(obj):
+        def _as_dict(obj):
             if obj is None:
                 return None
+            if hasattr(obj, "to_dict_recursive"):
+                return obj.to_dict_recursive()
             if isinstance(obj, dict):
                 return obj
-            if hasattr(obj, "to_dict_recursive"):
-                try:
-                    return obj.to_dict_recursive()
-                except Exception:
-                    pass
             try:
                 return dict(obj)
             except Exception:
-                return None
+                return str(obj)
 
-        intent_dict = _safe_dict(intent)
-
-        if not isinstance(intent_dict, dict):
-            return {
-                "intent_type": str(type(intent)),
-                "intent_repr": str(intent),
-                "intent_dict_type": str(type(intent_dict)),
-                "intent_dict_repr": str(intent_dict),
-            }
-
+        intent_dict = _as_dict(intent) or {}
         latest_charge = intent_dict.get("latest_charge")
-        charges_raw = intent_dict.get("charges")
-
-        if isinstance(charges_raw, dict):
-            charges = charges_raw.get("data") or []
-        elif isinstance(charges_raw, list):
-            charges = charges_raw
-        else:
-            charges = []
+        charges = ((intent_dict.get("charges") or {}).get("data") or [])
 
         return {
-            "intent_type": str(type(intent)),
             "id": intent_dict.get("id"),
             "status": intent_dict.get("status"),
             "amount": intent_dict.get("amount"),
             "currency": intent_dict.get("currency"),
-            "latest_charge_type": str(type(latest_charge)),
-            "latest_charge_repr": str(latest_charge),
-            "charges_raw_type": str(type(charges_raw)),
+            "latest_charge_type": type(latest_charge).__name__,
+            "latest_charge": latest_charge,
             "charges_count": len(charges),
-            "charges_preview": [str(c) for c in charges[:3]],
+            "charges": charges,
         }
     except Exception as exc:
-        return {"error": str(exc), "error_type": str(type(exc))}
+        return {"error": str(exc)}
 
 @app.get("/app.js")
 def serve_app_js():
