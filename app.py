@@ -469,6 +469,21 @@ class TicketStatusRequest(BaseModel):
     priority: str | None = None
     internal_note: str | None = None
 
+
+class RefundActionRequest(BaseModel):
+    payment_intent_id: str | None = None
+    charge_id: str | None = None
+    amount: float | None = None
+    refund_reason: str | None = None
+
+
+class ChargeActionRequest(BaseModel):
+    customer_id: str
+    payment_method_id: str
+    amount: int
+    currency: str = "usd"
+    description: str | None = None
+
 # =============================================================================
 # 6. AUTH HELPERS
 # =============================================================================
@@ -1145,6 +1160,59 @@ def execute_real_refund(
         return {"ok": False, "status": "stripe_refund_failed", "detail": str(exc)}
 
 
+def require_connected_stripe_account(user: User) -> str:
+    if not STRIPE_KEY:
+        raise HTTPException(status_code=500, detail="Stripe not configured.")
+    if not getattr(user, "stripe_connected", 0):
+        raise HTTPException(status_code=400, detail="Stripe not connected.")
+    stripe_account_id = str(getattr(user, "stripe_account_id", "") or "").strip()
+    if not stripe_account_id:
+        raise HTTPException(status_code=400, detail="Missing connected Stripe account.")
+    return stripe_account_id
+
+
+def execute_manual_charge(
+    *,
+    user: User,
+    customer_id: str,
+    payment_method_id: str,
+    amount: int,
+    currency: str = "usd",
+    description: str | None = None,
+) -> dict[str, Any]:
+    stripe_account_id = require_connected_stripe_account(user)
+
+    cents = int(amount or 0)
+    if cents <= 0:
+        raise HTTPException(status_code=400, detail="Charge amount must be greater than zero.")
+
+    try:
+        intent = stripe.PaymentIntent.create(
+            amount=cents,
+            currency=(currency or "usd").strip().lower(),
+            customer=(customer_id or "").strip(),
+            payment_method=(payment_method_id or "").strip(),
+            confirm=True,
+            off_session=True,
+            description=(description or "Xalvion support charge").strip(),
+            stripe_account=stripe_account_id,
+        )
+        return {
+            "ok": True,
+            "status": str(getattr(intent, "status", "") or ""),
+            "payment_intent_id": str(getattr(intent, "id", "") or ""),
+            "amount": int(getattr(intent, "amount", cents) or cents) / 100,
+            "currency": str(getattr(intent, "currency", currency) or currency).upper(),
+            "customer_id": customer_id,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "status": "stripe_charge_failed",
+            "detail": str(exc),
+        }
+
+
 def apply_real_actions(result: dict[str, Any], req: SupportRequest, user: User) -> dict[str, Any]:
     result = dict(result or {})
     if str(result.get("action", "none") or "none").lower() != "refund":
@@ -1693,6 +1761,55 @@ def integrations_stripe_disconnect(user: User = Depends(require_authenticated_us
     db_user.stripe_scope = None
     db.commit()
     return {"ok": True, "stripe_connected": False}
+
+
+@app.post("/actions/refund")
+def actions_refund(
+    req: RefundActionRequest,
+    user: User = Depends(require_authenticated_user),
+):
+    result = execute_real_refund(
+        amount=float(req.amount or 0),
+        payment_intent_id=req.payment_intent_id,
+        charge_id=req.charge_id,
+        refund_reason=req.refund_reason,
+        username=str(getattr(user, "username", "unknown") or "unknown"),
+        issue_type="manual_refund",
+        user=user,
+        result={
+            "action": "refund",
+            "amount": float(req.amount or 0),
+            "issue_type": "manual_refund",
+            "order_status": "unknown",
+            "confidence": 0.99,
+            "quality": 0.99,
+        },
+    )
+
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=str(result.get("detail", "Refund failed.")))
+
+    return result
+
+
+@app.post("/actions/charge")
+def actions_charge(
+    req: ChargeActionRequest,
+    user: User = Depends(require_authenticated_user),
+):
+    result = execute_manual_charge(
+        user=user,
+        customer_id=req.customer_id,
+        payment_method_id=req.payment_method_id,
+        amount=req.amount,
+        currency=req.currency,
+        description=req.description,
+    )
+
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=str(result.get("detail", "Charge failed.")))
+
+    return result
 
 # =============================================================================
 # 16. ROUTES — BILLING & PLANS

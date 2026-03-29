@@ -825,6 +825,27 @@
     return out;
   }
 
+  async function apiPost(path, body) {
+    const res = await fetch(`${API}${path}`, {
+      method: "POST",
+      headers: headers(true),
+      body: JSON.stringify(body || {})
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 401) {
+      invalidateSessionFrom401();
+      throw new Error(detailFromApiBody(data) || "Session expired.");
+    }
+
+    if (!res.ok) {
+      throw new Error(detailFromApiBody(data) || "Request failed.");
+    }
+
+    return data;
+  }
+
   function persistAuth() {
     if (state.token) localStorage.setItem(TOKEN_KEY, state.token);
     else localStorage.removeItem(TOKEN_KEY);
@@ -1047,6 +1068,70 @@
       setNotice("error", "Disconnect failed", error.message || "Could not disconnect Stripe.");
     } finally {
       if (els.stripeDisconnectBtn) els.stripeDisconnectBtn.disabled = false;
+    }
+  }
+
+  async function executeStripeRefund({
+    paymentIntentId = "",
+    chargeId = "",
+    amount = null,
+    refundReason = "requested_by_customer"
+  }) {
+    return apiPost("/actions/refund", {
+      payment_intent_id: paymentIntentId || null,
+      charge_id: chargeId || null,
+      amount,
+      refund_reason: refundReason
+    });
+  }
+
+  async function executeStripeCharge({
+    customerId,
+    paymentMethodId,
+    amount,
+    currency = "usd",
+    description = "Xalvion support charge"
+  }) {
+    return apiPost("/actions/charge", {
+      customer_id: customerId,
+      payment_method_id: paymentMethodId,
+      amount,
+      currency,
+      description
+    });
+  }
+
+  async function runWorkspaceRefundFromInput(amount = null) {
+    const paymentIntentId = String(els.paymentIntentInput?.value || "").trim();
+
+    if (!state.stripeConnected) {
+      setNotice("warning", "Stripe required", "Connect Stripe before executing live refunds.");
+      return;
+    }
+
+    if (!paymentIntentId) {
+      setNotice("warning", "Payment intent required", "Paste a payment intent ID before running a live refund.");
+      return;
+    }
+
+    try {
+      const result = await executeStripeRefund({
+        paymentIntentId,
+        amount,
+        refundReason: "requested_by_customer"
+      });
+
+      setNotice(
+        "success",
+        "Refund executed",
+        `Refund ${result.refund_id} completed in ${result.currency || "USD"}.`
+      );
+    } catch (error) {
+      setNotice(
+        "error",
+        "Refund failed",
+        error.message || "Could not execute refund."
+      );
     }
   }
 
@@ -2291,6 +2376,15 @@
         saveDraft(fill);
         autoResizeTextarea();
         els.messageInput.focus();
+      });
+    });
+
+    els.fillButtons.forEach((btn) => {
+      btn.addEventListener("dblclick", async () => {
+        const label = String(btn.textContent || "").trim().toLowerCase();
+        if (label === "duplicate charge") {
+          await runWorkspaceRefundFromInput();
+        }
       });
     });
 

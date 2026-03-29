@@ -36,7 +36,7 @@ MODEL_EXPENSIVE = os.getenv("MODEL_EXPENSIVE", "gpt-4o-mini")
 
 client = OpenAI(api_key=API_KEY, timeout=14.0) if API_KEY else None
 
-ALLOWED_ACTIONS = {"none", "refund", "credit", "review"}
+ALLOWED_ACTIONS = {"none", "refund", "credit", "review", "charge"}
 MAX_REFUND = 50
 MAX_CREDIT = 30
 
@@ -304,6 +304,8 @@ def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
         amount = min(amount, MAX_REFUND)
     elif action == "credit":
         amount = min(amount, MAX_CREDIT)
+    elif action == "charge":
+        amount = min(amount, MAX_REFUND)
     else:
         amount = 0
 
@@ -363,6 +365,15 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
         return {
             "action": "review",
             "amount": 0,
+            "tool_result": result,
+            "tool_status": result["status"],
+        }
+
+    if action == "charge":
+        result = {"status": "manual_charge_required"}
+        return {
+            "action": "charge",
+            "amount": amount,
             "tool_result": result,
             "tool_status": result["status"],
         }
@@ -445,7 +456,8 @@ Style rules:
 - Output JSON only.
 
 Business rules:
-- You may only choose one of these actions: none, refund, credit, review.
+- You may only choose one of these actions: none, refund, credit, review, charge.
+- Only choose charge when a valid saved Stripe customer and payment method already exist.
 - Never invent a refund above ${MAX_REFUND}.
 - Never invent a credit above ${MAX_CREDIT}.
 - If a hard business decision exists, align to it unless you are escalating risk.
@@ -493,7 +505,7 @@ Return valid JSON using this exact schema:
   "customer_message": "final message to customer",
   "customer_note": "short customer-facing note",
   "internal_note": "short operator/internal note",
-  "action": "none|refund|credit|review",
+  "action": "none|refund|credit|review|charge",
   "amount": 0,
   "reason": "short internal reason",
   "confidence": 0.0,
@@ -564,6 +576,8 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
         customer_message = f"I’ve approved a refund of ${amount} and the correction is now in motion."
     elif action == "credit" and amount > 0:
         customer_message = f"I’ve added a ${amount} credit to help make this right."
+    elif action == "charge" and amount > 0:
+        customer_message = "I’ve initiated the billing step using your saved payment method and will confirm once it completes."
     elif action == "review":
         customer_message = "I’ve routed this for manual review so the next step is handled safely and correctly."
     else:
@@ -615,6 +629,9 @@ def rewrite_output_for_issue(ticket: Dict[str, Any], executed: Dict[str, Any], p
 
     if executed["action"] == "credit" and f"${executed['amount']}" not in text:
         return f"I’ve added a ${executed['amount']} credit to help make this right."
+
+    if executed["action"] == "charge" and int(executed.get("amount", 0) or 0) > 0:
+        return "I’ve initiated the billing step using your saved payment method and will confirm once it completes."
 
     if executed["action"] == "review" and "review" not in text.lower():
         return "I’ve routed this for manual review so the next step is handled safely and correctly."
