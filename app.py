@@ -1703,6 +1703,43 @@ def debug_refund_mode():
     }
 
 
+@app.get("/debug/payment-intent/{payment_intent_id}")
+def debug_payment_intent(payment_intent_id: str):
+    try:
+        intent = stripe.PaymentIntent.retrieve(
+            payment_intent_id,
+            expand=["latest_charge", "charges"],
+        )
+
+        def _as_dict(obj):
+            if obj is None:
+                return None
+            if hasattr(obj, "to_dict_recursive"):
+                return obj.to_dict_recursive()
+            if isinstance(obj, dict):
+                return obj
+            try:
+                return dict(obj)
+            except Exception:
+                return str(obj)
+
+        intent_dict = _as_dict(intent) or {}
+        latest_charge = intent_dict.get("latest_charge")
+        charges = ((intent_dict.get("charges") or {}).get("data") or [])
+
+        return {
+            "id": intent_dict.get("id"),
+            "status": intent_dict.get("status"),
+            "amount": intent_dict.get("amount"),
+            "currency": intent_dict.get("currency"),
+            "latest_charge_type": type(latest_charge).__name__,
+            "latest_charge": latest_charge,
+            "charges_count": len(charges),
+            "charges": charges,
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
+
 @app.get("/app.js")
 def serve_app_js():
     if os.path.exists(APP_JS_PATH):
