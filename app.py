@@ -1210,8 +1210,206 @@ def execute_real_refund(
 
     lookup_attempts: list[tuple[str, dict[str, Any] | None]] = []
 
+    def _retrieve_intent(intent_id: str, acct: str | None):
+        kwargs: dict[str, Any] = {"expand": ["latest_charge", "charges"]}
+        if acct:
+            kwargs["stripe_account"] = acct
+        intent_obj = stripe.PaymentIntent.retrieve(intent_id, **kwargs)
+
+        if hasattr(intent_obj, "to_dict_recursive"):
+            intent = intent_obj.to_dict_recursive()
+        elif isinstance(intent_obj, dict):
+            intent = intent_obj
+        else:
+            try:
+                intent = dict(intent_obj)
+            except Exception:
+                intent = {}
+
+        return intent, acct if acct else None
+
     try:
         ctx: dict[str, Any] | None = None
+
+        if pi:
+            intent: dict[str, Any] | None = None
+            resolved_account: str | None = None
+            last_intent_error: Exception | None = None
+
+            accounts_to_try: list[str | None] = [connected_account_id] if connected_enabled else []
+            if None not in accounts_to_try:
+                accounts_to_try.append(None)
+
+            for acct in accounts_to_try:
+                try:
+                    intent, resolved_account = _retrieve_intent(pi, acct)
+                    lookup_attempts.append((
+                        "payment_intent_direct_connected" if acct else "payment_intent_direct_platform",
+                        {
+                            "payment_intent_id": str(intent.get("id", "") or pi),
+                            "status": str(intent.get("status", "") or ""),
+                            "amount": int(intent.get("amount", 0) or 0),
+                            "currency": str(intent.get("currency", "usd") or "usd").upper(),
+                            "resolved_stripe_account_id": resolved_account,
+                        },
+                    ))
+                    break
+                except Exception as exc:
+                    last_intent_error = exc
+                    lookup_attempts.append((
+                        "payment_intent_direct_connected_error" if acct else "payment_intent_direct_platform_error",
+                        {"detail": str(exc)},
+                    ))
+
+            if intent is None:
+                return {
+                    "ok": False,
+                    "status": "stripe_refund_failed",
+                    "detail": str(last_intent_error) if last_intent_error else "Payment intent not found.",
+                    "lookup_attempts": lookup_attempts,
+                }
+
+            payment_status = str(intent.get("status", "") or "").lower()
+            if payment_status and payment_status != "succeeded":
+                return {
+                    "ok": False,
+                    "status": "payment_not_refundable",
+                    "detail": f"Cannot refund payment with status: {payment_status}",
+                    "charge_context": {
+                        "payment_intent_id": str(intent.get("id", "") or pi),
+                        "charge_id": "",
+                        "charge_amount": int(intent.get("amount", 0) or 0),
+                        "currency": str(intent.get("currency", "usd") or "usd").upper(),
+                        "captured": payment_status == "succeeded",
+                        "refunded": False,
+                        "amount_refunded": 0,
+                        "status": payment_status,
+                        "resolved_stripe_account_id": resolved_account,
+                    },
+                    "lookup_attempts": lookup_attempts,
+                }
+
+            charge_amount = int(intent.get("amount", 0) or 0)
+            amount_received = int(intent.get("amount_received", charge_amount) or charge_amount)
+            amount_refunded = 0
+
+            try:
+                latest_charge = intent.get("latest_charge")
+                if isinstance(latest_charge, dict):
+                    amount_refunded = int(latest_charge.get("amount_refunded", 0) or 0)
+                elif latest_charge and str(latest_charge).startswith("ch_"):
+                    charge_ctx = get_charge_context(
+                        payment_intent_id=pi,
+                        charge_id=None,
+                        stripe_account_id=resolved_account,
+                        platform_only=not bool(resolved_account),
+                    )
+                    amount_refunded = int(charge_ctx.get("amount_refunded", 0) or 0)
+                    if not cid:
+                        cid = str(charge_ctx.get("charge_id", "") or "")
+            except Exception as exc:
+                lookup_attempts.append(("payment_intent_amount_refunded_lookup_error", {"detail": str(exc)}))
+
+            refundable_total = amount_received if amount_received > 0 else charge_amount
+            remaining = max(0, refundable_total - amount_refunded)
+
+            if remaining <= 0:
+                return {
+                    "ok": False,
+                    "status": "no_refundable_balance",
+                    "detail": "No refundable balance remaining.",
+                    "charge_context": {
+                        "payment_intent_id": str(intent.get("id", "") or pi),
+                        "charge_id": cid,
+                        "charge_amount": refundable_total,
+                        "currency": str(intent.get("currency", "usd") or "usd").upper(),
+                        "captured": True,
+                        "refunded": amount_refunded >= refundable_total if refundable_total > 0 else False,
+                        "amount_refunded": amount_refunded,
+                        "status": payment_status,
+                        "resolved_stripe_account_id": resolved_account,
+                    },
+                    "lookup_attempts": lookup_attempts,
+                }
+
+            if full_refund:
+                refund_cents = remaining
+                rules_requested_cents = remaining
+            else:
+                refund_cents = min(cents_requested, remaining)
+                rules_requested_cents = cents_requested
+
+            rules_ctx = {
+                "payment_intent_id": str(intent.get("id", "") or pi),
+                "charge_id": cid,
+                "charge_amount": refundable_total,
+                "currency": str(intent.get("currency", "usd") or "usd").upper(),
+                "captured": True,
+                "refunded": amount_refunded >= refundable_total if refundable_total > 0 else False,
+                "amount_refunded": amount_refunded,
+                "status": payment_status,
+                "resolved_stripe_account_id": resolved_account,
+            }
+
+            rules_summary = evaluate_refund_rules(
+                result=result,
+                user=user,
+                charge_context=rules_ctx,
+                requested_cents=rules_requested_cents,
+                refund_cents=refund_cents,
+            )
+
+            if not rules_summary["allowed"]:
+                blocked_details = "; ".join(r["detail"] for r in rules_summary["blocked_rules"])
+                return {
+                    "ok": False,
+                    "status": "refund_blocked_by_rules",
+                    "detail": blocked_details or "Blocked by rules.",
+                    "rules_summary": rules_summary,
+                    "charge_context": rules_ctx,
+                    "lookup_attempts": lookup_attempts,
+                }
+
+            meta_requested = str(rules_requested_cents if full_refund else cents_requested)
+            refund_data: dict[str, Any] = {
+                "payment_intent": pi,
+                "reason": safe_refund_reason(refund_reason),
+                "metadata": {
+                    "source": "xalvion",
+                    "username": username,
+                    "issue_type": issue_type,
+                    "requested_refund_cents": meta_requested,
+                    "charge_amount_cents": str(refundable_total),
+                    "rule_tier": rules_summary["tier"],
+                },
+            }
+
+            if resolved_account:
+                refund_data["stripe_account"] = resolved_account
+            if not full_refund and refund_cents > 0:
+                refund_data["amount"] = refund_cents
+
+            refund = stripe.Refund.create(**refund_data)
+            refund_amount = int(getattr(refund, "amount", refund_cents) or refund_cents) / 100
+
+            return {
+                "ok": True,
+                "status": "refunded",
+                "refund_id": getattr(refund, "id", ""),
+                "amount": refund_amount,
+                "currency": str(intent.get("currency", "usd") or "usd").upper(),
+                "payment_intent_id": str(intent.get("id", "") or pi),
+                "charge_id": cid,
+                "requested_amount": rules_requested_cents / 100,
+                "charge_amount": refundable_total / 100,
+                "remaining_refundable_amount": remaining / 100,
+                "capped": (not full_refund) and refund_cents < cents_requested,
+                "rules_summary": rules_summary,
+                "charge_context": rules_ctx,
+                "lookup_attempts": lookup_attempts,
+            }
+
+        ctx = None
 
         if connected_enabled:
             try:
@@ -1289,6 +1487,7 @@ def execute_real_refund(
 
         meta_requested = str(rules_requested_cents if full_refund else cents_requested)
         refund_data: dict[str, Any] = {
+            "charge": cid or str(ctx.get("charge_id", "") or ""),
             "reason": safe_refund_reason(refund_reason),
             "metadata": {
                 "source": "xalvion",
@@ -1299,11 +1498,6 @@ def execute_real_refund(
                 "rule_tier": rules_summary["tier"],
             },
         }
-
-        if pi:
-            refund_data["payment_intent"] = pi
-        else:
-            refund_data["charge"] = cid
 
         resolved_account = ctx.get("resolved_stripe_account_id")
         if resolved_account:
