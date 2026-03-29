@@ -99,7 +99,7 @@ LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
 
 REFUND_RULES: dict[str, Any] = {
     "enabled": True,
-    "allowed_tiers": {"pro", "elite"},
+    "allowed_tiers": {"free", "pro", "elite"},
     "max_auto_refund_amount": 50.00,
     "allowed_issue_types": {
         "duplicate_charge",
@@ -109,6 +109,7 @@ REFUND_RULES: dict[str, Any] = {
         "refund_request",
         "billing_duplicate_charge",
         "general_support",
+        "manual_refund",
     },
     "blocked_order_statuses": set(),
     "min_confidence": 0.50,
