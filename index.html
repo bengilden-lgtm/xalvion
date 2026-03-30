@@ -354,7 +354,7 @@
 
     .topbar{
       border-radius:var(--radius-xl);padding:15px 18px;
-      display:flex;align-items:center;justify-content:center;gap:12px; position:relative;
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
       flex:0 0 auto;position:relative;overflow:hidden;
     }
 
@@ -365,7 +365,7 @@
       pointer-events:none;filter:blur(22px);
     }
 
-    .title{min-width:0;position:relative;z-index:1;text-align:center}
+    .title{min-width:0;position:relative;z-index:1}
     .title h1{font-size:20px;font-weight:800;letter-spacing:-.032em;line-height:1.12}
     .title p{
       margin-top:6px;font-size:12.5px;color:rgba(205,218,248,.88);line-height:1.55;
@@ -373,7 +373,7 @@
       white-space:normal;overflow:visible;word-break:break-word;
     }
 
-    .top-actions{display:flex;gap:10px;position:absolute;right:18px;z-index:1}
+    .top-actions{display:flex;gap:10px;position:relative;z-index:1}
 
     .icon-btn{
       width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.04);
@@ -1073,235 +1073,6 @@
       }
     }
 
-    .proof-strip{
-      padding:0 0 12px;
-    }
-
-    .proof-strip .container{
-      max-width:none;
-      padding:0;
-    }
-
-    .proof-strip-head{
-      display:flex;
-      align-items:flex-end;
-      justify-content:space-between;
-      gap:16px;
-      margin-bottom:14px;
-      padding:0 2px;
-    }
-
-    .proof-strip-title{
-      display:grid;
-      gap:8px;
-      min-width:0;
-    }
-
-    .proof-strip-title h2{
-      font-size:22px;
-      line-height:1.08;
-      letter-spacing:-.04em;
-      font-weight:800;
-      color:rgba(245,248,255,.98);
-    }
-
-    .proof-strip-copy{
-      max-width:640px;
-      font-size:13px;
-      line-height:1.7;
-      color:rgba(214,226,252,.82);
-    }
-
-    .proof-grid{
-      display:grid;
-      grid-template-columns:repeat(3,minmax(0,1fr));
-      gap:12px;
-    }
-
-    .proof-flow-card{
-      border-radius:22px;
-      padding:16px;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.018)),
-        radial-gradient(circle at 100% 0%, rgba(139,111,255,.10), transparent 36%);
-      border:1px solid rgba(255,255,255,.07);
-      box-shadow:0 18px 48px rgba(0,0,0,.18);
-      display:grid;
-      gap:12px;
-      transition:border-color .16s ease, transform .16s ease, background .16s ease, box-shadow .18s ease;
-    }
-
-    .proof-flow-card:hover{
-      transform:translateY(-2px);
-      border-color:rgba(139,111,255,.18);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.022)),
-        radial-gradient(circle at 100% 0%, rgba(139,111,255,.14), transparent 40%);
-      box-shadow:0 24px 60px rgba(0,0,0,.22);
-    }
-
-    .proof-flow-head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-    }
-
-    .proof-case{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:7px 12px;
-      border-radius:999px;
-      border:1px solid rgba(139,111,255,.18);
-      background:rgba(139,111,255,.08);
-      color:rgba(220,210,255,.96);
-      font-size:10px;
-      letter-spacing:.12em;
-      text-transform:uppercase;
-      font-weight:800;
-      white-space:nowrap;
-    }
-
-    .proof-case-dot{
-      width:6px;
-      height:6px;
-      border-radius:50%;
-      background:#8b6fff;
-      box-shadow:0 0 10px rgba(139,111,255,.6);
-    }
-
-    .proof-time{
-      font-size:10px;
-      letter-spacing:.12em;
-      text-transform:uppercase;
-      font-weight:800;
-      color:rgba(186,198,235,.54);
-      white-space:nowrap;
-    }
-
-    .proof-ticket{
-      border-radius:16px;
-      padding:14px;
-      background:rgba(10,14,28,.56);
-      border:1px solid rgba(255,255,255,.06);
-      display:grid;
-      gap:8px;
-    }
-
-    .proof-label{
-      font-size:10px;
-      letter-spacing:.12em;
-      text-transform:uppercase;
-      font-weight:800;
-      color:rgba(188,201,238,.44);
-    }
-
-    .proof-ticket-text{
-      font-size:13px;
-      line-height:1.72;
-      color:rgba(239,244,255,.96);
-    }
-
-    .proof-flow{
-      display:grid;
-      gap:7px;
-    }
-
-    .proof-step{
-      display:flex;
-      align-items:flex-start;
-      gap:9px;
-      font-size:12.5px;
-      line-height:1.6;
-      color:rgba(216,228,252,.88);
-    }
-
-    .proof-step-mark{
-      width:18px;
-      height:18px;
-      border-radius:6px;
-      flex:0 0 18px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background:rgba(52,211,153,.12);
-      border:1px solid rgba(52,211,153,.18);
-      color:rgba(210,255,232,.96);
-      font-size:11px;
-      font-weight:800;
-      margin-top:1px;
-    }
-
-    .proof-outcome{
-      border-radius:16px;
-      padding:14px;
-      background:rgba(255,255,255,.028);
-      border:1px solid rgba(255,255,255,.06);
-      display:grid;
-      gap:6px;
-    }
-
-    .proof-outcome-text{
-      font-size:13px;
-      line-height:1.72;
-      color:rgba(234,240,255,.94);
-    }
-
-    .proof-footer{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-      padding-top:2px;
-    }
-
-    .proof-pill-row{
-      display:flex;
-      flex-wrap:wrap;
-      gap:7px;
-    }
-
-    .proof-pill{
-      display:inline-flex;
-      align-items:center;
-      min-height:24px;
-      padding:0 9px;
-      border-radius:999px;
-      font-size:10px;
-      letter-spacing:.08em;
-      text-transform:uppercase;
-      font-weight:800;
-      border:1px solid rgba(255,255,255,.08);
-      background:rgba(255,255,255,.03);
-      color:rgba(215,226,252,.86);
-    }
-
-    .proof-pill.success{
-      background:rgba(52,211,153,.10);
-      border-color:rgba(52,211,153,.18);
-      color:rgba(212,255,232,.96);
-    }
-
-    .proof-pill.info{
-      background:rgba(96,165,250,.10);
-      border-color:rgba(96,165,250,.18);
-      color:rgba(223,236,255,.96);
-    }
-
-    .proof-pill.warning{
-      background:rgba(245,158,11,.10);
-      border-color:rgba(245,158,11,.18);
-      color:rgba(255,236,202,.96);
-    }
-
-    @media (max-width:1180px){
-      .proof-grid{
-        grid-template-columns:1fr;
-      }
-    }
-
   </style>
 </head>
 <body>
@@ -1414,114 +1185,6 @@
         </div>
       </section>
 
-
-      <section class="proof-strip">
-        <div class="container">
-          <div class="proof-strip-head">
-            <div class="proof-strip-title">
-              <div class="section-label">Real examples</div>
-              <h2>This is what actually happens</h2>
-            </div>
-            <div class="proof-strip-copy">
-              Real ticket flows make the product feel credible fast. These examples show Xalvion resolving common support problems instead of just sending generic replies.
-            </div>
-          </div>
-
-          <div class="proof-grid">
-            <div class="proof-flow-card">
-              <div class="proof-flow-head">
-                <div class="proof-case"><span class="proof-case-dot"></span>Refund request</div>
-                <div class="proof-time">Real case</div>
-              </div>
-
-              <div class="proof-ticket">
-                <div class="proof-label">Customer message</div>
-                <div class="proof-ticket-text">“I’m wondering if it’s possible to get a refund? Some things have come up and it’s difficult for me to receive the order right now.”</div>
-              </div>
-
-              <div class="proof-flow">
-                <div class="proof-step"><span class="proof-step-mark">✓</span><span>Context understood: customer cannot receive the order right now</span></div>
-                <div class="proof-step"><span class="proof-step-mark">✓</span><span>Refund eligibility checked against the order state</span></div>
-                <div class="proof-step"><span class="proof-step-mark">✓</span><span>Empathetic response generated with clear next steps</span></div>
-              </div>
-
-              <div class="proof-outcome">
-                <div class="proof-label">Outcome</div>
-                <div class="proof-outcome-text">Refund approved safely and handled with empathy instead of forcing the customer into back-and-forth support.</div>
-              </div>
-
-              <div class="proof-footer">
-                <div class="proof-pill-row">
-                  <span class="proof-pill success">Refund approved</span>
-                  <span class="proof-pill info">Empathy kept</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="proof-flow-card">
-              <div class="proof-flow-head">
-                <div class="proof-case"><span class="proof-case-dot"></span>Shipping delay</div>
-                <div class="proof-time">Core use case</div>
-              </div>
-
-              <div class="proof-ticket">
-                <div class="proof-label">Customer message</div>
-                <div class="proof-ticket-text">“Hey Ben. It’s been a few weeks since this was shipped and I haven’t seen any updates. Do you know the status?”</div>
-              </div>
-
-              <div class="proof-flow">
-                <div class="proof-step"><span class="proof-step-mark">✓</span><span>Tracking checked and no movement detected</span></div>
-                <div class="proof-step"><span class="proof-step-mark">✓</span><span>Delay identified instead of pushing the customer to the carrier</span></div>
-                <div class="proof-step"><span class="proof-step-mark">✓</span><span>Follow-up / replacement / refund path prepared</span></div>
-              </div>
-
-              <div class="proof-outcome">
-                <div class="proof-label">Outcome</div>
-                <div class="proof-outcome-text">Customer gets a clear update and resolution path instead of a weak “contact the carrier” reply.</div>
-              </div>
-
-              <div class="proof-footer">
-                <div class="proof-pill-row">
-                  <span class="proof-pill success">Delay identified</span>
-                  <span class="proof-pill info">Ownership taken</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="proof-flow-card">
-              <div class="proof-flow-head">
-                <div class="proof-case"><span class="proof-case-dot"></span>Duplicate charge</div>
-                <div class="proof-time">High trust</div>
-              </div>
-
-              <div class="proof-ticket">
-                <div class="proof-label">Customer message</div>
-                <div class="proof-ticket-text">“Hey, I think I was charged twice for my order. Can you check this please?”</div>
-              </div>
-
-              <div class="proof-flow">
-                <div class="proof-step"><span class="proof-step-mark">✓</span><span>Payment records checked for a confirmed duplicate</span></div>
-                <div class="proof-step"><span class="proof-step-mark">✓</span><span>Refund allowed only if the charge matches policy rules</span></div>
-                <div class="proof-step"><span class="proof-step-mark">✓</span><span>Customer notified clearly once the extra payment is corrected</span></div>
-              </div>
-
-              <div class="proof-outcome">
-                <div class="proof-label">Outcome</div>
-                <div class="proof-outcome-text">Duplicate charge confirmed and refunded instantly instead of sitting in a queue for manual review.</div>
-              </div>
-
-              <div class="proof-footer">
-                <div class="proof-pill-row">
-                  <span class="proof-pill success">Refund issued</span>
-                  <span class="proof-pill warning">Policy capped</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-
       <section class="composer-wrap">
         <div class="quick-actions">
           <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
@@ -1589,11 +1252,11 @@
             </div>
             <div class="usage-line">
               <span>Limit</span>
-              <span id="planUsage">3</span>
+              <span id="planUsage">50</span>
             </div>
             <div class="usage-line">
               <span>Remaining</span>
-              <span id="planRemaining">3</span>
+              <span id="planRemaining">50</span>
             </div>
             <div class="usage-bar"><div id="planBar"></div></div>
             <div id="usagePanelCopy" class="muted-copy">Your plan sets the amount of support usage available each month.</div>
