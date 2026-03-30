@@ -39,13 +39,19 @@
     }
     .page{position:relative;z-index:2}
     nav{
-      position:fixed;top:0;left:0;right:0;z-index:100;
-      display:grid;grid-template-columns:max-content 1fr max-content;
-      align-items:center;
+      position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;
       padding:18px 48px;background:rgba(4,5,13,.75);border-bottom:1px solid var(--line);backdrop-filter:blur(20px);
     }
-    .nav-brand{display:flex;align-items:center;text-decoration:none;color:var(--text);justify-self:start}
-    .nav-links{display:flex;justify-content:center;justify-self:center;gap:36px;list-style:none}
+    .nav-brand{display:flex;align-items:center;text-decoration:none;color:var(--text);position:relative;z-index:2}
+    .nav-links{
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      gap:36px;
+      list-style:none;
+      z-index:1;
+    }
     .nav-links a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:500}
     .nav-links a:hover{color:var(--text)}
     .nav-cta{
@@ -434,7 +440,7 @@
     }
 
     @media (max-width:900px){
-      nav{padding:16px 24px;display:flex;justify-content:space-between}
+      nav{padding:16px 24px}
       .nav-links{display:none}
       .stats-grid,.cards,.pricing-grid,.proof-shell,.proof-metrics{grid-template-columns:1fr}
       .stat-item{border-right:none;border-bottom:1px solid var(--line)}
