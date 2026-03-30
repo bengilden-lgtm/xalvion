@@ -75,8 +75,8 @@
     username: localStorage.getItem(USER_KEY) || "",
     tier: localStorage.getItem(TIER_KEY) || "free",
     usage: 0,
-    limit: 50,
-    remaining: 50,
+    limit: 3,
+    remaining: 3,
     sending: false,
     actionsCount: 0,
     totalInteractions: 0,
@@ -806,6 +806,62 @@
         transform:none !important;
       }
 
+      .mobile-scroll-mode,
+      .mobile-scroll-mode body{
+        overflow-y:auto !important;
+        overflow-x:hidden !important;
+        height:auto !important;
+        min-height:100% !important;
+      }
+
+      .mobile-scroll-mode .app{
+        height:auto !important;
+        min-height:var(--app-height, 100dvh) !important;
+      }
+
+      .mobile-scroll-mode .sidebar,
+      .mobile-scroll-mode .main,
+      .mobile-scroll-mode .rail{
+        height:auto !important;
+        min-height:0 !important;
+      }
+
+      .mobile-scroll-mode .main{
+        overflow:visible !important;
+      }
+
+      .mobile-scroll-mode .workspace,
+      .mobile-scroll-mode .messages-shell,
+      .mobile-scroll-mode .composer-wrap{
+        overflow:visible !important;
+      }
+
+      .mobile-scroll-mode .messages{
+        height:auto !important;
+        max-height:none !important;
+        overflow:visible !important;
+      }
+
+      @media (max-width: 980px){
+        .mobile-scroll-mode .app{
+          grid-template-columns:1fr !important;
+          gap:10px !important;
+        }
+
+        .mobile-scroll-mode .sidebar,
+        .mobile-scroll-mode .rail{
+          display:none !important;
+        }
+
+        .mobile-scroll-mode .main{
+          min-height:var(--app-height, 100dvh) !important;
+        }
+
+        .mobile-scroll-mode .workspace{
+          min-height:0 !important;
+        }
+      }
+
       @media (max-width: 720px){
         .msg-card{width:100%}
         .details-grid,.rev-grid,.ops-grid{grid-template-columns:1fr}
@@ -883,7 +939,7 @@
 
   function invalidateSessionFrom401() {
     clearAuth();
-    updatePlanUI("free", 0, 50, 50);
+    updatePlanUI("free", 0, 3, 3);
     updateAuthStatus();
     updateTopbarStatus();
     updateStripeUI();
@@ -1434,7 +1490,7 @@
   function updatePlanUI(tier = state.tier, usage = state.usage, limit = state.limit, remaining = state.remaining) {
     state.tier = tier || "free";
     state.usage = Number.isFinite(Number(usage)) ? Number(usage) : 0;
-    state.limit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : 50;
+    state.limit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : 3;
     state.remaining = Number.isFinite(Number(remaining)) ? Number(remaining) : Math.max(0, state.limit - state.usage);
 
     setText(els.planTier, formatTier(state.tier));
@@ -2115,6 +2171,48 @@
     }
   }
 
+  function isMobileViewport() {
+    return window.matchMedia("(max-width: 980px)").matches;
+  }
+
+  function getMobileViewportHeight() {
+    const visualHeight = window.visualViewport?.height;
+    const height = typeof visualHeight === "number" && visualHeight > 0 ? visualHeight : window.innerHeight;
+    return `${height}px`;
+  }
+
+  function syncMobileViewport() {
+    document.documentElement.style.setProperty("--app-height", getMobileViewportHeight());
+
+    if (!isMobileViewport()) {
+      document.body.classList.remove("mobile-scroll-mode");
+      if (els.messages) {
+        els.messages.style.overflowY = "auto";
+        els.messages.style.webkitOverflowScrolling = "touch";
+        els.messages.style.maxHeight = "";
+      }
+      return;
+    }
+
+    document.body.classList.add("mobile-scroll-mode");
+
+    if (els.messages) {
+      els.messages.style.overflowY = "visible";
+      els.messages.style.webkitOverflowScrolling = "auto";
+      els.messages.style.maxHeight = "none";
+    }
+  }
+
+  function scrollComposerIntoView() {
+    if (!isMobileViewport()) return;
+    const composer = els.messageInput?.closest(".composer-wrap") || els.messageInput?.closest(".composer") || els.messageInput;
+    if (!composer) return;
+
+    window.setTimeout(() => {
+      composer.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }, 180);
+  }
+
   function buildKeyboardOverlay() {
     if (document.getElementById("xalvionShortcutOverlay")) return;
 
@@ -2263,7 +2361,7 @@
         updatePlanUI(
           data.tier,
           Number(data.usage || state.usage || 0),
-          Number(data.plan_limit || state.limit || 50),
+          Number(data.plan_limit || state.limit || 3),
           Number(data.remaining || state.remaining || 0)
         );
       }
@@ -2353,14 +2451,14 @@
     } catch (error) {
       clearAuth();
       updateTopbarStatus();
-      updatePlanUI("free", 0, 50, 50);
+      updatePlanUI("free", 0, 3, 3);
       setNotice("error", "Login failed", error.message || "Could not log in.");
     }
   }
 
   async function logout() {
     clearAuth();
-    updatePlanUI("free", 0, 50, 50);
+    updatePlanUI("free", 0, 3, 3);
     updateTopbarStatus();
     setNotice("success", "Logged out", "Guest workspace restored.");
     await hydrateMe();
@@ -2693,6 +2791,10 @@
     }
 
     autoResizeTextarea();
+    syncMobileViewport();
+    window.addEventListener("resize", syncMobileViewport, { passive: true });
+    window.visualViewport?.addEventListener("resize", syncMobileViewport, { passive: true });
+    els.messageInput?.addEventListener("focus", scrollComposerIntoView);
     updateTopbarStatus();
     updatePlanUI(state.tier, state.usage, state.limit, state.remaining);
     updateSystemNarrative(null);

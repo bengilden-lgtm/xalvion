@@ -1018,6 +1018,61 @@
       .impact-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
     }
 
+    @media (max-width:900px){
+      html,body{
+        height:auto;
+        min-height:100%;
+      }
+
+      body{
+        overflow-x:hidden !important;
+        overflow-y:auto !important;
+        overscroll-behavior-y:auto;
+      }
+
+      .app{
+        min-height:100dvh;
+        height:auto !important;
+        align-items:start;
+      }
+
+      .main,
+      .workspace,
+      .messages-shell,
+      .composer-wrap{
+        min-height:0;
+        overflow:visible;
+      }
+
+      .main{
+        grid-template-rows:auto auto auto;
+      }
+
+      .messages-shell{
+        height:auto !important;
+      }
+
+      .messages{
+        height:auto !important;
+        min-height:0 !important;
+        max-height:none !important;
+        overflow:visible !important;
+        padding:18px 14px 16px !important;
+      }
+
+      .workspace{
+        overflow:visible;
+      }
+
+      .composer-wrap{
+        position:sticky;
+        bottom:0;
+        z-index:8;
+        padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 8px);
+        background:linear-gradient(180deg, rgba(6,8,15,0), rgba(6,8,15,.72) 18%, rgba(6,8,15,.92) 100%);
+      }
+    }
+
   </style>
 </head>
 <body>

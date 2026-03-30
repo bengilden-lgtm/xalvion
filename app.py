@@ -118,7 +118,7 @@ REFUND_RULES: dict[str, Any] = {
 
 PLAN_CONFIG: dict[str, dict[str, Any]] = {
     "free": {
-        "monthly_limit": 50,
+        "monthly_limit": 12,
         "history_limit": 20,
         "streaming": True,
         "dashboard_access": "basic",
@@ -219,6 +219,8 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 _rate_log: dict[str, list[float]] = {}
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,64}$")
+GUEST_PREVIEW_LIMIT = 3
+_guest_usage: dict[str, int] = {}
 
 
 def _now_iso() -> str:
@@ -604,6 +606,16 @@ def get_current_username_from_header(authorization: str | None) -> str:
     token = authorization.split(" ", 1)[1].strip()
     return decode_token(token) or "guest"
 
+def get_client_key(request: Request, authorization: str | None = None) -> str:
+    username = get_current_username_from_header(authorization)
+    if username and username != "guest":
+        return f"user:{username}"
+
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent", "")[:120]
+    return f"guest:{ip}:{ua}"
+
 
 def require_authenticated_user(user: User = Depends(get_current_user)) -> User:
     if getattr(user, "username", "") in {"", "guest"}:
@@ -702,6 +714,24 @@ def enforce_plan_limits(user: User) -> None:
             detail=f"{plan['label']} plan limit reached. Used {usage}/{limit} tickets. Upgrade to continue.",
             headers={"X-Xalvion-Plan": plan_name, "X-Xalvion-Limit": str(limit)},
         )
+
+
+def enforce_guest_preview_limit(client_key: str) -> None:
+    if not check_rate_limit(client_key or "__guest__"):
+        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
+
+    guest_used = int(_guest_usage.get(client_key, 0) or 0)
+    if guest_used >= GUEST_PREVIEW_LIMIT:
+        raise HTTPException(
+            status_code=402,
+            detail="Preview limit reached. Create an account to continue with Xalvion.",
+            headers={"X-Xalvion-Plan": "guest", "X-Xalvion-Limit": str(GUEST_PREVIEW_LIMIT)},
+        )
+
+
+def increment_guest_preview_usage(client_key: str) -> int:
+    _guest_usage[client_key] = int(_guest_usage.get(client_key, 0) or 0) + 1
+    return _guest_usage[client_key]
 
 # =============================================================================
 # 8. OPERATOR & TICKET HELPERS
@@ -916,10 +946,23 @@ def serialize_ticket_with_log(ticket: Ticket, db: Session) -> dict[str, Any]:
     return base
 
 
-def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, Any]:
+def serialize_support_result(result: dict[str, Any], user: User, client_key: str | None = None) -> dict[str, Any]:
     usage_summary = get_usage_summary(user)
     tool_result = result.get("tool_result") or {}
     impact = result.get("impact") or {}
+
+    is_guest = str(getattr(user, "username", "") or "") == "guest"
+    if is_guest:
+        guest_usage = int(_guest_usage.get(client_key or "", 0) or 0)
+        public_tier = "free"
+        plan_limit = GUEST_PREVIEW_LIMIT
+        remaining = max(0, GUEST_PREVIEW_LIMIT - guest_usage)
+        usage_value = guest_usage
+    else:
+        public_tier = usage_summary["tier"]
+        plan_limit = usage_summary["limit"]
+        usage_value = usage_summary["usage"]
+        remaining = max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"])
 
     return {
         "reply": result.get("response", result.get("final", "No response")),
@@ -939,10 +982,10 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "meta": result.get("meta", {}),
         "triage": result.get("triage", {}),
         "history": result.get("history", {}),
-        "tier": usage_summary["tier"],
-        "plan_limit": usage_summary["limit"],
-        "usage": usage_summary["usage"],
-        "remaining": max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"]),
+        "tier": public_tier,
+        "plan_limit": plan_limit,
+        "usage": usage_value,
+        "remaining": remaining,
         "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
         "stripe_account_id": getattr(user, "stripe_account_id", None),
     }
@@ -1611,8 +1654,11 @@ def check_requires_approval(action: str, amount: float) -> bool:
     return action == "refund" and float(amount or 0) > APPROVAL_THRESHOLD
 
 
-def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
-    enforce_plan_limits(user)
+def run_support(req: SupportRequest, user: User, db: Session, client_key: str | None = None) -> dict[str, Any]:
+    if getattr(user, "username", "") == "guest":
+        enforce_guest_preview_limit(client_key or "guest")
+    else:
+        enforce_plan_limits(user)
     ticket = create_ticket_record(db, user, req)
 
     try:
@@ -1673,12 +1719,14 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
             approved=False,
         )
 
-        if hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
+        if getattr(user, "username", "") == "guest":
+            increment_guest_preview_usage(client_key or "guest")
+        elif hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
             user.usage = int(getattr(user, "usage", 0) or 0) + 1
             db.commit()
             db.refresh(user)
 
-        serialized = serialize_support_result(result, user)
+        serialized = serialize_support_result(result, user, client_key=client_key)
         serialized["ticket"] = serialize_ticket(ticket)
         serialized["operator_mode"] = get_operator_mode(db)
         return serialized
@@ -1701,6 +1749,8 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
             "Our team has been notified and will follow up shortly."
         )
         plan = get_plan_name(user)
+        is_guest = getattr(user, "username", "") == "guest"
+        guest_usage = int(_guest_usage.get(client_key or "", 0) or 0) if is_guest else 0
         return {
             "reply": fallback,
             "final": fallback,
@@ -1721,16 +1771,16 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
             "mode": "error",
             "confidence": 0.0,
             "quality": 0.0,
-            "tier": plan,
-            "plan_limit": get_plan_config(plan)["monthly_limit"],
-            "usage": int(getattr(user, "usage", 0) or 0),
-            "remaining": max(0, get_plan_config(plan)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)),
+            "tier": "free" if is_guest else plan,
+            "plan_limit": GUEST_PREVIEW_LIMIT if is_guest else get_plan_config(plan)["monthly_limit"],
+            "usage": guest_usage if is_guest else int(getattr(user, "usage", 0) or 0),
+            "remaining": max(0, (GUEST_PREVIEW_LIMIT if is_guest else get_plan_config(plan)["monthly_limit"]) - (guest_usage if is_guest else int(getattr(user, "usage", 0) or 0))),
             "ticket": serialize_ticket(ticket),
             "operator_mode": "balanced",
         }
 
 
-def run_support_for_username(req: SupportRequest, username: str) -> dict[str, Any]:
+def run_support_for_username(req: SupportRequest, username: str, client_key: str | None = None) -> dict[str, Any]:
     with db_session() as db:
         if username and username != "guest":
             user = db.query(User).filter(User.username == username).first()
@@ -1738,7 +1788,7 @@ def run_support_for_username(req: SupportRequest, username: str) -> dict[str, An
                 user = User(username="guest", password="", usage=0, tier="free")
         else:
             user = User(username="guest", password="", usage=0, tier="free")
-        return run_support(req, user, db)
+        return run_support(req, user, db, client_key=client_key)
 
 # =============================================================================
 # 12. STREAMING HELPERS
@@ -2709,19 +2759,24 @@ def update_operator_mode(
 @app.post("/support")
 def support(
     req: SupportRequest,
+    request: Request,
+    authorization: str | None = Header(None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return run_support(req, user, db)
+    client_key = get_client_key(request, authorization)
+    return run_support(req, user, db, client_key=client_key)
 
 
 @app.post("/support/stream")
 async def support_stream(
     req: SupportRequest,
+    request: Request,
     authorization: str | None = Header(None),
 ):
     username = get_current_username_from_header(authorization)
-    result = await run_in_threadpool(run_support_for_username, req, username)
+    client_key = get_client_key(request, authorization)
+    result = await run_in_threadpool(run_support_for_username, req, username, client_key)
     return StreamingResponse(
         stream_support_events(result),
         media_type="text/event-stream",
