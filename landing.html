@@ -52,7 +52,11 @@
     }
     .hero{
       min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
-      padding:120px 24px 80px;
+      padding:140px 24px 100px;
+      max-width:1200px;
+      margin:0 auto;
+      position:relative;
+      transform:translateY(-10px);
     }
     .eyebrow{
       display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;
@@ -61,8 +65,9 @@
     }
     .eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 8px var(--violet)}
     .hero h1{
-      font-family:'Cormorant Garamond',serif;font-size:clamp(58px,9vw,120px);font-weight:700;line-height:1;letter-spacing:-.03em;
-      max-width:960px;margin-bottom:16px;
+      font-family:'Cormorant Garamond',serif;font-size:clamp(58px,9vw,120px);font-weight:700;line-height:.96;letter-spacing:-.035em;
+      max-width:980px;margin:0 auto 18px auto;text-align:center;
+      text-wrap:balance;
     }
     .hero h1 em{
       font-style:italic;background:linear-gradient(135deg,#a78bfa 0%,#60a5fa 50%,#34d399 100%);
@@ -70,28 +75,41 @@
     }
     .hero p{
       font-family:'Cormorant Garamond',serif;font-size:clamp(22px,3vw,34px);font-style:italic;color:rgba(215,225,250,.86);
-      max-width:860px;margin-bottom:24px;
+      max-width:900px;margin:0 auto 24px auto;text-wrap:balance;
     }
     .hero .subcopy{
-      font-family:'Outfit',sans-serif;font-style:normal;font-size:18px;line-height:1.8;max-width:760px;
-      color:rgba(222,230,250,.88);margin-bottom:42px;
+      font-family:'Outfit',sans-serif;font-style:normal;font-size:18px;line-height:1.8;max-width:780px;
+      color:rgba(222,230,250,.88);margin:0 auto 34px auto;
+      text-wrap:pretty;
     }
-    .hero-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:64px}
+    .hero-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:center;margin-bottom:56px}
     .btn-primary,.btn-ghost{
       height:54px;padding:0 30px;border-radius:16px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-weight:600;
     }
     .btn-primary{
-      background:linear-gradient(135deg,#7c5cfc,#4f8ef7);color:#fff;box-shadow:0 0 40px rgba(124,92,252,.35),0 8px 24px rgba(0,0,0,.3)
+      background:linear-gradient(135deg,#7c5cfc,#4f8ef7);color:#fff;box-shadow:0 0 40px rgba(124,92,252,.35),0 8px 24px rgba(0,0,0,.3);
+      transition:transform .16s ease, box-shadow .16s ease, filter .16s ease;
+    }
+    .btn-primary:hover{
+      transform:translateY(-2px);
+      box-shadow:0 0 52px rgba(124,92,252,.42),0 14px 34px rgba(0,0,0,.34);
+      filter:saturate(1.05);
     }
     .btn-ghost{
-      border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text);backdrop-filter:blur(12px)
+      border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text);backdrop-filter:blur(12px);
+      transition:transform .16s ease, background .16s ease, border-color .16s ease;
+    }
+    .btn-ghost:hover{
+      transform:translateY(-2px);
+      background:rgba(255,255,255,.065);
+      border-color:rgba(255,255,255,.24);
     }
     .hero-demo,.card,.price-card,.proof-card,.testimonial-card{
       border-radius:28px;background:rgba(8,10,24,.52);border:1px solid var(--line2);
       backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
       box-shadow:0 40px 120px rgba(0,0,0,.42)
     }
-    .hero-demo{width:min(760px,100%);overflow:hidden}
+    .hero-demo{width:min(760px,100%);overflow:hidden;margin:0 auto}
     .demo-bar{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.025)}
     .demo-dot{width:10px;height:10px;border-radius:50%}
     .red{background:#ff5f57}.yellow{background:#ffbd2e}.green{background:#28c840}
@@ -643,6 +661,23 @@
     @media (max-width:900px){
       nav{padding:16px 24px}
       .nav-links{display:none}
+      .hero{
+        padding:128px 20px 84px;
+        max-width:none;
+        transform:none;
+      }
+      .hero h1{
+        font-size:clamp(52px,15vw,84px);
+        line-height:.98;
+        max-width:100%;
+      }
+      .hero p{
+        font-size:clamp(20px,6vw,30px);
+      }
+      .hero .subcopy{
+        font-size:16px;
+        line-height:1.72;
+      }
       .stats-grid,.cards,.pricing-grid,.proof-shell,.proof-metrics,.proof-example-grid{grid-template-columns:1fr}
       .stat-item{border-right:none;border-bottom:1px solid var(--line)}
       .stat-item:last-child{border-bottom:none}
@@ -672,22 +707,21 @@
         <li><a href="#positioning">Why it converts</a></li>
         <li><a href="#pricing">Pricing</a></li>
       </ul>
-      <a class="nav-cta" href="/">Open workspace →</a>
+      <a class="nav-cta" href="/">Try it now →</a>
     </nav>
 
     <section class="hero">
       <div class="eyebrow">
         <div class="eyebrow-dot"></div>
-        AI SUPPORT THAT HANDLES SAFE TICKETS AUTOMATICALLY
+        AI SUPPORT THAT DECIDES AND ACTS
       </div>
-      <h1>Resolve repetitive tickets automatically —<br/><em>without hiring more support</em></h1>
-      <p>Xalvion handles common support tickets (refunds, shipping, delays) safely — and escalates anything risky to a human.</p>
+      <h1>Resolve more tickets with<br/><em>locked actions</em></h1>
+      <p>Xalvion answers the issue, executes the approved step, and turns usage pressure into revenue.</p>
       <div class="subcopy">
-        Instead of replacing your support team, Xalvion removes the repetitive workload.<br/><br/>Safe actions are automated.<br/>Edge cases stay human.
+        This is not just a chatbot wrapper. Xalvion detects the case type, applies policy rules, triggers safe actions like refunds or credits, and keeps the upgrade loop visible inside the product.
       </div>
       <div class="hero-actions">
-        <div style="width:100%; text-align:center; font-size:14px; color:rgba(200,210,240,.7); margin-bottom:10px;">No risky automation. You stay in control.</div>
-        <a class="btn-primary" href="/">Try it on a real ticket →</a>
+        <a class="btn-primary" href="/">Open the workspace →</a>
         <a class="btn-ghost" href="#pricing">See pricing pressure</a>
       </div>
       <div class="hero-demo">
@@ -704,15 +738,12 @@
           </div>
           <div class="demo-msg">
             <div class="demo-avatar ai">AI</div>
-            <div class="demo-bubble ai">I’ve detected a likely duplicate charge.<br/><br/>→ Refund prepared ($25)<br/>→ Matches your policy<br/><br/>Would you like to approve this?</div>
+            <div class="demo-bubble ai">I've confirmed the duplicate charge and approved a $25 refund under duplicate-charge protection. The correction is already in motion.</div>
           </div>
           <div class="demo-pills">
-            <div class="pill success">Refund prepared</div>
+            <div class="pill success">Refund executed</div>
             <div class="pill info">Confidence 0.96</div>
             <div class="pill violet">Billing protection</div>
-          </div>
-          <div style="margin-top:6px;font-size:14px;color:rgba(200,210,240,.75);text-align:center;">
-            Example: duplicate charge → refund prepared in seconds
           </div>
         </div>
       </div>
@@ -752,8 +783,8 @@
             <p>Duplicate charges, late shipments, damaged orders, and refund requests are routed differently instead of getting the same generic assistant answer.</p>
           </div>
           <div class="card">
-            <h3>2. Control the action</h3>
-            <p>Actions follow your rules. Safe cases can be automated. Anything unclear gets flagged for review.</p>
+            <h3>2. Lock the action</h3>
+            <p>The model can suggest, but only approved actions survive: none, refund, credit, or review. Amounts are capped so the response layer cannot freewheel.</p>
           </div>
           <div class="card">
             <h3>3. Monetize the loop</h3>
@@ -962,7 +993,7 @@
             <div class="plan-badge">Most Popular</div>
             <h3>Pro</h3>
             <div class="price"><span class="price-anchor">$49</span>$29 <span>/ month</span></div>
-            <p class="plan-subcopy">For growing teams reducing repetitive support workload with a faster, clearer operator workflow.</p>
+            <p class="plan-subcopy">For growing teams replacing manual support with a faster, clearer operator workflow.</p>
             <div class="price-value-note">Replaces hours of repetitive support handling every month.</div>
             <div class="price-list">
               <div>500 monthly tickets</div>
@@ -997,7 +1028,7 @@
         </div>
 
         <div class="center" style="margin-top:38px">
-          <a class="btn-primary" href="/">Try it on a real ticket →</a>
+          <a class="btn-primary" href="/">Try the workspace now →</a>
         </div>
       </div>
     </section>
