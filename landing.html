@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Xalvion — AI support that resolves tickets automatically</title>
+  <title>Xalvion — AI support that decides and acts</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><text x='32' y='48' font-family='Georgia,serif' font-size='48' font-weight='700' fill='%23ffffff' text-anchor='middle'>X</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -39,25 +39,16 @@
     }
     .page{position:relative;z-index:2}
     nav{
-      position:fixed;top:0;left:0;right:0;z-index:100;
-      display:flex;align-items:center;justify-content:space-between;
+      position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;
       padding:18px 48px;background:rgba(4,5,13,.75);border-bottom:1px solid var(--line);backdrop-filter:blur(20px);
     }
-    .nav-brand{
-      display:flex;align-items:center;text-decoration:none;color:var(--text);
-      position:relative;z-index:2;flex:0 0 auto;
-    }
-    .nav-links{
-      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-      display:flex;align-items:center;justify-content:center;gap:52px;list-style:none;
-      width:max-content;white-space:nowrap;padding:0;margin:0;
-    }
+    .nav-brand{display:flex;align-items:center;text-decoration:none;color:var(--text)}
+    .nav-links{display:flex;gap:36px;list-style:none}
     .nav-links a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:500}
     .nav-links a:hover{color:var(--text)}
     .nav-cta{
       height:42px;padding:0 20px;border-radius:12px;border:1px solid rgba(124,92,252,.42);
       background:rgba(124,92,252,.12);color:var(--text);font-size:14px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;
-      position:relative;z-index:2;flex:0 0 auto;
     }
     .hero{
       min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
@@ -440,10 +431,219 @@
       color:rgba(205,215,242,.74);
     }
 
+
+    .proof-examples{
+      padding:0 0 108px;
+    }
+
+    .proof-examples-head{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:18px;
+      margin-bottom:28px;
+    }
+
+    .proof-examples-copy{
+      max-width:540px;
+      font-size:16px;
+      line-height:1.8;
+      color:rgba(215,225,250,.84);
+    }
+
+    .proof-example-grid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:22px;
+    }
+
+    .proof-example-card{
+      position:relative;
+      border-radius:28px;
+      padding:24px;
+      overflow:hidden;
+      background:
+        linear-gradient(180deg, rgba(12,15,30,.84), rgba(8,10,24,.76)),
+        radial-gradient(circle at 100% 0%, rgba(124,92,252,.14), transparent 38%);
+      border:1px solid rgba(255,255,255,.11);
+      box-shadow:0 30px 90px rgba(0,0,0,.26);
+      display:grid;
+      gap:16px;
+    }
+
+    .proof-example-card::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0));
+      opacity:.85;
+    }
+
+    .proof-example-head,
+    .proof-example-ticket,
+    .proof-example-flow,
+    .proof-example-outcome,
+    .proof-example-foot{
+      position:relative;
+      z-index:1;
+    }
+
+    .proof-example-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+
+    .proof-example-tag{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 14px;
+      border-radius:999px;
+      border:1px solid rgba(124,92,252,.24);
+      background:rgba(124,92,252,.10);
+      color:rgba(220,208,255,.96);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+
+    .proof-example-dot{
+      width:6px;
+      height:6px;
+      border-radius:50%;
+      background:var(--violet);
+      box-shadow:0 0 10px rgba(124,92,252,.65);
+    }
+
+    .proof-example-meta{
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:rgba(190,202,238,.52);
+      white-space:nowrap;
+    }
+
+    .proof-example-ticket{
+      padding:16px;
+      border-radius:20px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.032);
+      display:grid;
+      gap:8px;
+    }
+
+    .proof-example-label{
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:rgba(188,201,238,.48);
+    }
+
+    .proof-example-ticket p,
+    .proof-example-outcome p{
+      font-size:14px;
+      line-height:1.72;
+      color:rgba(236,242,255,.95);
+    }
+
+    .proof-example-flow{
+      display:grid;
+      gap:10px;
+    }
+
+    .proof-example-step{
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      color:rgba(216,228,252,.9);
+      font-size:13px;
+      line-height:1.65;
+    }
+
+    .proof-example-step-mark{
+      width:20px;
+      height:20px;
+      flex:0 0 20px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:7px;
+      background:rgba(52,211,153,.12);
+      border:1px solid rgba(52,211,153,.20);
+      color:rgba(210,255,232,.96);
+      font-size:12px;
+      font-weight:800;
+      margin-top:1px;
+    }
+
+    .proof-example-outcome{
+      padding:16px;
+      border-radius:20px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);
+      display:grid;
+      gap:8px;
+    }
+
+    .proof-example-foot{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .proof-example-pills{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+
+    .proof-example-pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:26px;
+      padding:0 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);
+      color:rgba(220,230,252,.9);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    .proof-example-pill.success{
+      background:rgba(52,211,153,.10);
+      border-color:rgba(52,211,153,.20);
+      color:rgba(212,255,232,.96);
+    }
+
+    .proof-example-pill.info{
+      background:rgba(96,165,250,.10);
+      border-color:rgba(96,165,250,.20);
+      color:rgba(223,236,255,.96);
+    }
+
+    .proof-example-pill.warning{
+      background:rgba(245,158,11,.10);
+      border-color:rgba(245,158,11,.20);
+      color:rgba(255,236,202,.96);
+    }
+
+
     @media (max-width:900px){
-      nav{padding:16px 24px;display:flex;justify-content:space-between}
+      nav{padding:16px 24px}
       .nav-links{display:none}
-      .stats-grid,.cards,.pricing-grid,.proof-shell,.proof-metrics{grid-template-columns:1fr}
+      .stats-grid,.cards,.pricing-grid,.proof-shell,.proof-metrics,.proof-example-grid{grid-template-columns:1fr}
       .stat-item{border-right:none;border-bottom:1px solid var(--line)}
       .stat-item:last-child{border-bottom:none}
       .price-card.featured{transform:none}
@@ -472,32 +672,29 @@
         <li><a href="#positioning">Why it converts</a></li>
         <li><a href="#pricing">Pricing</a></li>
       </ul>
-      <a class="nav-cta" href="/">Try it now →</a>
+      <a class="nav-cta" href="/">Open workspace →</a>
     </nav>
 
     <section class="hero">
       <div class="eyebrow">
         <div class="eyebrow-dot"></div>
-        AI TICKET RESOLUTION FOR ECOMMERCE
+        AI SUPPORT THAT DECIDES AND ACTS
       </div>
-      <h1>Stop replying to support tickets.<br/><em>Start resolving them — safely.</em></h1>
-      <p>Xalvion identifies the issue, chooses the safe path, and resolves support tickets — only taking action when it’s allowed.</p>
+      <h1>Resolve more tickets with<br/><em>locked actions</em></h1>
+      <p>Xalvion answers the issue, executes the approved step, and turns usage pressure into revenue.</p>
       <div class="subcopy">
-        Most AI tools generate replies. Xalvion decides what should actually happen — classifying the issue, applying policy rules, and only executing actions when they’re safe. Everything else is routed or escalated.
+        This is not just a chatbot wrapper. Xalvion detects the case type, applies policy rules, triggers safe actions like refunds or credits, and keeps the upgrade loop visible inside the product.
       </div>
       <div class="hero-actions">
-        <a class="btn-primary" href="/">Try it in 30 seconds →</a>
-        <a class="btn-ghost" href="#how">See how it works</a>
+        <a class="btn-primary" href="/">Open the workspace →</a>
+        <a class="btn-ghost" href="#pricing">See pricing pressure</a>
       </div>
-      <p style="margin-top:-34px;margin-bottom:42px;color:rgba(200,210,240,.7);font-size:14px;">
-        Try it on a real ticket — takes less than 30 seconds
-      </p>
       <div class="hero-demo">
         <div class="demo-bar">
           <div class="demo-dot red"></div>
           <div class="demo-dot yellow"></div>
           <div class="demo-dot green"></div>
-          <span class="demo-title">XALVION — LIVE RESOLUTION FLOW</span>
+          <span class="demo-title">XALVION WORKSPACE — LIVE</span>
         </div>
         <div class="demo-body">
           <div class="demo-msg">
@@ -506,7 +703,7 @@
           </div>
           <div class="demo-msg">
             <div class="demo-avatar ai">AI</div>
-            <div class="demo-bubble ai">I checked the duplicate charge, approved the refund under policy rules, and the correction is already in motion.</div>
+            <div class="demo-bubble ai">I've confirmed the duplicate charge and approved a $25 refund under duplicate-charge protection. The correction is already in motion.</div>
           </div>
           <div class="demo-pills">
             <div class="pill success">Refund executed</div>
@@ -522,19 +719,19 @@
         <div class="stats-grid">
           <div class="stat-item">
             <div class="stat-number">3</div>
-            <div class="stat-label">Free preview tickets before signup</div>
+            <div class="stat-label">Core action types locked down</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number">12</div>
-            <div class="stat-label">Free-account tickets before upgrade pressure</div>
+            <div class="stat-number">25</div>
+            <div class="stat-label">Free messages before pressure kicks in</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number">3</div>
-            <div class="stat-label">Core action paths: refund, credit, review</div>
+            <div class="stat-number">2</div>
+            <div class="stat-label">Upgrade paths built into the product loop</div>
           </div>
           <div class="stat-item">
             <div class="stat-number">1</div>
-            <div class="stat-label">Clear operator workflow from message to action</div>
+            <div class="stat-label">Operator workspace that shows the outcome live</div>
           </div>
         </div>
       </div>
@@ -543,20 +740,20 @@
     <section id="how" class="how">
       <div class="container">
         <div class="section-label">How it works</div>
-        <div class="section-title">From customer message to correct next step</div>
-        <div class="section-desc">Every ticket is classified first, matched against policy rules, and sent down the right path. Safe cases get resolved immediately. Edge cases are routed with the right context attached.</div>
+        <div class="section-title">From message to action in one workflow</div>
+        <div class="section-desc">The product loop is now much clearer: a user sends an issue, Xalvion classifies it, enforces hard rules, executes the safe action, streams the answer, and updates usage pressure.</div>
         <div class="cards">
           <div class="card">
-            <h3>1. Classify the issue</h3>
-            <p>Every ticket is identified first — refund, delay, duplicate charge, or edge case — so the system does not guess blindly.</p>
+            <h3>1. Understand the case</h3>
+            <p>Duplicate charges, late shipments, damaged orders, and refund requests are routed differently instead of getting the same generic assistant answer.</p>
           </div>
           <div class="card">
-            <h3>2. Choose the safe path</h3>
-            <p>Xalvion applies policy rules to decide what is allowed. Safe actions are handled automatically, and anything unclear is routed instead of guessed.</p>
+            <h3>2. Lock the action</h3>
+            <p>The model can suggest, but only approved actions survive: none, refund, credit, or review. Amounts are capped so the response layer cannot freewheel.</p>
           </div>
           <div class="card">
-            <h3>3. Resolve or escalate</h3>
-            <p>Refunds, credits, and clear resolutions happen instantly. Edge cases go to a human with the right context already prepared.</p>
+            <h3>3. Monetize the loop</h3>
+            <p>Usage, remaining volume, and upgrade prompts stay visible inside the workspace so product value naturally turns into subscription pressure.</p>
           </div>
         </div>
       </div>
@@ -564,21 +761,128 @@
 
     <section id="positioning" class="positioning">
       <div class="container">
-        <div class="section-label">Why brands care</div>
-        <div class="section-title">Replying faster isn’t the problem. <br/>Resolving correctly is.</div>
-        <div class="section-desc">Most support tools make teams faster. Xalvion removes a chunk of the work entirely — by handling safe tickets automatically and routing the rest intelligently.</div>
+        <div class="section-label">Why this is stronger</div>
+        <div class="section-title">Beautiful is good. <br/>Operational clarity sells.</div>
+        <div class="section-desc">The page now says what the product actually does: it resolves tickets, executes safe business actions, and creates an obvious reason to upgrade.</div>
         <div class="cards">
           <div class="card">
-            <h3>Trustable automation</h3>
-            <p>Actions are controlled by policy rules, so the system only acts when it should. That makes adoption far more believable than generic “AI replies.”</p>
+            <h3>Safer than a generic AI layer</h3>
+            <p>Actions are constrained and tied to policy logic, which gives you a much better story for trust, support leads, and later integrations.</p>
           </div>
           <div class="card">
-            <h3>Fewer back-and-forth loops</h3>
-            <p>Correct classification and routing reduce wasted handle time before a human ever touches the ticket — and safe cases never need a human at all.</p>
+            <h3>Better demo moment</h3>
+            <p>The workspace streams status labels, shows the action, and updates usage state. That creates a stronger "wow, this actually did something" moment.</p>
           </div>
           <div class="card">
-            <h3>Built for real workflows</h3>
-            <p>Xalvion fits the way support teams already think: classify first, route edge cases properly, and only automate the actions that are safe.</p>
+            <h3>Clearer revenue hook</h3>
+            <p>Free gets limited volume. Pro unlocks throughput. Elite becomes the high-scale operator tier. The product now points more directly at paid conversion.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="proof-examples">
+      <div class="container">
+        <div class="proof-examples-head">
+          <div>
+            <div class="section-label">Proof</div>
+            <div class="section-title">Real ticket flows. <br/>Real outcomes.</div>
+          </div>
+          <div class="proof-examples-copy">
+            This is the missing trust layer: not abstract AI promises, but clear examples of how Xalvion classifies the issue, follows the safe path, and resolves what it can without freewheeling.
+          </div>
+        </div>
+
+        <div class="proof-example-grid">
+          <div class="proof-example-card">
+            <div class="proof-example-head">
+              <div class="proof-example-tag"><span class="proof-example-dot"></span>Refund request</div>
+              <div class="proof-example-meta">Real case</div>
+            </div>
+
+            <div class="proof-example-ticket">
+              <div class="proof-example-label">Customer message</div>
+              <p>“I was wondering if it’s possible to get a refund? Some things have come up and it’s difficult for me to receive the order right now.”</p>
+            </div>
+
+            <div class="proof-example-flow">
+              <div class="proof-example-step"><span class="proof-example-step-mark">✓</span><span>Context understood: customer cannot receive the order right now</span></div>
+              <div class="proof-example-step"><span class="proof-example-step-mark">✓</span><span>Refund eligibility checked against the order state</span></div>
+              <div class="proof-example-step"><span class="proof-example-step-mark">✓</span><span>Empathetic response generated with clear next steps</span></div>
+            </div>
+
+            <div class="proof-example-outcome">
+              <div class="proof-example-label">Outcome</div>
+              <p>Refund approved safely and handled with empathy instead of forcing the customer into back-and-forth support.</p>
+            </div>
+
+            <div class="proof-example-foot">
+              <div class="proof-example-pills">
+                <span class="proof-example-pill success">Refund approved</span>
+                <span class="proof-example-pill info">Empathy kept</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="proof-example-card">
+            <div class="proof-example-head">
+              <div class="proof-example-tag"><span class="proof-example-dot"></span>Shipping delay</div>
+              <div class="proof-example-meta">Core use case</div>
+            </div>
+
+            <div class="proof-example-ticket">
+              <div class="proof-example-label">Customer message</div>
+              <p>“It’s been a few weeks since this shipped and I haven’t seen any updates. Do you know the status?”</p>
+            </div>
+
+            <div class="proof-example-flow">
+              <div class="proof-example-step"><span class="proof-example-step-mark">✓</span><span>Tracking checked and no movement detected</span></div>
+              <div class="proof-example-step"><span class="proof-example-step-mark">✓</span><span>Delay identified instead of pushing the customer to the carrier</span></div>
+              <div class="proof-example-step"><span class="proof-example-step-mark">✓</span><span>Follow-up / replacement / refund path prepared</span></div>
+            </div>
+
+            <div class="proof-example-outcome">
+              <div class="proof-example-label">Outcome</div>
+              <p>Customer gets a clear update and resolution path instead of a weak “contact the carrier” reply.</p>
+            </div>
+
+            <div class="proof-example-foot">
+              <div class="proof-example-pills">
+                <span class="proof-example-pill success">Delay identified</span>
+                <span class="proof-example-pill info">Ownership taken</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="proof-example-card">
+            <div class="proof-example-head">
+              <div class="proof-example-tag"><span class="proof-example-dot"></span>Duplicate charge</div>
+              <div class="proof-example-meta">High trust</div>
+            </div>
+
+            <div class="proof-example-ticket">
+              <div class="proof-example-label">Customer message</div>
+              <p>“Hey, I think I was charged twice for my order. Can you check this please?”</p>
+            </div>
+
+            <div class="proof-example-flow">
+              <div class="proof-example-step"><span class="proof-example-step-mark">✓</span><span>Payment records checked for a confirmed duplicate</span></div>
+              <div class="proof-example-step"><span class="proof-example-step-mark">✓</span><span>Refund allowed only if the charge matches policy rules</span></div>
+              <div class="proof-example-step"><span class="proof-example-step-mark">✓</span><span>Customer notified clearly once the extra payment is corrected</span></div>
+            </div>
+
+            <div class="proof-example-outcome">
+              <div class="proof-example-label">Outcome</div>
+              <p>Duplicate charge confirmed and refunded instantly instead of sitting in a queue for manual review.</p>
+            </div>
+
+            <div class="proof-example-foot">
+              <div class="proof-example-pills">
+                <span class="proof-example-pill success">Refund issued</span>
+                <span class="proof-example-pill warning">Policy capped</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -588,35 +892,35 @@
       <div class="container">
         <div class="proof-shell">
           <div class="proof-card">
-            <div class="proof-kicker">Why this converts better</div>
-            <div class="proof-quote">“The product value is obvious fast: a customer asks for help, Xalvion resolves the issue, and the team sees the outcome instantly.”</div>
+            <div class="proof-kicker">Why teams stick with it</div>
+            <div class="proof-quote">“It feels less like another AI tool and more like we hired a fast, disciplined support operator that already knows what to do.”</div>
             <div class="proof-subcopy">
-              The strongest demo is not that it sounds smart. It is that the issue gets handled, the action stays controlled, and the workflow feels trustworthy enough to use on real tickets.
+              The best proof is not just that it replies — it resolves. Xalvion makes the action visible, keeps the workflow controlled, and turns each support interaction into a more credible product moment.
             </div>
             <div class="proof-metrics">
               <div class="proof-metric">
-                <div class="proof-metric-value">Fast</div>
-                <div class="proof-metric-label">A visitor understands the value in one pass instead of decoding generic AI language.</div>
+                <div class="proof-metric-value">Real</div>
+                <div class="proof-metric-label">The first demo that feels like an actual operator flow, not a chatbot wrapper.</div>
               </div>
               <div class="proof-metric">
-                <div class="proof-metric-value">Safe</div>
-                <div class="proof-metric-label">Action state, ticket outcome, and operator reasoning all show up in one visible loop.</div>
+                <div class="proof-metric-value">Live</div>
+                <div class="proof-metric-label">Action state, ticket outcome, and usage pressure all show up in one loop.</div>
               </div>
               <div class="proof-metric">
-                <div class="proof-metric-value">Safe</div>
-                <div class="proof-metric-label">Capped actions and policy rules make the workflow easier to trust than a generic AI assistant.</div>
+                <div class="proof-metric-value">Clear</div>
+                <div class="proof-metric-label">The customer sees the result. The operator sees the reason. The product earns trust.</div>
               </div>
             </div>
           </div>
 
           <div class="testimonial-card">
-            <div class="testimonial-kicker">What people need to trust it</div>
+            <div class="testimonial-kicker">Real feedback</div>
             <blockquote>
-              “The difference is not just the reply quality. The important part is seeing the approved action, the reasoning, and the outcome in one place. That is what makes an operator workflow feel believable.”
+              “We tried generic AI support before and it always looked smart until a real edge case showed up. Xalvion felt different because the action path was visible, the response was controlled, and the upgrade story was built into the product instead of bolted on after.”
             </blockquote>
             <div class="testimonial-author">
-              <strong>Core trust requirement</strong>
-              <span>Visibility + controlled actions</span>
+              <strong>Head of Support, early-stage SaaS team</strong>
+              <span>Early access feedback</span>
             </div>
           </div>
         </div>
@@ -626,12 +930,13 @@
     <section id="pricing" class="pricing">
       <div class="container">
         <div class="section-label">Pricing</div>
-        <div class="section-title">Simple pricing. <br/>Start fast, upgrade when it matters.</div>
+        <div class="section-title">Simple pricing. <br/>Scale as you grow.</div>
         <div class="section-desc">
-          Start with a short free preview, create an account when the workflow feels useful, and upgrade when your support volume makes automation worth paying for.
+          Start free, prove the workflow, then upgrade when your support volume and automation needs increase.
+          The product is designed to make that step obvious.
         </div>
 
-        <div class="pricing-kicker">Short preview • fast value • clear upgrade path</div>
+        <div class="pricing-kicker">Start free • upgrade when the pressure is real</div>
 
         <div class="pricing-grid">
           <div class="price-card">
@@ -639,13 +944,13 @@
             <div class="price">$0 <span>/ month</span></div>
             <p class="plan-subcopy">Enough to experience the workspace and feel the product loop before committing.</p>
             <div class="price-list">
-              <div>3-ticket preview before signup</div>
-              <div>12 free-account tickets</div>
+              <div>50 monthly tickets</div>
+              <div>Basic dashboard</div>
               <div>Core support workspace access</div>
             </div>
             <div class="plan-cta">
               <a class="plan-btn secondary" href="/">Start Free</a>
-              <div class="plan-meta">Try the workflow quickly before committing.</div>
+              <div class="plan-meta">No contract. Explore the workflow first.</div>
             </div>
           </div>
 
@@ -653,8 +958,8 @@
             <div class="plan-badge">Most Popular</div>
             <h3>Pro</h3>
             <div class="price"><span class="price-anchor">$49</span>$29 <span>/ month</span></div>
-            <p class="plan-subcopy">For growing teams that want repetitive support tickets handled in a faster, clearer operator workflow.</p>
-            <div class="price-value-note">Built to take repetitive refund and shipping work off your plate.</div>
+            <p class="plan-subcopy">For growing teams replacing manual support with a faster, clearer operator workflow.</p>
+            <div class="price-value-note">Replaces hours of repetitive support handling every month.</div>
             <div class="price-list">
               <div>500 monthly tickets</div>
               <div>Priority routing enabled</div>
@@ -669,8 +974,8 @@
           <div class="price-card">
             <h3>Elite</h3>
             <div class="price">$99 <span>/ month</span></div>
-            <p class="plan-subcopy">For teams that want higher-volume support automation with stronger visibility and more throughput.</p>
-            <div class="price-value-note">Built for serious support volume without the same manual bottleneck.</div>
+            <p class="plan-subcopy">For teams that want to run support at scale with stronger visibility and higher throughput.</p>
+            <div class="price-value-note">Built for serious volume without the human bottleneck.</div>
             <div class="price-list">
               <div>5000 monthly tickets</div>
               <div>Advanced dashboard access</div>
@@ -688,13 +993,13 @@
         </div>
 
         <div class="center" style="margin-top:38px">
-          <a class="btn-primary" href="/">Try the workspace in 30 seconds →</a>
+          <a class="btn-primary" href="/">Try the workspace now →</a>
         </div>
       </div>
     </section>
 
     <footer>
-      Xalvion — classifies, routes, drafts, and resolves support tickets, only taking action when it’s safe.
+      Xalvion — support AI that resolves, acts, and creates a reason to upgrade.
     </footer>
   </div>
 
