@@ -43,14 +43,7 @@
       padding:18px 48px;background:rgba(4,5,13,.75);border-bottom:1px solid var(--line);backdrop-filter:blur(20px);
     }
     .nav-brand{display:flex;align-items:center;text-decoration:none;color:var(--text)}
-    .nav-links{
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
-  display:flex;
-  gap:48px;
-  align-items:center;
-}
+    .nav-links{display:flex;gap:36px;list-style:none}
     .nav-links a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:500}
     .nav-links a:hover{color:var(--text)}
     .nav-cta{
@@ -440,14 +433,7 @@
 
     @media (max-width:900px){
       nav{padding:16px 24px}
-      .nav-links{
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
-  display:flex;
-  gap:48px;
-  align-items:center;
-}
+      .nav-links{display:none}
       .stats-grid,.cards,.pricing-grid,.proof-shell,.proof-metrics{grid-template-columns:1fr}
       .stat-item{border-right:none;border-bottom:1px solid var(--line)}
       .stat-item:last-child{border-bottom:none}
@@ -457,13 +443,7 @@
       .pricing{padding:120px 0 100px}
       .proof{padding:0 0 100px}
     }
-  .nav-links a{
-  opacity:0.7;
-  transition:all .2s ease;
-}
-.nav-links a:hover{opacity:1;}
-.nav-links a.active{opacity:1;}
-</style>
+  </style>
 </head>
 <body>
   <canvas id="fluid"></canvas>
@@ -572,21 +552,21 @@
 
     <section id="positioning" class="positioning">
       <div class="container">
-        <div class="section-label">Why this is stronger</div>
-        <div class="section-title">Beautiful is good. <br/>Operational clarity sells.</div>
-        <div class="section-desc">The page now says what the product actually does: it resolves tickets, executes safe business actions, and creates an obvious reason to upgrade.</div>
+        <div class="section-label">Why teams trust it</div>
+        <div class="section-title">Automation matters. <br/>Control is what makes it believable.</div>
+        <div class="section-desc">Xalvion resolves repetitive support tickets, prepares approved actions, and keeps your team in control.</div>
         <div class="cards">
           <div class="card">
-            <h3>Safer than a generic AI layer</h3>
-            <p>Actions are constrained and tied to policy logic, which gives you a much better story for trust, support leads, and later integrations.</p>
+            <h3>Built for safe, controlled actions</h3>
+            <p>Every action follows defined rules and approval logic, so your team stays in control while automation handles the repetitive volume.</p>
           </div>
           <div class="card">
-            <h3>Better demo moment</h3>
-            <p>The workspace streams status labels, shows the action, and updates usage state. That creates a stronger "wow, this actually did something" moment.</p>
+            <h3>Clear operational visibility</h3>
+            <p>See exactly what happened — actions, status updates, and outcomes — in one operator workflow instead of a black-box chat.</p>
           </div>
           <div class="card">
-            <h3>Clearer revenue hook</h3>
-            <p>Free gets limited volume. Pro unlocks throughput. Elite becomes the high-scale operator tier. The product now points more directly at paid conversion.</p>
+            <h3>Designed to scale with your volume</h3>
+            <p>Start with a small preview, then scale into higher throughput as support volume grows and automation proves itself.</p>
           </div>
         </div>
       </div>
