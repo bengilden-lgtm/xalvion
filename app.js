@@ -6,6 +6,9 @@
   const USER_KEY = "xalvion_user";
   const TIER_KEY = "xalvion_tier";
   const DRAFT_KEY = "xalvion_workspace_draft";
+  const GUEST_USAGE_KEY = "xalvion_guest_usage";
+  const GUEST_USAGE_LIMIT = 3;
+  const FREE_USAGE_LIMIT = 12;
 
   const els = {
     messages: document.getElementById("messages"),
@@ -67,21 +70,16 @@
     refundPaymentIntentInput: document.getElementById("refundPaymentIntentInput"),
     refundChargeInput: document.getElementById("refundChargeInput"),
     refundAmountInput: document.getElementById("refundAmountInput"),
-    refundReasonSelect: document.getElementById("refundReasonSelect"),
-    limitModal: document.getElementById("limitModal"),
-    closeLimitModalBtn: document.getElementById("closeLimitModalBtn"),
-    limitUpgradeBtn: document.getElementById("limitUpgradeBtn"),
-    limitCloseBtn: document.getElementById("limitCloseBtn"),
-    limitModalCopy: document.getElementById("limitModalCopy")
+    refundReasonSelect: document.getElementById("refundReasonSelect")
   };
 
   const state = {
     token: localStorage.getItem(TOKEN_KEY) || "",
     username: localStorage.getItem(USER_KEY) || "",
     tier: localStorage.getItem(TIER_KEY) || "free",
-    usage: 0,
-    limit: 3,
-    remaining: 3,
+    usage: Number(localStorage.getItem(GUEST_USAGE_KEY) || 0) || 0,
+    limit: GUEST_USAGE_LIMIT,
+    remaining: Math.max(0, GUEST_USAGE_LIMIT - (Number(localStorage.getItem(GUEST_USAGE_KEY) || 0) || 0)),
     sending: false,
     actionsCount: 0,
     totalInteractions: 0,
@@ -92,9 +90,7 @@
     stripeConnected: false,
     stripeAccountId: "",
     stripeMode: "",
-    refundHistory: [],
-    moneySaved: 0,
-    autoResolvedCount: 0
+    refundHistory: []
   };
 
   const ICONS = {
@@ -881,69 +877,7 @@
           flex:0 0 36px !important;
         }
       }
-    
-
-      .proof-stack{
-        display:grid;
-        gap:10px;
-        margin-top:10px;
-      }
-
-      .proof-card-block{
-        border:1px solid rgba(255,255,255,.06);
-        background:rgba(255,255,255,.03);
-        border-radius:14px;
-        padding:10px 11px;
-      }
-
-      .proof-card-block.action{
-        border-color:rgba(110,231,183,.16);
-        background:rgba(52,211,153,.06);
-      }
-
-      .proof-card-block.impact{
-        border-color:rgba(96,165,250,.16);
-        background:rgba(96,165,250,.06);
-      }
-
-      .proof-card-label{
-        font-size:9px;
-        text-transform:uppercase;
-        letter-spacing:.16em;
-        color:rgba(188,202,240,.52);
-        font-weight:800;
-        margin-bottom:6px;
-      }
-
-      .proof-card-value{
-        font-size:12.5px;
-        line-height:1.55;
-        color:rgba(242,246,255,.95);
-        font-weight:700;
-      }
-
-      .proof-card-subvalue{
-        margin-top:4px;
-        font-size:11px;
-        line-height:1.5;
-        color:rgba(206,218,244,.74);
-      }
-
-      .chip[data-auto-send="true"]{
-        position:relative;
-        padding-right:30px;
-      }
-
-      .chip[data-auto-send="true"]::after{
-        content:"↗";
-        position:absolute;
-        right:11px;
-        top:50%;
-        transform:translateY(-50%);
-        opacity:.58;
-        font-size:11px;
-      }
-`;
+    `;
     document.head.appendChild(style);
   }
 
@@ -958,6 +892,86 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function isAuthenticated() {
+    return Boolean(state.token && state.username);
+  }
+
+  function getGuestUsage() {
+    return Math.max(0, Number(localStorage.getItem(GUEST_USAGE_KEY) || 0) || 0);
+  }
+
+  function setGuestUsage(value) {
+    const usage = Math.max(0, Number(value || 0) || 0);
+    localStorage.setItem(GUEST_USAGE_KEY, String(usage));
+    return usage;
+  }
+
+  function clearGuestUsage() {
+    localStorage.removeItem(GUEST_USAGE_KEY);
+  }
+
+  function getEffectiveLimit(tier = state.tier, providedLimit = state.limit) {
+    const normalizedTier = String(tier || "free").toLowerCase();
+
+    if (!isAuthenticated()) return GUEST_USAGE_LIMIT;
+    if (normalizedTier === "free") return FREE_USAGE_LIMIT;
+
+    const numericProvided = Number(providedLimit);
+    if (Number.isFinite(numericProvided) && numericProvided > 0) return numericProvided;
+    if (normalizedTier === "pro") return 500;
+    if (normalizedTier === "elite") return 5000;
+    return FREE_USAGE_LIMIT;
+  }
+
+  function getEffectiveUsage(candidateUsage = state.usage) {
+    const numericUsage = Math.max(0, Number(candidateUsage || 0) || 0);
+    if (!isAuthenticated()) return Math.max(numericUsage, getGuestUsage());
+    return numericUsage;
+  }
+
+  function enforceWorkspaceLimit() {
+    const limit = getEffectiveLimit(state.tier, state.limit);
+    const usage = getEffectiveUsage(state.usage);
+
+    if (usage < limit) return true;
+
+    updatePlanUI(state.tier, usage, limit, Math.max(0, limit - usage));
+    pulseRail("usage");
+
+    if (!isAuthenticated()) {
+      setNotice(
+        "warning",
+        "Create a free account to continue",
+        `You have used all ${GUEST_USAGE_LIMIT} guest runs. Sign up to unlock ${FREE_USAGE_LIMIT} free support runs and keep your workspace state.`
+      );
+      els.usernameInput?.focus();
+      return false;
+    }
+
+    if (String(state.tier || "free").toLowerCase() === "free") {
+      setNotice(
+        "warning",
+        "Free plan limit reached",
+        `You have used all ${FREE_USAGE_LIMIT} free runs. Upgrade to Pro to keep the automation moving.`
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  function consumeWorkspaceRun(serverUsage = null) {
+    const currentLimit = getEffectiveLimit(state.tier, state.limit);
+    let nextUsage = Number.isFinite(Number(serverUsage)) ? Number(serverUsage) : getEffectiveUsage(state.usage) + 1;
+    nextUsage = Math.max(0, nextUsage);
+
+    if (!isAuthenticated()) {
+      setGuestUsage(nextUsage);
+    }
+
+    updatePlanUI(state.tier, nextUsage, currentLimit, Math.max(0, currentLimit - nextUsage));
   }
 
   function headers(withJson = true) {
@@ -1003,6 +1017,10 @@
     state.token = "";
     state.username = "";
     state.tier = "free";
+    state.usage = 0;
+    state.limit = GUEST_USAGE_LIMIT;
+    state.remaining = GUEST_USAGE_LIMIT;
+    clearGuestUsage();
     persistAuth();
   }
 
@@ -1053,38 +1071,6 @@
     return `$${Number.isFinite(num) ? num.toFixed(0) : "0"}`;
   }
 
-  function safeNumber(value, fallback = 0) {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : fallback;
-  }
-
-  function decisionLabel(data = {}) {
-    const decision = data.decision || {};
-    const issueType = String(data.issue_type || data.meta?.issue_type || "general_support").replace(/_/g, " ");
-    const confidence = formatMetric(data.confidence || decision.confidence || 0, 2);
-    return `${issueType.replace(/\w/g, (c) => c.toUpperCase())} detected · ${confidence} confidence`;
-  }
-
-  function actionStatusLabel(data = {}) {
-    const action = String(data.action || "none").toLowerCase();
-    const toolStatus = String(data.tool_status || data.execution?.status || "completed").replace(/_/g, " ");
-    if (action === "none") return `Reply prepared · ${toolStatus}`;
-    return `${displayActionLabel(data)} · ${toolStatus}`;
-  }
-
-  function estimateImpactValue(data = {}) {
-    const impact = data.impact || {};
-    return safeNumber(impact.money_saved, 0) || safeNumber(impact.amount, 0) || safeNumber(data.amount, 0);
-  }
-
-  function impactLabel(data = {}) {
-    const impact = data.impact || {};
-    const autoResolved = impact.auto_resolved || String(data.action || "none").toLowerCase() !== "review";
-    const saved = estimateImpactValue(data);
-    const base = autoResolved ? "Ticket auto-resolved" : "Operator review protected";
-    return saved > 0 ? `${base} · Estimated value protected ${formatMoney(saved)}` : base;
-  }
-
   function relativeTime(date = new Date()) {
     const d = date instanceof Date ? date : new Date(date);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -1097,7 +1083,7 @@
       case "elite":
         return "Maximum capacity, premium control, and the strongest Xalvion operator environment.";
       default:
-        return "Free proves the workflow. Upgrade once the savings and automation pressure are obvious.";
+        return "Entry access with clear capacity limits and a visible upgrade path when usage pressure builds.";
     }
   }
 
@@ -1588,69 +1574,23 @@
     setText(els.streamStatus, text);
   }
 
-  function isAuthenticatedWorkspace() {
-    return Boolean(state.token && state.username);
-  }
-
-  function canonicalPlanLimit(tier = state.tier, authenticated = isAuthenticatedWorkspace()) {
-    const normalized = String(tier || "free").toLowerCase();
-    if (!authenticated) return 3;
-    if (normalized === "elite") return 5000;
-    if (normalized === "pro") return 500;
-    return 12;
-  }
-
-  function canonicalRemaining(usage = state.usage, tier = state.tier, authenticated = isAuthenticatedWorkspace(), fallbackRemaining = null) {
-    const normalizedUsage = Number.isFinite(Number(usage)) ? Number(usage) : 0;
-    if (Number.isFinite(Number(fallbackRemaining))) {
-      return Math.max(0, Number(fallbackRemaining));
-    }
-    return Math.max(0, canonicalPlanLimit(tier, authenticated) - normalizedUsage);
-  }
-
-  function usageGateState() {
-    const authenticated = isAuthenticatedWorkspace();
-    const tier = String(state.tier || "free").toLowerCase();
-    const limit = canonicalPlanLimit(tier, authenticated);
-    const usage = Number.isFinite(Number(state.usage)) ? Number(state.usage) : 0;
-    const remaining = Math.max(0, limit - usage);
-    return {
-      authenticated,
-      tier,
-      usage,
-      limit,
-      remaining,
-      blocked: usage >= limit,
-      mode: authenticated ? "upgrade" : "signup"
-    };
-  }
-
-  function enforceUsageGate() {
-    const gate = usageGateState();
-    if (!gate.blocked) return false;
-    showLimitModal(
-      gate.mode,
-      gate.mode === "signup"
-        ? "Create an account to unlock your next 9 free runs and keep the operator working on real tickets."
-        : "Upgrade to keep the operator running once your 12 free runs are used."
-    );
-    return true;
-  }
-
   function updatePlanUI(tier = state.tier, usage = state.usage, limit = state.limit, remaining = state.remaining) {
-    state.tier = tier || "free";
-    state.usage = Number.isFinite(Number(usage)) ? Number(usage) : 0;
+    state.tier = String(tier || "free").toLowerCase();
 
-    const authenticated = isAuthenticatedWorkspace();
-    const normalizedTier = String(state.tier || "free").toLowerCase();
-    const canonicalLimitValue = canonicalPlanLimit(normalizedTier, authenticated);
-    const providedLimit = Number(limit);
+    const resolvedUsage = getEffectiveUsage(usage);
+    const resolvedLimit = getEffectiveLimit(state.tier, limit);
+    const computedRemaining = Math.max(0, resolvedLimit - resolvedUsage);
+    const resolvedRemaining = Number.isFinite(Number(remaining))
+      ? Math.max(0, Math.min(Number(remaining), computedRemaining))
+      : computedRemaining;
 
-    state.limit = Number.isFinite(providedLimit) && providedLimit > 0
-      ? Math.min(providedLimit, canonicalLimitValue)
-      : canonicalLimitValue;
+    state.usage = resolvedUsage;
+    state.limit = resolvedLimit;
+    state.remaining = resolvedRemaining;
 
-    state.remaining = canonicalRemaining(state.usage, normalizedTier, authenticated, remaining);
+    if (!isAuthenticated()) {
+      setGuestUsage(state.usage);
+    }
 
     setText(els.planTier, formatTier(state.tier));
     setText(els.planUsage, `${state.usage} / ${state.limit}`);
@@ -1720,31 +1660,31 @@
     if (rawAction === "review") return "Billing review started";
     if (rawAction === "refund") return "Refund processed";
     if (rawAction === "credit") return "Credit applied";
-    return "Action completed";
+    return "Case processed";
   }
 
   function updateTopbarStatus() {
     if (els.workspaceHeadline) {
       els.workspaceHeadline.textContent = state.username
-        ? `Autonomous support operator for ${state.username}`
-        : "Xalvion resolves tickets, executes actions, and learns from every interaction.";
+        ? `AI support operator for ${state.username}`
+        : "AI support that resolves cases with visible reasoning and controlled action flow";
     }
 
     if (els.workspaceSubcopy) {
       if (state.latestRun) {
-        const confidence = formatMetric(state.latestRun.confidence || 0, 2);
-        els.workspaceSubcopy.textContent = `Autonomous mode active · ${confidence} confidence · ${formatMetric(state.actionsCount, 0)} actions taken.`;
+        const decision = state.latestRun.decision || {};
+        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} plan · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
       } else {
         els.workspaceSubcopy.textContent = state.username
-          ? `Autonomous mode active · ${formatMetric(state.actionsCount, 0)} actions taken · ${formatTier(state.tier)} plan live.`
-          : "Autonomous mode active · 0 actions taken · reply loop ready.";
+          ? `${formatTier(state.tier)} plan · live response loop · action visibility · premium support execution.`
+          : "Guest preview · response ready · visible action handling and premium support presentation.";
       }
     }
 
     if (els.brandSubcopy) {
       els.brandSubcopy.textContent = state.username
-        ? `Signed in as ${state.username}. Live support decisions, plan state, and action history stay persistent.`
-        : "Autonomous support operations with visible actions, savings, and a cleaner customer-ready surface.";
+        ? `Signed in as ${state.username}. Workspace state, plan data, and support activity stay persistent.`
+        : "Premium AI support operations with visible action handling and a cleaner customer-ready surface.";
     }
 
     updateAuthStatus();
@@ -1754,16 +1694,16 @@
     if (!els.systemPanelCopy) return;
 
     if (!data) {
-      els.systemPanelCopy.textContent = "Run a real support issue to see the decision, action, and savings stack update live.";
+      els.systemPanelCopy.textContent = "Use a common case type to prefill the composer and test response quality quickly.";
       return;
     }
 
     const decision = data.decision || {};
     const triage = data.triage || {};
     const parts = [
-      decisionLabel(data),
-      actionStatusLabel(data),
-      impactLabel(data),
+      `${displayActionLabel(data)} selected`,
+      `${displayQueueLabel({ decision })}`,
+      `${String(decision.risk_level || triage.risk_level || "medium")} risk`,
       `${decision.requires_approval ? "approval gate active" : "safe to continue"}`
     ];
 
@@ -1846,7 +1786,7 @@
           Workspace
         </div>
         <h1>Workspace ready</h1>
-        <p>Paste a real customer issue below and watch Xalvion resolve it with visible decisions, actions, and impact.</p>
+        <p>Run a support case below and stream the response into this thread with readable action context and premium presentation.</p>
       </div>
     `;
     els.messages.appendChild(empty);
@@ -1945,41 +1885,6 @@
     return meta;
   }
 
-
-  function createProofStack(data = {}) {
-    const wrap = document.createElement("div");
-    wrap.className = "proof-stack";
-
-    const decision = document.createElement("div");
-    decision.className = "proof-card-block";
-    decision.innerHTML = `
-      <div class="proof-card-label">Decision</div>
-      <div class="proof-card-value">${escapeHtml(decisionLabel(data))}</div>
-      <div class="proof-card-subvalue">${escapeHtml(String(data.reason || data.decision?.reason || "Decision path aligned to the safest next step."))}</div>
-    `;
-
-    const action = document.createElement("div");
-    action.className = "proof-card-block action";
-    action.innerHTML = `
-      <div class="proof-card-label">Action</div>
-      <div class="proof-card-value">${escapeHtml(actionStatusLabel(data))}</div>
-      <div class="proof-card-subvalue">${escapeHtml(displayQueueLabel(data))} · ${escapeHtml(displayRiskLabel(data))}</div>
-    `;
-
-    const impact = document.createElement("div");
-    impact.className = "proof-card-block impact";
-    impact.innerHTML = `
-      <div class="proof-card-label">Impact</div>
-      <div class="proof-card-value">${escapeHtml(impactLabel(data))}</div>
-      <div class="proof-card-subvalue">${escapeHtml(String((data.impact || {}).summary || "Visible operator output makes the savings legible."))}</div>
-    `;
-
-    wrap.appendChild(decision);
-    wrap.appendChild(action);
-    wrap.appendChild(impact);
-    return wrap;
-  }
-
   function addCopyControl(container, replyText) {
     const tools = document.createElement("div");
     tools.className = "assistant-tools";
@@ -2026,7 +1931,7 @@
 
     details.innerHTML = `
       <summary class="details-toggle">
-        <span>View operator trace</span>
+        <span>View details</span>
         <span class="chev">${ICONS.chevron}</span>
       </summary>
       <div class="details-panel">
@@ -2133,30 +2038,6 @@
     return events;
   }
 
-
-  function showLimitModal(mode = "upgrade", message = "") {
-    state.limitModalMode = mode === "signup" ? "signup" : "upgrade";
-
-    if (els.limitUpgradeBtn) {
-      els.limitUpgradeBtn.textContent = state.limitModalMode === "signup" ? "Create free account" : "Upgrade to Pro";
-    }
-
-    if (els.limitModalCopy) {
-      const saved = formatMoney(state.moneySaved || 0);
-      if (state.limitModalMode === "signup") {
-        els.limitModalCopy.textContent = `You've used all 3 guest runs. Xalvion resolved ${formatMetric(state.autoResolvedCount, 0)} tickets and surfaced ${saved} in visible value. Sign up to unlock 12 free tracked runs and keep your workspace progress.`;
-      } else {
-        els.limitModalCopy.textContent = `You've reached the free limit. Xalvion resolved ${formatMetric(state.autoResolvedCount, 0)} tickets and surfaced ${saved} in visible value. Upgrade to keep the automation running.`;
-      }
-      if (message) els.limitModalCopy.textContent += ` ${message}`;
-    }
-    if (els.limitModal) els.limitModal.style.display = "flex";
-  }
-
-  function closeLimitModal() {
-    if (els.limitModal) els.limitModal.style.display = "none";
-  }
-
   async function handleStandardReply(payload) {
     const res = await fetch(`${API}/support`, {
       method: "POST",
@@ -2165,13 +2046,7 @@
     });
 
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const detail = data.detail || "Request failed";
-      if (res.status === 402) {
-        showLimitModal(isAuthenticatedWorkspace() ? "upgrade" : "signup", detail);
-      }
-      throw new Error(detail);
-    }
+    if (!res.ok) throw new Error(data.detail || "Request failed");
     return data;
   }
 
@@ -2184,11 +2059,7 @@
 
     if (!res.ok || !res.body) {
       const data = await res.json().catch(() => ({}));
-      const detail = data.detail || "Streaming failed";
-      if (res.status === 402) {
-        showLimitModal(isAuthenticatedWorkspace() ? "upgrade" : "signup", detail);
-      }
-      throw new Error(detail);
+      throw new Error(data.detail || "Streaming failed");
     }
 
     const reader = res.body.getReader();
@@ -2253,21 +2124,14 @@
         ? Number(data.quality || 0)
         : (state.avgQuality * (state.totalInteractions - 1) + Number(data.quality || 0)) / state.totalInteractions;
 
-    const visibleSaved = estimateImpactValue(data);
-    state.moneySaved += visibleSaved;
-
-    const autoResolved = ((data.impact || {}).auto_resolved) || ["refund", "credit", "none"].includes(String(data.action || "none").toLowerCase());
-    if (autoResolved) state.autoResolvedCount += 1;
-
-    setText(els.statInteractions, formatMoney(state.moneySaved));
+    setText(els.statInteractions, formatMetric(state.totalInteractions, 0));
     setText(els.statConfidence, formatMetric(state.avgConfidence, 2));
     setText(els.statQuality, formatMetric(state.avgQuality, 2));
 
     if (String(data.action || "none").toLowerCase() !== "none") {
       state.actionsCount += 1;
+      setText(els.statActions, formatMetric(state.actionsCount, 0));
     }
-
-    setText(els.statActions, formatMetric(state.autoResolvedCount, 0));
   }
 
   function ensureOpsCard() {
@@ -2347,25 +2211,25 @@
       card.innerHTML = `
         <div class="panel-head">
           <div>
-            <div class="panel-title">Impact panel</div>
-            <div class="panel-copy">Show exactly what the operator saved, resolved, and protected in real time.</div>
+            <div class="panel-title">Revenue layer</div>
+            <div class="panel-copy">The business effect of each decision should be visible inside the workspace.</div>
           </div>
         </div>
         <div class="rev-grid">
           <div class="rev-metric">
-            <div class="rev-metric-label">Money saved</div>
+            <div class="rev-metric-label">Value protected</div>
             <div class="rev-metric-value" id="revMoneySaved">$0</div>
           </div>
           <div class="rev-metric">
-            <div class="rev-metric-label">Tickets auto-resolved</div>
+            <div class="rev-metric-label">Auto resolution</div>
             <div class="rev-metric-value" id="revAutoRate">0%</div>
           </div>
           <div class="rev-metric">
-            <div class="rev-metric-label">Refunds executed</div>
+            <div class="rev-metric-label">Refund total</div>
             <div class="rev-metric-value" id="revRefunds">$0</div>
           </div>
           <div class="rev-metric">
-            <div class="rev-metric-label">Escalations avoided</div>
+            <div class="rev-metric-label">High-risk saves</div>
             <div class="rev-metric-value" id="revChurn">0</div>
           </div>
         </div>
@@ -2381,9 +2245,9 @@
     const decision = data.decision || {};
     const toolStatus = String(data.tool_status || "");
 
-    const moneySaved = state.moneySaved || Number(impact.money_saved || impact.amount || data.amount || 0);
+    const moneySaved = Number(impact.money_saved || impact.amount || data.amount || 0);
     const refundTotal = String(data.action || "").toLowerCase() === "refund" ? Number(data.amount || 0) : 0;
-    const autoRate = state.autoResolvedCount || (((data.impact || {}).auto_resolved) ? 1 : 0);
+    const autoRate = state.totalInteractions > 0 ? Math.round((state.actionsCount / state.totalInteractions) * 100) : 0;
     const churnSaved = Number(decision.priority === "high" && toolStatus !== "error");
 
     const revMoneySaved = document.getElementById("revMoneySaved");
@@ -2394,15 +2258,15 @@
     const revRoiLabel = document.getElementById("revRoiLabel");
 
     if (revMoneySaved) revMoneySaved.textContent = formatMoney(moneySaved);
-    if (revAutoRate) revAutoRate.textContent = formatMetric(autoRate, 0);
+    if (revAutoRate) revAutoRate.textContent = `${autoRate}%`;
     if (revRefunds) revRefunds.textContent = formatMoney(refundTotal);
     if (revChurn) revChurn.textContent = String(churnSaved ? 1 : 0);
-    if (revBar) revBar.style.width = `${Math.min(100, state.totalInteractions > 0 ? Math.round((state.autoResolvedCount / state.totalInteractions) * 100) : 0)}%`;
+    if (revBar) revBar.style.width = `${Math.min(100, autoRate)}%`;
 
     if (revRoiLabel) {
       revRoiLabel.textContent = moneySaved > 0
-        ? `${formatMoney(moneySaved)} saved so far · ${formatMetric(state.autoResolvedCount, 0)} tickets resolved without manual handling.`
-        : "The workspace is collecting savings and automation proof as support runs complete.";
+        ? `${formatMoney(moneySaved)} of visible value was protected on this case.`
+        : "The workspace is collecting business impact as support runs complete.";
     }
   }
 
@@ -2525,7 +2389,7 @@
   async function sendMessage() {
     const payload = buildSupportPayload();
     if (!payload.message || state.sending) return;
-    if (enforceUsageGate()) return;
+    if (!enforceWorkspaceLimit()) return;
 
     ensureInjectedStyles();
     clearEmptyState();
@@ -2579,7 +2443,6 @@
       if (footer) {
         footer.innerHTML = "";
         footer.appendChild(createMetaRow(data));
-        footer.parentElement.appendChild(createProofStack(data));
 
         const toolsWrap = document.createElement("div");
         addCopyControl(toolsWrap, replyText);
@@ -2594,15 +2457,25 @@
       updateLatestRunCard(data);
       updateSystemNarrative(data);
 
-      if (data.tier || typeof data.usage !== "undefined" || typeof data.plan_limit !== "undefined" || typeof data.remaining !== "undefined") {
-        updatePlanUI(
-          data.tier || state.tier,
-          Number(typeof data.usage !== "undefined" ? data.usage : state.usage),
-          Number(typeof data.plan_limit !== "undefined" ? data.plan_limit : state.limit),
-          Number(typeof data.remaining !== "undefined" ? data.remaining : state.remaining)
-        );
+      const hasServerUsage = Number.isFinite(Number(data.usage));
+      const planTier = data.tier || state.tier;
+      const planLimit = Number(data.plan_limit || data.limit || state.limit || GUEST_USAGE_LIMIT);
+      const planRemaining = Number.isFinite(Number(data.remaining)) ? Number(data.remaining) : null;
+
+      if (hasServerUsage || planTier) {
+        if (hasServerUsage) {
+          updatePlanUI(
+            planTier,
+            Number(data.usage || 0),
+            planLimit,
+            planRemaining
+          );
+        } else {
+          state.tier = planTier || state.tier;
+          consumeWorkspaceRun();
+        }
       } else {
-        updatePlanUI(state.tier, state.usage + 1, state.limit, Math.max(0, state.remaining - 1));
+        consumeWorkspaceRun();
       }
 
       if (data.username && data.username !== "guest" && data.username !== "dev_user") {
@@ -2615,8 +2488,8 @@
     } catch (error) {
       stepTimers.forEach((timer) => window.clearTimeout(timer));
       removeStreamSteps(stepsEl);
-      setAssistantCopy(row, error.message && error.message.toLowerCase().includes("plan limit") ? "Free preview limit reached. Upgrade to keep the operator running on live tickets." : "Something went wrong while processing this support request.");
-      setNotice(error.message && error.message.toLowerCase().includes("plan limit") ? "warning" : "error", error.message && error.message.toLowerCase().includes("plan limit") ? "Free limit reached" : "Request failed", error.message || "Support request failed.");
+      setAssistantCopy(row, "Something went wrong while processing this support request.");
+      setNotice("error", "Request failed", error.message || "Support request failed.");
     } finally {
       setSending(false);
       scrollMessagesToBottom(true);
@@ -2645,7 +2518,7 @@
 
       setNotice("success", "Account created", "Log in to keep usage, plan status, and workspace state persistent.");
       state.tier = data.tier || "free";
-      updatePlanUI(state.tier, 0, 12, 12);
+      updatePlanUI(state.tier, 0, 50, 50);
       updateTopbarStatus();
     } catch (error) {
       setNotice("error", "Signup failed", error.message || "Could not create account.");
@@ -2673,11 +2546,12 @@
 
       state.token = data.token || "";
       state.username = data.username || username;
+      clearGuestUsage();
       updatePlanUI(
         data.tier || "free",
         Number(data.usage || 0),
-        Number(data.limit || 12),
-        Number(typeof data.remaining !== "undefined" ? data.remaining : Math.max(0, (Number(data.limit || 12)) - Number(data.usage || 0)))
+        Number(data.limit || 50),
+        Number(data.remaining || 0)
       );
 
       persistAuth();
@@ -2777,6 +2651,7 @@
 
   async function hydrateMe() {
     if (!state.token) {
+      updatePlanUI("free", getGuestUsage(), GUEST_USAGE_LIMIT, Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()));
       updateAuthStatus();
       return { ok: true, staleCleared: false };
     }
@@ -2833,17 +2708,11 @@
       if (typeof data.actions !== "undefined") {
         state.actionsCount = Number(data.actions || 0);
       }
-      if (typeof data.money_saved !== "undefined") {
-        state.moneySaved = Number(data.money_saved || 0);
-      }
-      if (typeof data.auto_resolved !== "undefined") {
-        state.autoResolvedCount = Number(data.auto_resolved || 0);
-      }
 
-      setText(els.statInteractions, formatMoney(state.moneySaved));
+      setText(els.statInteractions, formatMetric(state.totalInteractions, 0));
       setText(els.statQuality, formatMetric(state.avgQuality, 2));
       setText(els.statConfidence, formatMetric(state.avgConfidence, 2));
-      setText(els.statActions, formatMetric(state.autoResolvedCount, 0));
+      setText(els.statActions, formatMetric(state.actionsCount, 0));
 
       if (typeof data.your_tier !== "undefined" || typeof data.your_usage !== "undefined") {
         updatePlanUI(
@@ -2854,10 +2723,10 @@
         );
       }
     } catch {
-      setText(els.statInteractions, formatMoney(state.moneySaved));
+      setText(els.statInteractions, formatMetric(state.totalInteractions, 0));
       setText(els.statQuality, formatMetric(state.avgQuality, 2));
       setText(els.statConfidence, formatMetric(state.avgConfidence, 2));
-      setText(els.statActions, formatMetric(state.autoResolvedCount, 0));
+      setText(els.statActions, formatMetric(state.actionsCount, 0));
     }
   }
 
@@ -2952,20 +2821,6 @@
     els.refundModal?.addEventListener("click", (event) => {
       if (event.target === els.refundModal) closeRefundModal();
     });
-    els.closeLimitModalBtn?.addEventListener("click", closeLimitModal);
-    els.limitCloseBtn?.addEventListener("click", closeLimitModal);
-    els.limitUpgradeBtn?.addEventListener("click", () => {
-      closeLimitModal();
-      if (state.limitModalMode === "signup") {
-        els.usernameInput?.focus();
-        setNotice("warning", "Create your account", "Guest preview is capped at 3 runs. Sign up to unlock your full 12 free runs.");
-        return;
-      }
-      upgradePlan("pro");
-    });
-    els.limitModal?.addEventListener("click", (event) => {
-      if (event.target === els.limitModal) closeLimitModal();
-    });
 
     els.fillButtons.forEach((button) => {
       button.addEventListener("click", () => {
@@ -2974,10 +2829,6 @@
         els.messageInput.value = fill;
         saveDraft(fill);
         autoResizeTextarea();
-        if (button.dataset.autoSend === "true") {
-          sendMessage();
-          return;
-        }
         els.messageInput.focus();
       });
     });
