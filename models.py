@@ -1,56 +1,118 @@
-import os
-import requests
-from dotenv import load_dotenv
 
-load_dotenv()
+from __future__ import annotations
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+from typing import Literal
+from pydantic import BaseModel, Field, field_validator
 
 
-# 🧠 OPENROUTER (GPT)
-def call_openrouter(prompt):
-    try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "openai/gpt-4o-mini",
-                "messages": [{"role": "user", "content": prompt}]
-            }
-        )
-
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
-
-    except Exception as e:
-        return f"❌ OpenRouter error: {str(e)}"
+class AgentRequestContext(BaseModel):
+    surface: str = "workspace"
+    page_url: str | None = None
+    host: str | None = None
+    page_title: str | None = None
+    app_name: str | None = None
+    thread_id: str | None = None
+    subject: str | None = None
+    sender: str | None = None
+    dom_excerpt: str | None = None
+    selected_text: str | None = None
 
 
-# 🧠 CLAUDE
-def call_claude(prompt):
-    try:
-        response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            },
-            json={
-                "model": "claude-3-haiku-20240307",
-                "max_tokens": 500,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ]
-            }
-        )
+class ExtensionAnalyzeRequest(BaseModel):
+    text: str
+    sentiment: int | None = None
+    ltv: int | None = None
+    order_status: str | None = None
+    payment_intent_id: str | None = None
+    charge_id: str | None = None
+    page_url: str | None = None
+    host: str | None = None
+    page_title: str | None = None
+    app_name: str | None = None
+    thread_id: str | None = None
+    subject: str | None = None
+    sender: str | None = None
+    dom_excerpt: str | None = None
+    selected_text: str | None = None
 
-        data = response.json()
-        return data["content"][0]["text"]
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, v: str) -> str:
+        text = (v or "").strip()
+        if not text:
+            raise ValueError("text required")
+        if len(text) > 50000:
+            raise ValueError("text too long")
+        return text
 
-    except Exception as e:
-        return f"❌ Claude error: {str(e)}"
+
+class ThinkingTraceStep(BaseModel):
+    step: str
+    status: Literal["queued", "done", "error"]
+    detail: str | None = None
+
+
+class TriageMetadata(BaseModel):
+    urgency: int = 0
+    churn_risk: int = 0
+    refund_likelihood: int = 0
+    abuse_likelihood: int = 0
+    complexity: int = 0
+    recommended_owner: str = "ai"
+    risk_level: Literal["low", "medium", "high"] = "low"
+
+
+class SovereignDecision(BaseModel):
+    action: Literal["none", "refund", "credit", "review", "charge"] = "none"
+    amount: float = 0
+    confidence: float = 0
+    reason: str = ""
+    priority: Literal["low", "medium", "high"] = "medium"
+    queue: str = "new"
+    status: str = "new"
+    risk_level: Literal["low", "medium", "high"] = "low"
+    requires_approval: bool = False
+    tool_status: str = "no_action"
+
+
+class ImpactProjections(BaseModel):
+    type: str = "saved"
+    amount: float = 0
+    money_saved: float = 0
+    auto_resolved: bool = False
+    agent_minutes_saved: int = 0
+    signals: list[str] = Field(default_factory=list)
+
+
+class MemoryDelta(BaseModel):
+    plan_tier: str = "free"
+    repeat_customer: bool = False
+    refund_count: int = 0
+    credit_count: int = 0
+    review_count: int = 0
+    complaint_count: int = 0
+    abuse_score: int = 0
+    sentiment_avg: float = 5.0
+    last_issue_type: str = "general_support"
+
+
+class OutputEnvelope(BaseModel):
+    internal_note: str = ""
+    customer_note: str = ""
+    audit_log: str = ""
+
+
+class CanonicalAgentResponse(BaseModel):
+    reply: str
+    final: str
+    response: str
+    issue_type: str
+    mode: str
+    quality: float
+    triage_metadata: TriageMetadata
+    sovereign_decision: SovereignDecision
+    impact_projections: ImpactProjections
+    memory_delta: MemoryDelta
+    thinking_trace: list[ThinkingTraceStep] = Field(default_factory=list)
+    request_context: AgentRequestContext | None = None
+    output: OutputEnvelope

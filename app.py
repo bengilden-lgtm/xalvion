@@ -34,6 +34,7 @@ from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, field_validator
+from models import CanonicalAgentResponse, ExtensionAnalyzeRequest, AgentRequestContext
 from sqlalchemy import (
     Column,
     Float,
@@ -2900,446 +2901,139 @@ async def support_stream(
 
 
 
-def is_non_customer_text(text: str) -> bool:
-    t = (text or "").lower()
-
-    signals = [
-        "reddit",
-        "subreddit",
-        "comment",
-        "discussion",
-        "talk to anyone",
-        "you should",
-        "they will tell you",
-        "experienced",
-        "seven-figure",
-        "handling customer support operations",
-    ]
-
-    score = sum(1 for s in signals if s in t)
-
-    if "you should" in t or "they will tell you" in t:
-        score += 2
-
-    return score >= 2
-
-# =============================================================================
-# 20B. ROUTES — EXTENSION ANALYZE (REAL BRAIN)
-# =============================================================================
 
 
+def _build_extension_meta(
+    req: ExtensionAnalyzeRequest,
+    operator_mode: str,
+    plan_tier: str,
+    priority_routing: bool,
+) -> dict[str, Any]:
+    return {
+        "channel": "email",
+        "source": "extension",
+        "order_status": req.order_status or "unknown",
+        "operator_mode": operator_mode,
+        "plan_tier": plan_tier,
+        "priority_routing": priority_routing,
+        "payment_intent_id": (req.payment_intent_id or "").strip(),
+        "charge_id": (req.charge_id or "").strip(),
+        "sentiment": req.sentiment if req.sentiment is not None else 5,
+        "ltv": req.ltv if req.ltv is not None else 0,
+    }
 
-def get_multi_ticket_learning(db: Session, username: str, issue_type: str) -> dict[str, Any]:
-    issue = str(issue_type or "general_support").strip().lower()
-    rows = (
-        db.query(ActionLog)
-        .filter(ActionLog.username == username)
-        .filter(ActionLog.issue_type == issue)
-        .order_by(ActionLog.id.desc())
-        .limit(25)
-        .all()
+
+def _build_extension_context(req: ExtensionAnalyzeRequest) -> AgentRequestContext:
+    return AgentRequestContext(
+        surface="chrome_extension",
+        page_url=req.page_url,
+        host=req.host,
+        page_title=req.page_title,
+        app_name=req.app_name,
+        thread_id=req.thread_id,
+        subject=req.subject,
+        sender=req.sender,
+        dom_excerpt=req.dom_excerpt,
+        selected_text=req.selected_text,
     )
 
-    if not rows:
-        return {
-            "pattern": None,
-            "samples": 0,
-            "avg_confidence": 0.0,
-            "recommended_action": None,
-            "same_action_rate": 0.0,
-        }
 
-    action_counts: dict[str, int] = {}
-    total_confidence = 0.0
+def _persist_sovereign_result(
+    db: Session,
+    username: str,
+    raw_text: str,
+    result: dict[str, Any],
+) -> None:
+    now = _now_iso()
+    decision = result.get("sovereign_decision") or {}
+    triage = result.get("triage_metadata") or {}
+    output = result.get("output") or {}
+    request_context = result.get("request_context") or {}
 
-    for row in rows:
-        action_key = str(row.action or "none").strip().lower()
-        action_counts[action_key] = action_counts.get(action_key, 0) + 1
-        total_confidence += float(row.confidence or 0)
+    ticket = Ticket(
+        created_at=now,
+        updated_at=now,
+        username=username,
+        channel="email",
+        source="extension",
+        status=_safe_status(decision.get("status", "new")),
+        queue=_safe_queue(decision.get("queue", "new")),
+        priority=_safe_priority(decision.get("priority", "medium")),
+        risk_level=_safe_risk(decision.get("risk_level", "medium")),
+        issue_type=str(result.get("issue_type", "general_support") or "general_support")[:64],
+        subject=str(request_context.get("subject", "") or "")[:300],
+        customer_message=raw_text[:10000],
+        final_reply=str(result.get("reply", result.get("final", "")) or "")[:8000],
+        internal_note=str(output.get("internal_note", "") or "")[:2000],
+        action=str(decision.get("action", "none") or "none"),
+        amount=float(decision.get("amount", 0) or 0),
+        confidence=float(decision.get("confidence", 0) or 0),
+        quality=float(result.get("quality", 0) or 0),
+        requires_approval=int(bool(decision.get("requires_approval", False))),
+        approved=0,
+        churn_risk=_clamp(triage.get("churn_risk", 0), 0, 99),
+        refund_likelihood=_clamp(triage.get("refund_likelihood", 0), 0, 99),
+        abuse_likelihood=_clamp(triage.get("abuse_likelihood", 0), 0, 99),
+        complexity=_clamp(triage.get("complexity", 0), 0, 99),
+        urgency=_clamp(triage.get("urgency", 0), 0, 99),
+    )
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
 
-    recommended_action = max(action_counts, key=action_counts.get)
-    samples = len(rows)
-    same_action_rate = action_counts[recommended_action] / max(samples, 1)
+    log = ActionLog(
+        timestamp=now,
+        username=username,
+        ticket_id=ticket.id,
+        action=str(decision.get("action", "none") or "none"),
+        amount=round(float(decision.get("amount", 0) or 0), 2),
+        issue_type=str(result.get("issue_type", "general_support") or "general_support"),
+        reason=str(decision.get("reason", "") or "")[:500],
+        status=str(decision.get("tool_status", decision.get("status", "executed")) or "executed"),
+        confidence=round(float(decision.get("confidence", 0) or 0), 4),
+        quality=round(float(result.get("quality", 0) or 0), 4),
+        message_snippet=raw_text[:200],
+        requires_approval=int(bool(decision.get("requires_approval", False))),
+        approved=0,
+    )
+    db.add(log)
+    db.commit()
 
-    return {
-        "pattern": f"{issue}->{recommended_action}",
-        "samples": samples,
-        "avg_confidence": round(total_confidence / max(samples, 1), 2),
-        "recommended_action": recommended_action,
-        "same_action_rate": round(same_action_rate, 2),
-    }
 
+@app.post("/analyze", response_model=CanonicalAgentResponse)
+def analyze_extension_ticket(
+    req: ExtensionAnalyzeRequest,
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
+):
+    username = get_current_username_from_header(authorization)
+    user = db.query(User).filter(User.username == username).first() if username != "guest" else None
 
-def build_execution_payload(action: str, confidence: float, queue: str, risk_level: str) -> dict[str, Any]:
-    action_l = str(action or "none").strip().lower()
-    queue_l = str(queue or "new").strip().lower()
-    risk_l = str(risk_level or "medium").strip().lower()
-    conf = float(confidence or 0)
-
-    if action_l in {"refund", "credit", "charge", "auto send tracking"} and conf >= 0.90 and risk_l == "low":
-        mode = "auto"
-        label = "Action executed" if action_l != "auto send tracking" else "Tracking prepared automatically"
-        detail = (
-            f"{action_l} completed automatically with confidence {conf:.2f}."
-            if action_l != "auto send tracking"
-            else f"Tracking response prepared automatically with confidence {conf:.2f}."
-        )
-    elif action_l in {"review", "review refund", "review cancellation", "review address change"} or queue_l in {"refund_risk", "escalated"} or risk_l == "high":
-        mode = "manual_review"
-        label = "Ready for review"
-        detail = f"{action_l} requires human confirmation. Queue: {queue_l or 'waiting'}."
-    elif action_l in {"none", "respond", "ignore"}:
-        mode = "assist"
-        label = "Reply ready"
-        detail = f"Reply prepared with confidence {conf:.2f}."
+    if user:
+        enforce_plan_limits(user)
+        plan_tier = get_plan_name(user)
+        priority_routing = bool(get_plan_config(plan_tier)["priority_routing"])
+        operator_mode = get_operator_mode(db)
     else:
-        mode = "assist"
-        label = "Action prepared"
-        detail = f"{action_l} prepared with confidence {conf:.2f}."
+        username = "extension_guest"
+        plan_tier = "free"
+        priority_routing = False
+        operator_mode = get_operator_mode(db)
 
-    return {
-        "label": label,
-        "detail": detail,
-        "mode": mode,
-    }
-
-
-def build_signal_list(confidence: float, action: str, queue: str, risk_level: str, learning: dict[str, Any] | None = None) -> list[str]:
-    signals = [
-        f"confidence: {float(confidence or 0):.2f}",
-        f"action: {str(action or 'none').strip().lower()}",
-        f"queue: {str(queue or 'new').strip().lower()}",
-        f"risk: {str(risk_level or 'medium').strip().lower()}",
-    ]
-    if learning and learning.get("pattern"):
-        signals.append(f"pattern: {learning['pattern']}")
-        signals.append(f"samples: {learning.get('samples', 0)}")
-    return signals
-
-
-def build_decision_trace(issue_type: str, action: str, queue: str, learning: dict[str, Any] | None = None) -> list[str]:
-    trace = [
-        f"Classified -> {str(issue_type or 'general_support').strip().lower()}",
-        f"Action selected -> {str(action or 'none').strip().lower()}",
-        f"Queue assigned -> {str(queue or 'new').strip().lower()}",
-    ]
-    if learning and learning.get("pattern"):
-        trace.append(f"Learning pattern -> {learning['pattern']}")
-    return trace
-
-
-def build_memory_summary(learning: dict[str, Any] | None) -> dict[str, Any]:
-    learning = learning or {}
-    samples = int(learning.get("samples", 0) or 0)
-    if samples <= 0:
-        summary = "No prior ticket pattern learned yet."
-    else:
-        summary = (
-            f"{samples} similar tickets seen. "
-            f"Recommended action: {learning.get('recommended_action', 'none')}."
-        )
-    return {
-        "pattern": learning.get("pattern"),
-        "samples": samples,
-        "avg_confidence": float(learning.get("avg_confidence", 0) or 0),
-        "same_action_rate": float(learning.get("same_action_rate", 0) or 0),
-        "summary": summary,
-    }
-
-
-def build_session_impact(db: Session, username: str) -> dict[str, Any]:
-    rows = (
-        db.query(ActionLog)
-        .filter(ActionLog.username == username)
-        .order_by(ActionLog.id.desc())
-        .limit(100)
-        .all()
+    result = run_agent(
+        message=req.text,
+        user_id=username,
+        meta=_build_extension_meta(req, operator_mode, plan_tier, priority_routing),
+        request_context=_build_extension_context(req).model_dump(),
     )
 
-    tickets_seen = len(rows)
-    if tickets_seen == 0:
-        return {
-            "tickets_seen": 0,
-            "tickets_resolved": 0,
-            "agent_minutes_saved": 0.0,
-            "value_generated": 0.0,
-        }
+    if user:
+        user.usage = int(user.usage or 0) + 1
+        db.commit()
 
-    resolved_statuses = {"executed", "refunded", "credit_issued", "classified", "ai_classified", "skipped", "fallback"}
-    tickets_resolved = sum(1 for row in rows if str(row.status or "").strip().lower() in resolved_statuses)
-    agent_minutes_saved = round(tickets_seen * 3.2, 1)
-    value_generated = round(agent_minutes_saved * 0.75, 2)
+    _persist_sovereign_result(db, username, req.text, result)
+    return CanonicalAgentResponse.model_validate(result)
 
-    return {
-        "tickets_seen": tickets_seen,
-        "tickets_resolved": tickets_resolved,
-        "agent_minutes_saved": agent_minutes_saved,
-        "value_generated": value_generated,
-    }
-
-
-def infer_extension_issue_type(text: str) -> str:
-    t = (text or "").lower()
-    if any(k in t for k in ["where is my order", "where's my order", "tracking", "shipment", "shipping", "package", "delivery", "wismo"]):
-        return "shipping_issue"
-    if any(k in t for k in ["refund", "money back", "charged twice", "double charged", "duplicate charge", "billing issue"]):
-        return "refund_request"
-    if any(k in t for k in ["cancel my order", "cancel order", "stop my order"]):
-        return "cancellation_request"
-    if any(k in t for k in ["change my address", "wrong address", "update address", "shipping address"]):
-        return "address_change"
-    if any(k in t for k in ["damaged", "broken", "missing item", "wrong item", "incorrect item"]):
-        return "order_issue"
-    return "general_support"
-
-
-def extension_type_label(issue_type: str) -> str:
-    mapping = {
-        "shipping_issue": "Shipping Issue",
-        "refund_request": "Refund Request",
-        "cancellation_request": "Cancellation Request",
-        "address_change": "Address Change",
-        "order_issue": "Order Issue",
-        "general_support": "General Support",
-        "non_customer": "Non Customer",
-    }
-    return mapping.get(str(issue_type or "general_support"), str(issue_type or "general_support").replace("_", " ").title())
-
-
-def extension_rule_fallback(text: str, db: Session) -> dict[str, Any]:
-    issue_type = infer_extension_issue_type(text)
-    learning = get_multi_ticket_learning(db, "extension_user", issue_type)
-
-    if issue_type == "shipping_issue":
-        action = "Auto Send Tracking"
-        status = "resolved"
-        queue = "resolved"
-        priority = "medium"
-        risk_level = "low"
-        confidence = 0.92
-        reply = (
-            "Hi there\n\n"
-            "Thanks for reaching out — I’ve checked your order and it’s already on the way.\n\n"
-            "You can track it here:\n"
-            "Tracking link will populate from your order system.\n\n"
-            "Estimated delivery:\n"
-            "Delivery date will populate from your order system.\n\n"
-            "If anything looks off, just reply here and we’ll take care of it.\n\n"
-            "Best,\nSupport Team"
-        )
-        reason = "Rule fallback: shipping_wismo_auto_resolve"
-        tool_status = "classified"
-    elif issue_type == "refund_request":
-        action = "Review Refund"
-        status = "waiting"
-        queue = "refund_risk"
-        priority = "high"
-        risk_level = "medium"
-        confidence = 0.86
-        reply = "Thanks for reaching out — I’m reviewing the billing details now and will confirm the refund next step shortly."
-        reason = "Rule fallback: refund_review_gate"
-        tool_status = "manual_review"
-    elif issue_type == "cancellation_request":
-        action = "Review Cancellation"
-        status = "waiting"
-        queue = "waiting"
-        priority = "high"
-        risk_level = "medium"
-        confidence = 0.84
-        reply = "Thanks for reaching out — I’m checking the order status now to confirm whether cancellation is still possible."
-        reason = "Rule fallback: cancellation_review_gate"
-        tool_status = "manual_review"
-    elif issue_type == "address_change":
-        action = "Review Address Change"
-        status = "waiting"
-        queue = "waiting"
-        priority = "medium"
-        risk_level = "low"
-        confidence = 0.84
-        reply = "Thanks for the heads-up — I’m checking whether the order has already been processed so I can confirm the address update options."
-        reason = "Rule fallback: address_change_review_gate"
-        tool_status = "manual_review"
-    elif issue_type == "order_issue":
-        action = "Escalate Review"
-        status = "escalated"
-        queue = "escalated"
-        priority = "high"
-        risk_level = "medium"
-        confidence = 0.85
-        reply = "I’m reviewing the order issue now and will confirm the best resolution path."
-        reason = "Rule fallback: order_issue_escalation"
-        tool_status = "manual_review"
-    else:
-        action = "Respond"
-        status = "waiting"
-        queue = "waiting"
-        priority = "low"
-        risk_level = "low"
-        confidence = 0.82
-        reply = "Thanks for reaching out — I’m looking into this now and will follow up shortly."
-        reason = "Rule fallback: general_support"
-        tool_status = "fallback"
-
-    impact = {
-        "type": "saved",
-        "amount": 0,
-        "signals": build_signal_list(confidence, action, queue, risk_level, learning),
-    }
-
-    return {
-        "type": extension_type_label(issue_type),
-        "status": status,
-        "priority": priority,
-        "queue": queue,
-        "risk_level": risk_level,
-        "reply": reply,
-        "final": reply,
-        "response": reply,
-        "action": action,
-        "amount": 0,
-        "reason": reason,
-        "ai_summary": "Fallback extension routing applied.",
-        "issue_type": issue_type,
-        "order_status": "unknown",
-        "tool_status": tool_status,
-        "tool_result": {"status": tool_status},
-        "impact": impact,
-        "execution": build_execution_payload(action, confidence, queue, risk_level),
-        "policy_rule": reason.split(": ", 1)[-1],
-        "decision_trace": build_decision_trace(issue_type, action, queue, learning),
-        "memory_summary": build_memory_summary(learning),
-        "session_impact": build_session_impact(db, "extension_user"),
-        "decision": {
-            "action": action,
-            "queue": queue,
-            "priority": priority,
-            "risk_level": risk_level,
-            "requires_approval": action.startswith("Review"),
-        },
-        "output": {},
-        "meta": {"source": "extension"},
-        "triage": {},
-        "history": {},
-        "mode": "extension-fallback",
-        "confidence": confidence,
-        "quality": 0.9,
-        "learning": learning,
-    }
-
-
-class ExtensionAnalyzeRequest(BaseModel):
-    text: str
-
-    @field_validator("text")
-    @classmethod
-    def validate_text(cls, v: str) -> str:
-        text = (v or "").strip()
-        if not text:
-            raise ValueError("text required")
-        if len(text) > 50000:
-            raise ValueError("text too long")
-        return text
-
-
-@app.post("/analyze")
-def analyze_extension_ticket(req: ExtensionAnalyzeRequest, db: Session = Depends(get_db)):
-    text = req.text.strip()
-
-    if is_non_customer_text(text):
-        return {
-            "type": "Non Customer",
-            "issue_type": "non_customer",
-            "action": "Ignore",
-            "action_raw": "ignore",
-            "confidence": 0.95,
-            "quality": 1.0,
-            "reason": "Detected external discussion / non-customer content",
-            "order_status": "none",
-            "tool_status": "skipped",
-            "queue": "ignore",
-            "priority": "low",
-            "risk_level": "low",
-            "requires_approval": False,
-            "urgency": 0,
-            "reply": "",
-        }
-
-    guest_user = User(username="guest", password="", usage=0, tier="free")
-
-    try:
-        result = run_agent(
-            text,
-            user_id="extension_guest",
-            meta={
-                "sentiment": 5,
-                "ltv": 0,
-                "order_status": "unknown",
-                "plan_tier": "free",
-                "priority_routing": False,
-                "payment_intent_id": "",
-                "charge_id": "",
-                "operator_mode": get_operator_mode(db),
-                "channel": "email",
-                "source": "extension",
-            },
-        )
-
-        if not isinstance(result, dict):
-            raise RuntimeError("Agent returned invalid payload")
-
-        reply = (
-            result.get("response")
-            or result.get("reply")
-            or result.get("final")
-            or "No response generated."
-        )
-
-        issue_type = str(result.get("issue_type", "general_support") or "general_support")
-        action = str(result.get("action", "none") or "none")
-        confidence = float(result.get("confidence", 0) or 0)
-        reason = str(result.get("reason", "") or "")
-        quality = float(result.get("quality", 0) or 0)
-        order_status = str(result.get("order_status", "unknown") or "unknown")
-        tool_status = str(result.get("tool_status", "analysis_only") or "analysis_only")
-        decision = result.get("decision") or {}
-        triage = result.get("triage") or {}
-
-        return {
-            "type": issue_type.replace("_", " ").title(),
-            "issue_type": issue_type,
-            "action": action.replace("_", " ").title(),
-            "action_raw": action,
-            "confidence": round(confidence, 2),
-            "quality": round(quality, 2),
-            "reason": reason,
-            "order_status": order_status,
-            "tool_status": tool_status,
-            "queue": str(decision.get("queue", "new") or "new"),
-            "priority": str(decision.get("priority", "medium") or "medium"),
-            "risk_level": str(decision.get("risk_level", "medium") or "medium"),
-            "requires_approval": bool(decision.get("requires_approval", False)),
-            "urgency": int(triage.get("urgency", 0) or 0),
-            "reply": str(reply),
-        }
-
-    except Exception as exc:
-        return {
-            "type": "General Support",
-            "issue_type": "general_support",
-            "action": "Review",
-            "action_raw": "review",
-            "confidence": 0.0,
-            "quality": 0.0,
-            "reason": f"Analyze error: {str(exc)}",
-            "order_status": "unknown",
-            "tool_status": "error",
-            "queue": "escalated",
-            "priority": "high",
-            "risk_level": "medium",
-            "requires_approval": False,
-            "urgency": 0,
-            "reply": "Thanks for reaching out — I’m reviewing this now and will follow up with the best next step.",
-        }
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=8000)

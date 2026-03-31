@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
-import os
 from typing import Any, Dict, List
 
-FILE = "brain.json"
+from state_store import load_state, save_state
+
+BRAIN_STATE_KEY = "brain_v1"
 
 
 def default_brain() -> Dict[str, Any]:
@@ -26,8 +26,7 @@ def default_brain() -> Dict[str, Any]:
 
 
 def save_brain(brain: Dict[str, Any]) -> None:
-    with open(FILE, "w", encoding="utf-8") as f:
-        json.dump(brain, f, indent=2)
+    save_state(BRAIN_STATE_KEY, brain)
 
 
 def normalize_rule(rule: Any) -> Dict[str, Any] | None:
@@ -136,26 +135,13 @@ def normalize_brain(brain: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def load_brain() -> Dict[str, Any]:
-    if not os.path.exists(FILE):
-        brain = default_brain()
-        update_system_prompt(brain)
-        save_brain(brain)
-        return brain
-
-    try:
-        with open(FILE, "r", encoding="utf-8") as f:
-            brain = json.load(f)
-            if not isinstance(brain, dict):
-                brain = default_brain()
-    except Exception:
-        brain = default_brain()
-
+    brain = load_state(BRAIN_STATE_KEY, default_brain())
     brain = normalize_brain(brain)
 
     if not brain.get("system_prompt"):
         update_system_prompt(brain)
+        save_brain(brain)
 
-    save_brain(brain)
     return brain
 
 
@@ -171,7 +157,7 @@ def get_top_rule_objects(brain: Dict[str, Any], limit: int = 5) -> List[Dict[str
     return [rule for _, rule in scored[:limit]]
 
 
-def add_rule(brain: Dict[str, Any], rule: Dict[str, Any]) -> None:
+def add_rule(brain: Dict[str, Any], rule: Dict[str, Any] | str) -> None:
     normalized = normalize_rule(rule)
     if not normalized:
         return

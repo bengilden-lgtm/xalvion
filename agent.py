@@ -13,6 +13,16 @@ from memory import get_prompt_memory, get_user_memory, update_memory
 from router import route_task
 from security import safe_output, sanitize_input
 from tools import get_order, issue_credit, process_refund
+from models import (
+    AgentRequestContext,
+    CanonicalAgentResponse,
+    ImpactProjections,
+    MemoryDelta,
+    OutputEnvelope,
+    SovereignDecision,
+    ThinkingTraceStep,
+    TriageMetadata,
+)
 
 try:
     from analytics import log_event
@@ -716,35 +726,181 @@ def rewrite_output_for_issue(ticket: Dict[str, Any], executed: Dict[str, Any], p
     return text
 
 
-def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    clean, blocked_reason = sanitize_input(message)
-    if blocked_reason:
-        return build_structured_response(
-            customer_message=blocked_reason,
-            action_payload={"action": "none", "amount": 0, "reason": "blocked_input", "priority": "high", "risk_level": "high", "queue": "escalated"},
-            ticket={"issue_type": "blocked", "order_status": "blocked", "ltv": 0, "sentiment": 5, "plan_tier": "free", "operator_mode": "balanced"},
-            history=get_user_memory(user_id),
-            triage={"urgency": 90, "churn_risk": 0, "refund_likelihood": 0, "abuse_likelihood": 90, "complexity": 80, "recommended_owner": "senior_operator", "risk_level": "high"},
-            mode="blocked",
-            confidence=1.0,
-            quality=0.0,
-            tool_payload={"tool_result": {"status": "blocked"}, "tool_status": "blocked"},
-            internal_note="Security layer blocked prompt injection or unsafe input.",
-            customer_note=blocked_reason,
-        )
 
+
+def _trace(step: str, status: str, detail: str | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"step": step, "status": status}
+    if detail:
+        payload["detail"] = detail
+    return payload
+
+
+def _build_memory_delta(history: Dict[str, Any], ticket: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "plan_tier": str(ticket.get("plan_tier", history.get("plan_tier", "free")) or "free"),
+        "repeat_customer": bool(history.get("repeat_customer", False)),
+        "refund_count": int(history.get("refund_count", 0) or 0),
+        "credit_count": int(history.get("credit_count", 0) or 0),
+        "review_count": int(history.get("review_count", 0) or 0),
+        "complaint_count": int(history.get("complaint_count", 0) or 0),
+        "abuse_score": int(history.get("abuse_score", 0) or 0),
+        "sentiment_avg": float(history.get("sentiment_avg", 5.0) or 5.0),
+        "last_issue_type": str(history.get("last_issue_type", ticket.get("issue_type", "general_support")) or "general_support"),
+    }
+
+
+def _canonicalize_result(
+    *,
+    customer_message: str,
+    ticket: Dict[str, Any],
+    triage: Dict[str, Any],
+    final_action: Dict[str, Any],
+    executed: Dict[str, Any],
+    history: Dict[str, Any],
+    quality: float,
+    mode: str,
+    request_context: AgentRequestContext | None,
+    internal_note: str,
+    customer_note: str,
+    thinking_trace: list[dict[str, Any]],
+) -> Dict[str, Any]:
+    impact = calculate_impact(ticket, final_action)
+    tool_status = str(executed.get("tool_status", executed.get("status", "no_action")) or "no_action")
+    queue = str(final_action.get("queue", "new") or "new")
+    if tool_status in {"pending_approval", "manual_review"}:
+        status = "waiting"
+    elif queue == "resolved":
+        status = "resolved"
+    elif str(final_action.get("action", "none") or "none") in {"refund", "credit", "none"}:
+        status = "resolved"
+    else:
+        status = "escalated"
+
+    decision = {
+        "action": str(executed.get("action", final_action.get("action", "none")) or "none"),
+        "amount": float(executed.get("amount", final_action.get("amount", 0)) or 0),
+        "confidence": clamp_confidence(final_action.get("confidence", 0.9), 0.9),
+        "reason": str(final_action.get("reason", "") or ""),
+        "priority": str(final_action.get("priority", "medium") or "medium"),
+        "queue": queue,
+        "status": status,
+        "risk_level": str(final_action.get("risk_level", triage.get("risk_level", "medium")) or "medium"),
+        "requires_approval": bool(final_action.get("requires_approval", False)),
+        "tool_status": tool_status,
+    }
+
+    impact_projection = {
+        "type": str(impact.get("type", "saved") or "saved"),
+        "amount": float(impact.get("amount", 0) or 0),
+        "money_saved": float(impact.get("money_saved", 0) or 0),
+        "auto_resolved": bool(impact.get("auto_resolved", decision["action"] in {"refund", "credit", "none"})),
+        "agent_minutes_saved": int(impact.get("agent_minutes_saved", 6 if decision["action"] != "review" else 0) or 0),
+        "signals": list(impact.get("signals", [])) if isinstance(impact.get("signals", []), list) else [],
+    }
+
+    canonical = {
+        "reply": customer_message,
+        "final": customer_message,
+        "response": customer_message,
+        "issue_type": str(ticket.get("issue_type", "general_support") or "general_support"),
+        "mode": mode,
+        "quality": round(float(quality or 0), 2),
+        "triage_metadata": triage,
+        "sovereign_decision": decision,
+        "impact_projections": impact_projection,
+        "memory_delta": _build_memory_delta(history, ticket),
+        "thinking_trace": thinking_trace,
+        "request_context": request_context.model_dump() if request_context else None,
+        "output": {
+            "internal_note": internal_note,
+            "customer_note": customer_note,
+            "audit_log": f"{ticket.get('issue_type', 'general_support')} -> {decision['action']} (${decision['amount']}) | {decision['reason']}",
+        },
+        # legacy aliases for workspace compatibility
+        "action": decision["action"],
+        "amount": decision["amount"],
+        "confidence": decision["confidence"],
+        "reason": decision["reason"],
+        "decision": decision,
+        "impact": impact_projection,
+        "triage": triage,
+        "history": _build_memory_delta(history, ticket),
+        "order_status": str(ticket.get("order_status", "unknown") or "unknown"),
+        "tool_status": decision["tool_status"],
+        "tool_result": executed.get("tool_result", {"status": decision["tool_status"]}),
+        "meta": {
+            "issue_type": str(ticket.get("issue_type", "general_support") or "general_support"),
+            "priority": decision["priority"],
+            "ltv": int(ticket.get("ltv", 0) or 0),
+            "sentiment": int(ticket.get("sentiment", 5) or 5),
+            "plan_tier": str(ticket.get("plan_tier", "free") or "free"),
+            "operator_mode": str(ticket.get("operator_mode", "balanced") or "balanced"),
+            "queue": decision["queue"],
+        },
+    }
+    validated = CanonicalAgentResponse.model_validate(canonical).model_dump()
+    validated.update({k: v for k, v in canonical.items() if k not in validated})
+    return validated
+
+
+def run_agent(
+    message: str,
+    user_id: str = "default-user",
+    meta: Dict[str, Any] | None = None,
+    request_context: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    thinking_trace: list[dict[str, Any]] = []
+    clean, blocked_reason = sanitize_input(message)
+    ctx = AgentRequestContext.model_validate(request_context or {"surface": "workspace"})
+
+    if blocked_reason:
+        thinking_trace.append(_trace("sanitize_input", "error", "blocked_input"))
+        payload = CanonicalAgentResponse(
+            reply=blocked_reason,
+            final=blocked_reason,
+            response=blocked_reason,
+            issue_type="blocked",
+            mode="blocked",
+            quality=0.0,
+            triage_metadata=TriageMetadata(urgency=90, abuse_likelihood=90, complexity=80, recommended_owner="senior_operator", risk_level="high"),
+            sovereign_decision=SovereignDecision(action="none", amount=0, confidence=1.0, reason="blocked_input", priority="high", queue="escalated", status="blocked", risk_level="high", requires_approval=False, tool_status="blocked"),
+            impact_projections=ImpactProjections(),
+            memory_delta=MemoryDelta(),
+            thinking_trace=[ThinkingTraceStep(step="sanitize_input", status="error", detail="blocked_input")],
+            request_context=ctx,
+            output=OutputEnvelope(internal_note="Security layer blocked unsafe input.", customer_note=blocked_reason, audit_log="blocked_input"),
+        ).model_dump()
+        payload.update({
+            "action": "none",
+            "amount": 0,
+            "confidence": 1.0,
+            "reason": "blocked_input",
+            "decision": payload["sovereign_decision"],
+            "impact": payload["impact_projections"],
+            "triage": payload["triage_metadata"],
+            "history": payload["memory_delta"],
+            "order_status": "blocked",
+            "tool_status": "blocked",
+            "tool_result": {"status": "blocked"},
+            "meta": {"issue_type": "blocked", "priority": "high", "ltv": 0, "sentiment": 5, "plan_tier": "free", "operator_mode": "balanced", "queue": "escalated"},
+        })
+        return payload
+
+    thinking_trace.append(_trace("sanitize_input", "done"))
     clean = clean or ""
+
     if is_conversational_message(clean):
+        thinking_trace.append(_trace("conversation_gate", "done"))
         return conversational_reply(clean)
 
     meta = meta or {}
     user_memory = get_user_memory(user_id)
     meta["customer_history"] = user_memory
     ticket = build_ticket(clean, user_id=user_id, meta=meta)
-    triage = ticket.get("triage") or triage_ticket(ticket, user_memory)
-    ticket["triage"] = triage
+    ticket["request_context"] = ctx.model_dump()
+    thinking_trace.append(_trace("build_ticket", "done"))
 
-    order_info = {}
+    order_info: Dict[str, Any] = {}
     if should_attach_order_context(str(ticket.get("issue_type", "general_support"))):
         order_info = get_order(ticket["customer"], clean)
         if ticket.get("order_status") == "unknown":
@@ -754,18 +910,29 @@ def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] 
             ticket["eta"] = order_info.get("eta", "") or ""
     else:
         ticket["order_status"] = ticket.get("order_status", "unknown")
+    thinking_trace.append(_trace("order_context", "done"))
+
+    triage = ticket.get("triage") or triage_ticket(ticket, user_memory)
+    ticket["triage"] = triage
+    thinking_trace.append(_trace("triage", "done"))
 
     brain = load_brain()
     update_system_prompt(brain)
     save_brain(brain)
-
     memory_block = get_prompt_memory(user_id, limit=5)
+    thinking_trace.append(_trace("memory_load", "done"))
 
     hard_decision = normalize_action_payload(system_decision(ticket))
+    thinking_trace.append(_trace("system_decision", "done"))
     learned_action = None
     top_rules = get_top_rule_objects(brain, 5)
     if hard_decision.get("action") == "none":
         learned_action = normalize_action_payload(apply_learned_rules(ticket, top_rules)) if top_rules else None
+    thinking_trace.append(_trace("learned_rules", "done"))
+
+    if learned_action and hard_decision.get("action") != "none" and learned_action.get("action") != hard_decision.get("action"):
+        thinking_trace.append(_trace("conflict_gate", "error", "learned_rule_conflicts_with_hard_decision"))
+        learned_action = None
 
     planned_action = hard_decision if hard_decision.get("action") != "none" else (learned_action or hard_decision)
 
@@ -802,18 +969,21 @@ def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] 
             mode = f"sovereign-{model}"
             confidence = clamp_confidence(parsed.get("confidence", 0.92), 0.92)
             quality = 0.97
+            thinking_trace.append(_trace("llm_response", "done", model))
         except Exception:
             parsed = None
+            thinking_trace.append(_trace("llm_response", "error", "provider_failure"))
 
     if parsed is None:
         parsed = local_fallback_reply(ticket, planned_action, order_info, clean)
+        thinking_trace.append(_trace("local_fallback_reply", "done"))
 
     llm_payload = normalize_action_payload(parsed)
 
     if hard_decision.get("action") != "none":
-        final_action = {**hard_decision}
+        final_action = {**hard_decision, "confidence": confidence}
     elif learned_action and llm_payload.get("action") == "none":
-        final_action = {**learned_action}
+        final_action = {**learned_action, "confidence": confidence}
     else:
         final_action = {
             "action": llm_payload["action"],
@@ -823,47 +993,48 @@ def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] 
             "risk_level": str(parsed.get("risk_level", llm_payload.get("risk_level", triage.get("risk_level", "medium"))) or "medium"),
             "queue": str(parsed.get("queue", llm_payload.get("queue", "new")) or "new"),
             "requires_approval": bool(parsed.get("requires_approval", llm_payload.get("requires_approval", False))),
+            "confidence": confidence,
         }
 
     executed = execute_action(ticket, final_action)
+    thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
 
     customer_note = polish_message(str(parsed.get("customer_note", parsed.get("customer_message", "")) or ""))
     internal_note = str(parsed.get("internal_note", f"Decision path: {final_action.get('reason', 'No reason')}.") or "").strip()
-
     customer_message = rewrite_output_for_issue(ticket, executed, parsed, clean)
 
     final_payload = {
         **final_action,
         "action": executed.get("action", final_action.get("action", "none")),
         "amount": int(executed.get("amount", final_action.get("amount", 0)) or 0),
+        "confidence": confidence,
     }
 
-    response = build_structured_response(
-        customer_message=customer_message,
-        action_payload=final_payload,
-        ticket=ticket,
-        history=user_memory,
-        triage=triage,
-        mode=mode,
-        confidence=confidence,
-        quality=quality,
-        tool_payload=executed,
-        internal_note=internal_note,
-        customer_note=customer_note or customer_message,
-    )
-
-    update_memory(user_id, ticket, response["final"], response["decision"])
-    process_feedback(clean, response["final"], response["quality"])
-
+    update_memory(user_id, ticket, customer_message, final_payload)
+    process_feedback(clean, customer_message, quality)
     brain_for_decay = load_brain()
     decay_rules(brain_for_decay)
     save_brain(brain_for_decay)
+    log_event(clean, customer_message, confidence, quality)
+    if quality > 0.92:
+        brain_growth = load_brain()
+        add_rule(brain_growth, "Maintain strong clarity and confident tone.")
+        save_brain(brain_growth)
+    thinking_trace.append(_trace("memory_update", "done"))
+    thinking_trace.append(_trace("learning_update", "done"))
 
-    log_event(clean, response["final"], response["confidence"], response["quality"])
-
-    if response["quality"] > 0.92:
-      brain_growth = load_brain()
-      add_rule(brain_growth, "Maintain strong clarity and confident tone.")
-      save_brain(brain_growth)
-
-    return response
+    refreshed_memory = get_user_memory(user_id)
+    return _canonicalize_result(
+        customer_message=customer_message,
+        ticket=ticket,
+        triage=triage,
+        final_action=final_payload,
+        executed=executed,
+        history=refreshed_memory,
+        quality=quality,
+        mode=mode,
+        request_context=ctx,
+        internal_note=internal_note,
+        customer_note=customer_note or customer_message,
+        thinking_trace=thinking_trace,
+    )

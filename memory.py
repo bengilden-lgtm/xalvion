@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import json
-import os
 import time
 from collections import Counter
 from typing import Any, Dict, List
 
-MEMORY_FILE = "memory.json"
+from state_store import load_state, mutate_state, save_state
+
+MEMORY_STATE_KEY = "memory_v1"
 MAX_HISTORY = 40
 
 
@@ -15,20 +15,11 @@ def _now() -> float:
 
 
 def load_memory() -> Dict[str, Any]:
-    if not os.path.exists(MEMORY_FILE):
-        return {}
-
-    try:
-        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
+    return load_state(MEMORY_STATE_KEY, {})
 
 
 def save_memory(memory: Dict[str, Any]) -> None:
-    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, indent=2)
+    save_state(MEMORY_STATE_KEY, memory)
 
 
 def _default_user_memory() -> Dict[str, Any]:
@@ -85,12 +76,10 @@ def calculate_importance(message: str, sentiment: int, action: str = "none") -> 
 
 def apply_decay(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     now = _now()
-
     for item in history:
         age = max(0.0, now - float(item.get("timestamp", now)))
         decay_factor = max(0.55, 1.0 - (age / 320000.0))
         item["importance"] = round(float(item.get("importance", 1.0)) * decay_factor, 4)
-
     return history
 
 
@@ -189,39 +178,43 @@ def get_user_memory(user_id: str) -> Dict[str, Any]:
 
 
 def update_memory(user_id: str, ticket: Dict[str, Any], response: str, decision: Dict[str, Any] | None = None) -> None:
-    memory = load_memory()
-    user_data = get_user_memory(user_id)
     decision = decision or {}
 
-    issue = str(ticket.get("issue", "")).strip()
-    sentiment = int(ticket.get("sentiment", 5) or 5)
-    action = str(decision.get("action", ticket.get("action", "none")) or "none")
-    amount = int(decision.get("amount", 0) or 0)
-    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
-    ltv = int(ticket.get("ltv", 0) or 0)
+    def _mutate(memory: Dict[str, Any]) -> Dict[str, Any]:
+        current = memory.get(user_id, _default_user_memory())
+        user_data = _default_user_memory()
+        user_data.update(current if isinstance(current, dict) else {})
 
-    entry = {
-        "issue": issue,
-        "issue_type": issue_type,
-        "sentiment": sentiment,
-        "response": response,
-        "action": action,
-        "amount": amount,
-        "importance": calculate_importance(issue, sentiment, action),
-        "timestamp": _now(),
-    }
+        issue = str(ticket.get("issue", "")).strip()
+        sentiment = int(ticket.get("sentiment", 5) or 5)
+        action = str(decision.get("action", ticket.get("action", "none")) or "none")
+        amount = int(decision.get("amount", 0) or 0)
+        issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
+        ltv = int(ticket.get("ltv", 0) or 0)
 
-    user_data["history"].append(entry)
-    user_data["history"] = apply_decay(user_data["history"])[-MAX_HISTORY:]
-    user_data["ltv_high_watermark"] = max(int(user_data.get("ltv_high_watermark", 0) or 0), ltv)
-    user_data["plan_tier"] = str(ticket.get("plan_tier", user_data.get("plan_tier", "free")) or "free")
-    user_data["last_updated"] = _now()
+        entry = {
+            "issue": issue,
+            "issue_type": issue_type,
+            "sentiment": sentiment,
+            "response": response,
+            "action": action,
+            "amount": amount,
+            "importance": calculate_importance(issue, sentiment, action),
+            "timestamp": _now(),
+        }
 
-    user_data = _rebuild_user_metrics(user_data)
-    user_data["soul_file"] = generate_soul_file(user_data)
+        user_data["history"].append(entry)
+        user_data["history"] = apply_decay(user_data["history"])[-MAX_HISTORY:]
+        user_data["ltv_high_watermark"] = max(int(user_data.get("ltv_high_watermark", 0) or 0), ltv)
+        user_data["plan_tier"] = str(ticket.get("plan_tier", user_data.get("plan_tier", "free")) or "free")
+        user_data["last_updated"] = _now()
+        user_data = _rebuild_user_metrics(user_data)
+        user_data["soul_file"] = generate_soul_file(user_data)
 
-    memory[user_id] = user_data
-    save_memory(memory)
+        memory[user_id] = user_data
+        return memory
+
+    mutate_state(MEMORY_STATE_KEY, {}, _mutate)
 
 
 def get_prompt_memory(user_id: str, limit: int = 5) -> str:
