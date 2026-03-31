@@ -49,6 +49,15 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from agent import run_agent
+from actions import build_ticket as build_support_ticket, calculate_impact, system_decision, triage_ticket
+from memory import get_user_memory
+from utils import normalize_ticket, safe_execute
+
+try:
+    from learning import learn_from_ticket
+except Exception:
+    def learn_from_ticket(ticket: dict[str, Any], decision: dict[str, Any], outcome: dict[str, Any]) -> None:
+        return None
 
 try:
     from analytics import get_metrics
@@ -219,8 +228,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 _rate_log: dict[str, list[float]] = {}
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,64}$")
-GUEST_PREVIEW_LIMIT = 3
-_guest_usage: dict[str, int] = {}
 
 
 def _now_iso() -> str:
@@ -606,16 +613,6 @@ def get_current_username_from_header(authorization: str | None) -> str:
     token = authorization.split(" ", 1)[1].strip()
     return decode_token(token) or "guest"
 
-def get_client_key(request: Request, authorization: str | None = None) -> str:
-    username = get_current_username_from_header(authorization)
-    if username and username != "guest":
-        return f"user:{username}"
-
-    forwarded = request.headers.get("x-forwarded-for", "")
-    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
-    ua = request.headers.get("user-agent", "")[:120]
-    return f"guest:{ip}:{ua}"
-
 
 def require_authenticated_user(user: User = Depends(get_current_user)) -> User:
     if getattr(user, "username", "") in {"", "guest"}:
@@ -715,24 +712,6 @@ def enforce_plan_limits(user: User) -> None:
             headers={"X-Xalvion-Plan": plan_name, "X-Xalvion-Limit": str(limit)},
         )
 
-
-def enforce_guest_preview_limit(client_key: str) -> None:
-    if not check_rate_limit(client_key or "__guest__"):
-        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
-
-    guest_used = int(_guest_usage.get(client_key, 0) or 0)
-    if guest_used >= GUEST_PREVIEW_LIMIT:
-        raise HTTPException(
-            status_code=402,
-            detail="Preview limit reached. Create an account to continue with Xalvion.",
-            headers={"X-Xalvion-Plan": "guest", "X-Xalvion-Limit": str(GUEST_PREVIEW_LIMIT)},
-        )
-
-
-def increment_guest_preview_usage(client_key: str) -> int:
-    _guest_usage[client_key] = int(_guest_usage.get(client_key, 0) or 0) + 1
-    return _guest_usage[client_key]
-
 # =============================================================================
 # 8. OPERATOR & TICKET HELPERS
 # =============================================================================
@@ -785,6 +764,20 @@ def build_agent_meta(req: SupportRequest, user: User, db: Session | None = None)
 
 def create_ticket_record(db: Session, user: User, req: SupportRequest) -> Ticket:
     now = _now_iso()
+    bootstrap_ticket = build_support_ticket(
+        req.message,
+        user_id=str(getattr(user, "username", "unknown") or "unknown"),
+        meta={
+            "sentiment": req.sentiment if req.sentiment is not None else 5,
+            "ltv": req.ltv if req.ltv is not None else 0,
+            "order_status": req.order_status if req.order_status is not None else "unknown",
+            "plan_tier": get_plan_name(user),
+            "operator_mode": "balanced",
+            "channel": _safe_channel(req.channel),
+            "source": _safe_source(req.source),
+            "customer_history": {},
+        },
+    )
     ticket = Ticket(
         created_at=now,
         updated_at=now,
@@ -797,7 +790,7 @@ def create_ticket_record(db: Session, user: User, req: SupportRequest) -> Ticket
         queue="new",
         priority="medium",
         risk_level="medium",
-        issue_type="general_support",
+        issue_type=str(bootstrap_ticket.get("issue_type", "general_support") or "general_support")[:64],
     )
     db.add(ticket)
     db.commit()
@@ -946,26 +939,23 @@ def serialize_ticket_with_log(ticket: Ticket, db: Session) -> dict[str, Any]:
     return base
 
 
-def serialize_support_result(result: dict[str, Any], user: User, client_key: str | None = None) -> dict[str, Any]:
+def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, Any]:
     usage_summary = get_usage_summary(user)
     tool_result = result.get("tool_result") or {}
     impact = result.get("impact") or {}
-
-    is_guest = str(getattr(user, "username", "") or "") == "guest"
-    if is_guest:
-        guest_usage = int(_guest_usage.get(client_key or "", 0) or 0)
-        public_tier = "free"
-        plan_limit = GUEST_PREVIEW_LIMIT
-        remaining = max(0, GUEST_PREVIEW_LIMIT - guest_usage)
-        usage_value = guest_usage
-    else:
-        public_tier = usage_summary["tier"]
-        plan_limit = usage_summary["limit"]
-        usage_value = usage_summary["usage"]
-        remaining = max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"])
+    reply = result.get("reply") or result.get("response") or result.get("final") or "No response"
+    execution = result.get("execution") or {
+        "action": result.get("action", "none"),
+        "amount": result.get("amount", 0),
+        "status": result.get("tool_status", tool_result.get("status", "unknown")),
+        "auto_resolved": bool(impact.get("auto_resolved", False)),
+        "requires_approval": bool((result.get("decision") or {}).get("requires_approval", False)),
+    }
 
     return {
-        "reply": result.get("response", result.get("final", "No response")),
+        "reply": reply,
+        "response": result.get("response", reply),
+        "final": result.get("final", reply),
         "mode": result.get("mode", "unknown"),
         "quality": result.get("quality", 0),
         "confidence": result.get("confidence", 0),
@@ -977,15 +967,17 @@ def serialize_support_result(result: dict[str, Any], user: User, client_key: str
         "tool_result": tool_result,
         "tool_status": result.get("tool_status", tool_result.get("status", "unknown")),
         "impact": impact,
+        "execution": execution,
         "decision": result.get("decision", {}),
         "output": result.get("output", {}),
         "meta": result.get("meta", {}),
         "triage": result.get("triage", {}),
         "history": result.get("history", {}),
-        "tier": public_tier,
-        "plan_limit": plan_limit,
-        "usage": usage_value,
-        "remaining": remaining,
+        "runtime_ticket": result.get("runtime_ticket", {}),
+        "tier": usage_summary["tier"],
+        "plan_limit": usage_summary["limit"],
+        "usage": usage_summary["usage"],
+        "remaining": max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"]),
         "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
         "stripe_account_id": getattr(user, "stripe_account_id", None),
     }
@@ -1648,23 +1640,132 @@ def infer_tier_from_checkout_session(session_id: str) -> str:
 # =============================================================================
 
 
+def build_runtime_ticket(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
+    meta = build_agent_meta(req, user, db)
+    user_memory = get_user_memory(str(getattr(user, "username", "guest") or "guest"))
+    meta["customer_history"] = user_memory
+    raw_ticket = build_support_ticket(req.message, user_id=str(getattr(user, "username", "guest") or "guest"), meta=meta)
+    ticket = normalize_ticket(raw_ticket)
+    ticket["customer_history"] = user_memory
+    ticket["triage"] = ticket.get("triage") or triage_ticket(ticket, user_memory)
+    return ticket
+
+
+def hydrate_result_with_engine_context(
+    result: dict[str, Any],
+    *,
+    runtime_ticket: dict[str, Any],
+    hard_decision: dict[str, Any],
+    impact: dict[str, Any],
+    user: User,
+) -> dict[str, Any]:
+    hydrated = dict(result or {})
+    existing_decision = dict(hydrated.get("decision") or {})
+    existing_meta = dict(hydrated.get("meta") or {})
+    existing_output = dict(hydrated.get("output") or {})
+
+    issue_type = str(hydrated.get("issue_type") or runtime_ticket.get("issue_type") or "general_support")
+    order_status = str(hydrated.get("order_status") or runtime_ticket.get("order_status") or "unknown")
+    triage = hydrated.get("triage") or runtime_ticket.get("triage") or {}
+    history = hydrated.get("history") or runtime_ticket.get("customer_history") or {}
+
+    action = str(hydrated.get("action", existing_decision.get("action", "none")) or "none")
+    amount = float(hydrated.get("amount", existing_decision.get("amount", 0)) or 0)
+    reason = str(hydrated.get("reason") or existing_decision.get("reason") or hard_decision.get("reason") or "")
+    queue = str(existing_decision.get("queue") or hard_decision.get("queue") or "new")
+    priority = str(existing_decision.get("priority") or hard_decision.get("priority") or "medium")
+    risk_level = str(existing_decision.get("risk_level") or hard_decision.get("risk_level") or triage.get("risk_level") or "medium")
+    requires_approval = bool(existing_decision.get("requires_approval", hard_decision.get("requires_approval", False)))
+
+    hydrated["issue_type"] = issue_type
+    hydrated["order_status"] = order_status
+    hydrated["impact"] = impact or hydrated.get("impact") or {}
+    hydrated["triage"] = triage
+    hydrated["history"] = history
+    hydrated["runtime_ticket"] = runtime_ticket
+    hydrated["reply"] = hydrated.get("reply") or hydrated.get("response") or hydrated.get("final") or ""
+    hydrated["response"] = hydrated.get("response") or hydrated.get("reply") or hydrated.get("final") or ""
+    hydrated["final"] = hydrated.get("final") or hydrated.get("reply") or hydrated.get("response") or ""
+    hydrated["reason"] = reason
+    hydrated["action"] = action
+    hydrated["amount"] = round(amount, 2)
+
+    existing_decision.update({
+        "action": action,
+        "amount": round(amount, 2),
+        "reason": reason,
+        "queue": queue,
+        "priority": priority,
+        "risk_level": risk_level,
+        "requires_approval": requires_approval,
+        "shadow": hard_decision,
+    })
+    hydrated["decision"] = existing_decision
+
+    existing_meta.update({
+        "priority": existing_meta.get("priority") or priority,
+        "operator_mode": runtime_ticket.get("operator_mode", "balanced"),
+        "plan_tier": get_plan_name(user),
+        "channel": runtime_ticket.get("channel", "web"),
+        "source": runtime_ticket.get("source", "workspace"),
+    })
+    hydrated["meta"] = existing_meta
+
+    execution_status = str(hydrated.get("tool_status") or (hydrated.get("tool_result") or {}).get("status") or "unknown")
+    hydrated["execution"] = {
+        "action": action,
+        "amount": round(amount, 2),
+        "status": execution_status,
+        "auto_resolved": bool((impact or {}).get("auto_resolved", False)),
+        "requires_approval": requires_approval,
+    }
+
+    internal_note = str(existing_output.get("internal_note") or "").strip()
+    if not internal_note:
+        internal_note = f"Decision: {action} | Queue: {queue} | Priority: {priority} | Risk: {risk_level}"
+    existing_output["internal_note"] = internal_note
+    hydrated["output"] = existing_output
+    return hydrated
+
+
+def apply_learning_feedback(runtime_ticket: dict[str, Any], result: dict[str, Any]) -> None:
+    decision = {
+        "action": str(result.get("action", "none") or "none"),
+        "amount": float(result.get("amount", 0) or 0),
+        "reason": str(result.get("reason", "") or ""),
+    }
+    outcome = dict(result.get("impact") or {})
+    if not outcome:
+        outcome = calculate_impact(runtime_ticket, decision)
+    safe_execute(learn_from_ticket, runtime_ticket, decision, outcome)
+
+
 def check_requires_approval(action: str, amount: float) -> bool:
     if not LIVE_MODE:
         return False
     return action == "refund" and float(amount or 0) > APPROVAL_THRESHOLD
 
 
-def run_support(req: SupportRequest, user: User, db: Session, client_key: str | None = None) -> dict[str, Any]:
-    if getattr(user, "username", "") == "guest":
-        enforce_guest_preview_limit(client_key or "guest")
-    else:
-        enforce_plan_limits(user)
+def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
+    enforce_plan_limits(user)
     ticket = create_ticket_record(db, user, req)
+    runtime_ticket = build_runtime_ticket(req, user, db)
+    shadow_decision = safe_execute(system_decision, runtime_ticket)
+    if not isinstance(shadow_decision, dict) or "error" in shadow_decision:
+        shadow_decision = {
+            "action": "none",
+            "amount": 0,
+            "reason": "Shadow decision fallback",
+            "priority": "medium",
+            "risk_level": str((runtime_ticket.get("triage") or {}).get("risk_level", "medium") or "medium"),
+            "queue": "new",
+            "requires_approval": False,
+        }
 
     try:
         result = run_agent(
             req.message,
-            user_id=user.username,
+            user_id=str(getattr(user, "username", "guest") or "guest"),
             meta=build_agent_meta(req, user, db),
         )
 
@@ -1701,6 +1802,19 @@ def run_support(req: SupportRequest, user: User, db: Session, client_key: str | 
         else:
             result = apply_real_actions(result, req, user)
 
+        impact = calculate_impact(runtime_ticket, {
+            "action": str(result.get("action", "none") or "none"),
+            "amount": float(result.get("amount", 0) or 0),
+        })
+        result = hydrate_result_with_engine_context(
+            result,
+            runtime_ticket=runtime_ticket,
+            hard_decision=shadow_decision,
+            impact=impact,
+            user=user,
+        )
+        apply_learning_feedback(runtime_ticket, result)
+
         update_ticket_from_result(db, ticket, result)
 
         log_action(
@@ -1719,16 +1833,16 @@ def run_support(req: SupportRequest, user: User, db: Session, client_key: str | 
             approved=False,
         )
 
-        if getattr(user, "username", "") == "guest":
-            increment_guest_preview_usage(client_key or "guest")
-        elif hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
+        if hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
             user.usage = int(getattr(user, "usage", 0) or 0) + 1
             db.commit()
             db.refresh(user)
 
-        serialized = serialize_support_result(result, user, client_key=client_key)
+        serialized = serialize_support_result(result, user)
         serialized["ticket"] = serialize_ticket(ticket)
         serialized["operator_mode"] = get_operator_mode(db)
+        serialized["shadow_decision"] = shadow_decision
+        serialized["runtime_ticket"] = runtime_ticket
         return serialized
 
     except HTTPException:
@@ -1749,8 +1863,6 @@ def run_support(req: SupportRequest, user: User, db: Session, client_key: str | 
             "Our team has been notified and will follow up shortly."
         )
         plan = get_plan_name(user)
-        is_guest = getattr(user, "username", "") == "guest"
-        guest_usage = int(_guest_usage.get(client_key or "", 0) or 0) if is_guest else 0
         return {
             "reply": fallback,
             "final": fallback,
@@ -1758,29 +1870,32 @@ def run_support(req: SupportRequest, user: User, db: Session, client_key: str | 
             "action": "review",
             "amount": 0,
             "reason": "Pipeline error — escalated for manual review",
-            "issue_type": "general_support",
-            "order_status": "unknown",
+            "issue_type": str(runtime_ticket.get("issue_type", "general_support") or "general_support"),
+            "order_status": str(runtime_ticket.get("order_status", "unknown") or "unknown"),
             "tool_status": "error",
             "tool_result": {"status": "error"},
-            "impact": {"type": "saved", "amount": 0},
-            "decision": {"action": "review", "queue": "escalated", "priority": "high"},
+            "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
+            "decision": {"action": "review", "queue": "escalated", "priority": "high", "shadow": shadow_decision},
             "output": {"internal_note": f"Error: {str(exc)[:200]}"},
-            "meta": {},
-            "triage": {},
-            "history": {},
+            "meta": {"operator_mode": runtime_ticket.get("operator_mode", "balanced")},
+            "triage": runtime_ticket.get("triage", {}),
+            "history": runtime_ticket.get("customer_history", {}),
+            "execution": {"action": "review", "amount": 0, "status": "error", "auto_resolved": False, "requires_approval": False},
             "mode": "error",
             "confidence": 0.0,
             "quality": 0.0,
-            "tier": "free" if is_guest else plan,
-            "plan_limit": GUEST_PREVIEW_LIMIT if is_guest else get_plan_config(plan)["monthly_limit"],
-            "usage": guest_usage if is_guest else int(getattr(user, "usage", 0) or 0),
-            "remaining": max(0, (GUEST_PREVIEW_LIMIT if is_guest else get_plan_config(plan)["monthly_limit"]) - (guest_usage if is_guest else int(getattr(user, "usage", 0) or 0))),
+            "tier": plan,
+            "plan_limit": get_plan_config(plan)["monthly_limit"],
+            "usage": int(getattr(user, "usage", 0) or 0),
+            "remaining": max(0, get_plan_config(plan)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)),
             "ticket": serialize_ticket(ticket),
-            "operator_mode": "balanced",
+            "operator_mode": runtime_ticket.get("operator_mode", "balanced"),
+            "shadow_decision": shadow_decision,
+            "runtime_ticket": runtime_ticket,
         }
 
 
-def run_support_for_username(req: SupportRequest, username: str, client_key: str | None = None) -> dict[str, Any]:
+def run_support_for_username(req: SupportRequest, username: str) -> dict[str, Any]:
     with db_session() as db:
         if username and username != "guest":
             user = db.query(User).filter(User.username == username).first()
@@ -1788,7 +1903,7 @@ def run_support_for_username(req: SupportRequest, username: str, client_key: str
                 user = User(username="guest", password="", usage=0, tier="free")
         else:
             user = User(username="guest", password="", usage=0, tier="free")
-        return run_support(req, user, db, client_key=client_key)
+        return run_support(req, user, db)
 
 # =============================================================================
 # 12. STREAMING HELPERS
@@ -2759,24 +2874,19 @@ def update_operator_mode(
 @app.post("/support")
 def support(
     req: SupportRequest,
-    request: Request,
-    authorization: str | None = Header(None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    client_key = get_client_key(request, authorization)
-    return run_support(req, user, db, client_key=client_key)
+    return run_support(req, user, db)
 
 
 @app.post("/support/stream")
 async def support_stream(
     req: SupportRequest,
-    request: Request,
     authorization: str | None = Header(None),
 ):
     username = get_current_username_from_header(authorization)
-    client_key = get_client_key(request, authorization)
-    result = await run_in_threadpool(run_support_for_username, req, username, client_key)
+    result = await run_in_threadpool(run_support_for_username, req, username)
     return StreamingResponse(
         stream_support_events(result),
         media_type="text/event-stream",
@@ -2787,10 +2897,449 @@ async def support_stream(
         },
     )
 
+
+
+
+def is_non_customer_text(text: str) -> bool:
+    t = (text or "").lower()
+
+    signals = [
+        "reddit",
+        "subreddit",
+        "comment",
+        "discussion",
+        "talk to anyone",
+        "you should",
+        "they will tell you",
+        "experienced",
+        "seven-figure",
+        "handling customer support operations",
+    ]
+
+    score = sum(1 for s in signals if s in t)
+
+    if "you should" in t or "they will tell you" in t:
+        score += 2
+
+    return score >= 2
+
 # =============================================================================
-# 21. ENTRYPOINT
+# 20B. ROUTES — EXTENSION ANALYZE (REAL BRAIN)
 # =============================================================================
 
+
+
+def get_multi_ticket_learning(db: Session, username: str, issue_type: str) -> dict[str, Any]:
+    issue = str(issue_type or "general_support").strip().lower()
+    rows = (
+        db.query(ActionLog)
+        .filter(ActionLog.username == username)
+        .filter(ActionLog.issue_type == issue)
+        .order_by(ActionLog.id.desc())
+        .limit(25)
+        .all()
+    )
+
+    if not rows:
+        return {
+            "pattern": None,
+            "samples": 0,
+            "avg_confidence": 0.0,
+            "recommended_action": None,
+            "same_action_rate": 0.0,
+        }
+
+    action_counts: dict[str, int] = {}
+    total_confidence = 0.0
+
+    for row in rows:
+        action_key = str(row.action or "none").strip().lower()
+        action_counts[action_key] = action_counts.get(action_key, 0) + 1
+        total_confidence += float(row.confidence or 0)
+
+    recommended_action = max(action_counts, key=action_counts.get)
+    samples = len(rows)
+    same_action_rate = action_counts[recommended_action] / max(samples, 1)
+
+    return {
+        "pattern": f"{issue}->{recommended_action}",
+        "samples": samples,
+        "avg_confidence": round(total_confidence / max(samples, 1), 2),
+        "recommended_action": recommended_action,
+        "same_action_rate": round(same_action_rate, 2),
+    }
+
+
+def build_execution_payload(action: str, confidence: float, queue: str, risk_level: str) -> dict[str, Any]:
+    action_l = str(action or "none").strip().lower()
+    queue_l = str(queue or "new").strip().lower()
+    risk_l = str(risk_level or "medium").strip().lower()
+    conf = float(confidence or 0)
+
+    if action_l in {"refund", "credit", "charge", "auto send tracking"} and conf >= 0.90 and risk_l == "low":
+        mode = "auto"
+        label = "Action executed" if action_l != "auto send tracking" else "Tracking prepared automatically"
+        detail = (
+            f"{action_l} completed automatically with confidence {conf:.2f}."
+            if action_l != "auto send tracking"
+            else f"Tracking response prepared automatically with confidence {conf:.2f}."
+        )
+    elif action_l in {"review", "review refund", "review cancellation", "review address change"} or queue_l in {"refund_risk", "escalated"} or risk_l == "high":
+        mode = "manual_review"
+        label = "Ready for review"
+        detail = f"{action_l} requires human confirmation. Queue: {queue_l or 'waiting'}."
+    elif action_l in {"none", "respond", "ignore"}:
+        mode = "assist"
+        label = "Reply ready"
+        detail = f"Reply prepared with confidence {conf:.2f}."
+    else:
+        mode = "assist"
+        label = "Action prepared"
+        detail = f"{action_l} prepared with confidence {conf:.2f}."
+
+    return {
+        "label": label,
+        "detail": detail,
+        "mode": mode,
+    }
+
+
+def build_signal_list(confidence: float, action: str, queue: str, risk_level: str, learning: dict[str, Any] | None = None) -> list[str]:
+    signals = [
+        f"confidence: {float(confidence or 0):.2f}",
+        f"action: {str(action or 'none').strip().lower()}",
+        f"queue: {str(queue or 'new').strip().lower()}",
+        f"risk: {str(risk_level or 'medium').strip().lower()}",
+    ]
+    if learning and learning.get("pattern"):
+        signals.append(f"pattern: {learning['pattern']}")
+        signals.append(f"samples: {learning.get('samples', 0)}")
+    return signals
+
+
+def build_decision_trace(issue_type: str, action: str, queue: str, learning: dict[str, Any] | None = None) -> list[str]:
+    trace = [
+        f"Classified -> {str(issue_type or 'general_support').strip().lower()}",
+        f"Action selected -> {str(action or 'none').strip().lower()}",
+        f"Queue assigned -> {str(queue or 'new').strip().lower()}",
+    ]
+    if learning and learning.get("pattern"):
+        trace.append(f"Learning pattern -> {learning['pattern']}")
+    return trace
+
+
+def build_memory_summary(learning: dict[str, Any] | None) -> dict[str, Any]:
+    learning = learning or {}
+    samples = int(learning.get("samples", 0) or 0)
+    if samples <= 0:
+        summary = "No prior ticket pattern learned yet."
+    else:
+        summary = (
+            f"{samples} similar tickets seen. "
+            f"Recommended action: {learning.get('recommended_action', 'none')}."
+        )
+    return {
+        "pattern": learning.get("pattern"),
+        "samples": samples,
+        "avg_confidence": float(learning.get("avg_confidence", 0) or 0),
+        "same_action_rate": float(learning.get("same_action_rate", 0) or 0),
+        "summary": summary,
+    }
+
+
+def build_session_impact(db: Session, username: str) -> dict[str, Any]:
+    rows = (
+        db.query(ActionLog)
+        .filter(ActionLog.username == username)
+        .order_by(ActionLog.id.desc())
+        .limit(100)
+        .all()
+    )
+
+    tickets_seen = len(rows)
+    if tickets_seen == 0:
+        return {
+            "tickets_seen": 0,
+            "tickets_resolved": 0,
+            "agent_minutes_saved": 0.0,
+            "value_generated": 0.0,
+        }
+
+    resolved_statuses = {"executed", "refunded", "credit_issued", "classified", "ai_classified", "skipped", "fallback"}
+    tickets_resolved = sum(1 for row in rows if str(row.status or "").strip().lower() in resolved_statuses)
+    agent_minutes_saved = round(tickets_seen * 3.2, 1)
+    value_generated = round(agent_minutes_saved * 0.75, 2)
+
+    return {
+        "tickets_seen": tickets_seen,
+        "tickets_resolved": tickets_resolved,
+        "agent_minutes_saved": agent_minutes_saved,
+        "value_generated": value_generated,
+    }
+
+
+def infer_extension_issue_type(text: str) -> str:
+    t = (text or "").lower()
+    if any(k in t for k in ["where is my order", "where's my order", "tracking", "shipment", "shipping", "package", "delivery", "wismo"]):
+        return "shipping_issue"
+    if any(k in t for k in ["refund", "money back", "charged twice", "double charged", "duplicate charge", "billing issue"]):
+        return "refund_request"
+    if any(k in t for k in ["cancel my order", "cancel order", "stop my order"]):
+        return "cancellation_request"
+    if any(k in t for k in ["change my address", "wrong address", "update address", "shipping address"]):
+        return "address_change"
+    if any(k in t for k in ["damaged", "broken", "missing item", "wrong item", "incorrect item"]):
+        return "order_issue"
+    return "general_support"
+
+
+def extension_type_label(issue_type: str) -> str:
+    mapping = {
+        "shipping_issue": "Shipping Issue",
+        "refund_request": "Refund Request",
+        "cancellation_request": "Cancellation Request",
+        "address_change": "Address Change",
+        "order_issue": "Order Issue",
+        "general_support": "General Support",
+        "non_customer": "Non Customer",
+    }
+    return mapping.get(str(issue_type or "general_support"), str(issue_type or "general_support").replace("_", " ").title())
+
+
+def extension_rule_fallback(text: str, db: Session) -> dict[str, Any]:
+    issue_type = infer_extension_issue_type(text)
+    learning = get_multi_ticket_learning(db, "extension_user", issue_type)
+
+    if issue_type == "shipping_issue":
+        action = "Auto Send Tracking"
+        status = "resolved"
+        queue = "resolved"
+        priority = "medium"
+        risk_level = "low"
+        confidence = 0.92
+        reply = (
+            "Hi there\n\n"
+            "Thanks for reaching out — I’ve checked your order and it’s already on the way.\n\n"
+            "You can track it here:\n"
+            "Tracking link will populate from your order system.\n\n"
+            "Estimated delivery:\n"
+            "Delivery date will populate from your order system.\n\n"
+            "If anything looks off, just reply here and we’ll take care of it.\n\n"
+            "Best,\nSupport Team"
+        )
+        reason = "Rule fallback: shipping_wismo_auto_resolve"
+        tool_status = "classified"
+    elif issue_type == "refund_request":
+        action = "Review Refund"
+        status = "waiting"
+        queue = "refund_risk"
+        priority = "high"
+        risk_level = "medium"
+        confidence = 0.86
+        reply = "Thanks for reaching out — I’m reviewing the billing details now and will confirm the refund next step shortly."
+        reason = "Rule fallback: refund_review_gate"
+        tool_status = "manual_review"
+    elif issue_type == "cancellation_request":
+        action = "Review Cancellation"
+        status = "waiting"
+        queue = "waiting"
+        priority = "high"
+        risk_level = "medium"
+        confidence = 0.84
+        reply = "Thanks for reaching out — I’m checking the order status now to confirm whether cancellation is still possible."
+        reason = "Rule fallback: cancellation_review_gate"
+        tool_status = "manual_review"
+    elif issue_type == "address_change":
+        action = "Review Address Change"
+        status = "waiting"
+        queue = "waiting"
+        priority = "medium"
+        risk_level = "low"
+        confidence = 0.84
+        reply = "Thanks for the heads-up — I’m checking whether the order has already been processed so I can confirm the address update options."
+        reason = "Rule fallback: address_change_review_gate"
+        tool_status = "manual_review"
+    elif issue_type == "order_issue":
+        action = "Escalate Review"
+        status = "escalated"
+        queue = "escalated"
+        priority = "high"
+        risk_level = "medium"
+        confidence = 0.85
+        reply = "I’m reviewing the order issue now and will confirm the best resolution path."
+        reason = "Rule fallback: order_issue_escalation"
+        tool_status = "manual_review"
+    else:
+        action = "Respond"
+        status = "waiting"
+        queue = "waiting"
+        priority = "low"
+        risk_level = "low"
+        confidence = 0.82
+        reply = "Thanks for reaching out — I’m looking into this now and will follow up shortly."
+        reason = "Rule fallback: general_support"
+        tool_status = "fallback"
+
+    impact = {
+        "type": "saved",
+        "amount": 0,
+        "signals": build_signal_list(confidence, action, queue, risk_level, learning),
+    }
+
+    return {
+        "type": extension_type_label(issue_type),
+        "status": status,
+        "priority": priority,
+        "queue": queue,
+        "risk_level": risk_level,
+        "reply": reply,
+        "final": reply,
+        "response": reply,
+        "action": action,
+        "amount": 0,
+        "reason": reason,
+        "ai_summary": "Fallback extension routing applied.",
+        "issue_type": issue_type,
+        "order_status": "unknown",
+        "tool_status": tool_status,
+        "tool_result": {"status": tool_status},
+        "impact": impact,
+        "execution": build_execution_payload(action, confidence, queue, risk_level),
+        "policy_rule": reason.split(": ", 1)[-1],
+        "decision_trace": build_decision_trace(issue_type, action, queue, learning),
+        "memory_summary": build_memory_summary(learning),
+        "session_impact": build_session_impact(db, "extension_user"),
+        "decision": {
+            "action": action,
+            "queue": queue,
+            "priority": priority,
+            "risk_level": risk_level,
+            "requires_approval": action.startswith("Review"),
+        },
+        "output": {},
+        "meta": {"source": "extension"},
+        "triage": {},
+        "history": {},
+        "mode": "extension-fallback",
+        "confidence": confidence,
+        "quality": 0.9,
+        "learning": learning,
+    }
+
+
+class ExtensionAnalyzeRequest(BaseModel):
+    text: str
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, v: str) -> str:
+        text = (v or "").strip()
+        if not text:
+            raise ValueError("text required")
+        if len(text) > 50000:
+            raise ValueError("text too long")
+        return text
+
+
+@app.post("/analyze")
+def analyze_extension_ticket(req: ExtensionAnalyzeRequest, db: Session = Depends(get_db)):
+    text = req.text.strip()
+
+    if is_non_customer_text(text):
+        return {
+            "type": "Non Customer",
+            "issue_type": "non_customer",
+            "action": "Ignore",
+            "action_raw": "ignore",
+            "confidence": 0.95,
+            "quality": 1.0,
+            "reason": "Detected external discussion / non-customer content",
+            "order_status": "none",
+            "tool_status": "skipped",
+            "queue": "ignore",
+            "priority": "low",
+            "risk_level": "low",
+            "requires_approval": False,
+            "urgency": 0,
+            "reply": "",
+        }
+
+    guest_user = User(username="guest", password="", usage=0, tier="free")
+
+    try:
+        result = run_agent(
+            text,
+            user_id="extension_guest",
+            meta={
+                "sentiment": 5,
+                "ltv": 0,
+                "order_status": "unknown",
+                "plan_tier": "free",
+                "priority_routing": False,
+                "payment_intent_id": "",
+                "charge_id": "",
+                "operator_mode": get_operator_mode(db),
+                "channel": "email",
+                "source": "extension",
+            },
+        )
+
+        if not isinstance(result, dict):
+            raise RuntimeError("Agent returned invalid payload")
+
+        reply = (
+            result.get("response")
+            or result.get("reply")
+            or result.get("final")
+            or "No response generated."
+        )
+
+        issue_type = str(result.get("issue_type", "general_support") or "general_support")
+        action = str(result.get("action", "none") or "none")
+        confidence = float(result.get("confidence", 0) or 0)
+        reason = str(result.get("reason", "") or "")
+        quality = float(result.get("quality", 0) or 0)
+        order_status = str(result.get("order_status", "unknown") or "unknown")
+        tool_status = str(result.get("tool_status", "analysis_only") or "analysis_only")
+        decision = result.get("decision") or {}
+        triage = result.get("triage") or {}
+
+        return {
+            "type": issue_type.replace("_", " ").title(),
+            "issue_type": issue_type,
+            "action": action.replace("_", " ").title(),
+            "action_raw": action,
+            "confidence": round(confidence, 2),
+            "quality": round(quality, 2),
+            "reason": reason,
+            "order_status": order_status,
+            "tool_status": tool_status,
+            "queue": str(decision.get("queue", "new") or "new"),
+            "priority": str(decision.get("priority", "medium") or "medium"),
+            "risk_level": str(decision.get("risk_level", "medium") or "medium"),
+            "requires_approval": bool(decision.get("requires_approval", False)),
+            "urgency": int(triage.get("urgency", 0) or 0),
+            "reply": str(reply),
+        }
+
+    except Exception as exc:
+        return {
+            "type": "General Support",
+            "issue_type": "general_support",
+            "action": "Review",
+            "action_raw": "review",
+            "confidence": 0.0,
+            "quality": 0.0,
+            "reason": f"Analyze error: {str(exc)}",
+            "order_status": "unknown",
+            "tool_status": "error",
+            "queue": "escalated",
+            "priority": "high",
+            "risk_level": "medium",
+            "requires_approval": False,
+            "urgency": 0,
+            "reply": "Thanks for reaching out — I’m reviewing this now and will follow up with the best next step.",
+        }
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "8000"))
-    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=8000)

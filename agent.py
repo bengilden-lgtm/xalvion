@@ -393,8 +393,8 @@ def build_issue_examples(ticket: Dict[str, Any]) -> str:
     if issue_type == "shipping_issue":
         return """
 Examples:
-- "Your order is delayed in transit. I checked the latest status and it is still moving. I’ll keep an eye on it and update you if anything changes."
-- "Your package is running late. I checked the latest update and it is delayed in transit, but still active. I’m monitoring it from here."
+- "Hi there, thanks for reaching out — I’ve checked your order and it’s already on the way. You can track it here: [TRACKING LINK]. Estimated delivery: [DATE]. If anything looks off, just reply here and we’ll take care of it."
+- "Hi there, I checked the latest shipping status and your package is still moving. Tracking: [TRACKING LINK]. Latest ETA: [DATE]. If you need anything else, reply here and we’ll take care of it."
 """.strip()
 
     if issue_type == "damaged_order":
@@ -529,14 +529,51 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
 
     if issue_type == "shipping_issue":
         status = str(order_info.get("status", ticket.get("order_status", "unknown")) or "unknown")
-        eta = str(order_info.get("eta", "") or "")
-        customer_message = f"Your order is {status}."
-        if eta:
-            customer_message += f" The latest ETA is {eta}."
-        customer_message += " I’ve checked the latest status and I’m monitoring it from here."
+        tracking = str(order_info.get("tracking", "") or "").strip()
+        eta = str(order_info.get("eta", "") or "").strip()
+        tracking_line = tracking if tracking else "Tracking link will populate from your order system."
+        eta_line = eta if eta else "Delivery date will populate from your order system."
+
+        if status == "processing":
+            customer_message = (
+                "Hi there,\n\n"
+                "Thanks for reaching out — I checked your order and it’s still being processed.\n\n"
+                f"Tracking:\n{tracking_line}\n\n"
+                f"Estimated delivery:\n{eta_line}\n\n"
+                "If anything changes or you want me to review the next shipping step, just reply here and we’ll take care of it.\n\n"
+                "Best,\nSupport Team"
+            )
+        elif status == "delivered":
+            customer_message = (
+                "Hi there,\n\n"
+                "Thanks for reaching out — I checked the latest shipping status and the package shows as delivered.\n\n"
+                f"Tracking:\n{tracking_line}\n\n"
+                "If that doesn’t match what you’re seeing, reply here and we’ll investigate the delivery next step.\n\n"
+                "Best,\nSupport Team"
+            )
+        elif status == "delayed":
+            customer_message = (
+                "Hi there,\n\n"
+                "Thanks for reaching out — I checked the latest shipping status and your order appears delayed in transit.\n\n"
+                f"Tracking:\n{tracking_line}\n\n"
+                f"Estimated delivery:\n{eta_line}\n\n"
+                "If anything looks off, just reply here and we’ll take care of it.\n\n"
+                "Best,\nSupport Team"
+            )
+        else:
+            customer_message = (
+                "Hi there,\n\n"
+                "Thanks for reaching out — I’ve checked your order and it’s already on the way.\n\n"
+                f"You can track it here:\n{tracking_line}\n\n"
+                f"Estimated delivery:\n{eta_line}\n\n"
+                "If anything looks off, just reply here and we’ll take care of it.\n\n"
+                "Best,\nSupport Team"
+            )
+
         if action == "credit" and amount > 0:
-            customer_message += f" I’ve also added a ${amount} credit to help make up for the delay."
-        internal_note = f"Shipping case with status={status}, eta={eta}, triage={triage}."
+            customer_message += f"\n\nI’ve also added a ${amount} credit to help make up for the delay."
+
+        internal_note = f"Shipping case with status={status}, tracking={tracking or 'none'}, eta={eta or 'none'}, triage={triage}."
         return {
             "customer_message": customer_message,
             "customer_note": customer_message,
@@ -613,9 +650,49 @@ def rewrite_output_for_issue(ticket: Dict[str, Any], executed: Dict[str, Any], p
 
     if issue_type == "shipping_issue":
         status = str(ticket.get("order_status", "unknown") or "unknown")
-        if "annoyed" in lowered or "frustrat" in lowered:
-            return f"I get why that’s frustrating. Your order is {status}, and I’ve checked the latest status from here."
-        return f"Your order is {status}. I’ve checked the latest status and I’m monitoring it from here."
+        tracking = str(ticket.get("tracking", "") or "").strip()
+        eta = str(ticket.get("eta", "") or "").strip()
+
+        tracking_line = tracking if tracking else "Tracking link will populate from your order system."
+        eta_line = eta if eta else "Delivery date will populate from your order system."
+
+        if status == "processing":
+            return (
+                "Hi there,\n\n"
+                "Thanks for reaching out — I checked your order and it’s still being processed.\n\n"
+                f"Tracking:\n{tracking_line}\n\n"
+                f"Estimated delivery:\n{eta_line}\n\n"
+                "If anything changes or you want me to review the next shipping step, just reply here and we’ll take care of it.\n\n"
+                "Best,\nSupport Team"
+            )
+
+        if status == "delivered":
+            return (
+                "Hi there,\n\n"
+                "Thanks for reaching out — I checked the latest shipping status and the package shows as delivered.\n\n"
+                f"Tracking:\n{tracking_line}\n\n"
+                "If that doesn’t match what you’re seeing, reply here and we’ll investigate the delivery next step.\n\n"
+                "Best,\nSupport Team"
+            )
+
+        if status == "delayed":
+            return (
+                "Hi there,\n\n"
+                "Thanks for reaching out — I checked the latest shipping status and your order appears delayed in transit.\n\n"
+                f"Tracking:\n{tracking_line}\n\n"
+                f"Estimated delivery:\n{eta_line}\n\n"
+                "If anything looks off, just reply here and we’ll take care of it.\n\n"
+                "Best,\nSupport Team"
+            )
+
+        return (
+            "Hi there,\n\n"
+            "Thanks for reaching out — I’ve checked your order and it’s already on the way.\n\n"
+            f"You can track it here:\n{tracking_line}\n\n"
+            f"Estimated delivery:\n{eta_line}\n\n"
+            "If anything looks off, just reply here and we’ll take care of it.\n\n"
+            "Best,\nSupport Team"
+        )
 
     if issue_type == "damaged_order":
         if executed["action"] == "credit" and int(executed.get("amount", 0) or 0) > 0:
@@ -672,6 +749,9 @@ def run_agent(message: str, user_id: str = "default-user", meta: Dict[str, Any] 
         order_info = get_order(ticket["customer"], clean)
         if ticket.get("order_status") == "unknown":
             ticket["order_status"] = order_info.get("status", "unknown")
+        if order_info:
+            ticket["tracking"] = order_info.get("tracking", "") or ""
+            ticket["eta"] = order_info.get("eta", "") or ""
     else:
         ticket["order_status"] = ticket.get("order_status", "unknown")
 

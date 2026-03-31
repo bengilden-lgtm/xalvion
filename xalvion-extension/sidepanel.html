@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xalvion Assist</title>
+  <style>
+    :root {
+      --bg: #040816;
+      --panel: #071024;
+      --panel-2: #0b1630;
+      --line: rgba(255,255,255,0.08);
+      --text: #f5f7ff;
+      --muted: #a9b3cc;
+      --purple-1: #8b5cf6;
+      --purple-2: #4f46e5;
+      --blue-1: #22c1ff;
+      --blue-2: #0a84ff;
+      --warn: #facc15;
+      --danger: #ff6b6b;
+      --success: #34d399;
+      --radius: 14px;
+      --shadow: 0 14px 40px rgba(0,0,0,0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 400px;
+      min-height: 640px;
+      background:
+        radial-gradient(circle at top left, rgba(124,92,252,0.18), transparent 32%),
+        radial-gradient(circle at top right, rgba(34,193,255,0.12), transparent 28%),
+        linear-gradient(180deg, #030712 0%, #050b1c 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body { padding: 16px; }
+
+    .shell {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(8,14,32,0.92), rgba(4,8,22,0.96));
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-mark {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--purple-1), var(--blue-1));
+      box-shadow: 0 0 18px rgba(124,92,252,0.55);
+      flex: 0 0 auto;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-subtitle {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .content {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .actions {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+
+    .actions-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 13px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      transition: transform 0.14s ease, opacity 0.14s ease, box-shadow 0.14s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #analyze {
+      background: linear-gradient(135deg, var(--purple-1), var(--purple-2));
+      box-shadow: 0 10px 24px rgba(79,70,229,0.35);
+    }
+
+    #scanInbox {
+      background: linear-gradient(135deg, var(--blue-1), var(--blue-2));
+      box-shadow: 0 10px 24px rgba(10,132,255,0.25);
+    }
+
+    #insertBtn {
+      display: none;
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      border: 1px solid var(--line);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    #copyBtn {
+      display: none;
+      background: linear-gradient(135deg, #22c1ff, #0a84ff);
+      box-shadow: 0 10px 24px rgba(10,132,255,0.25);
+    }
+
+    .status {
+      display: none;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      line-height: 1.45;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      color: var(--muted);
+    }
+
+    .status.show { display: block; }
+
+    .status.error {
+      color: #ffd1d1;
+      background: rgba(255, 107, 107, 0.08);
+      border-color: rgba(255, 107, 107, 0.22);
+    }
+
+    .thinking {
+      display: none;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(11,22,48,0.68), rgba(7,16,36,0.82));
+      border-radius: var(--radius);
+      padding: 14px;
+      gap: 12px;
+    }
+
+    .thinking.show {
+      display: grid;
+      animation: fadeUp 0.24s ease;
+    }
+
+    .thinking-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .thinking-pulse {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--purple-1), var(--blue-1));
+      box-shadow: 0 0 18px rgba(124,92,252,0.45);
+      animation: pulse 1.2s ease-in-out infinite;
+      flex: 0 0 auto;
+    }
+
+    .thinking-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .thinking-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .thinking-steps {
+      display: grid;
+      gap: 8px;
+    }
+
+    .thinking-step {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.05);
+      background: rgba(255,255,255,0.02);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+    }
+
+    .thinking-step.active {
+      color: var(--text);
+      border-color: rgba(34,193,255,0.18);
+      background: rgba(34,193,255,0.05);
+    }
+
+    .thinking-step.done {
+      color: #b7ffe4;
+      border-color: rgba(52, 211, 153, 0.18);
+      background: rgba(52, 211, 153, 0.06);
+    }
+
+    .thinking-step-status {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      flex: 0 0 auto;
+    }
+
+    .thinking-step.active .thinking-step-status { color: #8fdfff; }
+    .thinking-step.done .thinking-step-status { color: #b7ffe4; }
+
+    .insight {
+      display: none;
+      border: 1px solid rgba(34,193,255,0.16);
+      background: linear-gradient(180deg, rgba(34,193,255,0.08), rgba(124,92,252,0.04));
+      border-radius: 12px;
+      padding: 12px 14px;
+      gap: 6px;
+    }
+
+    .insight.show { display: grid; animation: fadeUp 0.24s ease; }
+
+    .insight-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8fdfff;
+    }
+
+    .insight-value {
+      font-size: 13px;
+      line-height: 1.5;
+      font-weight: 650;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(11,22,48,0.78), rgba(7,16,36,0.9));
+      border-radius: var(--radius);
+      padding: 14px;
+      display: none;
+      gap: 12px;
+    }
+
+    .panel.show { display: grid; animation: fadeUp 0.24s ease; }
+
+    .panel-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: fit-content;
+      max-width: 100%;
+      padding: 9px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+    }
+
+    .status-badge.hidden,
+    .pill.hidden,
+    .explainability-wrap.hidden {
+      display: none;
+    }
+
+    .status-badge.resolved {
+      border-color: rgba(52, 211, 153, 0.28);
+      background: rgba(52, 211, 153, 0.12);
+      color: #b7ffe4;
+    }
+
+    .status-badge.pending,
+    .status-badge.waiting {
+      border-color: rgba(250, 204, 21, 0.24);
+      background: rgba(250, 204, 21, 0.10);
+      color: #ffe58a;
+    }
+
+    .status-badge.escalated,
+    .status-badge.ignored {
+      border-color: rgba(255, 107, 107, 0.24);
+      background: rgba(255, 107, 107, 0.10);
+      color: #ffd1d1;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      max-width: 100%;
+      padding: 9px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      border: 1px solid rgba(250, 204, 21, 0.2);
+      background: rgba(250, 204, 21, 0.08);
+      color: #ffe58a;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.02);
+      border-radius: 12px;
+      padding: 11px 12px;
+      min-width: 0;
+      opacity: 0;
+      transform: translateY(6px);
+      animation: cardIn 0.28s ease forwards;
+    }
+
+    .card.full { grid-column: 1 / -1; }
+
+    .label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .value {
+      font-size: 14px;
+      font-weight: 650;
+      line-height: 1.45;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .value.muted {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .reply-box {
+      white-space: pre-wrap;
+      line-height: 1.55;
+    }
+
+    .meter {
+      margin-top: 10px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--purple-1), var(--blue-1));
+      transition: width 0.22s ease;
+    }
+
+    .explainability-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+      text-align: left;
+    }
+
+    .explainability-toggle-title {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .explainability-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .explainability-summary {
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+      word-break: break-word;
+    }
+
+    .chevron {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+      transition: transform 0.18s ease;
+      flex: 0 0 auto;
+    }
+
+    .explainability-wrap.open .chevron { transform: rotate(180deg); }
+
+    .explainability-panel {
+      display: none;
+      gap: 10px;
+    }
+
+    .explainability-wrap.open .explainability-panel {
+      display: grid;
+      animation: fadeUp 0.18s ease;
+    }
+
+    .empty-state {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(11,22,48,0.42), rgba(7,16,36,0.56));
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .empty-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .empty-copy {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .empty-list {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .footer-note {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.45;
+      text-align: center;
+      padding-top: 2px;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.18); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <div>
+          <h1 class="brand-title">Xalvion Assist</h1>
+          <p class="brand-subtitle">Analyze the current ticket and surface the right next step.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="actions">
+        <button id="analyze">Analyze Ticket</button>
+        <button id="scanInbox">Scan Inbox ⚡</button>
+        <div class="actions-row">
+          <button id="insertBtn">Insert Reply</button>
+          <button id="copyBtn">Copy Reply</button>
+        </div>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div id="thinkingPanel" class="thinking">
+        <div class="thinking-header">
+          <div class="thinking-pulse"></div>
+          <div>
+            <div class="thinking-title">Working through the decision</div>
+            <div id="thinkingSubtitle" class="thinking-subtitle">Xalvion is reading the ticket, checking policy, and preparing the next step.</div>
+          </div>
+        </div>
+
+        <div id="thinkingSteps" class="thinking-steps">
+          <div class="thinking-step" data-step="0">
+            <span>Reading ticket context</span>
+            <span class="thinking-step-status">Queued</span>
+          </div>
+          <div class="thinking-step" data-step="1">
+            <span>Classifying intent</span>
+            <span class="thinking-step-status">Queued</span>
+          </div>
+          <div class="thinking-step" data-step="2">
+            <span>Matching policy</span>
+            <span class="thinking-step-status">Queued</span>
+          </div>
+          <div class="thinking-step" data-step="3">
+            <span>Checking memory patterns</span>
+            <span class="thinking-step-status">Queued</span>
+          </div>
+          <div class="thinking-step" data-step="4">
+            <span>Finalizing decision</span>
+            <span class="thinking-step-status">Queued</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="headerInsight" class="insight">
+        <div class="insight-label">Operator Insight</div>
+        <div id="headerInsightValue" class="insight-value">No decision yet.</div>
+      </div>
+
+      <div id="inboxSummary" class="insight">
+        <div class="insight-label">Inbox Summary</div>
+        <div id="inboxSummaryValue" class="insight-value">No inbox scan yet.</div>
+      </div>
+
+      <div id="emptyState" class="empty-state">
+        <div class="empty-title">No ticket analyzed yet</div>
+        <div class="empty-copy">Xalvion will evaluate the message, apply policy, recommend the best action, and explain why it made that decision.</div>
+        <ul class="empty-list">
+          <li>Understand intent</li>
+          <li>Apply policy</li>
+          <li>Take action</li>
+          <li>Learn from outcomes</li>
+        </ul>
+      </div>
+
+      <div id="resultPanel" class="panel">
+        <div class="panel-top">
+          <div id="notePill" class="pill hidden"></div>
+          <div id="statusBadge" class="status-badge hidden"></div>
+        </div>
+
+        <div id="explainabilityWrap" class="explainability-wrap hidden">
+          <button id="explainabilityToggle" class="explainability-toggle" type="button">
+            <div class="explainability-toggle-title">
+              <div class="explainability-title">Why this decision?</div>
+              <div id="explainabilitySummary" class="explainability-summary">Decision confidence, policy fit, learned behavior, and execution rationale.</div>
+            </div>
+            <div class="chevron">⌄</div>
+          </button>
+
+          <div id="explainabilityPanel" class="explainability-panel">
+            <div class="card full" id="explainDecisionCard">
+              <span class="label">Decision Logic</span>
+              <div id="explainDecisionValue" class="value muted reply-box">-</div>
+            </div>
+
+            <div class="card" id="explainConfidenceCard">
+              <span class="label">Confidence Context</span>
+              <div id="explainConfidenceValue" class="value muted reply-box">-</div>
+            </div>
+
+            <div class="card" id="explainLearningCard">
+              <span class="label">Learning Context</span>
+              <div id="explainLearningValue" class="value muted reply-box">-</div>
+            </div>
+
+            <div class="card full" id="explainExecutionCard">
+              <span class="label">Execution Rationale</span>
+              <div id="explainExecutionValue" class="value muted reply-box">-</div>
+            </div>
+
+            <div class="card full" id="explainImpactCard">
+              <span class="label">Impact Narrative</span>
+              <div id="explainImpactValue" class="value muted reply-box">-</div>
+            </div>
+
+            <div class="card full" id="explainSessionCard">
+              <span class="label">Session Context</span>
+              <div id="explainSessionValue" class="value muted reply-box">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card" id="statusCard">
+            <span class="label">Status</span>
+            <div id="statusValue" class="value">-</div>
+          </div>
+
+          <div class="card">
+            <span class="label">Type</span>
+            <div id="typeValue" class="value">-</div>
+          </div>
+
+          <div class="card">
+            <span class="label">Action</span>
+            <div id="actionValue" class="value">-</div>
+          </div>
+
+          <div class="card" id="confidenceCard">
+            <span class="label">Confidence</span>
+            <div id="confidenceValue" class="value">-</div>
+            <div class="meter">
+              <div id="confidenceMeter" class="meter-fill"></div>
+            </div>
+          </div>
+
+          <div class="card" id="priorityCard">
+            <span class="label">Priority</span>
+            <div id="priorityValue" class="value">-</div>
+          </div>
+
+          <div class="card" id="queueCard">
+            <span class="label">Queue</span>
+            <div id="queueValue" class="value">-</div>
+          </div>
+
+          <div class="card" id="riskCard">
+            <span class="label">Risk</span>
+            <div id="riskValue" class="value">-</div>
+          </div>
+
+          <div class="card full" id="reasonCard">
+            <span class="label">Reason</span>
+            <div id="reasonValue" class="value muted">-</div>
+          </div>
+
+          <div class="card full" id="policyCard">
+            <span class="label">Policy Rule</span>
+            <div id="policyValue" class="value muted">-</div>
+          </div>
+
+          <div class="card full" id="aiSummaryCard">
+            <span class="label">AI Summary</span>
+            <div id="aiSummaryValue" class="value muted">-</div>
+          </div>
+
+          <div class="card full" id="replyCard">
+            <span class="label">Reply</span>
+            <div id="replyValue" class="value reply-box">-</div>
+          </div>
+
+          <div class="card full" id="executionCard">
+            <span class="label">Execution</span>
+            <div id="executionValue" class="value">-</div>
+            <div id="executionDetailValue" class="value muted">-</div>
+          </div>
+
+          <div class="card" id="modeCard">
+            <span class="label">Mode</span>
+            <div id="modeValue" class="value">-</div>
+          </div>
+
+          <div class="card full" id="impactCard">
+            <span class="label">Impact</span>
+            <div id="impactValue" class="value reply-box">-</div>
+          </div>
+
+          <div class="card full" id="signalsCard">
+            <span class="label">Signals</span>
+            <div id="signalsValue" class="value muted reply-box">-</div>
+          </div>
+
+          <div class="card full" id="decisionTraceCard">
+            <span class="label">Decision Trace</span>
+            <div id="decisionTraceValue" class="value muted reply-box">-</div>
+          </div>
+
+          <div class="card full" id="memorySummaryCard">
+            <span class="label">Memory Summary</span>
+            <div id="memorySummaryValue" class="value muted reply-box">-</div>
+          </div>
+
+          <div class="card full" id="sessionImpactCard">
+            <span class="label">Session Impact</span>
+            <div id="sessionImpactValue" class="value muted reply-box">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-note">
+        Works on the current page only. Copy Reply appears only when a reply is generated.
+      </div>
+    </div>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

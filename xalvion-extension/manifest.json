@@ -1,0 +1,39 @@
+{
+  "name": "Xalvion Assist",
+  "description": "AI support copilot for tickets",
+  "version": "1.0",
+  "manifest_version": 3,
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://*.zendesk.com/*",
+    "https://*.gorgias.com/*",
+    "http://127.0.0.1:8000/*"
+  ],
+
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+
+  "action": {
+    "default_title": "Xalvion",
+    "default_popup": "sidepanel.html"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.google.com/*",
+        "https://*.zendesk.com/*",
+        "https://*.gorgias.com/*"
+      ],
+      "js": ["content-script.js"]
+    }
+  ]
+}
