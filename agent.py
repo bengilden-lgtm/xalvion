@@ -134,6 +134,34 @@ def polish_message(message: str) -> str:
     return text
 
 
+def normalize_text(text: str) -> str:
+    if not isinstance(text, str):
+        return text
+
+    try:
+        repaired = text.encode("latin1").decode("utf-8")
+        text = repaired
+    except Exception:
+        pass
+
+    replacements = {
+        "â€™": "’",
+        "â€˜": "‘",
+        "â€œ": "“",
+        "â€�": "”",
+        "â€“": "–",
+        "â€”": "—",
+        "â€¦": "…",
+        "Â ": " ",
+        "Â": "",
+    }
+
+    for bad, good in replacements.items():
+        text = text.replace(bad, good)
+
+    return text
+
+
 def clamp_confidence(value: Any, fallback: float = 0.9) -> float:
     try:
         number = float(value)
@@ -799,9 +827,9 @@ def _canonicalize_result(
     }
 
     canonical = {
-        "reply": customer_message,
-        "final": customer_message,
-        "response": customer_message,
+        "reply": normalize_text(customer_message),
+        "final": normalize_text(customer_message),
+        "response": normalize_text(customer_message),
         "issue_type": str(ticket.get("issue_type", "general_support") or "general_support"),
         "mode": mode,
         "quality": round(float(quality or 0), 2),
@@ -812,8 +840,8 @@ def _canonicalize_result(
         "thinking_trace": thinking_trace,
         "request_context": request_context.model_dump() if request_context else None,
         "output": {
-            "internal_note": internal_note,
-            "customer_note": customer_note,
+            "internal_note": normalize_text(internal_note),
+            "customer_note": normalize_text(customer_note),
             "audit_log": f"{ticket.get('issue_type', 'general_support')} -> {decision['action']} (${decision['amount']}) | {decision['reason']}",
         },
         # legacy aliases for workspace compatibility
@@ -999,9 +1027,15 @@ def run_agent(
     executed = execute_action(ticket, final_action)
     thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
 
-    customer_note = polish_message(str(parsed.get("customer_note", parsed.get("customer_message", "")) or ""))
-    internal_note = str(parsed.get("internal_note", f"Decision path: {final_action.get('reason', 'No reason')}.") or "").strip()
-    customer_message = rewrite_output_for_issue(ticket, executed, parsed, clean)
+    customer_note = normalize_text(
+        polish_message(str(parsed.get("customer_note", parsed.get("customer_message", "")) or ""))
+    )
+    internal_note = normalize_text(
+        str(parsed.get("internal_note", f"Decision path: {final_action.get('reason', 'No reason')}.") or "").strip()
+    )
+    customer_message = normalize_text(
+        rewrite_output_for_issue(ticket, executed, parsed, clean)
+    )
 
     final_payload = {
         **final_action,
