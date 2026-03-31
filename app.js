@@ -2461,8 +2461,22 @@
       const planTier = data.tier || state.tier;
       const planLimit = Number(data.plan_limit || data.limit || state.limit || GUEST_USAGE_LIMIT);
       const planRemaining = Number.isFinite(Number(data.remaining)) ? Number(data.remaining) : null;
+      const responseUsername = String(data.username || "").trim().toLowerCase();
+      const responseIsGuest = !responseUsername || responseUsername === "guest" || responseUsername === "dev_user";
 
-      if (hasServerUsage || planTier) {
+      if (!isAuthenticated() && responseIsGuest) {
+        const localGuestUsage = getGuestUsage();
+        const nextGuestUsage = hasServerUsage
+          ? Math.max(Number(data.usage || 0), localGuestUsage + 1)
+          : (localGuestUsage + 1);
+
+        updatePlanUI(
+          "free",
+          nextGuestUsage,
+          GUEST_USAGE_LIMIT,
+          Math.max(0, GUEST_USAGE_LIMIT - nextGuestUsage)
+        );
+      } else if (hasServerUsage || planTier) {
         if (hasServerUsage) {
           updatePlanUI(
             planTier,
