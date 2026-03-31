@@ -1588,11 +1588,69 @@
     setText(els.streamStatus, text);
   }
 
+  function isAuthenticatedWorkspace() {
+    return Boolean(state.token && state.username);
+  }
+
+  function canonicalPlanLimit(tier = state.tier, authenticated = isAuthenticatedWorkspace()) {
+    const normalized = String(tier || "free").toLowerCase();
+    if (!authenticated) return 3;
+    if (normalized === "elite") return 5000;
+    if (normalized === "pro") return 500;
+    return 12;
+  }
+
+  function canonicalRemaining(usage = state.usage, tier = state.tier, authenticated = isAuthenticatedWorkspace(), fallbackRemaining = null) {
+    const normalizedUsage = Number.isFinite(Number(usage)) ? Number(usage) : 0;
+    if (Number.isFinite(Number(fallbackRemaining))) {
+      return Math.max(0, Number(fallbackRemaining));
+    }
+    return Math.max(0, canonicalPlanLimit(tier, authenticated) - normalizedUsage);
+  }
+
+  function usageGateState() {
+    const authenticated = isAuthenticatedWorkspace();
+    const tier = String(state.tier || "free").toLowerCase();
+    const limit = canonicalPlanLimit(tier, authenticated);
+    const usage = Number.isFinite(Number(state.usage)) ? Number(state.usage) : 0;
+    const remaining = Math.max(0, limit - usage);
+    return {
+      authenticated,
+      tier,
+      usage,
+      limit,
+      remaining,
+      blocked: usage >= limit,
+      mode: authenticated ? "upgrade" : "signup"
+    };
+  }
+
+  function enforceUsageGate() {
+    const gate = usageGateState();
+    if (!gate.blocked) return false;
+    showLimitModal(
+      gate.mode,
+      gate.mode === "signup"
+        ? "Create an account to unlock your next 9 free runs and keep the operator working on real tickets."
+        : "Upgrade to keep the operator running once your 12 free runs are used."
+    );
+    return true;
+  }
+
   function updatePlanUI(tier = state.tier, usage = state.usage, limit = state.limit, remaining = state.remaining) {
     state.tier = tier || "free";
     state.usage = Number.isFinite(Number(usage)) ? Number(usage) : 0;
-    state.limit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : 3;
-    state.remaining = Number.isFinite(Number(remaining)) ? Number(remaining) : Math.max(0, state.limit - state.usage);
+
+    const authenticated = isAuthenticatedWorkspace();
+    const normalizedTier = String(state.tier || "free").toLowerCase();
+    const canonicalLimitValue = canonicalPlanLimit(normalizedTier, authenticated);
+    const providedLimit = Number(limit);
+
+    state.limit = Number.isFinite(providedLimit) && providedLimit > 0
+      ? Math.min(providedLimit, canonicalLimitValue)
+      : canonicalLimitValue;
+
+    state.remaining = canonicalRemaining(state.usage, normalizedTier, authenticated, remaining);
 
     setText(els.planTier, formatTier(state.tier));
     setText(els.planUsage, `${state.usage} / ${state.limit}`);
@@ -2076,10 +2134,20 @@
   }
 
 
-  function showLimitModal(message) {
+  function showLimitModal(mode = "upgrade", message = "") {
+    state.limitModalMode = mode === "signup" ? "signup" : "upgrade";
+
+    if (els.limitUpgradeBtn) {
+      els.limitUpgradeBtn.textContent = state.limitModalMode === "signup" ? "Create free account" : "Upgrade to Pro";
+    }
+
     if (els.limitModalCopy) {
       const saved = formatMoney(state.moneySaved || 0);
-      els.limitModalCopy.textContent = `You've reached the free limit. Xalvion resolved ${formatMetric(state.autoResolvedCount, 0)} tickets and surfaced ${saved} in visible value. Upgrade to keep the automation running.`;
+      if (state.limitModalMode === "signup") {
+        els.limitModalCopy.textContent = `You've used all 3 guest runs. Xalvion resolved ${formatMetric(state.autoResolvedCount, 0)} tickets and surfaced ${saved} in visible value. Sign up to unlock 12 free tracked runs and keep your workspace progress.`;
+      } else {
+        els.limitModalCopy.textContent = `You've reached the free limit. Xalvion resolved ${formatMetric(state.autoResolvedCount, 0)} tickets and surfaced ${saved} in visible value. Upgrade to keep the automation running.`;
+      }
       if (message) els.limitModalCopy.textContent += ` ${message}`;
     }
     if (els.limitModal) els.limitModal.style.display = "flex";
@@ -2100,7 +2168,7 @@
     if (!res.ok) {
       const detail = data.detail || "Request failed";
       if (res.status === 402) {
-        showLimitModal(detail);
+        showLimitModal(isAuthenticatedWorkspace() ? "upgrade" : "signup", detail);
       }
       throw new Error(detail);
     }
@@ -2118,7 +2186,7 @@
       const data = await res.json().catch(() => ({}));
       const detail = data.detail || "Streaming failed";
       if (res.status === 402) {
-        showLimitModal(detail);
+        showLimitModal(isAuthenticatedWorkspace() ? "upgrade" : "signup", detail);
       }
       throw new Error(detail);
     }
@@ -2457,6 +2525,7 @@
   async function sendMessage() {
     const payload = buildSupportPayload();
     if (!payload.message || state.sending) return;
+    if (enforceUsageGate()) return;
 
     ensureInjectedStyles();
     clearEmptyState();
@@ -2525,13 +2594,15 @@
       updateLatestRunCard(data);
       updateSystemNarrative(data);
 
-      if (data.tier) {
+      if (data.tier || typeof data.usage !== "undefined" || typeof data.plan_limit !== "undefined" || typeof data.remaining !== "undefined") {
         updatePlanUI(
-          data.tier,
-          Number(data.usage || state.usage || 0),
-          Number(data.plan_limit || state.limit || 3),
-          Number(data.remaining || state.remaining || 0)
+          data.tier || state.tier,
+          Number(typeof data.usage !== "undefined" ? data.usage : state.usage),
+          Number(typeof data.plan_limit !== "undefined" ? data.plan_limit : state.limit),
+          Number(typeof data.remaining !== "undefined" ? data.remaining : state.remaining)
         );
+      } else {
+        updatePlanUI(state.tier, state.usage + 1, state.limit, Math.max(0, state.remaining - 1));
       }
 
       if (data.username && data.username !== "guest" && data.username !== "dev_user") {
@@ -2574,7 +2645,7 @@
 
       setNotice("success", "Account created", "Log in to keep usage, plan status, and workspace state persistent.");
       state.tier = data.tier || "free";
-      updatePlanUI(state.tier, 0, 50, 50);
+      updatePlanUI(state.tier, 0, 12, 12);
       updateTopbarStatus();
     } catch (error) {
       setNotice("error", "Signup failed", error.message || "Could not create account.");
@@ -2605,8 +2676,8 @@
       updatePlanUI(
         data.tier || "free",
         Number(data.usage || 0),
-        Number(data.limit || 50),
-        Number(data.remaining || 0)
+        Number(data.limit || 12),
+        Number(typeof data.remaining !== "undefined" ? data.remaining : Math.max(0, (Number(data.limit || 12)) - Number(data.usage || 0)))
       );
 
       persistAuth();
@@ -2885,6 +2956,11 @@
     els.limitCloseBtn?.addEventListener("click", closeLimitModal);
     els.limitUpgradeBtn?.addEventListener("click", () => {
       closeLimitModal();
+      if (state.limitModalMode === "signup") {
+        els.usernameInput?.focus();
+        setNotice("warning", "Create your account", "Guest preview is capped at 3 runs. Sign up to unlock your full 12 free runs.");
+        return;
+      }
       upgradePlan("pro");
     });
     els.limitModal?.addEventListener("click", (event) => {
