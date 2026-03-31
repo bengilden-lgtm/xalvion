@@ -1164,8 +1164,8 @@
     <main class="main">
       <header class="topbar glass">
         <div class="title">
-          <h1>Run your support on autopilot</h1>
-          <p id="workspaceSubcopy">Autonomous mode active · 0 actions taken · reply loop ready.</p>
+          <h1>Customer support</h1>
+          <p id="workspaceSubcopy">Preview · response ready</p>
         </div>
         <div class="top-actions">
           <button id="newChatBtn" class="icon-btn" type="button" title="New chat">+</button>
@@ -1177,7 +1177,7 @@
         <div class="workspace-intro">
           <div class="workspace-intro-left">
             <div class="section-label">Workspace</div>
-            <div class="headline" id="workspaceHeadline">Xalvion resolves tickets, executes actions, and learns from every interaction.</div>
+            <div class="headline" id="workspaceHeadline">Send a customer issue and get a clear reply with the next step built in.</div>
           </div>
         </div>
         <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
@@ -1187,13 +1187,13 @@
 
       <section class="composer-wrap">
         <div class="quick-actions">
-          <button class="chip" data-fill="A customer says: I was charged twice." data-auto-send="true" title="Triggers duplicate-charge refund logic" type="button">Duplicate charge</button>
-          <button class="chip" data-fill="A customer says: My package is late and I am annoyed." data-auto-send="true" title="Triggers delay resolution flow" type="button">Late package</button>
-          <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." data-auto-send="true" title="Triggers damage recovery flow" type="button">Damaged order</button>
-          <button class="chip" data-fill="A customer says: Where is my order?" data-auto-send="true" title="Triggers tracking and delivery logic" type="button">Where is my order</button>
+          <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
+          <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
+          <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
+          <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
         </div>
         <div class="composer glass">
-          <textarea id="messageInput" placeholder="Paste a real customer issue — Xalvion will resolve it instantly"></textarea>
+          <textarea id="messageInput" placeholder="Paste a customer issue or type a support request..."></textarea>
           <button id="sendBtn" class="send-btn" type="button">Send</button>
         </div>
       </section>
@@ -1202,15 +1202,15 @@
     <aside class="rail scroll-shell" id="railShell" data-show-top="false" data-show-bottom="false">
       <div class="rail-scroll scroll-area" id="railScroll">
         <div class="rail-card" id="dashboardCard">
-          <div class="rail-title">Impact</div>
+          <div class="rail-title">Dashboard</div>
           <div class="stat-grid">
             <div class="stat-box">
               <div id="statInteractions" class="stat-value">0</div>
-              <div class="stat-label">Money saved</div>
+              <div class="stat-label">Tickets handled</div>
             </div>
             <div class="stat-box">
               <div id="statActions" class="stat-value">0</div>
-              <div class="stat-label">Auto-resolved</div>
+              <div class="stat-label">Actions completed</div>
             </div>
           </div>
         </div>
@@ -1259,7 +1259,7 @@
               <span id="planRemaining">50</span>
             </div>
             <div class="usage-bar"><div id="planBar"></div></div>
-            <div id="usagePanelCopy" class="muted-copy">Free proves the workflow. Paid plans unlock more automation when the savings become obvious.</div>
+            <div id="usagePanelCopy" class="muted-copy">Your plan sets the amount of support usage available each month.</div>
           </div>
         </div>
 
@@ -1389,23 +1389,5 @@
 
   <script src="/fluid/script.js"></script>
   <script src="/app.js"></script>
-  <div id="limitModal" class="refund-modal" style="display:none;">
-    <div class="refund-modal-card" style="max-width:520px;">
-      <div class="refund-modal-head">
-        <div>
-          <div class="refund-modal-title">Automation limit reached</div>
-          <div class="refund-modal-subtitle">Free shows the value. Paid keeps the operator running.</div>
-        </div>
-        <button id="closeLimitModalBtn" class="refund-close" type="button" aria-label="Close upgrade modal">×</button>
-      </div>
-      <div class="refund-modal-body">
-        <div id="limitModalCopy" class="refund-modal-note">You've reached the free limit. Xalvion already resolved tickets and surfaced the savings. Upgrade to keep the automation running.</div>
-        <div class="refund-actions" style="margin-top:16px;">
-          <button id="limitUpgradeBtn" class="btn" type="button">Upgrade to Pro</button>
-          <button id="limitCloseBtn" class="ghost-btn" type="button">Keep exploring</button>
-        </div>
-      </div>
-    </div>
-  </div>
 </body>
 </html>

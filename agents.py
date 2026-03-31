@@ -1,45 +1,35 @@
-def process_message(message: str):
-    message = message.lower()
+"""
+agents.py — thin public interface over the real agent pipeline.
 
-    if "hello" in message:
-        return {
-            "final": "Hey — I'm alive and thinking.",
-            "confidence": 0.9,
-            "quality": 0.9,
-            "mode": "friendly"
-        }
+FIX: Original was a dead stub (hello/help string matching) that existed
+     alongside the real agent.py but did nothing useful.  This version
+     delegates to run_agent() so any caller that imports from agents.py
+     gets the full Xalvion pipeline.
+"""
+from __future__ import annotations
 
-    if "help" in message:
-        return {
-            "final": "I can help you. Ask me anything.",
-            "confidence": 0.8,
-            "quality": 0.8,
-            "mode": "assist"
-        }
+from typing import Any, Dict
 
-    return {
-        "final": f"I understand: {message}",
-        "confidence": 0.7,
-        "quality": 0.7,
-        "mode": "default"
-    }
+from agent import run_agent as _run_agent
 
 
-def run_agent(message: str):
-    try:
-        result = process_message(message)
+def process_message(
+    message: str,
+    user_id: str = "default-user",
+    meta: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """
+    Process a support message through the full Xalvion pipeline.
 
-        return {
-            "final": result.get("final", "No response"),
-            "confidence": result.get("confidence", 0.5),
-            "quality": result.get("quality", 0.5),
-            "mode": result.get("mode", "unknown")
-        }
+    Returns the same structured dict as agent.run_agent().
+    """
+    return _run_agent(message, user_id=user_id, meta=meta or {})
 
-    except Exception as e:
-        return {
-            "final": f"ERROR: {str(e)}",
-            "confidence": 0,
-            "quality": 0,
-            "mode": "debug"
-        }
+
+def run_agent(
+    message: str,
+    user_id: str = "default-user",
+    meta: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Alias kept for backwards compatibility."""
+    return process_message(message, user_id=user_id, meta=meta)

@@ -1,11 +1,33 @@
-fastapi
-uvicorn
-pydantic
-python-dotenv
-openai
-sqlalchemy
-python-jose
-stripe
-requests
+# Xalvion Sovereign Brain — Python dependencies
+# Pin minor versions for reproducible deploys; patch versions float for security fixes.
+
+# --- Web framework ---
+fastapi>=0.111.0,<1.0
+uvicorn[standard]>=0.29.0,<1.0
+
+# --- Data validation ---
+pydantic>=2.7.0,<3.0
+
+# --- Environment ---
+python-dotenv>=1.0.0,<2.0
+
+# --- AI providers ---
+openai>=1.30.0,<2.0
+
+# --- Database ---
+sqlalchemy>=2.0.30,<3.0
+
+# --- Auth ---
+python-jose[cryptography]>=3.3.0,<4.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
+
+# --- Payments ---
+stripe>=9.0.0,<10.0
+
+# --- HTTP client (models.py / OpenRouter / Claude) ---
+requests>=2.31.0,<3.0
+
+# --- Missing from original (imported but not listed) ---
+# httpx is pulled in by openai SDK — listed explicitly for clarity
+httpx>=0.27.0,<1.0
