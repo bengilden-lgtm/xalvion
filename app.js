@@ -90,7 +90,8 @@
     stripeConnected: false,
     stripeAccountId: "",
     stripeMode: "",
-    refundHistory: []
+    refundHistory: [],
+    lastLimitNoticeKey: ""
   };
 
   const ICONS = {
@@ -931,6 +932,64 @@
     return numericUsage;
   }
 
+  function getLimitMessageConfig() {
+    if (!isAuthenticated()) {
+      return {
+        key: `guest-${getEffectiveUsage(state.usage)}`,
+        title: "You’ve hit the free preview limit",
+        detail: `Create a free account to unlock ${FREE_USAGE_LIMIT} free runs and keep using Xalvion.`,
+        body: `You’ve used all ${GUEST_USAGE_LIMIT} guest runs.
+
+Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and continue resolving tickets with Xalvion.`
+      };
+    }
+
+    return {
+      key: `free-${getEffectiveUsage(state.usage)}`,
+      title: "You’ve hit the free plan limit",
+      detail: "Upgrade to Pro to keep automation running and unlock more capacity.",
+      body: `You’ve used all ${FREE_USAGE_LIMIT} free runs.
+
+Upgrade to Pro to keep automation running, unlock more capacity, and continue executing support actions without interruption.`
+    };
+  }
+
+  function pushLimitMessage(force = false) {
+    const { key, title, detail, body } = getLimitMessageConfig();
+    if (!force && state.lastLimitNoticeKey === key) return;
+    state.lastLimitNoticeKey = key;
+
+    setNotice("warning", title, detail);
+
+    if (!els.messages) return;
+
+    clearEmptyState();
+    const row = addAssistantMessage(body);
+    const footer = getAssistantFooterNode(row);
+    if (footer) {
+      footer.innerHTML = "";
+      const meta = document.createElement("div");
+      meta.className = "assistant-meta";
+      meta.appendChild(
+        createMetaChip({
+          icon: ICONS.warn,
+          text: isAuthenticated() ? "Upgrade required" : "Signup required",
+          tone: "review"
+        })
+      );
+      meta.appendChild(
+        createMetaChip({
+          icon: ICONS.ticket,
+          text: `${getEffectiveUsage(state.usage)} / ${getEffectiveLimit(state.tier, state.limit)} used`
+        })
+      );
+      footer.appendChild(meta);
+    }
+
+    scrollMessagesToBottom(true);
+    refreshMessageShellGlow();
+  }
+
   function enforceWorkspaceLimit() {
     const limit = getEffectiveLimit(state.tier, state.limit);
     const usage = getEffectiveUsage(state.usage);
@@ -939,23 +998,14 @@
 
     updatePlanUI(state.tier, usage, limit, Math.max(0, limit - usage));
     pulseRail("usage");
+    pushLimitMessage();
 
     if (!isAuthenticated()) {
-      setNotice(
-        "warning",
-        "Create a free account to continue",
-        `You have used all ${GUEST_USAGE_LIMIT} guest runs. Sign up to unlock ${FREE_USAGE_LIMIT} free support runs and keep your workspace state.`
-      );
       els.usernameInput?.focus();
       return false;
     }
 
     if (String(state.tier || "free").toLowerCase() === "free") {
-      setNotice(
-        "warning",
-        "Free plan limit reached",
-        `You have used all ${FREE_USAGE_LIMIT} free runs. Upgrade to Pro to keep the automation moving.`
-      );
       return false;
     }
 
@@ -2497,8 +2547,18 @@
         persistAuth();
       }
 
+      const usageAfterRun = getEffectiveUsage(state.usage);
+      const limitAfterRun = getEffectiveLimit(state.tier, state.limit);
+      const limitReachedAfterRun = usageAfterRun >= limitAfterRun && (String(state.tier || "free").toLowerCase() === "free" || !isAuthenticated());
+
       updateTopbarStatus();
       setNotice(data.action === "review" ? "warning" : "success", noticeTitleForResult(data), replyText);
+
+      if (limitReachedAfterRun) {
+        pushLimitMessage(true);
+      } else {
+        state.lastLimitNoticeKey = "";
+      }
     } catch (error) {
       stepTimers.forEach((timer) => window.clearTimeout(timer));
       removeStreamSteps(stepsEl);
@@ -2602,7 +2662,7 @@
       saveDraft(demoText);
       els.messageInput.focus();
     }
-    setNotice("info", "Preview access loaded", "A high-intent billing case is ready to run through the workspace.");
+    setNotice("info", "Quick demo loaded", "A high-intent billing case is ready to run through the workspace.");
   }
 
   async function upgradePlan(tier) {
@@ -2948,7 +3008,7 @@
         "Your saved login no longer matches an account on this server. Log in again to use billing and Stripe."
       );
     } else if (!state.username) {
-      setNotice("info", "Preview access", "Preview ready. Run a customer issue or create an account.");
+      setNotice("info", "Quick demo", "Run a customer issue or create an account to keep using the workspace.");
     } else {
       setNotice("success", "Workspace synced", `Signed in as ${state.username}. The operator workspace is ready.`);
     }
