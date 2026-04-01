@@ -131,6 +131,8 @@
     lastLimitNoticeKey: ""
   };
 
+  let phase2Core = null;
+
   const ICONS = {
     copy: `
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1268,7 +1270,31 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     return out;
   }
 
+
+  async function loadPhase2Core() {
+    try {
+      const mod = await import('/workspace-modules.js');
+      if (mod && typeof mod.createPhase2Core === 'function') {
+        phase2Core = mod.createPhase2Core({ fetchImpl: window.fetch.bind(window) });
+      }
+    } catch (error) {
+      console.warn('[xalvion] phase2 core unavailable, continuing with inline runtime', error);
+      phase2Core = null;
+    }
+  }
+
   async function apiPost(path, body) {
+    if (phase2Core?.api?.post) {
+      return phase2Core.api.post({
+        baseUrl: API,
+        path,
+        body,
+        headers: headers(true),
+        onUnauthorized: invalidateSessionFrom401,
+        extractDetail: detailFromApiBody
+      });
+    }
+
     const res = await fetch(`${API}${path}`, {
       method: "POST",
       headers: headers(true),
@@ -1289,6 +1315,16 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     return data;
   }
   async function apiGet(path) {
+    if (phase2Core?.api?.get) {
+      return phase2Core.api.get({
+        baseUrl: API,
+        path,
+        headers: headers(false),
+        onUnauthorized: invalidateSessionFrom401,
+        extractDetail: detailFromApiBody
+      });
+    }
+
     const res = await fetch(`${API}${path}`, {
       headers: headers(false)
     });
@@ -1341,6 +1377,9 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function detailFromApiBody(data) {
+    if (phase2Core?.format?.detailFromApiBody) {
+      return phase2Core.format.detailFromApiBody(data);
+    }
     const d = data && data.detail;
     if (typeof d === "string") return d;
     if (Array.isArray(d) && d.length && typeof d[0]?.msg === "string") return d[0].msg;
@@ -1363,26 +1402,41 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function formatTier(value) {
+    if (phase2Core?.format?.formatTier) {
+      return phase2Core.format.formatTier(value);
+    }
     const tier = String(value || "free").toLowerCase();
     return tier.charAt(0).toUpperCase() + tier.slice(1);
   }
 
   function formatMetric(value, digits = 0) {
+    if (phase2Core?.format?.formatMetric) {
+      return phase2Core.format.formatMetric(value, digits);
+    }
     const num = Number(value || 0);
     return Number.isFinite(num) ? num.toFixed(digits) : digits ? (0).toFixed(digits) : "0";
   }
 
   function formatMoney(value) {
+    if (phase2Core?.format?.formatMoney) {
+      return phase2Core.format.formatMoney(value);
+    }
     const num = Number(value || 0);
     return `$${Number.isFinite(num) ? num.toFixed(0) : "0"}`;
   }
 
   function relativeTime(date = new Date()) {
+    if (phase2Core?.format?.relativeTime) {
+      return phase2Core.format.relativeTime(date);
+    }
     const d = date instanceof Date ? date : new Date(date);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
   function planCopy(tier) {
+    if (phase2Core?.store?.planCopy) {
+      return phase2Core.store.planCopy(tier);
+    }
     switch (String(tier || "free").toLowerCase()) {
       case "pro":
         return "Priority handling, larger usage limits, and a more serious operating surface for real support volume.";
@@ -3894,6 +3948,7 @@ function bindEvents() {
   }
 
   async function init() {
+    await loadPhase2Core();
     ensureInjectedStyles();
     ensureCrmStyles();
     hydrateStripeCallbackState();

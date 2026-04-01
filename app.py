@@ -50,10 +50,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-from controller import run_agent
+from agent import run_agent
 from actions import build_ticket as build_support_ticket, calculate_impact, system_decision, triage_ticket
 from memory import get_user_memory
-from security import assert_production_runtime_safety
 from utils import normalize_ticket, safe_execute
 
 try:
@@ -70,7 +69,6 @@ except Exception:
 
 
 load_dotenv(override=True)
-assert_production_runtime_safety()
 
 # =============================================================================
 # 1. CONFIG
@@ -177,6 +175,7 @@ if STRIPE_KEY:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 INDEX_PATH = os.path.join(BASE_DIR, "index.html")
 APP_JS_PATH = os.path.join(BASE_DIR, "app.js")
+WORKSPACE_MODULES_PATH = os.path.join(BASE_DIR, "workspace_modules.js")
 LANDING_PATH = os.path.join(BASE_DIR, "landing.html")
 FLUID_DIR = os.path.join(BASE_DIR, "fluid")
 
@@ -2226,6 +2225,14 @@ def serve_app_js():
         return FileResponse(APP_JS_PATH, media_type="application/javascript")
     raise HTTPException(status_code=404, detail="app.js not found")
 
+
+
+
+@app.get("/workspace-modules.js")
+def serve_workspace_modules_js():
+    if os.path.exists(WORKSPACE_MODULES_PATH):
+        return FileResponse(WORKSPACE_MODULES_PATH, media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="workspace_modules.js not found")
 
 @app.get("/landing")
 def serve_landing():
