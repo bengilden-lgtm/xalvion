@@ -71,14 +71,17 @@
     refundChargeInput: document.getElementById("refundChargeInput"),
     refundAmountInput: document.getElementById("refundAmountInput"),
     refundReasonSelect: document.getElementById("refundReasonSelect"),
-    leadQueueCard: document.getElementById("leadQueueCard"),
-    leadUsernameInput: document.getElementById("leadUsernameInput"),
-    leadTextInput: document.getElementById("leadTextInput"),
-    addLeadBtn: document.getElementById("addLeadBtn"),
+    crmCard: document.getElementById("crmCard"),
+    crmSummary: document.getElementById("crmSummary"),
+    crmNewCount: document.getElementById("crmNewCount"),
+    crmDueCount: document.getElementById("crmDueCount"),
     refreshLeadsBtn: document.getElementById("refreshLeadsBtn"),
-    leadQueueList: document.getElementById("leadQueueList"),
-    leadQueueCount: document.getElementById("leadQueueCount"),
-    leadQueueCopy: document.getElementById("leadQueueCopy")
+    addLeadBtn: document.getElementById("addLeadBtn"),
+    leadUsernameInput: document.getElementById("leadUsernameInput"),
+    leadSourceInput: document.getElementById("leadSourceInput"),
+    leadTextInput: document.getElementById("leadTextInput"),
+    leadList: document.getElementById("leadList"),
+    followupList: document.getElementById("followupList")
   };
 
   const state = {
@@ -99,7 +102,8 @@
     stripeAccountId: "",
     stripeMode: "",
     refundHistory: [],
-    leadQueue: [],
+    crmLeads: [],
+    crmSummary: { new: 0, contacted: 0, replied: 0, closed: 0, due_followups: 0 },
     lastLimitNoticeKey: ""
   };
 
@@ -946,117 +950,123 @@
           flex:0 0 36px !important;
         }
       }
-
-      .lead-queue-list{
-        display:grid;
-        gap:10px;
-      }
-
-      .lead-queue-empty{
-        border-radius:14px;
-        border:1px dashed rgba(255,255,255,.08);
-        background:rgba(255,255,255,.02);
-        padding:12px;
-        color:rgba(211,223,249,.74);
-        font-size:12px;
-        line-height:1.6;
-      }
-
-      .lead-card{
-        border-radius:16px;
-        border:1px solid rgba(255,255,255,.06);
-        background:rgba(255,255,255,.025);
-        padding:12px;
-        display:grid;
-        gap:10px;
-      }
-
-      .lead-head,.lead-meta,.lead-actions{
-        display:flex;
-        align-items:center;
-        gap:8px;
-        flex-wrap:wrap;
-      }
-
-      .lead-head{
-        justify-content:space-between;
-      }
-
-      .lead-name{
-        font-size:12px;
-        font-weight:800;
-        color:rgba(245,248,255,.96);
-        letter-spacing:.01em;
-      }
-
-      .lead-chip{
-        display:inline-flex;
-        align-items:center;
-        gap:5px;
-        min-height:20px;
-        padding:0 8px;
-        border-radius:999px;
-        border:1px solid rgba(255,255,255,.06);
-        background:rgba(255,255,255,.03);
-        color:rgba(220,230,252,.74);
-        font-size:10px;
-        font-weight:700;
-      }
-
-      .lead-chip.score{
-        color:rgba(222,238,255,.95);
-        border-color:rgba(96,165,250,.18);
-        background:rgba(96,165,250,.08);
-      }
-
-      .lead-chip.sent{
-        color:rgba(255,241,214,.95);
-        border-color:rgba(245,158,11,.18);
-        background:rgba(245,158,11,.08);
-      }
-
-      .lead-chip.replied{
-        color:rgba(220,255,240,.95);
-        border-color:rgba(52,211,153,.18);
-        background:rgba(52,211,153,.08);
-      }
-
-      .lead-chip.closed{
-        color:rgba(231,226,255,.95);
-        border-color:rgba(139,111,255,.18);
-        background:rgba(139,111,255,.08);
-      }
-
-      .lead-text,.lead-message{
-        font-size:12px;
-        line-height:1.65;
-        color:rgba(223,232,252,.86);
-        white-space:pre-wrap;
-        word-break:break-word;
-      }
-
-      .lead-message{
-        border-radius:12px;
-        border:1px solid rgba(255,255,255,.05);
-        background:rgba(255,255,255,.02);
-        padding:10px;
-      }
-
-      .lead-form{
-        display:grid;
-        gap:8px;
-      }
-
-      .lead-form textarea{
-        min-height:88px;
-        resize:vertical;
-      }
-
     `;
     document.head.appendChild(style);
   }
 
-  function setText(el, value) {
+  
+  function ensureCrmStyles() {
+    if (document.getElementById("xalvion-crm-styles")) return;
+
+    const style = document.createElement("style");
+    style.id = "xalvion-crm-styles";
+    style.textContent = `
+      .crm-list{
+        display:grid;
+        gap:10px;
+      }
+
+      .crm-item{
+        display:grid;
+        gap:10px;
+        padding:12px;
+        border-radius:16px;
+        border:1px solid rgba(255,255,255,.06);
+        background:rgba(255,255,255,.025);
+      }
+
+      .crm-item-head{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:10px;
+      }
+
+      .crm-item-title{
+        font-size:13px;
+        font-weight:800;
+        color:rgba(244,247,255,.96);
+        line-height:1.35;
+      }
+
+      .crm-item-sub{
+        margin-top:4px;
+        font-size:11px;
+        color:rgba(204,216,246,.72);
+        line-height:1.55;
+        white-space:pre-wrap;
+        word-break:break-word;
+      }
+
+      .crm-chip-row{
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px;
+      }
+
+      .crm-chip{
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        min-height:22px;
+        padding:0 8px;
+        border-radius:999px;
+        border:1px solid rgba(255,255,255,.06);
+        background:rgba(255,255,255,.03);
+        color:rgba(224,233,255,.78);
+        font-size:10px;
+        font-weight:700;
+        letter-spacing:.03em;
+      }
+
+      .crm-chip.status-contacted{border-color:rgba(96,165,250,.18);background:rgba(96,165,250,.08);color:rgba(226,237,255,.96);}
+      .crm-chip.status-replied{border-color:rgba(52,211,153,.18);background:rgba(52,211,153,.08);color:rgba(222,255,238,.96);}
+      .crm-chip.status-closed{border-color:rgba(248,113,113,.18);background:rgba(248,113,113,.08);color:rgba(255,228,228,.96);}
+
+      .crm-message{
+        padding:10px 11px;
+        border-radius:12px;
+        border:1px solid rgba(255,255,255,.05);
+        background:rgba(255,255,255,.02);
+        color:rgba(235,241,255,.90);
+        font-size:11.5px;
+        line-height:1.65;
+        white-space:pre-wrap;
+        word-break:break-word;
+      }
+
+      .crm-actions{
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+      }
+
+      .crm-btn{
+        min-height:30px;
+        padding:0 10px;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,.08);
+        background:rgba(255,255,255,.04);
+        color:rgba(241,245,255,.94);
+        font-size:11px;
+        font-weight:700;
+        cursor:pointer;
+      }
+
+      .crm-btn:hover{
+        transform:translateY(-1px);
+        background:rgba(255,255,255,.07);
+        border-color:rgba(255,255,255,.14);
+      }
+
+      .crm-btn.followup{border-color:rgba(245,158,11,.18);background:rgba(245,158,11,.10);color:rgba(255,240,210,.96);}
+      .crm-btn.reply{border-color:rgba(52,211,153,.18);background:rgba(52,211,153,.08);color:rgba(222,255,238,.96);}
+      .crm-btn.close{border-color:rgba(248,113,113,.18);background:rgba(248,113,113,.08);color:rgba(255,228,228,.96);}
+    `;
+    document.head.appendChild(style);
+  }
+
+function setText(el, value) {
     if (el) el.textContent = String(value ?? "");
   }
 
@@ -1205,26 +1215,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     return out;
   }
 
-  async function apiGet(path) {
-    const res = await fetch(`${API}${path}`, {
-      method: "GET",
-      headers: headers(false)
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (res.status === 401) {
-      invalidateSessionFrom401();
-      throw new Error(detailFromApiBody(data) || "Session expired.");
-    }
-
-    if (!res.ok) {
-      throw new Error(detailFromApiBody(data) || "Request failed.");
-    }
-
-    return data;
-  }
-
   async function apiPost(path, body) {
     const res = await fetch(`${API}${path}`, {
       method: "POST",
@@ -1245,6 +1235,25 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     return data;
   }
+  async function apiGet(path) {
+    const res = await fetch(`${API}${path}`, {
+      headers: headers(false)
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 401) {
+      invalidateSessionFrom401();
+      throw new Error(detailFromApiBody(data) || "Session expired.");
+    }
+
+    if (!res.ok) {
+      throw new Error(detailFromApiBody(data) || "Request failed.");
+    }
+
+    return data;
+  }
+
 
   function persistAuth() {
     if (state.token) localStorage.setItem(TOKEN_KEY, state.token);
@@ -3044,6 +3053,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       await hydrateMe();
       await loadDashboardSummary();
       await loadRefundHistory();
+      await loadCrmLeads();
     } catch (error) {
       clearAuth();
       updateTopbarStatus();
@@ -3061,6 +3071,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     await loadDashboardSummary();
     await loadIntegrations();
     await loadRefundHistory();
+    await loadCrmLeads();
   }
 
   function activatePreviewAccess() {
@@ -3251,167 +3262,171 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     setNotice("success", "Thread exported", "The current workspace thread was downloaded as a text file.");
   }
 
-
-  function leadStatusTone(status) {
-    const value = String(status || "new").toLowerCase();
-    if (value === "replied") return "replied";
-    if (value === "closed") return "closed";
-    if (value === "sent") return "sent";
-    return "new";
+  
+  function escapeAttr(value) {
+    return String(value ?? "").replaceAll('"', "&quot;");
   }
 
-  function formatLeadDate(value) {
-    if (!value) return "";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "";
-    return parsed.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  }
+  function renderCrmSummary(summary = {}) {
+    state.crmSummary = {
+      new: Number(summary.new || 0),
+      contacted: Number(summary.contacted || 0),
+      replied: Number(summary.replied || 0),
+      closed: Number(summary.closed || 0),
+      due_followups: Number(summary.due_followups || 0)
+    };
 
-  function renderLeadQueue(leads = []) {
-    state.leadQueue = Array.isArray(leads) ? leads.slice() : [];
-
-    if (els.leadQueueCount) {
-      setText(els.leadQueueCount, String(state.leadQueue.length));
+    if (els.crmSummary) {
+      const total = state.crmSummary.new + state.crmSummary.contacted + state.crmSummary.replied + state.crmSummary.closed;
+      const detail = [
+        `${total} total`,
+        `${state.crmSummary.contacted} contacted`,
+        `${state.crmSummary.replied} replied`,
+        `${state.crmSummary.closed} closed`
+      ].join(" • ");
+      setText(els.crmSummary, total ? detail : "Sign in to build a tracked outreach queue and keep follow-ups on time.");
     }
 
-    if (!els.leadQueueList) return;
+    setText(els.crmNewCount, state.crmSummary.new);
+    setText(els.crmDueCount, state.crmSummary.due_followups);
+  }
 
-    if (!state.leadQueue.length) {
-      els.leadQueueList.innerHTML = '<div class="lead-queue-empty">No leads queued yet. Add a prospect from the rail and Xalvion will generate the first outreach message for you.</div>';
+  function leadMessageForStatus(lead) {
+    if (!lead) return "";
+    if (lead.status === "contacted" && lead.follow_up_message) return lead.follow_up_message;
+    return lead.message || "";
+  }
+
+  function leadTimeLabel(lead) {
+    if (!lead) return "";
+    if (lead.status === "contacted" && lead.follow_up_due) return `Follow-up due ${lead.follow_up_due.replace("T", " ").slice(0, 16)}`;
+    if (lead.last_contacted) return `Last contacted ${String(lead.last_contacted).replace("T", " ").slice(0, 16)}`;
+    return `Added ${String(lead.created_at || "").replace("T", " ").slice(0, 16)}`;
+  }
+
+  function renderLeadItems(items = [], target = null, mode = "queue") {
+    const el = target || els.leadList;
+    if (!el) return;
+
+    if (!items.length) {
+      el.innerHTML = `<div class="refund-empty">${mode === "followup" ? "No follow-ups due yet." : "No leads yet. Add one to start building your outreach queue."}</div>`;
       return;
     }
 
-    els.leadQueueList.innerHTML = state.leadQueue.map((lead) => {
-      const username = escapeHtml(lead.username || "");
-      const source = escapeHtml(lead.source || "manual");
-      const status = String(lead.status || "new").toLowerCase();
-      const statusTone = leadStatusTone(status);
-      const createdAt = formatLeadDate(lead.created_at);
-      const followUpDue = formatLeadDate(lead.follow_up_due);
-      return `
-        <div class="lead-card">
-          <div class="lead-head">
-            <div class="lead-name">@${username}</div>
-            <div class="lead-meta">
-              <span class="lead-chip score">Score ${Number(lead.score || 0)}</span>
-              <span class="lead-chip ${statusTone}">${escapeHtml(status)}</span>
-            </div>
+    el.innerHTML = `<div class="crm-list">${items.map((lead) => `
+      <div class="crm-item">
+        <div class="crm-item-head">
+          <div>
+            <div class="crm-item-title">${escapeHtml(lead.username || "Lead")}</div>
+            <div class="crm-item-sub">${escapeHtml(lead.text || "")}</div>
           </div>
-          <div class="lead-meta">
-            <span class="lead-chip">${source}</span>
-            ${createdAt ? `<span class="lead-chip">Added ${createdAt}</span>` : ""}
-            ${followUpDue ? `<span class="lead-chip">Follow up ${followUpDue}</span>` : ""}
-          </div>
-          <div class="lead-text">${escapeHtml(lead.text || "")}</div>
-          <div class="lead-message">${escapeHtml(lead.message || "")}</div>
-          <div class="lead-actions">
-            <button class="ghost-btn js-copy-lead" data-username="${username}" type="button">Copy message</button>
-            <button class="ghost-btn js-lead-status" data-username="${username}" data-status="sent" type="button">Mark sent</button>
-            <button class="ghost-btn js-lead-status" data-username="${username}" data-status="replied" type="button">Mark replied</button>
-            <button class="ghost-btn js-lead-status" data-username="${username}" data-status="closed" type="button">Mark closed</button>
+          <div class="crm-chip-row">
+            <span class="crm-chip">Score ${Number(lead.score || 0)}</span>
+            <span class="crm-chip">${escapeHtml(lead.source || "manual")}</span>
+            <span class="crm-chip status-${escapeHtml(lead.status || "new")}">${escapeHtml((lead.status || "new").toUpperCase())}</span>
           </div>
         </div>
-      `;
-    }).join("");
+        <div class="crm-message">${escapeHtml(leadMessageForStatus(lead))}</div>
+        <div class="crm-item-sub">${escapeHtml(leadTimeLabel(lead))}</div>
+        <div class="crm-actions">
+          <button class="crm-btn" type="button" data-lead-copy="${escapeAttr(lead.id)}">Copy message</button>
+          ${lead.status === "new" ? `<button class="crm-btn followup" type="button" data-lead-status="${escapeAttr(lead.id)}" data-status-value="contacted">Mark sent</button>` : ""}
+          ${lead.status === "contacted" ? `<button class="crm-btn reply" type="button" data-lead-status="${escapeAttr(lead.id)}" data-status-value="replied">Mark replied</button>` : ""}
+          ${lead.status !== "closed" ? `<button class="crm-btn close" type="button" data-lead-status="${escapeAttr(lead.id)}" data-status-value="closed">Mark closed</button>` : ""}
+        </div>
+      </div>
+    `).join("")}</div>`;
   }
 
-  async function loadLeads(silent = false) {
-    if (!isAuthenticated()) {
-      renderLeadQueue([]);
-      if (els.leadQueueCopy) {
-        setText(els.leadQueueCopy, "Log in to save outreach leads, track follow-ups, and keep your customer pipeline inside Xalvion.");
-      }
+  function renderCrmLeads(items = [], summary = null) {
+    state.crmLeads = Array.isArray(items) ? items.slice() : [];
+    const computedSummary = summary || {};
+    renderCrmSummary(computedSummary);
+    const queueItems = state.crmLeads.filter((lead) => lead.status !== "closed");
+    const followups = state.crmLeads.filter((lead) => lead.status === "contacted" && lead.follow_up_due);
+    renderLeadItems(queueItems, els.leadList, "queue");
+    renderLeadItems(followups, els.followupList, "followup");
+  }
+
+  async function loadCrmLeads() {
+    if (!state.token || !state.username) {
+      state.crmLeads = [];
+      renderCrmLeads([], { new: 0, contacted: 0, replied: 0, closed: 0, due_followups: 0 });
       return;
     }
 
     try {
       const data = await apiGet("/leads");
-      renderLeadQueue(Array.isArray(data.leads) ? data.leads : []);
-      if (els.leadQueueCopy) {
-        setText(els.leadQueueCopy, "Outreach queue is active. Prioritize high-intent leads, copy the draft, then send manually for the best reply rate.");
-      }
+      renderCrmLeads(Array.isArray(data.items) ? data.items : [], data.summary || {});
     } catch (error) {
-      if (!silent) {
-        setNotice("error", "Lead queue unavailable", error.message || "Could not load outreach leads.");
+      if (els.leadList) {
+        els.leadList.innerHTML = '<div class="refund-empty">Could not load leads right now.</div>';
       }
+      if (els.followupList) {
+        els.followupList.innerHTML = '<div class="refund-empty">Could not load follow-ups right now.</div>';
+      }
+      renderCrmSummary({ new: 0, contacted: 0, replied: 0, closed: 0, due_followups: 0 });
     }
   }
 
-  async function addLeadFromUI() {
-    if (!isAuthenticated()) {
-      setNotice("warning", "Authentication required", "Log in to save leads and track outreach.");
+  async function addLeadFromWorkspace() {
+    if (!state.token || !state.username) {
+      setNotice("warning", "Login required", "Sign in before adding leads to the outreach queue.");
       return;
     }
 
-    const username = String(els.leadUsernameInput?.value || "").trim().replace(/^@+/, "");
-    const text = String(els.leadTextInput?.value || "").trim();
+    const username = (els.leadUsernameInput?.value || "").trim();
+    const text = (els.leadTextInput?.value || "").trim();
+    const source = (els.leadSourceInput?.value || "manual").trim();
 
-    if (!username) {
-      setNotice("warning", "Lead username required", "Add a handle or company name before saving the lead.");
-      els.leadUsernameInput?.focus();
-      return;
-    }
-
-    if (!text) {
-      setNotice("warning", "Lead context required", "Paste the post, pain point, or note you want Xalvion to use for outreach.");
-      els.leadTextInput?.focus();
+    if (!username || !text) {
+      setNotice("warning", "Lead details missing", "Add a username and the source context you want to work from.");
       return;
     }
 
     try {
-      const data = await apiPost("/leads/add", { username, text, source: "workspace" });
-      els.leadUsernameInput.value = "";
-      els.leadTextInput.value = "";
-      setNotice("success", "Lead saved", `@${username} was added to your outreach queue.`);
-      await loadLeads(true);
-      if (data?.lead?.message) {
-        await navigator.clipboard.writeText(String(data.lead.message));
-      }
+      const data = await apiPost("/leads/add", { username, text, source });
+      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {});
+      if (els.leadUsernameInput) els.leadUsernameInput.value = "";
+      if (els.leadTextInput) els.leadTextInput.value = "";
+      if (els.leadSourceInput) els.leadSourceInput.value = "";
+      setNotice("success", "Lead added", "The outreach queue was updated and a first-touch message is ready to copy.");
     } catch (error) {
-      setNotice("error", "Lead save failed", error.message || "Could not add the lead.");
+      setNotice("error", "Lead add failed", error.message || "Could not add this lead.");
     }
   }
 
-  async function copyLeadMessage(username) {
-    const lead = state.leadQueue.find((item) => String(item.username || "") === String(username || ""));
-    if (!lead?.message) {
-      setNotice("warning", "No message available", "This lead does not have a draft message yet.");
-      return;
-    }
+  async function updateLeadStatus(leadId, status) {
+    if (!leadId || !status) return;
 
     try {
-      await navigator.clipboard.writeText(String(lead.message));
-      setNotice("success", "Message copied", `Outreach draft for @${username} is on your clipboard.`);
+      const data = await apiPost(`/leads/${encodeURIComponent(leadId)}/status`, { status });
+      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {});
+      const notices = {
+        contacted: ["success", "Lead marked sent", "A follow-up is now scheduled automatically inside your queue."],
+        replied: ["success", "Lead replied", "Nice — this lead was moved forward in the CRM layer."],
+        closed: ["success", "Lead closed", "The lead was moved out of the active queue."]
+      };
+      const [kind, title, detail] = notices[status] || ["info", "Lead updated", "Lead status updated."];
+      setNotice(kind, title, detail);
     } catch (error) {
-      setNotice("error", "Copy failed", "Could not copy the outreach draft.");
+      setNotice("error", "Lead update failed", error.message || "Could not update lead status.");
     }
   }
 
-  async function updateLeadStatus(username, status) {
-    if (!isAuthenticated()) {
-      setNotice("warning", "Authentication required", "Log in to update outreach status.");
-      return;
-    }
-
-    const routeMap = {
-      sent: "mark-sent",
-      replied: "mark-replied",
-      closed: "mark-closed"
-    };
-    const route = routeMap[String(status || "").toLowerCase()];
-    if (!route) return;
+  async function copyLeadMessage(leadId) {
+    const lead = state.crmLeads.find((item) => String(item.id) === String(leadId));
+    if (!lead) return;
 
     try {
-      await apiPost(`/leads/${encodeURIComponent(username)}/${route}`, {});
-      await loadLeads(true);
-      setNotice("success", "Lead updated", `@${username} marked as ${status}.`);
+      await navigator.clipboard.writeText(leadMessageForStatus(lead));
+      setNotice("success", "Message copied", `Outreach text for ${lead.username} is now on your clipboard.`);
     } catch (error) {
-      setNotice("error", "Lead update failed", error.message || "Could not update the lead.");
+      setNotice("error", "Copy failed", "Could not copy the outreach message.");
     }
   }
 
-
-  function bindEvents() {
+function bindEvents() {
     els.sendBtn?.addEventListener("click", sendMessage);
     els.signupBtn?.addEventListener("click", signup);
     els.loginBtn?.addEventListener("click", login);
@@ -3458,11 +3473,41 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     els.stripeDisconnectBtn?.addEventListener("click", disconnectStripe);
     els.openRefundModalBtn?.addEventListener("click", openRefundModal);
     els.refreshRefundHistoryBtn?.addEventListener("click", loadRefundHistory);
+    els.refreshLeadsBtn?.addEventListener("click", loadCrmLeads);
+    els.addLeadBtn?.addEventListener("click", addLeadFromWorkspace);
+    els.leadList?.addEventListener("click", async (event) => {
+      const copyBtn = event.target.closest("[data-lead-copy]");
+      if (copyBtn) {
+        await copyLeadMessage(copyBtn.getAttribute("data-lead-copy"));
+        return;
+      }
+
+      const statusBtn = event.target.closest("[data-lead-status]");
+      if (statusBtn) {
+        await updateLeadStatus(
+          statusBtn.getAttribute("data-lead-status"),
+          statusBtn.getAttribute("data-status-value")
+        );
+      }
+    });
+    els.followupList?.addEventListener("click", async (event) => {
+      const copyBtn = event.target.closest("[data-lead-copy]");
+      if (copyBtn) {
+        await copyLeadMessage(copyBtn.getAttribute("data-lead-copy"));
+        return;
+      }
+
+      const statusBtn = event.target.closest("[data-lead-status]");
+      if (statusBtn) {
+        await updateLeadStatus(
+          statusBtn.getAttribute("data-lead-status"),
+          statusBtn.getAttribute("data-status-value")
+        );
+      }
+    });
     els.closeRefundModalBtn?.addEventListener("click", closeRefundModal);
     els.cancelRefundModalBtn?.addEventListener("click", closeRefundModal);
     els.executeRefundBtn?.addEventListener("click", executeRefundFromModal);
-    els.addLeadBtn?.addEventListener("click", addLeadFromUI);
-    els.refreshLeadsBtn?.addEventListener("click", () => loadLeads());
     els.refundModal?.addEventListener("click", (event) => {
       if (event.target === els.refundModal) closeRefundModal();
     });
@@ -3485,20 +3530,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
           await runWorkspaceRefundFromInput();
         }
       });
-    });
-
-
-    els.leadQueueList?.addEventListener("click", (event) => {
-      const copyButton = event.target.closest(".js-copy-lead");
-      if (copyButton) {
-        copyLeadMessage(copyButton.dataset.username || "");
-        return;
-      }
-
-      const statusButton = event.target.closest(".js-lead-status");
-      if (statusButton) {
-        updateLeadStatus(statusButton.dataset.username || "", statusButton.dataset.status || "");
-      }
     });
 
     els.messages?.addEventListener("scroll", updateStickiness, { passive: true });
@@ -3553,6 +3584,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   async function init() {
     ensureInjectedStyles();
+    ensureCrmStyles();
     hydrateStripeCallbackState();
     buildKeyboardOverlay();
     ensureOpsCard();
@@ -3585,6 +3617,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     await loadDashboardSummary();
     await loadIntegrations();
     await loadRefundHistory();
+    await loadCrmLeads();
 
     if (meResult?.staleCleared) {
       setNotice(

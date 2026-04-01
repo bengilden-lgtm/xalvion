@@ -18,6 +18,7 @@ import json
 import os
 import re
 import time
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, AsyncIterator, Generator
@@ -3390,10 +3391,11 @@ def analyze_extension_ticket(
 
 
 # =============================================================================
-# 16. OUTREACH QUEUE HELPERS
+# 13. OUTREACH CRM HELPERS
 # =============================================================================
 
-OUTREACH_QUEUE_FILE = os.path.join(BASE_DIR, "leads.json")
+OUTREACH_QUEUE_PATH = os.path.join(BASE_DIR, "outreach_queue.json")
+LEAD_STATUS_ORDER = {"new", "contacted", "replied", "closed"}
 
 
 class LeadAddRequest(BaseModel):
@@ -3403,185 +3405,299 @@ class LeadAddRequest(BaseModel):
 
     @field_validator("username")
     @classmethod
-    def validate_lead_username(cls, v: str) -> str:
-        value = (v or "").strip()
-        if not value:
+    def validate_username_field(cls, v: str) -> str:
+        text = (v or "").strip()
+        if not text:
             raise ValueError("username required")
-        if len(value) > 120:
+        if len(text) > 120:
             raise ValueError("username too long")
-        return value
+        return text
 
     @field_validator("text")
     @classmethod
-    def validate_lead_text(cls, v: str) -> str:
-        value = (v or "").strip()
-        if not value:
+    def validate_text_field(cls, v: str) -> str:
+        text = (v or "").strip()
+        if not text:
             raise ValueError("text required")
-        if len(value) > 5000:
+        if len(text) > 5000:
             raise ValueError("text too long")
-        return value
+        return text
 
 
-def _ensure_outreach_queue_file() -> None:
+class LeadStatusRequest(BaseModel):
+    status: str
+    note: str | None = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status_field(cls, v: str) -> str:
+        status = (v or "").strip().lower()
+        if status not in LEAD_STATUS_ORDER:
+            raise ValueError("status must be one of new/contacted/replied/closed")
+        return status
+
+
+def _crm_now() -> datetime:
+    return datetime.utcnow()
+
+
+def _crm_now_iso() -> str:
+    return _crm_now().isoformat()
+
+
+def _read_outreach_queue() -> list[dict[str, Any]]:
     try:
-        if not os.path.exists(OUTREACH_QUEUE_FILE):
-            with open(OUTREACH_QUEUE_FILE, "w", encoding="utf-8") as fh:
-                json.dump([], fh, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
-
-
-def _load_outreach_queue() -> list[dict[str, Any]]:
-    _ensure_outreach_queue_file()
-    try:
-        with open(OUTREACH_QUEUE_FILE, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-            return data if isinstance(data, list) else []
+        if not os.path.exists(OUTREACH_QUEUE_PATH):
+            return []
+        with open(OUTREACH_QUEUE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
     except Exception:
         return []
 
 
-def _save_outreach_queue(leads: list[dict[str, Any]]) -> None:
-    with open(OUTREACH_QUEUE_FILE, "w", encoding="utf-8") as fh:
-        json.dump(leads, fh, indent=2, ensure_ascii=False)
+def _write_outreach_queue(leads: list[dict[str, Any]]) -> None:
+    with open(OUTREACH_QUEUE_PATH, "w", encoding="utf-8") as f:
+        json.dump(leads, f, indent=2, ensure_ascii=False)
 
 
-def _score_outreach_lead(text_value: str) -> int:
-    text = str(text_value or "").lower()
+def _lead_score(text: str, source: str = "manual") -> int:
+    lowered = (text or "").lower()
     score = 0
-    weighted_keywords = {
-        "support": 1,
-        "refund": 2,
-        "customer service": 1,
+    keyword_weights = {
         "zendesk": 2,
-        "tickets": 2,
-        "complaint": 1,
-        "shopify": 2,
         "gorgias": 2,
+        "support": 1,
+        "customer support": 2,
+        "tickets": 2,
+        "refund": 2,
+        "refunds": 2,
+        "chargeback": 3,
+        "complaint": 2,
+        "cancel": 2,
+        "shopify": 2,
         "manual": 1,
-        "painful": 2,
-        "killing us": 3,
         "out of control": 3,
-        "overwhelmed": 3,
+        "killing us": 3,
+        "painful": 2,
         "swamped": 2,
+        "overwhelmed": 2,
     }
-    for keyword, weight in weighted_keywords.items():
-        if keyword in text:
+    for key, weight in keyword_weights.items():
+        if key in lowered:
             score += weight
+    if (source or "").lower() in {"reddit", "twitter", "x", "shopify"}:
+        score += 1
     return max(score, 1)
 
 
-def _generate_outreach_message(text_value: str) -> str:
-    excerpt = " ".join(str(text_value or "").strip().split())
-    if len(excerpt) > 160:
-        excerpt = excerpt[:157].rstrip() + "..."
+def _normalize_lead_status(value: str) -> str:
+    status = (value or "new").strip().lower()
+    return status if status in LEAD_STATUS_ORDER else "new"
+
+
+def _generate_initial_lead_message(username: str, text: str) -> str:
+    excerpt = " ".join((text or "").strip().split())
+    excerpt = excerpt[:140] + ("..." if len(excerpt) > 140 else "")
     return (
-        f'Hey — saw your post about support:\n\n"{excerpt}"\n\n'
-        "I built a tool that prepares support decisions (refunds, replies, escalations) "
-        "but keeps you in control with approval.\n\n"
-        "Most teams cut support workload pretty heavily once it is in the loop.\n\n"
-        "Happy to run a few of your tickets through it for free if you want to see it."
+        f"Hey — saw your post about support:\n\n"
+        f"\"{excerpt}\"\n\n"
+        f"I built a tool that prepares support decisions (refunds, replies, escalations) "
+        f"but keeps you in control with approval.\n\n"
+        f"It usually cuts support workload pretty hard without adding risk.\n\n"
+        f"Happy to run a few of your tickets through it for free if you want to see it."
     )
 
 
-def _normalize_outreach_status(value: str | None) -> str:
-    normalized = str(value or "new").strip().lower()
-    return normalized if normalized in {"new", "sent", "replied", "closed"} else "new"
+def _generate_followup_message(lead: dict[str, Any]) -> str:
+    text = str(lead.get("text", "") or "").lower()
+    if "refund" in text or "charge" in text:
+        angle = "Still dealing with refund volume?"
+    elif "zendesk" in text or "ticket" in text:
+        angle = "Still getting hit by ticket volume?"
+    else:
+        angle = "Just looping back on this"
+    return (
+        f"{angle}\n\n"
+        f"Happy to show how Xalvion prepares the right support action "
+        f"while keeping approval in your hands."
+    )
 
 
-def _serialize_outreach_lead(lead: dict[str, Any]) -> dict[str, Any]:
+def _build_lead_record(username: str, text: str, source: str = "manual") -> dict[str, Any]:
+    now_iso = _crm_now_iso()
+    score = _lead_score(text, source)
+    initial = _generate_initial_lead_message(username, text)
+    follow_up_due = (_crm_now() + timedelta(days=2)).isoformat()
     return {
-        "username": str(lead.get("username", "") or ""),
-        "text": str(lead.get("text", "") or ""),
-        "score": int(lead.get("score", 0) or 0),
-        "message": str(lead.get("message", "") or ""),
-        "status": _normalize_outreach_status(lead.get("status")),
-        "source": str(lead.get("source", "manual") or "manual"),
-        "created_at": str(lead.get("created_at", "") or ""),
-        "last_contacted": str(lead.get("last_contacted", "") or ""),
-        "follow_up_due": str(lead.get("follow_up_due", "") or ""),
+        "id": uuid.uuid4().hex,
+        "username": (username or "").strip(),
+        "text": (text or "").strip(),
+        "source": (source or "manual").strip().lower() or "manual",
+        "score": score,
+        "status": "new",
+        "created_at": now_iso,
+        "last_contacted": None,
+        "follow_up_due": follow_up_due,
+        "message": initial,
+        "follow_up_message": _generate_followup_message({"text": text}),
+        "messages": [
+            {
+                "type": "initial",
+                "text": initial,
+                "timestamp": now_iso,
+            }
+        ],
+        "notes": [],
     }
 
 
-def _sort_outreach_queue(leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return sorted(
-        [_serialize_outreach_lead(lead) for lead in leads],
-        key=lambda item: (-int(item.get("score", 0) or 0), str(item.get("created_at", ""))),
+def _serialize_lead(lead: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(lead or {})
+    normalized["status"] = _normalize_lead_status(str(normalized.get("status", "new") or "new"))
+    normalized["score"] = int(normalized.get("score", 1) or 1)
+    normalized["source"] = str(normalized.get("source", "manual") or "manual")
+    normalized["message"] = str(normalized.get("message", "") or "")
+    normalized["follow_up_message"] = str(
+        normalized.get("follow_up_message") or _generate_followup_message(normalized)
     )
+    normalized["messages"] = list(normalized.get("messages") or [])
+    normalized["notes"] = list(normalized.get("notes") or [])
+    return normalized
 
 
-def _touch_follow_up_window(status: str) -> tuple[str, str]:
-    if status == "sent":
-        return _now_iso(), (datetime.utcnow() + timedelta(days=2)).isoformat()
-    if status == "replied":
-        return _now_iso(), (datetime.utcnow() + timedelta(days=5)).isoformat()
-    return "", ""
+def _get_sorted_leads() -> list[dict[str, Any]]:
+    leads = [_serialize_lead(item) for item in _read_outreach_queue()]
+    status_rank = {"replied": 0, "contacted": 1, "new": 2, "closed": 3}
+    leads.sort(
+        key=lambda item: (
+            status_rank.get(item.get("status", "new"), 9),
+            -(int(item.get("score", 0) or 0)),
+            item.get("created_at", ""),
+        )
+    )
+    return leads
+
+
+def _get_lead_summary(leads: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {"new": 0, "contacted": 0, "replied": 0, "closed": 0, "due_followups": 0}
+    now = _crm_now()
+    for lead in leads:
+        status = _normalize_lead_status(str(lead.get("status", "new") or "new"))
+        counts[status] = counts.get(status, 0) + 1
+        due_at = lead.get("follow_up_due")
+        if status == "contacted" and due_at:
+            try:
+                if datetime.fromisoformat(str(due_at)) <= now:
+                    counts["due_followups"] += 1
+            except Exception:
+                pass
+    return counts
+
+
+def _update_lead_status(lead_id: str, status: str, note: str | None = None) -> dict[str, Any] | None:
+    leads = _read_outreach_queue()
+    now_iso = _crm_now_iso()
+    due_again = (_crm_now() + timedelta(days=2)).isoformat()
+    updated_lead = None
+
+    for lead in leads:
+        if str(lead.get("id", "")) != str(lead_id):
+            continue
+
+        lead["status"] = _normalize_lead_status(status)
+        if lead["status"] == "contacted":
+            lead["last_contacted"] = now_iso
+            lead["follow_up_due"] = due_again
+            follow_text = _generate_followup_message(lead)
+            lead["follow_up_message"] = follow_text
+            history = list(lead.get("messages") or [])
+            history.append({"type": "follow_up_scheduled", "text": follow_text, "timestamp": now_iso})
+            lead["messages"] = history[-12:]
+        elif lead["status"] == "replied":
+            lead["follow_up_due"] = None
+        elif lead["status"] == "closed":
+            lead["follow_up_due"] = None
+
+        if note:
+            notes = list(lead.get("notes") or [])
+            notes.append({"text": str(note)[:300], "timestamp": now_iso})
+            lead["notes"] = notes[-12:]
+
+        updated_lead = _serialize_lead(lead)
+        break
+
+    if updated_lead is not None:
+        _write_outreach_queue(leads)
+    return updated_lead
 
 
 @app.get("/leads")
-def list_outreach_queue(user: User = Depends(require_authenticated_user)):
-    leads = _sort_outreach_queue(_load_outreach_queue())
-    return {"leads": leads, "count": len(leads)}
+def list_outreach_leads(user: User = Depends(require_authenticated_user)):
+    leads = _get_sorted_leads()
+    return {
+        "items": leads,
+        "summary": _get_lead_summary(leads),
+        "username": user.username,
+    }
+
+
+@app.get("/leads/followups")
+def list_outreach_followups(user: User = Depends(require_authenticated_user)):
+    leads = _get_sorted_leads()
+    now = _crm_now()
+    due: list[dict[str, Any]] = []
+    for lead in leads:
+        due_at = lead.get("follow_up_due")
+        if lead.get("status") != "contacted" or not due_at:
+            continue
+        try:
+            if datetime.fromisoformat(str(due_at)) <= now:
+                due.append(lead)
+        except Exception:
+            continue
+    return {
+        "items": due,
+        "summary": _get_lead_summary(leads),
+        "username": user.username,
+    }
 
 
 @app.post("/leads/add")
-def add_outreach_lead(req: LeadAddRequest, user: User = Depends(require_authenticated_user)):
-    leads = _load_outreach_queue()
-    username_key = req.username.strip().lower()
-
-    for existing in leads:
-        if str(existing.get("username", "")).strip().lower() == username_key:
-            raise HTTPException(status_code=409, detail="Lead already exists")
-
-    lead = {
-        "username": req.username.strip(),
-        "text": req.text.strip(),
-        "score": _score_outreach_lead(req.text),
-        "message": _generate_outreach_message(req.text),
-        "status": "new",
-        "source": str(req.source or "manual").strip() or "manual",
-        "created_at": _now_iso(),
-        "last_contacted": "",
-        "follow_up_due": "",
+def add_outreach_lead(
+    req: LeadAddRequest,
+    user: User = Depends(require_authenticated_user),
+):
+    leads = _read_outreach_queue()
+    record = _build_lead_record(req.username, req.text, req.source or "manual")
+    leads.append(record)
+    _write_outreach_queue(leads)
+    all_leads = _get_sorted_leads()
+    return {
+        "lead": _serialize_lead(record),
+        "items": all_leads,
+        "summary": _get_lead_summary(all_leads),
+        "username": user.username,
     }
-    leads.append(lead)
-    _save_outreach_queue(leads)
-    return {"lead": _serialize_outreach_lead(lead), "count": len(leads)}
 
 
-def _update_outreach_status(username: str, status: str) -> dict[str, Any]:
-    normalized_user = (username or "").strip().lower()
-    leads = _load_outreach_queue()
+@app.post("/leads/{lead_id}/status")
+def update_outreach_lead_status(
+    lead_id: str,
+    req: LeadStatusRequest,
+    user: User = Depends(require_authenticated_user),
+):
+    updated = _update_lead_status(lead_id, req.status, req.note)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Lead not found")
 
-    for lead in leads:
-        if str(lead.get("username", "")).strip().lower() == normalized_user:
-            lead["status"] = _normalize_outreach_status(status)
-            last_contacted, follow_up_due = _touch_follow_up_window(lead["status"])
-            if last_contacted:
-                lead["last_contacted"] = last_contacted
-            if follow_up_due:
-                lead["follow_up_due"] = follow_up_due
-            elif lead["status"] == "closed":
-                lead["follow_up_due"] = ""
-            _save_outreach_queue(leads)
-            return _serialize_outreach_lead(lead)
-
-    raise HTTPException(status_code=404, detail="Lead not found")
-
-
-@app.post("/leads/{username}/mark-sent")
-def mark_outreach_lead_sent(username: str, user: User = Depends(require_authenticated_user)):
-    return {"lead": _update_outreach_status(username, "sent")}
-
-
-@app.post("/leads/{username}/mark-replied")
-def mark_outreach_lead_replied(username: str, user: User = Depends(require_authenticated_user)):
-    return {"lead": _update_outreach_status(username, "replied")}
-
-
-@app.post("/leads/{username}/mark-closed")
-def mark_outreach_lead_closed(username: str, user: User = Depends(require_authenticated_user)):
-    return {"lead": _update_outreach_status(username, "closed")}
+    all_leads = _get_sorted_leads()
+    return {
+        "lead": updated,
+        "items": all_leads,
+        "summary": _get_lead_summary(all_leads),
+        "username": user.username,
+    }
 
 if __name__ == "__main__":
     import uvicorn
