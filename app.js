@@ -81,7 +81,29 @@
     leadSourceInput: document.getElementById("leadSourceInput"),
     leadTextInput: document.getElementById("leadTextInput"),
     leadList: document.getElementById("leadList"),
-    followupList: document.getElementById("followupList")
+    followupList: document.getElementById("followupList"),
+    crmTodayCard: document.getElementById("crmTodayCard"),
+    crmTodaySummary: document.getElementById("crmTodaySummary"),
+    crmTodayDueCount: document.getElementById("crmTodayDueCount"),
+    crmTodayNewCount: document.getElementById("crmTodayNewCount"),
+    crmTodayClosedCount: document.getElementById("crmTodayClosedCount"),
+    crmTodayBestSource: document.getElementById("crmTodayBestSource"),
+    crmHotList: document.getElementById("crmHotList"),
+    revenueSummary: document.getElementById("revenueSummary"),
+    revenueLeadsCount: document.getElementById("revenueLeadsCount"),
+    revenueReplyRate: document.getElementById("revenueReplyRate"),
+    revenueClosingRate: document.getElementById("revenueClosingRate"),
+    revenueWinRate: document.getElementById("revenueWinRate"),
+    revenueTotalValue: document.getElementById("revenueTotalValue"),
+    revenueBestSource: document.getElementById("revenueBestSource"),
+    sourceList: document.getElementById("sourceList"),
+    forecastSummary: document.getElementById("forecastSummary"),
+    forecastPipelineValue: document.getElementById("forecastPipelineValue"),
+    forecastWeightedRevenue: document.getElementById("forecastWeightedRevenue"),
+    forecastProjectedRevenue: document.getElementById("forecastProjectedRevenue"),
+    forecastCoverage: document.getElementById("forecastCoverage"),
+    forecastStageList: document.getElementById("forecastStageList"),
+    forecastDealList: document.getElementById("forecastDealList")
   };
 
   const state = {
@@ -104,6 +126,8 @@
     refundHistory: [],
     crmLeads: [],
     crmSummary: { new: 0, contacted: 0, replied: 0, closed: 0, due_followups: 0 },
+    crmDailySummary: { due_followups: 0, new_today: 0, closed_today: 0, best_source: "manual", hottest_open: [], reminders: [] },
+    revenueMetrics: { totals: {}, by_source: [], best_source: "manual", forecast: {} },
     lastLimitNoticeKey: ""
   };
 
@@ -964,6 +988,35 @@
       .crm-list{
         display:grid;
         gap:10px;
+      }
+
+      .crm-hot-item{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        padding:10px 12px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,.06);
+        background:rgba(255,255,255,.025);
+      }
+
+      .crm-hot-copy{
+        display:grid;
+        gap:3px;
+        min-width:0;
+      }
+
+      .crm-hot-title{
+        font-size:12px;
+        font-weight:800;
+        color:rgba(244,247,255,.96);
+      }
+
+      .crm-hot-sub{
+        font-size:11px;
+        color:rgba(198,210,238,.72);
+        white-space:normal;
       }
 
       .crm-item{
@@ -3072,6 +3125,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     await loadIntegrations();
     await loadRefundHistory();
     await loadCrmLeads();
+    await loadRevenueMetrics();
   }
 
   function activatePreviewAccess() {
@@ -3291,6 +3345,182 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     setText(els.crmDueCount, state.crmSummary.due_followups);
   }
 
+  function renderCrmDailySummary(summary = {}) {
+    state.crmDailySummary = {
+      due_followups: Number(summary.due_followups || 0),
+      new_today: Number(summary.new_today || 0),
+      closed_today: Number(summary.closed_today || 0),
+      closed_revenue_today: Number(summary.closed_revenue_today || 0),
+      best_source: String(summary.best_source || "manual"),
+      hottest_open: Array.isArray(summary.hottest_open) ? summary.hottest_open : [],
+      reminders: Array.isArray(summary.reminders) ? summary.reminders : []
+    };
+
+    const lines = [
+      `${state.crmDailySummary.due_followups} due now`,
+      `${state.crmDailySummary.new_today} new today`,
+      `${state.crmDailySummary.closed_today} closed today`
+    ];
+    if (state.crmDailySummary.closed_revenue_today > 0) {
+      lines.push(`$${state.crmDailySummary.closed_revenue_today.toFixed(2)} closed today`);
+    }
+    setText(els.crmTodaySummary, lines.join(" • ") || "No pipeline activity yet.");
+    setText(els.crmTodayDueCount, state.crmDailySummary.due_followups);
+    setText(els.crmTodayNewCount, state.crmDailySummary.new_today);
+    setText(els.crmTodayClosedCount, state.crmDailySummary.closed_today);
+    setText(els.crmTodayBestSource, state.crmDailySummary.best_source || "manual");
+
+    if (els.crmHotList) {
+      const items = state.crmDailySummary.hottest_open;
+      els.crmHotList.innerHTML = items.length ? items.map((lead) => `
+        <div class="crm-hot-item">
+          <div class="crm-hot-copy">
+            <div class="crm-hot-title">${escapeHtml(lead.username || "Lead")}</div>
+            <div class="crm-hot-sub">${escapeHtml(String(lead.status || "new").toUpperCase())} • ${escapeHtml(lead.source || "manual")} • score ${Number(lead.score || 0)}</div>
+          </div>
+          <div class="crm-chip-row"><span class="crm-chip">Hot ${Number(lead.hotness || 0)}</span></div>
+        </div>
+      `).join("") : '<div class="refund-empty">No hot deals yet.</div>';
+    }
+  }
+
+  function renderRevenueMetrics(metrics = {}) {
+    const safeMetrics = metrics && typeof metrics === "object" ? metrics : {};
+    const totals = safeMetrics.totals && typeof safeMetrics.totals === "object" ? safeMetrics.totals : {};
+    const bySource = Array.isArray(safeMetrics.by_source) ? safeMetrics.by_source : [];
+    state.revenueMetrics = {
+      totals,
+      by_source: bySource,
+      best_source: String(safeMetrics.best_source || "manual"),
+      forecast: safeMetrics.forecast && typeof safeMetrics.forecast === "object" ? safeMetrics.forecast : {}
+    };
+
+    const leads = Number(totals.leads || 0);
+    const revenue = Number(totals.revenue || 0);
+    const summaryBits = [
+      `${leads} leads`,
+      `${Number(totals.demo || 0)} demos`,
+      `${Number(totals.closed || 0)} closed`
+    ];
+    if (revenue > 0) summaryBits.push(`$${revenue.toFixed(2)} revenue`);
+    setText(els.revenueSummary, leads ? summaryBits.join(" • ") : "Track pipeline conversion, source quality, and closed revenue as you work the queue.");
+    setText(els.revenueLeadsCount, leads);
+    setText(els.revenueReplyRate, `${Number(totals.reply_rate || 0).toFixed(1)}%`);
+    setText(els.revenueClosingRate, `${Number(totals.closing_rate || 0).toFixed(1)}%`);
+    setText(els.revenueWinRate, `${Number(totals.win_rate || 0).toFixed(1)}%`);
+    setText(els.revenueTotalValue, `$${revenue.toFixed(2)}`);
+    setText(els.revenueBestSource, state.revenueMetrics.best_source || "manual");
+
+    renderForecastMetrics(state.revenueMetrics.forecast || {});
+
+    if (els.sourceList) {
+      els.sourceList.innerHTML = bySource.length ? bySource.map((row) => `
+        <div class="crm-hot-item">
+          <div class="crm-hot-copy">
+            <div class="crm-hot-title">${escapeHtml(row.source || "manual")}</div>
+            <div class="crm-hot-sub">${Number(row.leads || 0)} leads • ${Number(row.closed || 0)} closed • ${Number(row.reply_rate || 0).toFixed(1)}% reply • ${Number(row.win_rate || 0).toFixed(1)}% win</div>
+          </div>
+          <div class="crm-chip-row"><span class="crm-chip">$${Number(row.revenue || 0).toFixed(2)}</span></div>
+        </div>
+      `).join("") : '<div class="refund-empty">No source performance data yet.</div>';
+    }
+  }
+
+  function renderForecastMetrics(forecast = {}) {
+    const safeForecast = forecast && typeof forecast === "object" ? forecast : {};
+    const pipelineValue = Number(safeForecast.pipeline_value || 0);
+    const weightedOpenRevenue = Number(safeForecast.weighted_open_revenue || 0);
+    const projectedRevenue = Number(safeForecast.projected_total_revenue || 0);
+    const coverage = Number(safeForecast.coverage_ratio || 0);
+    const stageBreakdown = Array.isArray(safeForecast.stage_breakdown) ? safeForecast.stage_breakdown : [];
+    const topDeals = Array.isArray(safeForecast.top_weighted_deals) ? safeForecast.top_weighted_deals : [];
+
+    setText(els.forecastSummary, pipelineValue ? `${topDeals.length} weighted deals • ${coverage.toFixed(1)}% coverage` : "Track weighted pipeline value by stage and see the most important open deals.");
+    setText(els.forecastPipelineValue, `$${pipelineValue.toFixed(2)}`);
+    setText(els.forecastWeightedRevenue, `$${weightedOpenRevenue.toFixed(2)}`);
+    setText(els.forecastProjectedRevenue, `$${projectedRevenue.toFixed(2)}`);
+    setText(els.forecastCoverage, `${coverage.toFixed(1)}%`);
+
+    if (els.forecastStageList) {
+      els.forecastStageList.innerHTML = stageBreakdown.length ? stageBreakdown.map((row) => `
+        <div class="crm-hot-item">
+          <div class="crm-hot-copy">
+            <div class="crm-hot-title">${escapeHtml(String(row.stage || "lead").toUpperCase())}</div>
+            <div class="crm-hot-sub">${Number(row.count || 0)} deals • prob ${(Number(row.probability || 0) * 100).toFixed(0)}% • pipeline $${Number(row.pipeline_value || 0).toFixed(2)}</div>
+          </div>
+          <div class="crm-chip-row"><span class="crm-chip">$${Number(row.weighted_value || 0).toFixed(2)}</span></div>
+        </div>
+      `).join("") : '<div class="refund-empty">No pipeline forecast yet.</div>';
+    }
+
+    if (els.forecastDealList) {
+      els.forecastDealList.innerHTML = topDeals.length ? topDeals.map((deal) => `
+        <div class="crm-hot-item">
+          <div class="crm-hot-copy">
+            <div class="crm-hot-title">${escapeHtml(deal.username || "Lead")}</div>
+            <div class="crm-hot-sub">${escapeHtml(String(deal.stage || "lead").toUpperCase())} • ${escapeHtml(deal.source || "manual")} • ${(Number(deal.probability || 0)).toFixed(1)}% confidence</div>
+          </div>
+          <div class="crm-chip-row"><span class="crm-chip">$${Number(deal.weighted_value || 0).toFixed(2)}</span></div>
+        </div>
+      `).join("") : '<div class="refund-empty">No weighted opportunities yet.</div>';
+    }
+  }
+
+  async function loadRevenueMetrics() {
+    if (!state.token || !state.username) {
+      renderRevenueMetrics({ totals: {}, by_source: [], best_source: "manual" });
+      return;
+    }
+    try {
+      const data = await apiGet("/analytics/metrics");
+      renderRevenueMetrics(data.metrics || {});
+    } catch (error) {
+      renderRevenueMetrics({ totals: {}, by_source: [], best_source: "manual" });
+    }
+  }
+
+  function promptConvertLead(leadId) {
+    const lead = state.crmLeads.find((item) => String(item.id) === String(leadId));
+    if (!lead) return;
+    const raw = window.prompt(`Enter closed deal value for ${lead.username}`, String(lead.value || lead.converted_value || "99"));
+    if (raw === null) return;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setNotice("warning", "Invalid value", "Enter a valid number for the closed deal value.");
+      return;
+    }
+    convertLead(leadId, parsed);
+  }
+
+  async function convertLead(leadId, value) {
+    if (!leadId) return;
+    try {
+      const data = await apiPost(`/leads/${encodeURIComponent(leadId)}/convert`, { value, note: `Closed at $${Number(value).toFixed(2)}` });
+      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {}, data.daily_summary || {}, data.metrics || null);
+      renderRevenueMetrics(data.metrics || state.revenueMetrics || {});
+      setNotice("success", "Lead converted", `Closed revenue updated by $${Number(value).toFixed(2)}.`);
+    } catch (error) {
+      setNotice("error", "Conversion failed", error.message || "Could not close this lead.");
+    }
+  }
+
+  function stageOptionsMarkup(currentStage) {
+    const options = ["lead", "contacted", "replied", "demo", "closed"];
+    return options.map((stage) => `<option value="${stage}"${stage === currentStage ? " selected" : ""}>${stage.toUpperCase()}</option>`).join("");
+  }
+
+  async function updateLeadStage(leadId, stage) {
+    if (!leadId || !stage) return;
+    try {
+      const data = await apiPost(`/leads/${encodeURIComponent(leadId)}/status`, { stage, status: stage === "lead" ? "new" : (stage === "closed" ? "closed" : (stage === "contacted" ? "contacted" : "replied")) });
+      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {}, data.daily_summary || {}, data.metrics || null);
+      renderRevenueMetrics(data.metrics || state.revenueMetrics || {});
+      setNotice("success", "Stage updated", `Lead moved to ${stage}.`);
+    } catch (error) {
+      setNotice("error", "Stage update failed", error.message || "Could not update stage.");
+    }
+  }
+
   function leadMessageForStatus(lead) {
     if (!lead) return "";
     if (lead.status === "contacted" && lead.follow_up_message) return lead.follow_up_message;
@@ -3324,40 +3554,51 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
             <span class="crm-chip">Score ${Number(lead.score || 0)}</span>
             <span class="crm-chip">${escapeHtml(lead.source || "manual")}</span>
             <span class="crm-chip status-${escapeHtml(lead.status || "new")}">${escapeHtml((lead.status || "new").toUpperCase())}</span>
+            <span class="crm-chip">Stage ${escapeHtml(String(lead.stage || lead.status || "lead").toUpperCase())}</span>
           </div>
         </div>
         <div class="crm-message">${escapeHtml(leadMessageForStatus(lead))}</div>
-        <div class="crm-item-sub">${escapeHtml(leadTimeLabel(lead))}</div>
-        <div class="crm-actions">
+        <div class="crm-item-sub">${escapeHtml(leadTimeLabel(lead))}${Number(lead.converted_value || 0) > 0 ? ` • Closed $${Number(lead.converted_value || 0).toFixed(2)}` : (Number(lead.value || 0) > 0 ? ` • Value $${Number(lead.value || 0).toFixed(2)}` : "")}</div>
+        <div class="crm-actions" style="align-items:center; flex-wrap:wrap;">
           <button class="crm-btn" type="button" data-lead-copy="${escapeAttr(lead.id)}">Copy message</button>
           ${lead.status === "new" ? `<button class="crm-btn followup" type="button" data-lead-status="${escapeAttr(lead.id)}" data-status-value="contacted">Mark sent</button>` : ""}
-          ${lead.status === "contacted" ? `<button class="crm-btn reply" type="button" data-lead-status="${escapeAttr(lead.id)}" data-status-value="replied">Mark replied</button>` : ""}
-          ${lead.status !== "closed" ? `<button class="crm-btn close" type="button" data-lead-status="${escapeAttr(lead.id)}" data-status-value="closed">Mark closed</button>` : ""}
+          ${(lead.status === "contacted" || lead.status === "replied") ? `<button class="crm-btn reply" type="button" data-lead-status="${escapeAttr(lead.id)}" data-status-value="replied">Mark replied</button>` : ""}
+          ${lead.stage !== "demo" && lead.status !== "closed" ? `<button class="crm-btn" type="button" data-lead-stage="${escapeAttr(lead.id)}" data-stage-value="demo">Mark demo</button>` : ""}
+          ${mode === "followup" ? `<button class="crm-btn followup" type="button" data-reminder-done="${escapeAttr(lead.id)}">Mark done</button><button class="crm-btn" type="button" data-reminder-snooze="${escapeAttr(lead.id)}">Snooze 1d</button>` : ""}
+          ${lead.status !== "closed" ? `<button class="crm-btn close" type="button" data-lead-convert="${escapeAttr(lead.id)}">Close deal</button>` : ""}
+          <label class="refund-label" style="display:flex; align-items:center; gap:6px; margin-left:auto; font-size:10px; letter-spacing:.12em;">
+            <span>Stage</span>
+            <select class="refund-input" data-stage-select="${escapeAttr(lead.id)}" style="height:30px; min-width:116px; padding:0 10px; font-size:11px;">
+              ${stageOptionsMarkup(String(lead.stage || lead.status || "lead"))}
+            </select>
+          </label>
         </div>
       </div>
     `).join("")}</div>`;
   }
 
-  function renderCrmLeads(items = [], summary = null) {
+  function renderCrmLeads(items = [], summary = null, dailySummary = null, metrics = null) {
     state.crmLeads = Array.isArray(items) ? items.slice() : [];
     const computedSummary = summary || {};
     renderCrmSummary(computedSummary);
+    renderCrmDailySummary(dailySummary || {});
     const queueItems = state.crmLeads.filter((lead) => lead.status !== "closed");
-    const followups = state.crmLeads.filter((lead) => lead.status === "contacted" && lead.follow_up_due);
+    const followups = state.crmLeads.filter((lead) => (lead.status === "contacted" || lead.status === "replied") && lead.follow_up_due);
     renderLeadItems(queueItems, els.leadList, "queue");
     renderLeadItems(followups, els.followupList, "followup");
+    if (metrics) renderRevenueMetrics(metrics);
   }
 
   async function loadCrmLeads() {
     if (!state.token || !state.username) {
       state.crmLeads = [];
-      renderCrmLeads([], { new: 0, contacted: 0, replied: 0, closed: 0, due_followups: 0 });
+      renderCrmLeads([], { new: 0, contacted: 0, replied: 0, closed: 0, due_followups: 0 }, {}, { totals: {}, by_source: [], best_source: "manual" });
       return;
     }
 
     try {
       const data = await apiGet("/leads");
-      renderCrmLeads(Array.isArray(data.items) ? data.items : [], data.summary || {});
+      renderCrmLeads(Array.isArray(data.items) ? data.items : [], data.summary || {}, data.daily_summary || {}, data.metrics || null);
     } catch (error) {
       if (els.leadList) {
         els.leadList.innerHTML = '<div class="refund-empty">Could not load leads right now.</div>';
@@ -3365,7 +3606,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       if (els.followupList) {
         els.followupList.innerHTML = '<div class="refund-empty">Could not load follow-ups right now.</div>';
       }
-      renderCrmSummary({ new: 0, contacted: 0, replied: 0, closed: 0, due_followups: 0 });
+      renderCrmLeads([], { new: 0, contacted: 0, replied: 0, closed: 0, due_followups: 0 }, {}, { totals: {}, by_source: [], best_source: "manual" });
     }
   }
 
@@ -3386,7 +3627,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     try {
       const data = await apiPost("/leads/add", { username, text, source });
-      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {});
+      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {}, data.daily_summary || {}, data.metrics || null);
       if (els.leadUsernameInput) els.leadUsernameInput.value = "";
       if (els.leadTextInput) els.leadTextInput.value = "";
       if (els.leadSourceInput) els.leadSourceInput.value = "";
@@ -3401,7 +3642,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     try {
       const data = await apiPost(`/leads/${encodeURIComponent(leadId)}/status`, { status });
-      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {});
+      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {}, data.daily_summary || {}, data.metrics || null);
       const notices = {
         contacted: ["success", "Lead marked sent", "A follow-up is now scheduled automatically inside your queue."],
         replied: ["success", "Lead replied", "Nice — this lead was moved forward in the CRM layer."],
@@ -3411,6 +3652,28 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       setNotice(kind, title, detail);
     } catch (error) {
       setNotice("error", "Lead update failed", error.message || "Could not update lead status.");
+    }
+  }
+
+  async function markReminderDone(leadId) {
+    if (!leadId) return;
+    try {
+      const data = await apiPost(`/crm/reminders/${encodeURIComponent(leadId)}/done`, { days: 2 });
+      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {}, data.daily_summary || {}, data.metrics || null);
+      setNotice("success", "Reminder completed", "Follow-up was logged and the next reminder moved out." );
+    } catch (error) {
+      setNotice("error", "Reminder update failed", error.message || "Could not mark this reminder done.");
+    }
+  }
+
+  async function snoozeReminder(leadId) {
+    if (!leadId) return;
+    try {
+      const data = await apiPost(`/crm/reminders/${encodeURIComponent(leadId)}/snooze`, { days: 1 });
+      renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {}, data.daily_summary || {}, data.metrics || null);
+      setNotice("info", "Reminder snoozed", "This follow-up was moved out by one day.");
+    } catch (error) {
+      setNotice("error", "Snooze failed", error.message || "Could not snooze this reminder.");
     }
   }
 
@@ -3488,6 +3751,24 @@ function bindEvents() {
           statusBtn.getAttribute("data-lead-status"),
           statusBtn.getAttribute("data-status-value")
         );
+        return;
+      }
+
+      const stageBtn = event.target.closest("[data-lead-stage]");
+      if (stageBtn) {
+        await updateLeadStage(stageBtn.getAttribute("data-lead-stage"), stageBtn.getAttribute("data-stage-value"));
+        return;
+      }
+
+      const convertBtn = event.target.closest("[data-lead-convert]");
+      if (convertBtn) {
+        promptConvertLead(convertBtn.getAttribute("data-lead-convert"));
+        return;
+      }
+
+      const stageSelect = event.target.closest("[data-stage-select]");
+      if (stageSelect && event.target.matches("select")) {
+        await updateLeadStage(stageSelect.getAttribute("data-stage-select"), event.target.value);
       }
     });
     els.followupList?.addEventListener("click", async (event) => {
@@ -3497,12 +3778,42 @@ function bindEvents() {
         return;
       }
 
+      const doneBtn = event.target.closest("[data-reminder-done]");
+      if (doneBtn) {
+        await markReminderDone(doneBtn.getAttribute("data-reminder-done"));
+        return;
+      }
+
+      const snoozeBtn = event.target.closest("[data-reminder-snooze]");
+      if (snoozeBtn) {
+        await snoozeReminder(snoozeBtn.getAttribute("data-reminder-snooze"));
+        return;
+      }
+
       const statusBtn = event.target.closest("[data-lead-status]");
       if (statusBtn) {
         await updateLeadStatus(
           statusBtn.getAttribute("data-lead-status"),
           statusBtn.getAttribute("data-status-value")
         );
+        return;
+      }
+
+      const stageBtn = event.target.closest("[data-lead-stage]");
+      if (stageBtn) {
+        await updateLeadStage(stageBtn.getAttribute("data-lead-stage"), stageBtn.getAttribute("data-stage-value"));
+        return;
+      }
+
+      const convertBtn = event.target.closest("[data-lead-convert]");
+      if (convertBtn) {
+        promptConvertLead(convertBtn.getAttribute("data-lead-convert"));
+        return;
+      }
+
+      const stageSelect = event.target.closest("[data-stage-select]");
+      if (stageSelect && event.target.matches("select")) {
+        await updateLeadStage(stageSelect.getAttribute("data-stage-select"), event.target.value);
       }
     });
     els.closeRefundModalBtn?.addEventListener("click", closeRefundModal);
@@ -3618,6 +3929,7 @@ function bindEvents() {
     await loadIntegrations();
     await loadRefundHistory();
     await loadCrmLeads();
+    await loadRevenueMetrics();
 
     if (meResult?.staleCleared) {
       setNotice(
