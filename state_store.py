@@ -1,91 +1,107 @@
-
 from __future__ import annotations
 
 import json
 import os
+import sqlite3
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Callable
+from threading import Lock
+from typing import Any, Callable, Iterator
 
-from sqlalchemy import Column, String, Text, create_engine, text
-from sqlalchemy.orm import declarative_base, sessionmaker
-
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aurum.db")
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
-    pool_pre_ping=True,
-)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-Base = declarative_base()
+DATABASE_PATH = os.getenv("STATE_STORE_PATH", "/mnt/data/aurum.db")
+_INIT_LOCK = Lock()
 
 
-class AgentState(Base):
-    __tablename__ = "agent_state"
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DATABASE_PATH, timeout=5.0, isolation_level=None, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
+    conn.execute("PRAGMA foreign_keys=ON;")
+    return conn
 
-    key = Column(String, primary_key=True)
-    value = Column(Text, nullable=False, default="{}")
-    updated_at = Column(String, nullable=False)
+
+def _ensure_schema() -> None:
+    with _INIT_LOCK:
+        conn = _connect()
+        try:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL DEFAULT '{}',
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+        finally:
+            conn.close()
 
 
-Base.metadata.create_all(bind=engine)
+@contextmanager
+def _transaction(immediate: bool = False) -> Iterator[sqlite3.Connection]:
+    _ensure_schema()
+    conn = _connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def load_state(key: str, default: dict[str, Any]) -> dict[str, Any]:
-    db = SessionLocal()
+    _ensure_schema()
+    conn = _connect()
     try:
-        row = db.query(AgentState).filter(AgentState.key == key).first()
+        row = conn.execute("SELECT value FROM agent_state WHERE key = ?", (key,)).fetchone()
         if row is None:
             return default.copy()
         try:
-            parsed = json.loads(row.value)
+            parsed = json.loads(row["value"])
             return parsed if isinstance(parsed, dict) else default.copy()
         except Exception:
             return default.copy()
     finally:
-        db.close()
+        conn.close()
 
 
 def save_state(key: str, value: dict[str, Any]) -> None:
-    db = SessionLocal()
-    try:
-        payload = json.dumps(value, ensure_ascii=False)
-        now = datetime.utcnow().isoformat()
-        row = db.query(AgentState).filter(AgentState.key == key).first()
-        if row is None:
-            db.add(AgentState(key=key, value=payload, updated_at=now))
-        else:
-            row.value = payload
-            row.updated_at = now
-        db.commit()
-    finally:
-        db.close()
+    payload = json.dumps(value, ensure_ascii=False)
+    now = datetime.utcnow().isoformat()
+    with _transaction() as conn:
+        conn.execute(
+            """
+            INSERT INTO agent_state (key, value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+            """,
+            (key, payload, now),
+        )
 
 
 def mutate_state(key: str, default: dict[str, Any], mutator: Callable[[dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
-    db = SessionLocal()
-    try:
-        db.execute(text("BEGIN IMMEDIATE"))
-        row = db.query(AgentState).filter(AgentState.key == key).first()
+    with _transaction(immediate=True) as conn:
+        row = conn.execute("SELECT value FROM agent_state WHERE key = ?", (key,)).fetchone()
         if row is None:
             current = default.copy()
-            row = AgentState(key=key, value=json.dumps(current, ensure_ascii=False), updated_at=datetime.utcnow().isoformat())
-            db.add(row)
-            db.flush()
         else:
             try:
-                current = json.loads(row.value)
-                if not isinstance(current, dict):
-                    current = default.copy()
+                parsed = json.loads(row["value"])
+                current = parsed if isinstance(parsed, dict) else default.copy()
             except Exception:
                 current = default.copy()
-
         updated = mutator(current)
-        row.value = json.dumps(updated, ensure_ascii=False)
-        row.updated_at = datetime.utcnow().isoformat()
-        db.commit()
+        conn.execute(
+            """
+            INSERT INTO agent_state (key, value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+            """,
+            (key, json.dumps(updated, ensure_ascii=False), datetime.utcnow().isoformat()),
+        )
         return updated
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()

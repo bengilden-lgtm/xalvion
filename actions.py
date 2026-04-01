@@ -26,12 +26,12 @@ def classify_issue(issue: str) -> str:
 
     if "charged twice" in text or "double charge" in text or "billed twice" in text or "duplicate charge" in text:
         return "billing_duplicate_charge"
+    if "damaged" in text or "broken" in text:
+        return "damaged_order"
     if "refund" in text:
         return "refund_request"
     if "late" in text or "where is my order" in text or "tracking" in text or "package" in text:
         return "shipping_issue"
-    if "damaged" in text or "broken" in text:
-        return "damaged_order"
     if "login" in text or "password" in text or "sign in" in text:
         return "auth_issue"
     if "export" in text and "error" in text:

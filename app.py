@@ -50,9 +50,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-from agent import run_agent
+from controller import run_agent
 from actions import build_ticket as build_support_ticket, calculate_impact, system_decision, triage_ticket
 from memory import get_user_memory
+from security import assert_production_runtime_safety
 from utils import normalize_ticket, safe_execute
 
 try:
@@ -69,6 +70,7 @@ except Exception:
 
 
 load_dotenv(override=True)
+assert_production_runtime_safety()
 
 # =============================================================================
 # 1. CONFIG

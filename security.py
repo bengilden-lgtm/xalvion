@@ -1,27 +1,15 @@
 """
-security.py — input sanitization and output safety.
-
-FIXES:
-1. Replaced trivially-bypassed lowercase regex blocklist with case-insensitive
-   compiled patterns that also catch leet-speak variants and whitespace tricks.
-2. Added length cap — very long inputs are a common DoS / prompt-stuffing vector.
-3. Added unicode normalization to defeat homoglyph attacks.
-4. safe_output() now strips a broader set of internal leak phrases.
-5. All functions fully typed.
+security.py - input sanitization, output safety, and production runtime guards.
 """
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 from typing import Tuple
 
-# ---------------------------------------------------------------------------
-# CONFIG
-# ---------------------------------------------------------------------------
+MAX_INPUT_LENGTH = 10_000
 
-MAX_INPUT_LENGTH = 10_000  # characters
-
-# Compiled case-insensitive patterns — harder to bypass than plain .lower()
 _BLOCKED_PATTERNS: list[re.Pattern[str]] = [
     re.compile(p, re.IGNORECASE | re.DOTALL)
     for p in [
@@ -32,19 +20,18 @@ _BLOCKED_PATTERNS: list[re.Pattern[str]] = [
         r"delete\s+system",
         r"shutdown\s+(the\s+)?system",
         r"(drop|truncate)\s+table",
-        r"<script[\s>]",           # XSS attempt
-        r";\s*-{2}",               # SQL comment injection
-        r"UNION\s+SELECT",         # SQL injection
-        r"\/\*.*?\*\/",            # SQL block comment
-        r"base64_decode",          # encoded payload attempt
-        r"eval\s*\(",              # JS/Python eval
-        r"__import__\s*\(",        # Python import injection
-        r"os\.system\s*\(",        # shell execution
-        r"subprocess\.",           # subprocess execution
+        r"<script[\s>]",
+        r";\s*-{2}",
+        r"UNION\s+SELECT",
+        r"\/\*.*?\*\/",
+        r"base64_decode",
+        r"eval\s*\(",
+        r"__import__\s*\(",
+        r"os\.system\s*\(",
+        r"subprocess\.",
     ]
 ]
 
-# Phrases that must never appear in customer-facing output
 _LEAK_PHRASES: list[str] = [
     "system prompt",
     "payment_intent_id",
@@ -60,43 +47,36 @@ _LEAK_PHRASES: list[str] = [
     "aurum.db",
 ]
 
+_INSECURE_SECRET_MARKERS = {"dev_secret_change_me", "change_me", "fallback", "dev", "development", "insecure", "test-secret"}
 
-# ---------------------------------------------------------------------------
-# INPUT SANITIZATION
-# ---------------------------------------------------------------------------
+
+def assert_production_runtime_safety() -> None:
+    environment = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
+    secret = (os.getenv("JWT_SECRET", "") or "").strip()
+    lowered = secret.lower()
+    if environment == "production":
+        insecure = (not secret) or any(marker in lowered for marker in _INSECURE_SECRET_MARKERS)
+        if insecure or len(secret) < 32:
+            raise RuntimeError("Refusing to start in production: JWT_SECRET is missing, too short, or using a dev/fallback value.")
+
 
 def sanitize_input(user_input: str) -> Tuple[str | None, str | None]:
-    """
-    Returns (clean_text, None) on success or (None, block_reason) on failure.
-    """
     if not user_input:
         return "", None
-
-    # Normalize unicode — defeats homoglyph / zero-width attacks
     text = unicodedata.normalize("NFKC", user_input).strip()
-
     if len(text) > MAX_INPUT_LENGTH:
         return None, "Message too long. Please keep requests under 10,000 characters."
-
     for pattern in _BLOCKED_PATTERNS:
         if pattern.search(text):
             return None, "Your message contains content that cannot be processed."
-
     return text, None
 
 
-# ---------------------------------------------------------------------------
-# OUTPUT SAFETY
-# ---------------------------------------------------------------------------
-
 def safe_output(text: str) -> str:
-    """Strip any internal/sensitive phrases from customer-facing output."""
     if not text:
         return ""
-
     lowered = text.lower()
     for phrase in _LEAK_PHRASES:
         if phrase in lowered:
             return "I'm here to help with your request."
-
     return text

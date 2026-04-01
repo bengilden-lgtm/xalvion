@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from actions import build_ticket, calculate_impact, apply_learned_rules, system_decision, triage_ticket
-from brain import add_rule, get_top_rule_objects, load_brain, save_brain, update_system_prompt
+from brain import add_rule, decay_rules, get_top_rule_objects, load_brain, save_brain, update_system_prompt
 from memory import get_prompt_memory, get_user_memory, update_memory
 from router import route_task
 from security import safe_output, sanitize_input
@@ -35,12 +35,6 @@ try:
     from feedback import process_feedback
 except Exception:
     def process_feedback(user_input, response, quality):
-        return None
-
-try:
-    from learning import learn_from_ticket
-except Exception:
-    def learn_from_ticket(ticket, decision, outcome):
         return None
 
 
@@ -1074,8 +1068,10 @@ def run_agent(
     }
 
     update_memory(user_id, ticket, customer_message, final_payload)
-    learn_from_ticket(ticket, final_payload, executed)
     process_feedback(clean, customer_message, quality)
+    brain_for_decay = load_brain()
+    decay_rules(brain_for_decay)
+    save_brain(brain_for_decay)
     log_event(clean, customer_message, confidence, quality)
     if quality > 0.92:
         brain_growth = load_brain()
