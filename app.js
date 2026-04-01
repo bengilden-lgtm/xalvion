@@ -71,14 +71,14 @@
     refundChargeInput: document.getElementById("refundChargeInput"),
     refundAmountInput: document.getElementById("refundAmountInput"),
     refundReasonSelect: document.getElementById("refundReasonSelect"),
-    leadsCard: document.getElementById("leadsCard"),
-    leadPanelCopy: document.getElementById("leadPanelCopy"),
+    leadQueueCard: document.getElementById("leadQueueCard"),
     leadUsernameInput: document.getElementById("leadUsernameInput"),
     leadTextInput: document.getElementById("leadTextInput"),
     addLeadBtn: document.getElementById("addLeadBtn"),
     refreshLeadsBtn: document.getElementById("refreshLeadsBtn"),
-    leadStats: document.getElementById("leadStats"),
-    leadsList: document.getElementById("leadsList")
+    leadQueueList: document.getElementById("leadQueueList"),
+    leadQueueCount: document.getElementById("leadQueueCount"),
+    leadQueueCopy: document.getElementById("leadQueueCopy")
   };
 
   const state = {
@@ -99,8 +99,8 @@
     stripeAccountId: "",
     stripeMode: "",
     refundHistory: [],
-    lastLimitNoticeKey: "",
-    leads: []
+    leadQueue: [],
+    lastLimitNoticeKey: ""
   };
 
   const ICONS = {
@@ -196,6 +196,23 @@
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M13.5 2.5L7 9"></path>
         <path d="M13.5 2.5L9 13.5 7 9l-4.5-2 11-4.5Z"></path>
+      </svg>
+    `,
+    approve: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 8.4 6.2 11.4 13 4.6"></path>
+      </svg>
+    `,
+    reject: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 4l8 8"></path>
+        <path d="M12 4 4 12"></path>
+      </svg>
+    `,
+    edit: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 11.8 3.4 9.4 9.9 2.9a1.4 1.4 0 0 1 2 0l1.2 1.2a1.4 1.4 0 0 1 0 2l-6.5 6.5L4.2 13z"></path>
+        <path d="M9 4l3 3"></path>
       </svg>
     `
   };
@@ -437,6 +454,48 @@
 
       .copy-btn{
         min-width:24px;
+      }
+
+      .mini-btn.approve-btn{
+        background:rgba(52,211,153,.12);
+        border-color:rgba(52,211,153,.18);
+        color:rgba(221,255,239,.96);
+        padding:0 10px;
+      }
+
+      .mini-btn.reject-btn{
+        background:rgba(248,113,113,.10);
+        border-color:rgba(248,113,113,.18);
+        color:rgba(255,224,224,.96);
+        padding:0 10px;
+      }
+
+      .mini-btn.edit-btn{
+        background:rgba(96,165,250,.10);
+        border-color:rgba(96,165,250,.18);
+        color:rgba(224,236,255,.96);
+        padding:0 10px;
+      }
+
+      .approval-banner{
+        display:flex;
+        align-items:flex-start;
+        gap:8px;
+        padding:9px 10px;
+        border-radius:12px;
+        border:1px solid rgba(245,158,11,.18);
+        background:rgba(245,158,11,.08);
+        color:rgba(255,239,210,.96);
+        font-size:11px;
+        line-height:1.5;
+      }
+
+      .approval-banner svg{
+        width:13px;
+        height:13px;
+        flex:0 0 13px;
+        margin-top:1px;
+      }
         width:24px;
         padding:0;
       }
@@ -887,6 +946,112 @@
           flex:0 0 36px !important;
         }
       }
+
+      .lead-queue-list{
+        display:grid;
+        gap:10px;
+      }
+
+      .lead-queue-empty{
+        border-radius:14px;
+        border:1px dashed rgba(255,255,255,.08);
+        background:rgba(255,255,255,.02);
+        padding:12px;
+        color:rgba(211,223,249,.74);
+        font-size:12px;
+        line-height:1.6;
+      }
+
+      .lead-card{
+        border-radius:16px;
+        border:1px solid rgba(255,255,255,.06);
+        background:rgba(255,255,255,.025);
+        padding:12px;
+        display:grid;
+        gap:10px;
+      }
+
+      .lead-head,.lead-meta,.lead-actions{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex-wrap:wrap;
+      }
+
+      .lead-head{
+        justify-content:space-between;
+      }
+
+      .lead-name{
+        font-size:12px;
+        font-weight:800;
+        color:rgba(245,248,255,.96);
+        letter-spacing:.01em;
+      }
+
+      .lead-chip{
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        min-height:20px;
+        padding:0 8px;
+        border-radius:999px;
+        border:1px solid rgba(255,255,255,.06);
+        background:rgba(255,255,255,.03);
+        color:rgba(220,230,252,.74);
+        font-size:10px;
+        font-weight:700;
+      }
+
+      .lead-chip.score{
+        color:rgba(222,238,255,.95);
+        border-color:rgba(96,165,250,.18);
+        background:rgba(96,165,250,.08);
+      }
+
+      .lead-chip.sent{
+        color:rgba(255,241,214,.95);
+        border-color:rgba(245,158,11,.18);
+        background:rgba(245,158,11,.08);
+      }
+
+      .lead-chip.replied{
+        color:rgba(220,255,240,.95);
+        border-color:rgba(52,211,153,.18);
+        background:rgba(52,211,153,.08);
+      }
+
+      .lead-chip.closed{
+        color:rgba(231,226,255,.95);
+        border-color:rgba(139,111,255,.18);
+        background:rgba(139,111,255,.08);
+      }
+
+      .lead-text,.lead-message{
+        font-size:12px;
+        line-height:1.65;
+        color:rgba(223,232,252,.86);
+        white-space:pre-wrap;
+        word-break:break-word;
+      }
+
+      .lead-message{
+        border-radius:12px;
+        border:1px solid rgba(255,255,255,.05);
+        background:rgba(255,255,255,.02);
+        padding:10px;
+      }
+
+      .lead-form{
+        display:grid;
+        gap:8px;
+      }
+
+      .lead-form textarea{
+        min-height:88px;
+        resize:vertical;
+      }
+
     `;
     document.head.appendChild(style);
   }
@@ -946,20 +1111,20 @@
       return {
         key: `guest-${getEffectiveUsage(state.usage)}`,
         title: "You’ve hit the free preview limit",
-        detail: `Create a free account to unlock ${FREE_USAGE_LIMIT} free runs and keep using Xalvion.`,
+        detail: `Create a free account to unlock ${FREE_USAGE_LIMIT} free runs and keep the operator workflow live.`,
         body: `You’ve used all ${GUEST_USAGE_LIMIT} guest runs.
 
-Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and continue resolving tickets with Xalvion.`
+You just felt the core workflow. Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and continue preparing support decisions with approval controls.`
       };
     }
 
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
       title: "You’ve hit the free plan limit",
-      detail: "Upgrade to Pro to keep automation running and unlock more capacity.",
+      detail: "Upgrade to Pro to keep approval-first automation running and unlock more capacity.",
       body: `You’ve used all ${FREE_USAGE_LIMIT} free runs.
 
-Upgrade to Pro to keep automation running, unlock more capacity, and continue executing support actions without interruption.`
+You just saved real support effort. Upgrade to Pro to keep the approval-first operator live, unlock more capacity, and continue scanning tickets without interruption.`
     };
   }
 
@@ -1038,6 +1203,26 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
     if (withJson) out["Content-Type"] = "application/json";
     if (state.token) out.Authorization = `Bearer ${state.token}`;
     return out;
+  }
+
+  async function apiGet(path) {
+    const res = await fetch(`${API}${path}`, {
+      method: "GET",
+      headers: headers(false)
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 401) {
+      invalidateSessionFrom401();
+      throw new Error(detailFromApiBody(data) || "Session expired.");
+    }
+
+    if (!res.ok) {
+      throw new Error(detailFromApiBody(data) || "Request failed.");
+    }
+
+    return data;
   }
 
   async function apiPost(path, body) {
@@ -1667,9 +1852,14 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
   }
 
   function actionLabel(data) {
-    const action = String(data?.action || "none").toLowerCase();
-    const amount = Number(data?.amount || 0);
+    const decision = data?.decision || {};
+    const action = String(data?.action || decision.action || "none").toLowerCase();
+    const amount = Number(data?.amount || decision.amount || 0);
+    const requiresApproval = Boolean(data?.requires_approval || decision.requires_approval || data?.execution?.requires_approval);
 
+    if (requiresApproval && action === "refund") return amount > 0 ? `Refund ${formatMoney(amount)} pending approval` : "Refund pending approval";
+    if (requiresApproval && action === "charge") return amount > 0 ? `Charge ${formatMoney(amount)} pending approval` : "Charge pending approval";
+    if (requiresApproval && action === "credit") return amount > 0 ? `Credit ${formatMoney(amount)} pending approval` : "Credit pending approval";
     if (action === "refund") return amount > 0 ? `Refunded ${formatMoney(amount)}` : "Refund processed";
     if (action === "credit") return amount > 0 ? `Credited ${formatMoney(amount)}` : "Credit applied";
     if (action === "review") return "Escalated to review";
@@ -1695,7 +1885,12 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
   }
 
   function displayActionLabel(data = {}) {
-    const rawAction = String(data.action || "none").toLowerCase();
+    const decision = data.decision || {};
+    const rawAction = String(data.action || decision.action || "none").toLowerCase();
+    const requiresApproval = Boolean(data.requires_approval || decision.requires_approval || data.execution?.requires_approval);
+    if (requiresApproval && rawAction === "refund") return "Refund approval required";
+    if (requiresApproval && rawAction === "charge") return "Charge approval required";
+    if (requiresApproval && rawAction === "credit") return "Credit approval required";
     if (rawAction === "review") return "Billing review started";
     return actionLabel(data);
   }
@@ -1944,7 +2139,206 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
     return meta;
   }
 
-  function addCopyControl(container, replyText) {
+  function getApprovalContext(data = {}) {
+    const decision = data.decision || {};
+    const ticket = data.ticket || {};
+    const actionLog = data.action_log || ticket.action_log || {};
+
+    const ticketId = Number(ticket.id || data.ticket_id || 0) || null;
+    const action = String(decision.action || data.action || actionLog.action || "none").toLowerCase();
+    const amount = Number(decision.amount || data.amount || actionLog.amount || 0) || 0;
+    const requiresApproval = Boolean(data.requires_approval || decision.requires_approval || data.execution?.requires_approval || ticket.requires_approval || actionLog.requires_approval);
+    const approved = Boolean(ticket.approved || actionLog.approved);
+    const status = String(data.tool_status || actionLog.status || ticket.status || "").toLowerCase();
+
+    return {
+      ticketId,
+      action,
+      amount,
+      requiresApproval,
+      approved,
+      status,
+      canApprove: requiresApproval && !approved && !!ticketId && isAuthenticated(),
+      paymentIntentId: normalizeReference("pi_"),
+      chargeId: normalizeReference("ch_"),
+    };
+  }
+
+  function createApprovalBanner(data = {}) {
+    const approval = getApprovalContext(data);
+    if (!approval.requiresApproval || approval.approved) return null;
+
+    const banner = document.createElement("div");
+    banner.className = "approval-banner";
+    const amountText = approval.amount > 0 ? ` ${formatMoney(approval.amount)}` : "";
+    const actionText = approval.action && approval.action !== "none" ? `${approval.action}${amountText}` : "prepared action";
+    banner.innerHTML = `${ICONS.warn}<div><strong>Approval required</strong><br>${escapeHtml(`Xalvion prepared ${actionText} and is holding execution until you approve it.`)}</div>`;
+    return banner;
+  }
+
+  async function resolveApproval(ticketId, action, body = {}) {
+    const res = await fetch(`${API}/tickets/${ticketId}/${action}`, {
+      method: "POST",
+      headers: headers(true),
+      body: JSON.stringify(body || {})
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      invalidateSessionFrom401();
+      throw new Error(detailFromApiBody(data) || "Session expired.");
+    }
+    if (!res.ok) {
+      throw new Error(detailFromApiBody(data) || `Could not ${action} this action.`);
+    }
+    return data;
+  }
+
+  function normalizeApprovalResponse(data = {}, previous = {}) {
+    const ticket = data.ticket || {};
+    const actionLog = ticket.action_log || previous.action_log || {};
+    return {
+      ...previous,
+      ...data,
+      ticket,
+      action_log: actionLog,
+      reply: data.reply || data.response || data.final || ticket.final_reply || previous.reply || "",
+      response: data.response || data.reply || data.final || ticket.final_reply || previous.response || "",
+      final: data.final || data.reply || data.response || ticket.final_reply || previous.final || "",
+      action: data.action || ticket.action || previous.action || "none",
+      amount: Number.isFinite(Number(data.amount)) ? Number(data.amount) : (Number(ticket.amount || previous.amount || 0) || 0),
+      reason: data.reason || actionLog.reason || ticket.internal_note || previous.reason || "",
+      tool_status: data.tool_status || actionLog.status || ticket.status || previous.tool_status || "unknown",
+      decision: {
+        ...(previous.decision || {}),
+        ...(data.decision || {}),
+        action: (data.decision || {}).action || data.action || ticket.action || previous.action || "none",
+        amount: Number((data.decision || {}).amount || data.amount || ticket.amount || previous.amount || 0) || 0,
+        queue: (data.decision || {}).queue || ticket.queue || (previous.decision || {}).queue || "new",
+        priority: (data.decision || {}).priority || ticket.priority || (previous.decision || {}).priority || "medium",
+        risk_level: (data.decision || {}).risk_level || ticket.risk_level || (previous.decision || {}).risk_level || "medium",
+        requires_approval: Boolean((data.decision || {}).requires_approval || ticket.requires_approval || false)
+      },
+      impact: {
+        ...(previous.impact || {}),
+        ...(data.impact || {}),
+        amount: Number((data.impact || {}).amount || data.amount || ticket.amount || previous.amount || 0) || 0,
+        auto_resolved: Boolean((data.impact || {}).auto_resolved || (!ticket.requires_approval && String(ticket.status || "").toLowerCase() === "resolved"))
+      },
+      output: {
+        ...(previous.output || {}),
+        ...(data.output || {}),
+        internal_note: ((data.output || {}).internal_note || ticket.internal_note || (previous.output || {}).internal_note || "")
+      },
+      confidence: Number(data.confidence || ticket.confidence || previous.confidence || 0) || 0,
+      quality: Number(data.quality || ticket.quality || previous.quality || 0) || 0,
+      requires_approval: Boolean((data.decision || {}).requires_approval || ticket.requires_approval || false),
+    };
+  }
+
+  function wireApprovalButtons(container, data, row) {
+    const approval = getApprovalContext(data);
+    if (!approval.canApprove) return;
+
+    const approveBtn = document.createElement("button");
+    approveBtn.type = "button";
+    approveBtn.className = "mini-btn approve-btn";
+    approveBtn.innerHTML = `${ICONS.approve}<span>Approve</span>`;
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "mini-btn reject-btn";
+    rejectBtn.innerHTML = `${ICONS.reject}<span>Reject</span>`;
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "mini-btn edit-btn";
+    editBtn.innerHTML = `${ICONS.edit}<span>Edit</span>`;
+
+    const setBusy = (busy) => {
+      [approveBtn, rejectBtn, editBtn].forEach((btn) => { btn.disabled = busy; });
+    };
+
+    approveBtn.addEventListener("click", async () => {
+      if (!approval.ticketId) return;
+      setBusy(true);
+      try {
+        const response = await resolveApproval(approval.ticketId, "approve", {
+          payment_intent_id: approval.paymentIntentId,
+          charge_id: approval.chargeId,
+          refund_reason: "requested_by_customer",
+        });
+        const normalized = normalizeApprovalResponse(response, data);
+        state.latestRun = normalized;
+        setAssistantCopy(row, normalized.reply || normalized.response || "Approved.");
+        const footer = getAssistantFooterNode(row);
+        if (footer) {
+          footer.innerHTML = "";
+          footer.appendChild(createMetaRow(normalized));
+          const toolsWrap = document.createElement("div");
+          addCopyControl(toolsWrap, normalized.reply || normalized.response || "");
+          footer.appendChild(toolsWrap);
+        }
+        const details = row.querySelector(".details-wrap");
+        if (details) details.replaceWith(createDetailsPanel(normalized));
+        updateStatsFromResult(normalized);
+        updateRevenueCard(normalized);
+        updateLatestRunCard(normalized);
+        updateSystemNarrative(normalized);
+        updateTopbarStatus();
+        setNotice("success", "Action approved", response.message || "Prepared action approved.");
+      } catch (error) {
+        setNotice("error", "Approval failed", error.message || "Could not approve this action.");
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    rejectBtn.addEventListener("click", async () => {
+      if (!approval.ticketId) return;
+      setBusy(true);
+      try {
+        const response = await resolveApproval(approval.ticketId, "reject", {
+          internal_note: "Rejected from workspace approval controls.",
+        });
+        const normalized = normalizeApprovalResponse(response, data);
+        state.latestRun = normalized;
+        setAssistantCopy(row, normalized.reply || normalized.response || "Rejected.");
+        const footer = getAssistantFooterNode(row);
+        if (footer) {
+          footer.innerHTML = "";
+          footer.appendChild(createMetaRow(normalized));
+          const toolsWrap = document.createElement("div");
+          addCopyControl(toolsWrap, normalized.reply || normalized.response || "");
+          footer.appendChild(toolsWrap);
+        }
+        const details = row.querySelector(".details-wrap");
+        if (details) details.replaceWith(createDetailsPanel(normalized));
+        updateStatsFromResult(normalized);
+        updateRevenueCard(normalized);
+        updateLatestRunCard(normalized);
+        updateSystemNarrative(normalized);
+        updateTopbarStatus();
+        setNotice("warning", "Action rejected", response.message || "Prepared action moved to manual follow-up.");
+      } catch (error) {
+        setNotice("error", "Reject failed", error.message || "Could not reject this action.");
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    editBtn.addEventListener("click", () => {
+      els.paymentIntentInput?.focus();
+      els.messageInput?.focus();
+      setNotice("info", "Edit before approval", "Adjust the composer or add a payment reference, then rerun or approve when ready.");
+    });
+
+    container.appendChild(approveBtn);
+    container.appendChild(rejectBtn);
+    container.appendChild(editBtn);
+  }
+
+  function addCopyControl(container, replyText, data = null, row = null) {
     const tools = document.createElement("div");
     tools.className = "assistant-tools";
 
@@ -1965,6 +2359,9 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
     });
 
     tools.appendChild(copyBtn);
+    if (data && row) {
+      wireApprovalButtons(tools, data, row);
+    }
     container.appendChild(tools);
   }
 
@@ -1988,12 +2385,15 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
     const toolStatus = String(data.tool_status || "resolved");
     const internalNote = data.reason || output.internal_note || "";
 
+    const approvalBanner = createApprovalBanner(data);
+
     details.innerHTML = `
       <summary class="details-toggle">
         <span>View details</span>
         <span class="chev">${ICONS.chevron}</span>
       </summary>
       <div class="details-panel">
+        ${approvalBanner ? approvalBanner.outerHTML : ""}
         <div class="details-grid">
           ${createDetailBox("Action", actionLabel(data))}
           ${createDetailBox("Queue", queueLabel(decision.queue || "new"))}
@@ -2504,7 +2904,7 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
         footer.appendChild(createMetaRow(data));
 
         const toolsWrap = document.createElement("div");
-        addCopyControl(toolsWrap, replyText);
+        addCopyControl(toolsWrap, replyText, data, row);
         footer.appendChild(toolsWrap);
 
         const details = createDetailsPanel(data);
@@ -2644,7 +3044,6 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
       await hydrateMe();
       await loadDashboardSummary();
       await loadRefundHistory();
-      await loadLeads();
     } catch (error) {
       clearAuth();
       updateTopbarStatus();
@@ -2662,7 +3061,6 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
     await loadDashboardSummary();
     await loadIntegrations();
     await loadRefundHistory();
-    renderLeads([]);
   }
 
   function activatePreviewAccess() {
@@ -2815,171 +3213,6 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
     }
   }
 
-
-
-  function escapeAttribute(value) {
-    return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
-  function updateLeadSummary(leads = state.leads || []) {
-    if (!els.leadStats) return;
-    if (!isAuthenticated()) {
-      els.leadStats.textContent = "Sign in to load your outreach queue.";
-      return;
-    }
-    const counts = { new: 0, messaged: 0, replied: 0, closed: 0 };
-    leads.forEach((lead) => {
-      const key = String(lead?.status || "new").toLowerCase();
-      if (counts[key] !== undefined) counts[key] += 1;
-    });
-    els.leadStats.textContent = `${leads.length} leads • ${counts.new} new • ${counts.messaged} sent • ${counts.replied} replied • ${counts.closed} closed`;
-  }
-
-  function renderLeads(leads = state.leads || []) {
-    if (!els.leadsList) return;
-    const safeLeads = Array.isArray(leads) ? leads : [];
-    state.leads = safeLeads;
-    updateLeadSummary(safeLeads);
-
-    if (!safeLeads.length) {
-      els.leadsList.innerHTML = `<div class="lead-empty">${isAuthenticated() ? 'No leads saved yet. Add one above to generate your first-touch message automatically.' : 'Sign in to save leads, copy outreach messages, and track prospect status.'}</div>`;
-      return;
-    }
-
-    els.leadsList.innerHTML = safeLeads.map((lead) => {
-      const username = escapeHtml(lead.username || "Unknown lead");
-      const score = Number(lead.score || 0);
-      const source = escapeHtml(lead.source || "manual");
-      const status = String(lead.status || "new").toLowerCase();
-      const text = escapeHtml(lead.text || "");
-      const message = escapeHtml(lead.message || "");
-      const created = escapeHtml((lead.created_at || "").replace("T", " ").slice(0, 16));
-      const userAttr = escapeAttribute(lead.username || "");
-      const hotClass = score >= 2 ? 'hot' : 'new';
-      return `
-        <div class="lead-item">
-          <div class="lead-head">
-            <div>
-              <div class="lead-user">${username}</div>
-              <div class="lead-meta">
-                <span class="lead-chip ${hotClass}">Score ${score}</span>
-                <span class="lead-chip ${status}">${escapeHtml(status)}</span>
-                <span class="lead-chip">${source}</span>
-              </div>
-            </div>
-            <div class="muted-copy">${created}</div>
-          </div>
-          <div class="lead-text">${text}</div>
-          <div class="lead-message">${message}</div>
-          <div class="lead-buttons">
-            <button class="ghost-btn" type="button" data-copy-lead="${userAttr}">Copy message</button>
-            <button class="ghost-btn" type="button" data-lead-status="messaged" data-lead-user="${userAttr}">Mark sent</button>
-            <button class="ghost-btn" type="button" data-lead-status="replied" data-lead-user="${userAttr}">Mark replied</button>
-            <button class="ghost-btn" type="button" data-lead-status="closed" data-lead-user="${userAttr}">Mark closed</button>
-          </div>
-        </div>
-      `;
-    }).join("");
-  }
-
-  async function loadLeads() {
-    if (!els.leadsList) return [];
-    if (!isAuthenticated()) {
-      renderLeads([]);
-      return [];
-    }
-
-    try {
-      const res = await fetch(`${API}/leads`, { headers: headers(false) });
-      const data = await res.json().catch(() => ({}));
-
-      if (res.status === 401) {
-        invalidateSessionFrom401();
-        renderLeads([]);
-        return [];
-      }
-
-      if (!res.ok) {
-        throw new Error(detailFromApiBody(data) || "Could not load leads.");
-      }
-
-      renderLeads(Array.isArray(data.leads) ? data.leads : []);
-      return Array.isArray(data.leads) ? data.leads : [];
-    } catch (error) {
-      renderLeads([]);
-      setNotice("warning", "Lead engine unavailable", error.message || "Could not load leads right now.");
-      return [];
-    }
-  }
-
-  async function addLeadFromUI() {
-    if (!isAuthenticated()) {
-      setNotice("warning", "Sign in required", "Create an account or log in to save and track outreach leads.");
-      els.usernameInput?.focus();
-      return;
-    }
-
-    const username = (els.leadUsernameInput?.value || "").trim();
-    const text = (els.leadTextInput?.value || "").trim();
-
-    if (!username || !text) {
-      setNotice("warning", "Missing lead info", "Add a prospect handle and the pain point or post text before saving the lead.");
-      return;
-    }
-
-    try {
-      if (els.addLeadBtn) els.addLeadBtn.disabled = true;
-      const data = await apiPost("/leads/add", { username, text, source: "workspace" });
-      if (els.leadUsernameInput) els.leadUsernameInput.value = "";
-      if (els.leadTextInput) els.leadTextInput.value = "";
-      await loadLeads();
-      setNotice("success", "Lead saved", data.message || `Saved ${username} to your outreach queue.`);
-      pulseRail("account");
-    } catch (error) {
-      setNotice("error", "Lead save failed", error.message || "Could not save this lead.");
-    } finally {
-      if (els.addLeadBtn) els.addLeadBtn.disabled = false;
-    }
-  }
-
-  async function copyLeadMessage(username) {
-    const lead = (state.leads || []).find((item) => item.username === username);
-    if (!lead?.message) {
-      setNotice("warning", "Message unavailable", "This lead does not have a generated first-touch message yet.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(lead.message);
-      setNotice("success", "Message copied", `Outreach message for ${username} is ready to paste.`);
-    } catch (error) {
-      setNotice("error", "Copy failed", "Could not copy the outreach message.");
-    }
-  }
-
-  async function markLeadStatus(username, status) {
-    if (!isAuthenticated()) {
-      setNotice("warning", "Sign in required", "Log in to update lead status.");
-      return;
-    }
-
-    const routeMap = {
-      messaged: `/leads/${encodeURIComponent(username)}/mark-sent`,
-      replied: `/leads/${encodeURIComponent(username)}/mark-replied`,
-      closed: `/leads/${encodeURIComponent(username)}/mark-closed`
-    };
-
-    const path = routeMap[status];
-    if (!path) return;
-
-    try {
-      const data = await apiPost(path, {});
-      await loadLeads();
-      setNotice("success", "Lead updated", data.message || `${username} updated.`);
-    } catch (error) {
-      setNotice("error", "Lead update failed", error.message || "Could not update lead status.");
-    }
-  }
-
   function resetWorkspaceThread() {
     if (!els.messages) return;
     els.messages.innerHTML = "";
@@ -3018,6 +3251,166 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
     setNotice("success", "Thread exported", "The current workspace thread was downloaded as a text file.");
   }
 
+
+  function leadStatusTone(status) {
+    const value = String(status || "new").toLowerCase();
+    if (value === "replied") return "replied";
+    if (value === "closed") return "closed";
+    if (value === "sent") return "sent";
+    return "new";
+  }
+
+  function formatLeadDate(value) {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return parsed.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function renderLeadQueue(leads = []) {
+    state.leadQueue = Array.isArray(leads) ? leads.slice() : [];
+
+    if (els.leadQueueCount) {
+      setText(els.leadQueueCount, String(state.leadQueue.length));
+    }
+
+    if (!els.leadQueueList) return;
+
+    if (!state.leadQueue.length) {
+      els.leadQueueList.innerHTML = '<div class="lead-queue-empty">No leads queued yet. Add a prospect from the rail and Xalvion will generate the first outreach message for you.</div>';
+      return;
+    }
+
+    els.leadQueueList.innerHTML = state.leadQueue.map((lead) => {
+      const username = escapeHtml(lead.username || "");
+      const source = escapeHtml(lead.source || "manual");
+      const status = String(lead.status || "new").toLowerCase();
+      const statusTone = leadStatusTone(status);
+      const createdAt = formatLeadDate(lead.created_at);
+      const followUpDue = formatLeadDate(lead.follow_up_due);
+      return `
+        <div class="lead-card">
+          <div class="lead-head">
+            <div class="lead-name">@${username}</div>
+            <div class="lead-meta">
+              <span class="lead-chip score">Score ${Number(lead.score || 0)}</span>
+              <span class="lead-chip ${statusTone}">${escapeHtml(status)}</span>
+            </div>
+          </div>
+          <div class="lead-meta">
+            <span class="lead-chip">${source}</span>
+            ${createdAt ? `<span class="lead-chip">Added ${createdAt}</span>` : ""}
+            ${followUpDue ? `<span class="lead-chip">Follow up ${followUpDue}</span>` : ""}
+          </div>
+          <div class="lead-text">${escapeHtml(lead.text || "")}</div>
+          <div class="lead-message">${escapeHtml(lead.message || "")}</div>
+          <div class="lead-actions">
+            <button class="ghost-btn js-copy-lead" data-username="${username}" type="button">Copy message</button>
+            <button class="ghost-btn js-lead-status" data-username="${username}" data-status="sent" type="button">Mark sent</button>
+            <button class="ghost-btn js-lead-status" data-username="${username}" data-status="replied" type="button">Mark replied</button>
+            <button class="ghost-btn js-lead-status" data-username="${username}" data-status="closed" type="button">Mark closed</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  async function loadLeads(silent = false) {
+    if (!isAuthenticated()) {
+      renderLeadQueue([]);
+      if (els.leadQueueCopy) {
+        setText(els.leadQueueCopy, "Log in to save outreach leads, track follow-ups, and keep your customer pipeline inside Xalvion.");
+      }
+      return;
+    }
+
+    try {
+      const data = await apiGet("/leads");
+      renderLeadQueue(Array.isArray(data.leads) ? data.leads : []);
+      if (els.leadQueueCopy) {
+        setText(els.leadQueueCopy, "Outreach queue is active. Prioritize high-intent leads, copy the draft, then send manually for the best reply rate.");
+      }
+    } catch (error) {
+      if (!silent) {
+        setNotice("error", "Lead queue unavailable", error.message || "Could not load outreach leads.");
+      }
+    }
+  }
+
+  async function addLeadFromUI() {
+    if (!isAuthenticated()) {
+      setNotice("warning", "Authentication required", "Log in to save leads and track outreach.");
+      return;
+    }
+
+    const username = String(els.leadUsernameInput?.value || "").trim().replace(/^@+/, "");
+    const text = String(els.leadTextInput?.value || "").trim();
+
+    if (!username) {
+      setNotice("warning", "Lead username required", "Add a handle or company name before saving the lead.");
+      els.leadUsernameInput?.focus();
+      return;
+    }
+
+    if (!text) {
+      setNotice("warning", "Lead context required", "Paste the post, pain point, or note you want Xalvion to use for outreach.");
+      els.leadTextInput?.focus();
+      return;
+    }
+
+    try {
+      const data = await apiPost("/leads/add", { username, text, source: "workspace" });
+      els.leadUsernameInput.value = "";
+      els.leadTextInput.value = "";
+      setNotice("success", "Lead saved", `@${username} was added to your outreach queue.`);
+      await loadLeads(true);
+      if (data?.lead?.message) {
+        await navigator.clipboard.writeText(String(data.lead.message));
+      }
+    } catch (error) {
+      setNotice("error", "Lead save failed", error.message || "Could not add the lead.");
+    }
+  }
+
+  async function copyLeadMessage(username) {
+    const lead = state.leadQueue.find((item) => String(item.username || "") === String(username || ""));
+    if (!lead?.message) {
+      setNotice("warning", "No message available", "This lead does not have a draft message yet.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(String(lead.message));
+      setNotice("success", "Message copied", `Outreach draft for @${username} is on your clipboard.`);
+    } catch (error) {
+      setNotice("error", "Copy failed", "Could not copy the outreach draft.");
+    }
+  }
+
+  async function updateLeadStatus(username, status) {
+    if (!isAuthenticated()) {
+      setNotice("warning", "Authentication required", "Log in to update outreach status.");
+      return;
+    }
+
+    const routeMap = {
+      sent: "mark-sent",
+      replied: "mark-replied",
+      closed: "mark-closed"
+    };
+    const route = routeMap[String(status || "").toLowerCase()];
+    if (!route) return;
+
+    try {
+      await apiPost(`/leads/${encodeURIComponent(username)}/${route}`, {});
+      await loadLeads(true);
+      setNotice("success", "Lead updated", `@${username} marked as ${status}.`);
+    } catch (error) {
+      setNotice("error", "Lead update failed", error.message || "Could not update the lead.");
+    }
+  }
+
+
   function bindEvents() {
     els.sendBtn?.addEventListener("click", sendMessage);
     els.signupBtn?.addEventListener("click", signup);
@@ -3028,8 +3421,6 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
       resetWorkspaceThread();
       setNotice("info", "New workspace thread", "The thread was cleared. Run the next customer issue whenever you're ready.");
     });
-
-    els.leadTextInput?.addEventListener("input", autoResizeTextarea);
 
     els.messageInput?.addEventListener("input", () => {
       autoResizeTextarea();
@@ -3067,11 +3458,11 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
     els.stripeDisconnectBtn?.addEventListener("click", disconnectStripe);
     els.openRefundModalBtn?.addEventListener("click", openRefundModal);
     els.refreshRefundHistoryBtn?.addEventListener("click", loadRefundHistory);
-    els.addLeadBtn?.addEventListener("click", addLeadFromUI);
-    els.refreshLeadsBtn?.addEventListener("click", loadLeads);
     els.closeRefundModalBtn?.addEventListener("click", closeRefundModal);
     els.cancelRefundModalBtn?.addEventListener("click", closeRefundModal);
     els.executeRefundBtn?.addEventListener("click", executeRefundFromModal);
+    els.addLeadBtn?.addEventListener("click", addLeadFromUI);
+    els.refreshLeadsBtn?.addEventListener("click", () => loadLeads());
     els.refundModal?.addEventListener("click", (event) => {
       if (event.target === els.refundModal) closeRefundModal();
     });
@@ -3096,18 +3487,17 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
       });
     });
 
-    els.leadsList?.addEventListener("click", (event) => {
-      const target = event.target instanceof HTMLElement ? event.target.closest("button") : null;
-      if (!target) return;
-      const copyUser = target.dataset.copyLead;
-      const status = target.dataset.leadStatus;
-      const statusUser = target.dataset.leadUser;
-      if (copyUser) {
-        copyLeadMessage(copyUser);
+
+    els.leadQueueList?.addEventListener("click", (event) => {
+      const copyButton = event.target.closest(".js-copy-lead");
+      if (copyButton) {
+        copyLeadMessage(copyButton.dataset.username || "");
         return;
       }
-      if (status && statusUser) {
-        markLeadStatus(statusUser, status);
+
+      const statusButton = event.target.closest(".js-lead-status");
+      if (statusButton) {
+        updateLeadStatus(statusButton.dataset.username || "", statusButton.dataset.status || "");
       }
     });
 
@@ -3195,7 +3585,6 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
     await loadDashboardSummary();
     await loadIntegrations();
     await loadRefundHistory();
-    await loadLeads();
 
     if (meResult?.staleCleared) {
       setNotice(
