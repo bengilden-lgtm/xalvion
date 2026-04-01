@@ -937,20 +937,30 @@
       return {
         key: `guest-${getEffectiveUsage(state.usage)}`,
         title: "You’ve hit the free preview limit",
-        detail: `Create a free account to unlock ${FREE_USAGE_LIMIT} free runs and keep using Xalvion.`,
+        detail: `Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and see how much support time Xalvion can save.`,
         body: `You’ve used all ${GUEST_USAGE_LIMIT} guest runs.
 
-Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and continue resolving tickets with Xalvion.`
+Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and continue using Xalvion as an approval-first AI operator.
+
+What you unlock next:
+• More ticket runs without losing momentum
+• A persistent workspace and plan state
+• A clearer path to real inbox automation`
       };
     }
 
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
       title: "You’ve hit the free plan limit",
-      detail: "Upgrade to Pro to keep automation running and unlock more capacity.",
+      detail: "Upgrade to Growth to keep automation moving, unlock more throughput, and turn support pressure into measurable time saved.",
       body: `You’ve used all ${FREE_USAGE_LIMIT} free runs.
 
-Upgrade to Pro to keep automation running, unlock more capacity, and continue executing support actions without interruption.`
+Upgrade to Growth to keep Xalvion running inside the workflow, unlock more capacity, and move from “this is useful” to “this is saving us real hours.”
+
+What the paid workspace unlocks:
+• More ticket volume and less interruption
+• Stronger inbox scan and routing coverage
+• A cleaner ROI story for your team`
     };
   }
 
@@ -984,6 +994,41 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
         })
       );
       footer.appendChild(meta);
+
+      const tools = document.createElement("div");
+      tools.className = "assistant-tools";
+
+      const primaryCta = document.createElement("button");
+      primaryCta.type = "button";
+      primaryCta.className = "mini-btn";
+      primaryCta.innerHTML = `${ICONS.spark}<span>${isAuthenticated() ? "Upgrade now" : "Create free account"}</span>`;
+      primaryCta.addEventListener("click", () => {
+        if (isAuthenticated()) {
+          upgradePlan("pro");
+        } else {
+          els.signupBtn?.click();
+          els.usernameInput?.focus();
+        }
+      });
+      tools.appendChild(primaryCta);
+
+      const secondaryCta = document.createElement("button");
+      secondaryCta.type = "button";
+      secondaryCta.className = "mini-btn";
+      secondaryCta.innerHTML = `${ICONS.ticket}<span>${isAuthenticated() ? "See pricing" : "Log in"}</span>`;
+      secondaryCta.addEventListener("click", () => {
+        if (isAuthenticated()) {
+          const pricingSection = document.getElementById("pricingCard") || document.querySelector("[data-upgrade]") || els.usageCard;
+          pricingSection?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+          pulseRail("usage");
+        } else {
+          els.loginBtn?.click();
+          els.usernameInput?.focus();
+        }
+      });
+      tools.appendChild(secondaryCta);
+
+      footer.appendChild(tools);
     }
 
     scrollMessagesToBottom(true);
@@ -1108,6 +1153,8 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
 
   function formatTier(value) {
     const tier = String(value || "free").toLowerCase();
+    if (tier === "pro") return "Growth";
+    if (tier === "elite") return "Operator";
     return tier.charAt(0).toUpperCase() + tier.slice(1);
   }
 
@@ -1129,11 +1176,11 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
   function planCopy(tier) {
     switch (String(tier || "free").toLowerCase()) {
       case "pro":
-        return "Priority handling, larger usage limits, and a more serious operating surface for real support volume.";
+        return "Growth capacity, stronger routing, and a clearer ROI story once support volume starts to bite.";
       case "elite":
-        return "Maximum capacity, premium control, and the strongest Xalvion operator environment.";
+        return "Maximum capacity, premium control, and the strongest Xalvion operator environment for serious support volume.";
       default:
-        return "Entry access with clear capacity limits and a visible upgrade path when usage pressure builds.";
+        return "Free access to prove the workflow fast, with a visible upgrade path once the queue and time savings become real.";
     }
   }
 
@@ -2662,7 +2709,7 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
       saveDraft(demoText);
       els.messageInput.focus();
     }
-    setNotice("info", "Quick demo loaded", "A high-intent billing case is ready to run through the workspace.");
+    setNotice("info", "Quick demo loaded", "A high-intent billing case is ready so you can see the operator flow, risk signal, and conversion pressure together.");
   }
 
   async function upgradePlan(tier) {
@@ -2694,7 +2741,7 @@ Upgrade to Pro to keep automation running, unlock more capacity, and continue ex
         Number(data.limit || state.limit),
         Number(data.remaining || state.remaining)
       );
-      setNotice("success", "Plan updated", `Workspace upgraded to ${formatTier(tier)}.`);
+      setNotice("success", "Plan updated", `Workspace upgraded to ${formatTier(tier)}. You now have more capacity and a stronger operator workflow.`);
       updateTopbarStatus();
     } catch (error) {
       setNotice("error", "Upgrade failed", error.message || "Could not upgrade the plan.");
