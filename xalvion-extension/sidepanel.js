@@ -169,6 +169,80 @@ function hidePanel() {
   if (resultPanel) resultPanel.classList.remove("show");
 }
 
+
+function getDecisionData(data) {
+  if (!data || typeof data !== "object") return {};
+  return (data.sovereign_decision && typeof data.sovereign_decision === "object")
+    ? data.sovereign_decision
+    : ((data.decision && typeof data.decision === "object") ? data.decision : {});
+}
+
+function getTriageData(data) {
+  if (!data || typeof data !== "object") return {};
+  return (data.triage_metadata && typeof data.triage_metadata === "object")
+    ? data.triage_metadata
+    : ((data.triage && typeof data.triage === "object") ? data.triage : {});
+}
+
+function getImpactData(data) {
+  if (!data || typeof data !== "object") return {};
+  return (data.impact_projections && typeof data.impact_projections === "object")
+    ? data.impact_projections
+    : ((data.impact && typeof data.impact === "object") ? data.impact : {});
+}
+
+function getHistoryData(data) {
+  if (!data || typeof data !== "object") return {};
+  return (data.memory_delta && typeof data.memory_delta === "object")
+    ? data.memory_delta
+    : ((data.history && typeof data.history === "object") ? data.history : {});
+}
+
+function getThinkingTrace(data) {
+  return Array.isArray(data?.thinking_trace) ? data.thinking_trace : [];
+}
+
+function inferDisplayAction(data, reply, issueType) {
+  const decision = getDecisionData(data);
+  const raw = normalize(decision.action || data.action);
+  if (raw) return raw;
+  if (issueType === "shipping_issue" && reply) return "Inform";
+  if (reply) return "Reply";
+  return "";
+}
+
+function inferExecutionPayload(data, reply, issueType) {
+  if (data?.execution && typeof data.execution === "object") {
+    return data.execution;
+  }
+
+  const decision = getDecisionData(data);
+  const impact = getImpactData(data);
+  const displayAction = inferDisplayAction(data, reply, issueType);
+  const toolStatus = normalize(decision.tool_status || data.tool_status);
+
+  let label = "-";
+  if (toolStatus === "success" && displayAction && displayAction !== "Reply" && displayAction !== "Inform") {
+    label = `${displayAction.charAt(0).toUpperCase()}${displayAction.slice(1)} executed`;
+  } else if (issueType === "shipping_issue" && reply) {
+    label = "Tracking response prepared";
+  } else if (reply) {
+    label = "Reply prepared";
+  }
+
+  const detailParts = [];
+  if (toolStatus) detailParts.push(`Tool: ${toolStatus}`);
+  if (impact?.agent_minutes_saved) detailParts.push(`Saved ${impact.agent_minutes_saved} min`);
+
+  return {
+    label,
+    detail: detailParts.join(" • "),
+    mode: normalize(data.mode),
+    auto_resolved: Boolean(impact?.auto_resolved),
+    requires_approval: Boolean(decision?.requires_approval)
+  };
+}
+
 function normalize(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -655,23 +729,28 @@ async function playThinkingSequence(runId, mode = "single") {
 }
 
 function buildHeaderInsight(data) {
-  const status = normalize(data.status).toLowerCase();
-  const action = normalize(data.action);
-  const confidence = Number(data.confidence);
-  const policy = normalize(data.policy_rule);
-  const memorySummary = data.memory_summary || {};
+  const decision = getDecisionData(data);
+  const history = getHistoryData(data);
+  const issueType = normalize(data.issue_type || data.type).toLowerCase();
+  const status = normalize(decision.status || data.status).toLowerCase();
+  const action = inferDisplayAction(data, normalize(data.reply), issueType);
+  const confidence = Number(decision.confidence ?? data.confidence);
   const samples =
-    Number(memorySummary.samples) ||
-    Number(memorySummary.same_action_count) ||
-    Number(memorySummary.issue_count) ||
+    Number(history.samples) ||
+    Number(history.same_action_count) ||
+    Number(history.issue_count) ||
     0;
 
+  if (issueType === "shipping_issue" && normalize(data.reply)) {
+    return "Shipping context verified and a customer-safe tracking reply is ready.";
+  }
+
   if (status === "resolved" && action && samples > 0 && Number.isFinite(confidence) && confidence > 0) {
-    return `Resolved instantly based on ${samples} similar past tickets at ${confidence.toFixed(2)} confidence.`;
+    return `Resolved using ${samples} similar past tickets at ${confidence.toFixed(2)} confidence.`;
   }
 
   if (status === "resolved" && action) {
-    return `High-confidence automation selected: ${action}.`;
+    return `High-confidence path selected: ${action}.`;
   }
 
   if ((status === "waiting" || status === "pending") && action) {
@@ -679,11 +758,7 @@ function buildHeaderInsight(data) {
   }
 
   if (status === "escalated") {
-    return `Escalated for review because this case falls outside the low-risk auto-resolution path.`;
-  }
-
-  if (policy && action) {
-    return `Policy '${policy}' selected '${action}' for this ticket.`;
+    return "Escalated for review because this case falls outside the low-risk automation path.";
   }
 
   return "Decision prepared using ticket context, policy fit, and learned behavior.";
@@ -718,25 +793,32 @@ function hideInboxSummary() {
 function render(data) {
   ensureEnterpriseCards();
 
-  const status = normalize(data.status);
-  const statusLower = status.toLowerCase();
-  const reply = normalize(data.reply);
+  const decision = getDecisionData(data);
+  const triage = getTriageData(data);
+  const impact = getImpactData(data);
+  const history = getHistoryData(data);
+  const issueType = normalize(data.issue_type || data.type);
+  const reply = normalize(data.reply || data.response || data.final);
   const note = normalize(data.note);
   const policyRule = normalize(data.policy_rule);
   const aiSummary = normalize(data.ai_summary);
-  const reason = normalize(data.reason);
-  const priority = normalize(String(data.priority ?? ""));
-  const queue = normalize(String(data.queue ?? ""));
-  const risk = normalize(String(data.risk_level ?? ""));
-  const confidence = data.confidence ?? "";
+  const action = inferDisplayAction(data, reply, issueType);
+  const reason = normalize(decision.reason || data.reason);
+  const priority = normalize(String(decision.priority ?? data.priority ?? ""));
+  const queue = normalize(String(decision.queue ?? data.queue ?? ""));
+  const risk = normalize(String(decision.risk_level ?? triage.risk_level ?? data.risk_level ?? ""));
+  const confidence = decision.confidence ?? data.confidence ?? "";
+  const status = normalize(decision.status || data.status || (reply ? "resolved" : ""));
+  const statusLower = status.toLowerCase();
+  const execution = inferExecutionPayload(data, reply, issueType);
 
-  if (typeValue) typeValue.textContent = safe(data.type || data.issue_type);
-  if (actionValue) actionValue.textContent = safe(data.action);
+  if (typeValue) typeValue.textContent = safe(issueType);
+  if (actionValue) actionValue.textContent = safe(action, issueType === "shipping_issue" && reply ? "Inform" : "-");
   if (confidenceValue) confidenceValue.textContent = confidence === "" ? "-" : String(confidence);
   if (priorityValue) priorityValue.textContent = priority || "-";
   if (queueValue) queueValue.textContent = queue || "-";
   if (riskValue) riskValue.textContent = risk || "-";
-  if (reasonValue) reasonValue.textContent = reason || "-";
+  if (reasonValue) reasonValue.textContent = reason || (issueType === "shipping_issue" ? "Tracking and ETA surfaced from current order context." : "-");
   if (policyValue) policyValue.textContent = policyRule || "-";
   if (aiSummaryValue) aiSummaryValue.textContent = aiSummary || "-";
   if (replyValue) replyValue.textContent = reply || "-";
@@ -760,15 +842,35 @@ function render(data) {
   setVisible(priorityCard, !!priority);
   setVisible(queueCard, !!queue && statusLower !== "resolved" && statusLower !== "ignored" && queue !== "none");
   setVisible(riskCard, !!risk);
-  setVisible(reasonCard, !!reason);
+  setVisible(reasonCard, !!(reason || issueType === "shipping_issue"));
   setVisible(policyCard, !!policyRule);
   setVisible(aiSummaryCard, !!aiSummary);
   setVisible(replyCard, !!reply);
 
-  renderExecution(data.execution);
-  renderImpact(data.impact);
-  renderMetaCards(data);
-  renderExplainability(data);
+  renderExecution(execution);
+  renderImpact(impact);
+  renderMetaCards({
+    ...data,
+    impact,
+    history,
+    decision_trace: getThinkingTrace(data).map(step => `${step.step}: ${step.status}${step.detail ? ` (${step.detail})` : ""}`),
+    memory_summary: history,
+    session_impact: data.session_impact || (impact.agent_minutes_saved ? {
+      tickets_seen: 1,
+      tickets_resolved: statusLower === "resolved" ? 1 : 0,
+      agent_minutes_saved: impact.agent_minutes_saved,
+      value_generated: impact.money_saved || 0
+    } : {})
+  });
+  renderExplainability({
+    ...data,
+    impact,
+    reason,
+    confidence,
+    priority,
+    risk_level: risk,
+    execution
+  });
 
   if (resultPanel) {
     const cards = Array.from(resultPanel.querySelectorAll(".card"));
@@ -794,9 +896,15 @@ function render(data) {
   }
 
   hideInboxSummary();
-  showHeaderInsight(buildHeaderInsight(data));
+  showHeaderInsight(buildHeaderInsight({ ...data, status, action, confidence, issue_type: issueType }));
   hideThinkingPanel();
   showPanel();
+
+  if (impact?.agent_minutes_saved > 0) {
+    showStatus(`⚡ Saved ${impact.agent_minutes_saved} agent minutes`);
+  } else {
+    showStatus("Ready.");
+  }
 }
 
 async function extractText(tabId) {
@@ -850,8 +958,9 @@ function buildInboxSummary(results) {
   let risk = 0;
 
   results.forEach((r) => {
-    const status = normalize(r.status).toLowerCase();
-    const riskLevel = normalize(r.risk_level).toLowerCase();
+    const decision = getDecisionData(r);
+    const status = normalize(decision.status || r.status).toLowerCase();
+    const riskLevel = normalize(decision.risk_level || r.risk_level).toLowerCase();
 
     if (status === "resolved") auto += 1;
     else review += 1;
@@ -859,11 +968,14 @@ function buildInboxSummary(results) {
     if (riskLevel === "high") risk += 1;
   });
 
+  const minutesSaved = auto * 6;
+
   return {
     total: results.length,
     auto,
     review,
-    risk
+    risk,
+    minutesSaved
   };
 }
 
@@ -1175,13 +1287,14 @@ async function scanInbox() {
     const summary = buildInboxSummary(results);
     const summaryText =
       `${summary.total} tickets scanned\n` +
-      `• ${summary.auto} safe to auto-resolve\n` +
-      `• ${summary.review} need review\n` +
-      `• ${summary.risk} high risk`;
+      `⚡ ${summary.auto} safe to auto-resolve\n` +
+      `🧠 ${summary.review} need review\n` +
+      `⚠️ ${summary.risk} high-risk cases\n` +
+      `💰 Estimated time saved: ${summary.minutesSaved} min`;
 
     showInboxSummary(summaryText);
     showHeaderInsight(`Inbox scan complete — ${summary.auto}/${summary.total} visible tickets look safe to automate.`);
-    showStatus("Inbox analysis complete.");
+    showStatus(`Inbox analysis complete. Estimated time saved: ${summary.minutesSaved} min`);
   } catch (err) {
     console.error("Inbox scan failed:", err);
     hideThinkingPanel();
