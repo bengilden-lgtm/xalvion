@@ -177,6 +177,7 @@ INDEX_PATH = os.path.join(BASE_DIR, "index.html")
 APP_JS_PATH = os.path.join(BASE_DIR, "app.js")
 LANDING_PATH = os.path.join(BASE_DIR, "landing.html")
 FLUID_DIR = os.path.join(BASE_DIR, "fluid")
+OUTREACH_QUEUE_FILE = os.path.join(BASE_DIR, "outreach_queue.json")
 
 # =============================================================================
 # FastAPI App + CORS
