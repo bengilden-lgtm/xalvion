@@ -3032,7 +3032,12 @@ def analyze_extension_ticket(
         db.commit()
 
     _persist_sovereign_result(db, username, req.text, result)
-    return CanonicalAgentResponse.model_validate(result)
+
+    payload = CanonicalAgentResponse.model_validate(result).model_dump()
+    return JSONResponse(
+        content=payload,
+        media_type="application/json; charset=utf-8",
+    )
 
 if __name__ == "__main__":
     import uvicorn

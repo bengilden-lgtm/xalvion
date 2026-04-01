@@ -133,25 +133,48 @@ def polish_message(message: str) -> str:
     text = text.replace("..", ".").strip()
     return text
 
-
 def normalize_text(text: str) -> str:
     if not isinstance(text, str):
         return text
 
-    try:
-        repaired = text.encode("latin1").decode("utf-8")
-        text = repaired
-    except Exception:
-        pass
+    # Try common mojibake repair paths. Running more than once helps when a
+    # string has been mis-decoded repeatedly through different layers.
+    repair_attempts = (
+        ("latin1", "utf-8"),
+        ("cp1252", "utf-8"),
+    )
+    for _ in range(2):
+        changed = False
+        for src_enc, dst_enc in repair_attempts:
+            try:
+                repaired = text.encode(src_enc).decode(dst_enc)
+                if repaired != text:
+                    text = repaired
+                    changed = True
+                    break
+            except Exception:
+                continue
+        if not changed:
+            break
 
     replacements = {
+        "Iâve": "I’ve",
+        "Iâ€™ve": "I’ve",
+        "Iâve": "I’ve",
         "â€™": "’",
+        "â": "’",
         "â€˜": "‘",
+        "â": "‘",
         "â€œ": "“",
+        "â": "“",
         "â€�": "”",
+        "â": "”",
         "â€“": "–",
+        "â": "–",
         "â€”": "—",
+        "â": "—",
         "â€¦": "…",
+        "â¦": "…",
         "Â ": " ",
         "Â": "",
     }
@@ -160,7 +183,6 @@ def normalize_text(text: str) -> str:
         text = text.replace(bad, good)
 
     return text
-
 
 def clamp_confidence(value: Any, fallback: float = 0.9) -> float:
     try:
@@ -254,10 +276,9 @@ def build_structured_response(
             "queue": queue,
         },
         "output": {
-            "customer_message": customer_message,
-            "internal_note": internal_note,
+            "internal_note": normalize_text(internal_note),
+            "customer_note": normalize_text(customer_note),
             "audit_log": f"{ticket.get('issue_type', 'general_support')} -> {safe_action['action']} (${safe_action['amount']}) | {action_payload.get('reason', '')}",
-            "customer_note": customer_note,
         },
         "meta": {
             "issue_type": ticket.get("issue_type", "general_support"),
@@ -826,10 +847,12 @@ def _canonicalize_result(
         "signals": list(impact.get("signals", [])) if isinstance(impact.get("signals", []), list) else [],
     }
 
+    safe_message = normalize_text(customer_message)
+
     canonical = {
-        "reply": normalize_text(customer_message),
-        "final": normalize_text(customer_message),
-        "response": normalize_text(customer_message),
+        "reply": safe_message,
+        "final": safe_message,
+        "response": safe_message,
         "issue_type": str(ticket.get("issue_type", "general_support") or "general_support"),
         "mode": mode,
         "quality": round(float(quality or 0), 2),
