@@ -1073,6 +1073,30 @@
       }
     }
 
+
+
+    .lead-copy{font-size:12px;line-height:1.58;color:rgba(226,236,255,.82)}
+    .lead-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .lead-toolbar .input{min-width:0;flex:1 1 100%;height:38px}
+    .lead-toolbar textarea.input{height:auto;padding-top:10px;padding-bottom:10px;resize:vertical}
+    .lead-actions-inline{display:flex;gap:8px;flex-wrap:wrap}
+    .lead-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+    .lead-item{border-radius:16px;padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);display:grid;gap:10px}
+    .lead-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .lead-user{font-size:13px;font-weight:800;color:var(--text)}
+    .lead-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+    .lead-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+    .lead-chip.hot{border-color:rgba(139,111,255,.24);background:rgba(139,111,255,.11);color:rgba(234,226,255,.96)}
+    .lead-chip.replied{border-color:rgba(116,228,184,.22);background:rgba(116,228,184,.10);color:rgba(220,255,241,.96)}
+    .lead-chip.messaged{border-color:rgba(123,179,255,.22);background:rgba(123,179,255,.10);color:rgba(226,236,255,.96)}
+    .lead-chip.closed{border-color:rgba(255,198,92,.22);background:rgba(255,198,92,.10);color:rgba(255,241,214,.96)}
+    .lead-chip.new{border-color:rgba(255,255,255,.12)}
+    .lead-text,.lead-message{font-size:12.5px;line-height:1.6;color:rgba(232,239,255,.9);white-space:pre-wrap;word-break:break-word}
+    .lead-message{padding:10px 11px;border-radius:12px;background:rgba(6,10,22,.44);border:1px solid rgba(255,255,255,.06)}
+    .lead-buttons{display:flex;gap:6px;flex-wrap:wrap}
+    .lead-buttons .ghost-btn,.lead-buttons .btn{min-height:32px;padding:0 11px;font-size:12px}
+    .lead-empty{font-size:12.5px;line-height:1.6;color:var(--muted);padding:12px;border-radius:14px;background:rgba(255,255,255,.025);border:1px dashed rgba(255,255,255,.08)}
+
   </style>
 </head>
 <body>
@@ -1260,6 +1284,25 @@
             </div>
             <div class="usage-bar"><div id="planBar"></div></div>
             <div id="usagePanelCopy" class="muted-copy">Your plan sets the amount of support usage available each month.</div>
+          </div>
+        </div>
+
+
+
+        <div class="rail-card" id="leadsCard">
+          <div class="rail-title">Lead engine</div>
+          <div id="leadPanelCopy" class="lead-copy">Save prospects, generate a tailored first message, and track outreach without leaving Xalvion.</div>
+          <div class="lead-toolbar">
+            <input id="leadUsernameInput" class="input" type="text" placeholder="Prospect handle or company" />
+            <textarea id="leadTextInput" class="input" rows="3" placeholder="Paste the post, pain point, or lead note..."></textarea>
+            <div class="lead-actions-inline">
+              <button id="addLeadBtn" class="btn" type="button">Add lead</button>
+              <button id="refreshLeadsBtn" class="ghost-btn" type="button">Refresh</button>
+            </div>
+          </div>
+          <div id="leadStats" class="muted-copy" style="margin-top:12px">Sign in to load your outreach queue.</div>
+          <div id="leadsList" class="lead-list">
+            <div class="lead-empty">No leads yet. Paste a prospect note above and save it to generate a first-touch message automatically.</div>
           </div>
         </div>
 
