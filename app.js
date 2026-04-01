@@ -188,6 +188,23 @@
         <path d="M13.5 2.5L7 9"></path>
         <path d="M13.5 2.5L9 13.5 7 9l-4.5-2 11-4.5Z"></path>
       </svg>
+    `,
+    approve: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 8.4 6.2 11.4 13 4.6"></path>
+      </svg>
+    `,
+    reject: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 4l8 8"></path>
+        <path d="M12 4 4 12"></path>
+      </svg>
+    `,
+    edit: `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 11.8 3.4 9.4 9.9 2.9a1.4 1.4 0 0 1 2 0l1.2 1.2a1.4 1.4 0 0 1 0 2l-6.5 6.5L4.2 13z"></path>
+        <path d="M9 4l3 3"></path>
+      </svg>
     `
   };
 
@@ -428,6 +445,48 @@
 
       .copy-btn{
         min-width:24px;
+      }
+
+      .mini-btn.approve-btn{
+        background:rgba(52,211,153,.12);
+        border-color:rgba(52,211,153,.18);
+        color:rgba(221,255,239,.96);
+        padding:0 10px;
+      }
+
+      .mini-btn.reject-btn{
+        background:rgba(248,113,113,.10);
+        border-color:rgba(248,113,113,.18);
+        color:rgba(255,224,224,.96);
+        padding:0 10px;
+      }
+
+      .mini-btn.edit-btn{
+        background:rgba(96,165,250,.10);
+        border-color:rgba(96,165,250,.18);
+        color:rgba(224,236,255,.96);
+        padding:0 10px;
+      }
+
+      .approval-banner{
+        display:flex;
+        align-items:flex-start;
+        gap:8px;
+        padding:9px 10px;
+        border-radius:12px;
+        border:1px solid rgba(245,158,11,.18);
+        background:rgba(245,158,11,.08);
+        color:rgba(255,239,210,.96);
+        font-size:11px;
+        line-height:1.5;
+      }
+
+      .approval-banner svg{
+        width:13px;
+        height:13px;
+        flex:0 0 13px;
+        margin-top:1px;
+      }
         width:24px;
         padding:0;
       }
@@ -937,30 +996,20 @@
       return {
         key: `guest-${getEffectiveUsage(state.usage)}`,
         title: "You’ve hit the free preview limit",
-        detail: `Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and see how much support time Xalvion can save.`,
+        detail: `Create a free account to unlock ${FREE_USAGE_LIMIT} free runs and keep the operator workflow live.`,
         body: `You’ve used all ${GUEST_USAGE_LIMIT} guest runs.
 
-Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and continue using Xalvion as an approval-first AI operator.
-
-What you unlock next:
-• More ticket runs without losing momentum
-• A persistent workspace and plan state
-• A clearer path to real inbox automation`
+You just felt the core workflow. Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and continue preparing support decisions with approval controls.`
       };
     }
 
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
       title: "You’ve hit the free plan limit",
-      detail: "Upgrade to Growth to keep automation moving, unlock more throughput, and turn support pressure into measurable time saved.",
+      detail: "Upgrade to Pro to keep approval-first automation running and unlock more capacity.",
       body: `You’ve used all ${FREE_USAGE_LIMIT} free runs.
 
-Upgrade to Growth to keep Xalvion running inside the workflow, unlock more capacity, and move from “this is useful” to “this is saving us real hours.”
-
-What the paid workspace unlocks:
-• More ticket volume and less interruption
-• Stronger inbox scan and routing coverage
-• A cleaner ROI story for your team`
+You just saved real support effort. Upgrade to Pro to keep the approval-first operator live, unlock more capacity, and continue scanning tickets without interruption.`
     };
   }
 
@@ -994,41 +1043,6 @@ What the paid workspace unlocks:
         })
       );
       footer.appendChild(meta);
-
-      const tools = document.createElement("div");
-      tools.className = "assistant-tools";
-
-      const primaryCta = document.createElement("button");
-      primaryCta.type = "button";
-      primaryCta.className = "mini-btn";
-      primaryCta.innerHTML = `${ICONS.spark}<span>${isAuthenticated() ? "Upgrade now" : "Create free account"}</span>`;
-      primaryCta.addEventListener("click", () => {
-        if (isAuthenticated()) {
-          upgradePlan("pro");
-        } else {
-          els.signupBtn?.click();
-          els.usernameInput?.focus();
-        }
-      });
-      tools.appendChild(primaryCta);
-
-      const secondaryCta = document.createElement("button");
-      secondaryCta.type = "button";
-      secondaryCta.className = "mini-btn";
-      secondaryCta.innerHTML = `${ICONS.ticket}<span>${isAuthenticated() ? "See pricing" : "Log in"}</span>`;
-      secondaryCta.addEventListener("click", () => {
-        if (isAuthenticated()) {
-          const pricingSection = document.getElementById("pricingCard") || document.querySelector("[data-upgrade]") || els.usageCard;
-          pricingSection?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-          pulseRail("usage");
-        } else {
-          els.loginBtn?.click();
-          els.usernameInput?.focus();
-        }
-      });
-      tools.appendChild(secondaryCta);
-
-      footer.appendChild(tools);
     }
 
     scrollMessagesToBottom(true);
@@ -1153,8 +1167,6 @@ What the paid workspace unlocks:
 
   function formatTier(value) {
     const tier = String(value || "free").toLowerCase();
-    if (tier === "pro") return "Growth";
-    if (tier === "elite") return "Operator";
     return tier.charAt(0).toUpperCase() + tier.slice(1);
   }
 
@@ -1176,11 +1188,11 @@ What the paid workspace unlocks:
   function planCopy(tier) {
     switch (String(tier || "free").toLowerCase()) {
       case "pro":
-        return "Growth capacity, stronger routing, and a clearer ROI story once support volume starts to bite.";
+        return "Priority handling, larger usage limits, and a more serious operating surface for real support volume.";
       case "elite":
-        return "Maximum capacity, premium control, and the strongest Xalvion operator environment for serious support volume.";
+        return "Maximum capacity, premium control, and the strongest Xalvion operator environment.";
       default:
-        return "Free access to prove the workflow fast, with a visible upgrade path once the queue and time savings become real.";
+        return "Entry access with clear capacity limits and a visible upgrade path when usage pressure builds.";
     }
   }
 
@@ -1705,9 +1717,14 @@ What the paid workspace unlocks:
   }
 
   function actionLabel(data) {
-    const action = String(data?.action || "none").toLowerCase();
-    const amount = Number(data?.amount || 0);
+    const decision = data?.decision || {};
+    const action = String(data?.action || decision.action || "none").toLowerCase();
+    const amount = Number(data?.amount || decision.amount || 0);
+    const requiresApproval = Boolean(data?.requires_approval || decision.requires_approval || data?.execution?.requires_approval);
 
+    if (requiresApproval && action === "refund") return amount > 0 ? `Refund ${formatMoney(amount)} pending approval` : "Refund pending approval";
+    if (requiresApproval && action === "charge") return amount > 0 ? `Charge ${formatMoney(amount)} pending approval` : "Charge pending approval";
+    if (requiresApproval && action === "credit") return amount > 0 ? `Credit ${formatMoney(amount)} pending approval` : "Credit pending approval";
     if (action === "refund") return amount > 0 ? `Refunded ${formatMoney(amount)}` : "Refund processed";
     if (action === "credit") return amount > 0 ? `Credited ${formatMoney(amount)}` : "Credit applied";
     if (action === "review") return "Escalated to review";
@@ -1733,7 +1750,12 @@ What the paid workspace unlocks:
   }
 
   function displayActionLabel(data = {}) {
-    const rawAction = String(data.action || "none").toLowerCase();
+    const decision = data.decision || {};
+    const rawAction = String(data.action || decision.action || "none").toLowerCase();
+    const requiresApproval = Boolean(data.requires_approval || decision.requires_approval || data.execution?.requires_approval);
+    if (requiresApproval && rawAction === "refund") return "Refund approval required";
+    if (requiresApproval && rawAction === "charge") return "Charge approval required";
+    if (requiresApproval && rawAction === "credit") return "Credit approval required";
     if (rawAction === "review") return "Billing review started";
     return actionLabel(data);
   }
@@ -1982,7 +2004,206 @@ What the paid workspace unlocks:
     return meta;
   }
 
-  function addCopyControl(container, replyText) {
+  function getApprovalContext(data = {}) {
+    const decision = data.decision || {};
+    const ticket = data.ticket || {};
+    const actionLog = data.action_log || ticket.action_log || {};
+
+    const ticketId = Number(ticket.id || data.ticket_id || 0) || null;
+    const action = String(decision.action || data.action || actionLog.action || "none").toLowerCase();
+    const amount = Number(decision.amount || data.amount || actionLog.amount || 0) || 0;
+    const requiresApproval = Boolean(data.requires_approval || decision.requires_approval || data.execution?.requires_approval || ticket.requires_approval || actionLog.requires_approval);
+    const approved = Boolean(ticket.approved || actionLog.approved);
+    const status = String(data.tool_status || actionLog.status || ticket.status || "").toLowerCase();
+
+    return {
+      ticketId,
+      action,
+      amount,
+      requiresApproval,
+      approved,
+      status,
+      canApprove: requiresApproval && !approved && !!ticketId && isAuthenticated(),
+      paymentIntentId: normalizeReference("pi_"),
+      chargeId: normalizeReference("ch_"),
+    };
+  }
+
+  function createApprovalBanner(data = {}) {
+    const approval = getApprovalContext(data);
+    if (!approval.requiresApproval || approval.approved) return null;
+
+    const banner = document.createElement("div");
+    banner.className = "approval-banner";
+    const amountText = approval.amount > 0 ? ` ${formatMoney(approval.amount)}` : "";
+    const actionText = approval.action && approval.action !== "none" ? `${approval.action}${amountText}` : "prepared action";
+    banner.innerHTML = `${ICONS.warn}<div><strong>Approval required</strong><br>${escapeHtml(`Xalvion prepared ${actionText} and is holding execution until you approve it.`)}</div>`;
+    return banner;
+  }
+
+  async function resolveApproval(ticketId, action, body = {}) {
+    const res = await fetch(`${API}/tickets/${ticketId}/${action}`, {
+      method: "POST",
+      headers: headers(true),
+      body: JSON.stringify(body || {})
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      invalidateSessionFrom401();
+      throw new Error(detailFromApiBody(data) || "Session expired.");
+    }
+    if (!res.ok) {
+      throw new Error(detailFromApiBody(data) || `Could not ${action} this action.`);
+    }
+    return data;
+  }
+
+  function normalizeApprovalResponse(data = {}, previous = {}) {
+    const ticket = data.ticket || {};
+    const actionLog = ticket.action_log || previous.action_log || {};
+    return {
+      ...previous,
+      ...data,
+      ticket,
+      action_log: actionLog,
+      reply: data.reply || data.response || data.final || ticket.final_reply || previous.reply || "",
+      response: data.response || data.reply || data.final || ticket.final_reply || previous.response || "",
+      final: data.final || data.reply || data.response || ticket.final_reply || previous.final || "",
+      action: data.action || ticket.action || previous.action || "none",
+      amount: Number.isFinite(Number(data.amount)) ? Number(data.amount) : (Number(ticket.amount || previous.amount || 0) || 0),
+      reason: data.reason || actionLog.reason || ticket.internal_note || previous.reason || "",
+      tool_status: data.tool_status || actionLog.status || ticket.status || previous.tool_status || "unknown",
+      decision: {
+        ...(previous.decision || {}),
+        ...(data.decision || {}),
+        action: (data.decision || {}).action || data.action || ticket.action || previous.action || "none",
+        amount: Number((data.decision || {}).amount || data.amount || ticket.amount || previous.amount || 0) || 0,
+        queue: (data.decision || {}).queue || ticket.queue || (previous.decision || {}).queue || "new",
+        priority: (data.decision || {}).priority || ticket.priority || (previous.decision || {}).priority || "medium",
+        risk_level: (data.decision || {}).risk_level || ticket.risk_level || (previous.decision || {}).risk_level || "medium",
+        requires_approval: Boolean((data.decision || {}).requires_approval || ticket.requires_approval || false)
+      },
+      impact: {
+        ...(previous.impact || {}),
+        ...(data.impact || {}),
+        amount: Number((data.impact || {}).amount || data.amount || ticket.amount || previous.amount || 0) || 0,
+        auto_resolved: Boolean((data.impact || {}).auto_resolved || (!ticket.requires_approval && String(ticket.status || "").toLowerCase() === "resolved"))
+      },
+      output: {
+        ...(previous.output || {}),
+        ...(data.output || {}),
+        internal_note: ((data.output || {}).internal_note || ticket.internal_note || (previous.output || {}).internal_note || "")
+      },
+      confidence: Number(data.confidence || ticket.confidence || previous.confidence || 0) || 0,
+      quality: Number(data.quality || ticket.quality || previous.quality || 0) || 0,
+      requires_approval: Boolean((data.decision || {}).requires_approval || ticket.requires_approval || false),
+    };
+  }
+
+  function wireApprovalButtons(container, data, row) {
+    const approval = getApprovalContext(data);
+    if (!approval.canApprove) return;
+
+    const approveBtn = document.createElement("button");
+    approveBtn.type = "button";
+    approveBtn.className = "mini-btn approve-btn";
+    approveBtn.innerHTML = `${ICONS.approve}<span>Approve</span>`;
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "mini-btn reject-btn";
+    rejectBtn.innerHTML = `${ICONS.reject}<span>Reject</span>`;
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "mini-btn edit-btn";
+    editBtn.innerHTML = `${ICONS.edit}<span>Edit</span>`;
+
+    const setBusy = (busy) => {
+      [approveBtn, rejectBtn, editBtn].forEach((btn) => { btn.disabled = busy; });
+    };
+
+    approveBtn.addEventListener("click", async () => {
+      if (!approval.ticketId) return;
+      setBusy(true);
+      try {
+        const response = await resolveApproval(approval.ticketId, "approve", {
+          payment_intent_id: approval.paymentIntentId,
+          charge_id: approval.chargeId,
+          refund_reason: "requested_by_customer",
+        });
+        const normalized = normalizeApprovalResponse(response, data);
+        state.latestRun = normalized;
+        setAssistantCopy(row, normalized.reply || normalized.response || "Approved.");
+        const footer = getAssistantFooterNode(row);
+        if (footer) {
+          footer.innerHTML = "";
+          footer.appendChild(createMetaRow(normalized));
+          const toolsWrap = document.createElement("div");
+          addCopyControl(toolsWrap, normalized.reply || normalized.response || "");
+          footer.appendChild(toolsWrap);
+        }
+        const details = row.querySelector(".details-wrap");
+        if (details) details.replaceWith(createDetailsPanel(normalized));
+        updateStatsFromResult(normalized);
+        updateRevenueCard(normalized);
+        updateLatestRunCard(normalized);
+        updateSystemNarrative(normalized);
+        updateTopbarStatus();
+        setNotice("success", "Action approved", response.message || "Prepared action approved.");
+      } catch (error) {
+        setNotice("error", "Approval failed", error.message || "Could not approve this action.");
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    rejectBtn.addEventListener("click", async () => {
+      if (!approval.ticketId) return;
+      setBusy(true);
+      try {
+        const response = await resolveApproval(approval.ticketId, "reject", {
+          internal_note: "Rejected from workspace approval controls.",
+        });
+        const normalized = normalizeApprovalResponse(response, data);
+        state.latestRun = normalized;
+        setAssistantCopy(row, normalized.reply || normalized.response || "Rejected.");
+        const footer = getAssistantFooterNode(row);
+        if (footer) {
+          footer.innerHTML = "";
+          footer.appendChild(createMetaRow(normalized));
+          const toolsWrap = document.createElement("div");
+          addCopyControl(toolsWrap, normalized.reply || normalized.response || "");
+          footer.appendChild(toolsWrap);
+        }
+        const details = row.querySelector(".details-wrap");
+        if (details) details.replaceWith(createDetailsPanel(normalized));
+        updateStatsFromResult(normalized);
+        updateRevenueCard(normalized);
+        updateLatestRunCard(normalized);
+        updateSystemNarrative(normalized);
+        updateTopbarStatus();
+        setNotice("warning", "Action rejected", response.message || "Prepared action moved to manual follow-up.");
+      } catch (error) {
+        setNotice("error", "Reject failed", error.message || "Could not reject this action.");
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    editBtn.addEventListener("click", () => {
+      els.paymentIntentInput?.focus();
+      els.messageInput?.focus();
+      setNotice("info", "Edit before approval", "Adjust the composer or add a payment reference, then rerun or approve when ready.");
+    });
+
+    container.appendChild(approveBtn);
+    container.appendChild(rejectBtn);
+    container.appendChild(editBtn);
+  }
+
+  function addCopyControl(container, replyText, data = null, row = null) {
     const tools = document.createElement("div");
     tools.className = "assistant-tools";
 
@@ -2003,6 +2224,9 @@ What the paid workspace unlocks:
     });
 
     tools.appendChild(copyBtn);
+    if (data && row) {
+      wireApprovalButtons(tools, data, row);
+    }
     container.appendChild(tools);
   }
 
@@ -2026,12 +2250,15 @@ What the paid workspace unlocks:
     const toolStatus = String(data.tool_status || "resolved");
     const internalNote = data.reason || output.internal_note || "";
 
+    const approvalBanner = createApprovalBanner(data);
+
     details.innerHTML = `
       <summary class="details-toggle">
         <span>View details</span>
         <span class="chev">${ICONS.chevron}</span>
       </summary>
       <div class="details-panel">
+        ${approvalBanner ? approvalBanner.outerHTML : ""}
         <div class="details-grid">
           ${createDetailBox("Action", actionLabel(data))}
           ${createDetailBox("Queue", queueLabel(decision.queue || "new"))}
@@ -2542,7 +2769,7 @@ What the paid workspace unlocks:
         footer.appendChild(createMetaRow(data));
 
         const toolsWrap = document.createElement("div");
-        addCopyControl(toolsWrap, replyText);
+        addCopyControl(toolsWrap, replyText, data, row);
         footer.appendChild(toolsWrap);
 
         const details = createDetailsPanel(data);
@@ -2709,7 +2936,7 @@ What the paid workspace unlocks:
       saveDraft(demoText);
       els.messageInput.focus();
     }
-    setNotice("info", "Quick demo loaded", "A high-intent billing case is ready so you can see the operator flow, risk signal, and conversion pressure together.");
+    setNotice("info", "Quick demo loaded", "A high-intent billing case is ready to run through the workspace.");
   }
 
   async function upgradePlan(tier) {
@@ -2741,7 +2968,7 @@ What the paid workspace unlocks:
         Number(data.limit || state.limit),
         Number(data.remaining || state.remaining)
       );
-      setNotice("success", "Plan updated", `Workspace upgraded to ${formatTier(tier)}. You now have more capacity and a stronger operator workflow.`);
+      setNotice("success", "Plan updated", `Workspace upgraded to ${formatTier(tier)}.`);
       updateTopbarStatus();
     } catch (error) {
       setNotice("error", "Upgrade failed", error.message || "Could not upgrade the plan.");

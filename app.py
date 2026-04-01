@@ -488,6 +488,13 @@ class RefundActionRequest(BaseModel):
     refund_reason: str | None = None
 
 
+class ApprovalDecisionRequest(BaseModel):
+    payment_intent_id: str | None = None
+    charge_id: str | None = None
+    refund_reason: str | None = None
+    internal_note: str | None = None
+
+
 class ChargeActionRequest(BaseModel):
     customer_id: str
     payment_method_id: str
@@ -1742,9 +1749,215 @@ def apply_learning_feedback(runtime_ticket: dict[str, Any], result: dict[str, An
 
 
 def check_requires_approval(action: str, amount: float) -> bool:
-    if not LIVE_MODE:
-        return False
-    return action == "refund" and float(amount or 0) > APPROVAL_THRESHOLD
+    normalized = str(action or "none").strip().lower()
+    value = float(amount or 0)
+
+    if normalized in {"refund", "charge"}:
+        return True
+
+    if LIVE_MODE and normalized == "credit" and value > APPROVAL_THRESHOLD:
+        return True
+
+    return False
+
+
+def build_approval_hold_message(action: str, amount: float) -> str:
+    normalized = str(action or "none").strip().lower()
+    value = round(float(amount or 0), 2)
+
+    if normalized == "refund" and value > 0:
+        return f"I’ve prepared a refund of ${value:.2f} and held it for approval before anything is executed."
+    if normalized == "charge" and value > 0:
+        return f"I’ve prepared a charge of ${value:.2f} and held it for approval before anything is executed."
+    if normalized == "credit" and value > 0:
+        return f"I’ve prepared a ${value:.2f} credit and held it for approval before anything is executed."
+    return "I’ve prepared the next action and held it for approval before anything is executed."
+
+
+def serialize_pending_approval_result(result: dict[str, Any], *, action: str, amount: float) -> dict[str, Any]:
+    pending = dict(result or {})
+    reason = str(pending.get("reason", "") or "Approval required before execution")
+    hold_message = build_approval_hold_message(action, amount)
+
+    pending["action"] = action
+    pending["amount"] = round(float(amount or 0), 2)
+    pending["reply"] = hold_message
+    pending["response"] = hold_message
+    pending["final"] = hold_message
+    pending["tool_status"] = "pending_approval"
+    pending["tool_result"] = {
+        "status": "pending_approval",
+        "proposed_action": action,
+        "proposed_amount": round(float(amount or 0), 2),
+    }
+
+    decision = dict(pending.get("decision") or {})
+    decision.update({
+        "action": action,
+        "amount": round(float(amount or 0), 2),
+        "reason": reason,
+        "requires_approval": True,
+        "status": "waiting",
+        "queue": decision.get("queue") or ("refund_risk" if action == "refund" else "waiting"),
+        "priority": decision.get("priority") or ("high" if action in {"refund", "charge"} else "medium"),
+        "risk_level": decision.get("risk_level") or ("high" if action in {"refund", "charge"} else "medium"),
+        "proposed_action": action,
+        "proposed_amount": round(float(amount or 0), 2),
+    })
+    pending["decision"] = decision
+
+    execution = dict(pending.get("execution") or {})
+    execution.update({
+        "action": action,
+        "amount": round(float(amount or 0), 2),
+        "status": "pending_approval",
+        "auto_resolved": False,
+        "requires_approval": True,
+        "proposed_action": action,
+        "proposed_amount": round(float(amount or 0), 2),
+    })
+    pending["execution"] = execution
+    return pending
+
+
+def build_ticket_response_payload(ticket: Ticket, log: ActionLog | None = None) -> dict[str, Any]:
+    action = str(ticket.action or "none")
+    amount = round(float(ticket.amount or 0), 2)
+    tool_status = str(log.status if log else ticket.status or "unknown")
+    confidence = round(float(ticket.confidence or 0), 2)
+    quality = round(float(ticket.quality or 0), 2)
+    reason = str(log.reason if log else ticket.internal_note or "")
+    reply = str(ticket.final_reply or "")
+
+    return {
+        "reply": reply,
+        "response": reply,
+        "final": reply,
+        "action": action,
+        "amount": amount,
+        "reason": reason,
+        "issue_type": str(ticket.issue_type or "general_support"),
+        "tool_status": tool_status,
+        "confidence": confidence,
+        "quality": quality,
+        "decision": {
+            "action": action,
+            "amount": amount,
+            "queue": str(ticket.queue or "new"),
+            "priority": str(ticket.priority or "medium"),
+            "risk_level": str(ticket.risk_level or "medium"),
+            "requires_approval": bool(ticket.requires_approval),
+            "status": str(ticket.status or "new"),
+        },
+        "output": {
+            "internal_note": str(ticket.internal_note or ""),
+        },
+        "impact": {
+            "type": action,
+            "amount": amount,
+            "money_saved": 0,
+            "auto_resolved": str(ticket.status or "").lower() == "resolved" and not bool(ticket.requires_approval),
+        },
+        "ticket": serialize_ticket_with_log(ticket, db),
+    }
+
+
+def append_ticket_internal_note(ticket: Ticket, note: str) -> None:
+    addition = str(note or "").strip()
+    if not addition:
+        return
+    existing = (ticket.internal_note or "").strip()
+    ticket.internal_note = (existing + "\n" + addition).strip() if existing else addition
+
+
+def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionRequest, user: User) -> tuple[dict[str, Any], str]:
+    proposed_action = str(log.action or ticket.action or "none").strip().lower()
+    proposed_amount = round(float(log.amount or ticket.amount or 0), 2)
+
+    payload = {
+        "reply": ticket.final_reply or build_approval_hold_message(proposed_action, proposed_amount),
+        "response": ticket.final_reply or build_approval_hold_message(proposed_action, proposed_amount),
+        "final": ticket.final_reply or build_approval_hold_message(proposed_action, proposed_amount),
+        "action": proposed_action,
+        "amount": proposed_amount,
+        "reason": str(log.reason or ticket.internal_note or "Approved by operator"),
+        "issue_type": ticket.issue_type,
+        "tool_status": "approved",
+        "tool_result": {"status": "approved"},
+        "decision": {
+            "action": proposed_action,
+            "amount": proposed_amount,
+            "queue": ticket.queue,
+            "priority": ticket.priority,
+            "risk_level": ticket.risk_level,
+            "requires_approval": False,
+            "status": "resolved",
+        },
+        "output": {
+            "internal_note": str(ticket.internal_note or ""),
+        },
+    }
+
+    if proposed_action == "refund":
+        if (req.payment_intent_id or "").strip() or (req.charge_id or "").strip():
+            support_req = SupportRequest(
+                message=ticket.customer_message or ticket.subject or "Refund approval",
+                payment_intent_id=(req.payment_intent_id or None),
+                charge_id=(req.charge_id or None),
+                refund_reason=(req.refund_reason or None),
+                channel=ticket.channel or "web",
+                source=ticket.source or "workspace",
+            )
+            payload = apply_real_actions(payload, support_req, user)
+            payload.setdefault("decision", {}).update({
+                "action": str(payload.get("action", proposed_action) or proposed_action),
+                "amount": round(float(payload.get("amount", proposed_amount) or proposed_amount), 2),
+                "queue": "resolved",
+                "priority": ticket.priority or "high",
+                "risk_level": ticket.risk_level or "medium",
+                "requires_approval": False,
+                "status": "resolved",
+            })
+            if payload.get("tool_status") == "refunded":
+                payload["reply"] = payload.get("reply") or payload.get("response") or "I’ve approved the refund and it’s now in motion."
+                payload["response"] = payload.get("response") or payload.get("reply")
+                payload["final"] = payload.get("final") or payload.get("response") or payload.get("reply")
+                return payload, "approved"
+
+        hold = (
+            "Approval recorded. Connect Stripe or provide a payment reference to execute this refund from the workspace."
+        )
+        payload["reply"] = hold
+        payload["response"] = hold
+        payload["final"] = hold
+        payload["tool_status"] = "approved_pending_execution"
+        payload["tool_result"] = {"status": "approved_pending_execution"}
+        payload.setdefault("decision", {}).update({"status": "waiting", "queue": "waiting"})
+        return payload, "approved_pending_execution"
+
+    if proposed_action == "credit":
+        payload["reply"] = f"I’ve approved the ${proposed_amount:.2f} credit and it’s ready for the next step."
+        payload["response"] = payload["reply"]
+        payload["final"] = payload["reply"]
+        payload["tool_status"] = "approved"
+        payload["tool_result"] = {"status": "approved"}
+        return payload, "approved"
+
+    if proposed_action == "charge":
+        payload["reply"] = f"I’ve approved the ${proposed_amount:.2f} charge and moved it into the execution path."
+        payload["response"] = payload["reply"]
+        payload["final"] = payload["reply"]
+        payload["tool_status"] = "approved_pending_execution"
+        payload["tool_result"] = {"status": "approved_pending_execution"}
+        payload.setdefault("decision", {}).update({"status": "waiting", "queue": "waiting"})
+        return payload, "approved_pending_execution"
+
+    payload["reply"] = "I’ve approved the prepared action and moved it into the next step."
+    payload["response"] = payload["reply"]
+    payload["final"] = payload["reply"]
+    payload["tool_status"] = "approved"
+    payload["tool_result"] = {"status": "approved"}
+    return payload, "approved"
 
 
 def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
@@ -1782,24 +1995,7 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         )
 
         if needs_approval:
-            result["action"] = "review"
-            result["amount"] = 0
-            result["reason"] = (
-                f"Refund ${amount:.2f} exceeds approval threshold ${APPROVAL_THRESHOLD:.2f}. "
-                "Manual approval required."
-            )
-            result["response"] = (
-                "I've flagged this refund for manual approval. Your team will review and process it shortly."
-            )
-            result["final"] = result["response"]
-            result["reply"] = result["response"]
-            result["tool_status"] = "pending_approval"
-            result.setdefault("decision", {}).update({
-                "requires_approval": True,
-                "queue": "refund_risk",
-                "priority": "high",
-                "risk_level": "high",
-            })
+            result = serialize_pending_approval_result(result, action=action, amount=amount)
         else:
             result = apply_real_actions(result, req, user)
 
@@ -1818,7 +2014,7 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
 
         update_ticket_from_result(db, ticket, result)
 
-        log_action(
+        action_entry = log_action(
             db,
             username=str(getattr(user, "username", "unknown")),
             ticket_id=ticket.id,
@@ -1840,7 +2036,16 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
             db.refresh(user)
 
         serialized = serialize_support_result(result, user)
-        serialized["ticket"] = serialize_ticket(ticket)
+        serialized["ticket"] = serialize_ticket_with_log(ticket, db)
+        serialized["action_log"] = serialized["ticket"].get("action_log") or {
+            "log_id": action_entry.id,
+            "action": action_entry.action,
+            "amount": action_entry.amount,
+            "status": action_entry.status,
+            "requires_approval": bool(action_entry.requires_approval),
+            "approved": bool(action_entry.approved),
+            "timestamp": action_entry.timestamp,
+        }
         serialized["operator_mode"] = get_operator_mode(db)
         serialized["shadow_decision"] = shadow_decision
         serialized["runtime_ticket"] = runtime_ticket
@@ -2850,6 +3055,128 @@ def admin_approve_action(
     }
 
 
+@app.get("/tickets/pending-approvals")
+def list_pending_ticket_approvals(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not getattr(user, "username", "") or user.username == "guest":
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    query = db.query(Ticket).filter(Ticket.requires_approval == 1, Ticket.approved == 0)
+    if getattr(user, "username", "") != ADMIN_USERNAME:
+        query = query.filter(Ticket.username == user.username)
+
+    tickets = query.order_by(Ticket.updated_at.desc()).limit(50).all()
+    return [serialize_ticket_with_log(ticket, db) for ticket in tickets]
+
+
+@app.post("/tickets/{ticket_id}/approve")
+def approve_ticket(
+    ticket_id: int,
+    req: ApprovalDecisionRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not getattr(user, "username", "") or user.username == "guest":
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if getattr(user, "username", "") != ADMIN_USERNAME and ticket.username != user.username:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not bool(ticket.requires_approval) or bool(ticket.approved):
+        raise HTTPException(status_code=400, detail="No pending approval for this ticket")
+
+    log = (
+        db.query(ActionLog)
+        .filter(ActionLog.ticket_id == ticket.id, ActionLog.requires_approval == 1, ActionLog.approved == 0)
+        .order_by(ActionLog.id.desc())
+        .first()
+    )
+    if not log:
+        raise HTTPException(status_code=404, detail="Pending approval log not found")
+
+    append_ticket_internal_note(ticket, req.internal_note or "")
+    payload, log_status = approve_ticket_action(ticket, log, req, user)
+
+    ticket.updated_at = _now_iso()
+    ticket.action = str(payload.get("action", ticket.action) or ticket.action)
+    ticket.amount = float(payload.get("amount", ticket.amount) or ticket.amount)
+    ticket.final_reply = str(payload.get("reply", payload.get("response", ticket.final_reply)) or ticket.final_reply)[:8000]
+    ticket.status = _safe_status((payload.get("decision") or {}).get("status", "resolved"), "resolved")
+    ticket.queue = _safe_queue((payload.get("decision") or {}).get("queue", "resolved"), "resolved")
+    ticket.priority = _safe_priority((payload.get("decision") or {}).get("priority", ticket.priority or "high"), ticket.priority or "high")
+    ticket.risk_level = _safe_risk((payload.get("decision") or {}).get("risk_level", ticket.risk_level or "medium"), ticket.risk_level or "medium")
+    ticket.requires_approval = 0
+    ticket.approved = 1
+    append_ticket_internal_note(ticket, f"Approved by {user.username} at {_now_iso()}")
+
+    log.approved = 1
+    log.requires_approval = 0
+    log.status = log_status
+    log.reason = str(payload.get("reason", log.reason) or log.reason)
+    db.commit()
+    db.refresh(ticket)
+    db.refresh(log)
+
+    response = build_ticket_response_payload(ticket, log)
+    response["message"] = f"Ticket {ticket.id} approved"
+    return response
+
+
+@app.post("/tickets/{ticket_id}/reject")
+def reject_ticket(
+    ticket_id: int,
+    req: ApprovalDecisionRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not getattr(user, "username", "") or user.username == "guest":
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if getattr(user, "username", "") != ADMIN_USERNAME and ticket.username != user.username:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not bool(ticket.requires_approval) or bool(ticket.approved):
+        raise HTTPException(status_code=400, detail="No pending approval for this ticket")
+
+    log = (
+        db.query(ActionLog)
+        .filter(ActionLog.ticket_id == ticket.id, ActionLog.requires_approval == 1, ActionLog.approved == 0)
+        .order_by(ActionLog.id.desc())
+        .first()
+    )
+    if not log:
+        raise HTTPException(status_code=404, detail="Pending approval log not found")
+
+    rejection_note = str(req.internal_note or "Rejected by operator before execution.").strip()
+    ticket.updated_at = _now_iso()
+    ticket.status = _safe_status("escalated")
+    ticket.queue = _safe_queue("escalated")
+    ticket.requires_approval = 0
+    ticket.approved = 0
+    ticket.final_reply = "I’ve held this case for manual follow-up instead of executing the prepared action."
+    append_ticket_internal_note(ticket, rejection_note)
+    append_ticket_internal_note(ticket, f"Rejected by {user.username} at {_now_iso()}")
+
+    log.status = "rejected"
+    log.reason = rejection_note[:500]
+    log.requires_approval = 0
+    log.approved = 0
+
+    db.commit()
+    db.refresh(ticket)
+    db.refresh(log)
+
+    response = build_ticket_response_payload(ticket, log)
+    response["message"] = f"Ticket {ticket.id} rejected"
+    return response
+
+
 @app.get("/operator/mode")
 def read_operator_mode(
     admin: User = Depends(require_admin),
@@ -3026,6 +3353,28 @@ def analyze_extension_ticket(
         meta=_build_extension_meta(req, operator_mode, plan_tier, priority_routing),
         request_context=_build_extension_context(req).model_dump(),
     )
+
+    try:
+        decision = dict(result.get("sovereign_decision") or {})
+        action = str(decision.get("action", "none") or "none").strip().lower()
+        amount = round(float(decision.get("amount", 0) or 0), 2)
+        if check_requires_approval(action, amount):
+            hold_message = build_approval_hold_message(action, amount)
+            decision.update({
+                "requires_approval": True,
+                "status": "waiting",
+                "queue": decision.get("queue") or ("refund_risk" if action == "refund" else "waiting"),
+                "priority": decision.get("priority") or ("high" if action in {"refund", "charge"} else "medium"),
+                "risk_level": decision.get("risk_level") or ("high" if action in {"refund", "charge"} else "medium"),
+                "tool_status": "pending_approval",
+            })
+            result["reply"] = hold_message
+            result["response"] = hold_message
+            result["final"] = hold_message
+            result["sovereign_decision"] = decision
+        
+    except Exception:
+        pass
 
     if user:
         user.usage = int(user.usage or 0) + 1
