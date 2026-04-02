@@ -439,12 +439,13 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
 
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
 
+    # True local fast paths — do not hit integrated actions for standard shipping/damage flows.
     if issue_type == "shipping_issue":
         return {
             "action": "none",
             "amount": 0,
             "tool_result": {"status": "local_tracking", "type": "tracking", "message": "Shipping handled locally"},
-            "tool_status": "success",
+            "tool_status": "local_tracking",
         }
 
     if issue_type == "damaged_order":
@@ -452,14 +453,19 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
             "action": "review",
             "amount": 0,
             "tool_result": {"status": "local_damage_flow", "type": "escalation", "message": "Damage routed locally"},
-            "tool_status": "success",
+            "tool_status": "local_damage_flow",
         }
 
     integrated_action = "escalate" if action == "review" else action
     integration_result = dispatch_integrated_action(integrated_action, payload)
     mapped_action = "review" if integrated_action == "escalate" else action
 
-    return {"action": mapped_action, "amount": amount if mapped_action in {"refund", "credit", "charge"} else 0, "tool_result": integration_result, "tool_status": integration_result.get("status", "success")}
+    return {
+        "action": mapped_action,
+        "amount": amount if mapped_action in {"refund", "credit", "charge"} else 0,
+        "tool_result": integration_result,
+        "tool_status": integration_result.get("status", "success"),
+    }
 
 def build_issue_examples(ticket: Dict[str, Any]) -> str:
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")

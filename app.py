@@ -3221,8 +3221,6 @@ async def support_stream(
     username = get_current_username_from_header(authorization)
 
     async def generator() -> AsyncIterator[str]:
-        # Stream visible progress immediately so the UI does not sit on a blank loader
-        # while the support pipeline is still computing the result.
         initial_steps = [
             {"stage": "reviewing", "label": "Reviewing request"},
             {"stage": "routing", "label": "Choosing next step"},
@@ -3237,6 +3235,12 @@ async def support_stream(
                 timeout=28.0,
             )
         except asyncio.TimeoutError:
+            lowered = (req.message or "").lower()
+            inferred_issue_type = (
+                "damaged_order" if any(word in lowered for word in ("damage", "damaged", "broken")) else
+                "shipping_issue" if any(word in lowered for word in ("order", "tracking", "package", "late", "delivery")) else
+                "general_support"
+            )
             fallback = {
                 "reply": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
                 "final": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
@@ -3244,8 +3248,8 @@ async def support_stream(
                 "action": "review",
                 "amount": 0,
                 "reason": "stream_timeout",
-                "issue_type": "general_support",
-                "order_status": "unknown",
+                "issue_type": inferred_issue_type,
+                "order_status": str(req.order_status or "unknown"),
                 "tool_status": "timeout",
                 "tool_result": {"status": "timeout"},
                 "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
@@ -3271,7 +3275,7 @@ async def support_stream(
                 "amount": 0,
                 "reason": "stream_error",
                 "issue_type": "general_support",
-                "order_status": "unknown",
+                "order_status": str(req.order_status or "unknown"),
                 "tool_status": "error",
                 "tool_result": {"status": "error"},
                 "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
