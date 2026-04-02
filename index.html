@@ -1106,8 +1106,12 @@
 
           <div class="section-label">Access</div>
           <div class="auth-card">
-            <input id="usernameInput" class="input" type="text" placeholder="Username" />
-            <input id="passwordInput" class="input" type="password" placeholder="Password" />
+            <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
+            <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
+            <p id="authHints" class="muted-copy" style="margin-top:8px;font-size:12px;line-height:1.45;opacity:0.85">
+              Username: 3–64 characters, letters, numbers, and <code>.</code> <code>_</code> <code>-</code> only.
+              Password: at least 8 characters.
+            </p>
             <div class="btn-row">
               <button id="signupBtn" class="ghost-btn" type="button">Sign up</button>
               <button id="loginBtn" class="btn" type="button">Log in</button>
@@ -1192,9 +1196,16 @@
           <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
           <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
         </div>
-        <div class="composer glass">
+        <div class="composer glass" style="flex-direction:column;align-items:stretch;gap:10px">
+          <div class="muted-copy" style="font-size:12px;line-height:1.4;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <span>Optional Stripe context (attached to support requests):</span>
+            <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" style="min-width:140px;max-width:min(100%,260px);flex:1" />
+            <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" style="min-width:140px;max-width:min(100%,260px);flex:1" />
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-end;width:100%">
           <textarea id="messageInput" placeholder="Paste a customer issue or type a support request..."></textarea>
           <button id="sendBtn" class="send-btn" type="button">Send</button>
+          </div>
         </div>
       </section>
     </main>
@@ -1558,5 +1569,13 @@
 
   <script src="/fluid/script.js"></script>
   <script src="/app.js"></script>
+  <script>
+    (function () {
+      var s = document.createElement("script");
+      s.src = "/workspace_modules.js";
+      s.onerror = function () {};
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

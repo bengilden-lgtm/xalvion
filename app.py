@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 import time
@@ -69,6 +70,8 @@ except Exception:
 
 
 load_dotenv(override=True)
+
+logger = logging.getLogger("xalvion.api")
 
 # =============================================================================
 # 1. CONFIG
@@ -175,6 +178,7 @@ if STRIPE_KEY:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 INDEX_PATH = os.path.join(BASE_DIR, "index.html")
 APP_JS_PATH = os.path.join(BASE_DIR, "app.js")
+WORKSPACE_MODULES_JS_PATH = os.path.join(BASE_DIR, "workspace_modules.js")
 LANDING_PATH = os.path.join(BASE_DIR, "landing.html")
 FLUID_DIR = os.path.join(BASE_DIR, "fluid")
 
@@ -2343,6 +2347,13 @@ def serve_app_js():
     raise HTTPException(status_code=404, detail="app.js not found")
 
 
+@app.get("/workspace_modules.js")
+def serve_workspace_modules_js():
+    if os.path.exists(WORKSPACE_MODULES_JS_PATH):
+        return FileResponse(WORKSPACE_MODULES_JS_PATH, media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="workspace_modules.js not found")
+
+
 @app.get("/landing")
 def serve_landing():
     if os.path.exists(LANDING_PATH):
@@ -2417,14 +2428,25 @@ def me(user: User = Depends(get_current_user)):
 
 @app.post("/signup")
 def signup(req: AuthRequest, db: Session = Depends(get_db)):
-    username = validate_username(req.username)
-    password = validate_password(req.password)
+    try:
+        username = validate_username(req.username)
+        password = validate_password(req.password)
+    except HTTPException as exc:
+        logger.info("signup_validation_failed detail=%s", exc.detail)
+        raise
 
     if db.query(User).filter(User.username == username).first():
+        logger.info("signup_duplicate_username username=%s", username)
         raise HTTPException(status_code=400, detail="Username already taken")
 
-    db.add(User(username=username, password=hash_password(password), usage=0, tier="free"))
-    db.commit()
+    try:
+        db.add(User(username=username, password=hash_password(password), usage=0, tier="free"))
+        db.commit()
+    except Exception:
+        logger.exception("signup_db_error username=%s", username)
+        raise HTTPException(status_code=500, detail="Could not create account. Try again.")
+
+    logger.info("signup_ok username=%s", username)
     return {"message": "Account created", "tier": "free"}
 
 
@@ -2434,10 +2456,12 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
     password = (req.password or "").strip()
 
     if not username or not password:
+        logger.info("login_rejected reason=missing_fields")
         raise HTTPException(status_code=400, detail="Username and password required")
 
     user = db.query(User).filter(User.username == username).first()
     if not user or not verify_password(password, user.password):
+        logger.info("login_failed username=%s", username)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if user.username == ADMIN_USERNAME and user.tier != "elite":
@@ -2447,6 +2471,7 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
 
     token = create_token(user.username)
     usage_summary = get_usage_summary(user)
+    logger.info("login_ok username=%s tier=%s", username, usage_summary.get("tier"))
     return {
         "token": token,
         "username": user.username,
@@ -3324,7 +3349,16 @@ def support(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return run_support(req, user, db)
+    try:
+        return run_support(req, user, db)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception(
+            "support_failed username=%s",
+            getattr(user, "username", "") or "?",
+        )
+        raise
 
 
 @app.post("/support/stream")
@@ -3351,6 +3385,7 @@ async def support_stream(
                 timeout=28.0,
             )
         except asyncio.TimeoutError:
+            logger.warning("support_stream_timeout username=%s", username or "?")
             fallback = {
                 "reply": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
                 "final": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
@@ -3377,6 +3412,7 @@ async def support_stream(
             yield sse_event("done", {"ok": False, "timeout": True})
             return
         except Exception:
+            logger.exception("support_stream_error username=%s", username or "?")
             fallback = {
                 "reply": "I hit a temporary issue while processing this request. Please send it again and I’ll retry cleanly.",
                 "final": "I hit a temporary issue while processing this request. Please send it again and I’ll retry cleanly.",

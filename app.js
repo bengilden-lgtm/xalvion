@@ -12,6 +12,19 @@
   const FREE_USAGE_LIMIT = 12;
   const GUEST_USAGE_RESET_WINDOW_MS = 12 * 60 * 60 * 1000;
 
+  const AUTH_DEBUG =
+    typeof location !== "undefined" &&
+    (location.hostname === "localhost" || location.hostname === "127.0.0.1");
+
+  function authDebugLog(label, detail) {
+    if (!AUTH_DEBUG) return;
+    try {
+      const msg = detail && (detail.message || String(detail));
+      if (msg) console.warn(`[xalvion:auth] ${label}`, msg);
+      else console.warn(`[xalvion:auth] ${label}`);
+    } catch {}
+  }
+
 // ===== SAFE FALLBACK FOR pulseRail =====
 if (typeof window.pulseRail !== "function") {
   window.pulseRail = function () {
@@ -53,6 +66,7 @@ if (typeof window.pulseRail !== "function") {
     usageCard: document.getElementById("usageCard"),
     accountCard: document.getElementById("accountCard"),
     paymentIntentInput: document.getElementById("paymentIntentInput"),
+    chargeIdInput: document.getElementById("chargeIdInput"),
     railInner: document.querySelector(".rail-inner"),
     messagesShell: document.getElementById("messagesShell"),
     upgradeButtons: Array.from(document.querySelectorAll("[data-upgrade]")),
@@ -136,7 +150,8 @@ if (typeof window.pulseRail !== "function") {
     crmSummary: { new: 0, contacted: 0, replied: 0, closed: 0, due_followups: 0 },
     crmDailySummary: { due_followups: 0, new_today: 0, closed_today: 0, best_source: "manual", hottest_open: [], reminders: [] },
     revenueMetrics: { totals: {}, by_source: [], best_source: "manual", forecast: {} },
-    lastLimitNoticeKey: ""
+    lastLimitNoticeKey: "",
+    authSubmitting: false
   };
 
   const ICONS = {
@@ -1366,8 +1381,39 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   function detailFromApiBody(data) {
     const d = data && data.detail;
     if (typeof d === "string") return d;
-    if (Array.isArray(d) && d.length && typeof d[0]?.msg === "string") return d[0].msg;
+    if (Array.isArray(d) && d.length) {
+      const parts = d
+        .map((item) => {
+          if (!item || typeof item !== "object") return "";
+          if (typeof item.msg === "string") return item.msg;
+          return "";
+        })
+        .filter(Boolean);
+      if (parts.length) return parts.join(" ");
+    }
     return "";
+  }
+
+  function describeAuthRuleViolations(username, password) {
+    const u = String(username || "");
+    const p = String(password || "");
+    const parts = [];
+    if (u.length < 3 || u.length > 64) {
+      parts.push("Username must be 3–64 characters.");
+    }
+    if (u && !/^[a-zA-Z0-9._-]+$/.test(u)) {
+      parts.push("Username may only use letters, numbers, dot (.), underscore (_), and dash (-).");
+    }
+    if (p.length < 8) {
+      parts.push("Password must be at least 8 characters.");
+    }
+    return parts;
+  }
+
+  function setAuthSubmitting(value) {
+    state.authSubmitting = Boolean(value);
+    if (els.signupBtn) els.signupBtn.disabled = state.authSubmitting;
+    if (els.loginBtn) els.loginBtn.disabled = state.authSubmitting;
   }
 
   function loadDraft() {
@@ -1811,21 +1857,29 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   async function runWorkspaceRefundFromInput(amount = null) {
-    const paymentIntentId = String(els.paymentIntentInput?.value || "").trim();
+    const paymentIntentId = String(
+      els.paymentIntentInput?.value || els.refundPaymentIntentInput?.value || ""
+    ).trim();
+    const chargeId = String(els.chargeIdInput?.value || els.refundChargeInput?.value || "").trim();
 
     if (!state.stripeConnected) {
       setNotice("warning", "Stripe required", "Connect Stripe before executing live refunds.");
       return;
     }
 
-    if (!paymentIntentId) {
-      setNotice("warning", "Payment intent required", "Paste a payment intent ID before running a live refund.");
+    if (!paymentIntentId && !chargeId) {
+      setNotice(
+        "warning",
+        "Payment reference required",
+        "Paste a payment intent ID (pi_…) or charge ID (ch_…) in the workspace fields or refund modal before running a live refund."
+      );
       return;
     }
 
     try {
       const result = await executeStripeRefund({
         paymentIntentId,
+        chargeId,
         amount,
         refundReason: "requested_by_customer"
       });
@@ -2601,7 +2655,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function normalizeReference(prefix) {
-    const value = (els.paymentIntentInput?.value || "").trim();
+    const el = prefix === "pi_" ? els.paymentIntentInput : els.chargeIdInput;
+    const value = String(el?.value || "").trim();
     return value.startsWith(prefix) ? value : null;
   }
 
@@ -2665,10 +2720,12 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     if (res.status === 402) {
       pushLimitMessage(true);
-      throw new Error(data.detail || "Plan limit reached. Upgrade to continue.");
+      throw new Error(detailFromApiBody(data) || "Plan limit reached. Upgrade to continue.");
     }
 
-    if (!res.ok) throw new Error(data.detail || "Request failed");
+    if (!res.ok) {
+      throw new Error(detailFromApiBody(data) || `Support request failed (${res.status}).`);
+    }
     return data;
   }
 
@@ -2683,9 +2740,9 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       const data = await res.json().catch(() => ({}));
       if (res.status === 402) {
         pushLimitMessage(true);
-        throw new Error(data.detail || "Plan limit reached. Upgrade to continue.");
+        throw new Error(detailFromApiBody(data) || "Plan limit reached. Upgrade to continue.");
       }
-      throw new Error(data.detail || "Streaming failed");
+      throw new Error(detailFromApiBody(data) || `Streaming failed (${res.status}).`);
     }
 
     const reader = res.body.getReader();
@@ -3078,9 +3135,30 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
       try {
         data = await handleStreamReply(payload, row, stepsEl);
-      } catch {
-        data = await handleStandardReply(payload);
-        setAssistantCopy(row, data.reply || "No response returned.");
+      } catch (streamErr) {
+        authDebugLog("support_stream_fallback", streamErr);
+        try {
+          data = await handleStandardReply(payload);
+          const fb = data.reply || data.response || data.final || "";
+          setAssistantCopy(row, fb || "No response returned.");
+        } catch (stdErr) {
+          const combined =
+            (stdErr && stdErr.message) ||
+            (streamErr && streamErr.message) ||
+            "Support request failed.";
+          throw new Error(combined);
+        }
+      }
+
+      if (!data) {
+        authDebugLog("support_empty_stream", "falling back to POST /support");
+        try {
+          data = await handleStandardReply(payload);
+          const fb = data.reply || data.response || data.final || "";
+          setAssistantCopy(row, fb || "No response returned.");
+        } catch (stdErr) {
+          throw new Error(stdErr.message || "No response returned.");
+        }
       }
 
       stepTimers.forEach((timer) => window.clearTimeout(timer));
@@ -3166,8 +3244,12 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     } catch (error) {
       stepTimers.forEach((timer) => window.clearTimeout(timer));
       removeStreamSteps(stepsEl);
-      setAssistantCopy(row, "Something went wrong while processing this support request.");
-      setNotice("error", "Request failed", error.message || "Support request failed.");
+      const errText =
+        (error && error.message) ||
+        "Something went wrong while processing this support request.";
+      setAssistantCopy(row, errText);
+      setNotice("error", "Request failed", errText);
+      authDebugLog("support_failed", error);
     } finally {
       setSending(false);
       scrollMessagesToBottom(true);
@@ -3175,7 +3257,32 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     }
   }
 
+  async function applyAuthenticatedSession(data, username, noticeOpts) {
+    state.token = data.token || "";
+    state.username = data.username || username;
+    clearGuestUsage();
+    updatePlanUI(
+      data.tier || "free",
+      Number(data.usage || 0),
+      Number(data.limit || 50),
+      Number(data.remaining || 0)
+    );
+    persistAuth();
+    updateTopbarStatus();
+    await loadIntegrations();
+    if (noticeOpts) {
+      setNotice(noticeOpts.kind, noticeOpts.title, noticeOpts.detail);
+    }
+    await hydrateMe();
+    await loadDashboardSummary();
+    await loadRefundHistory();
+    await loadCrmLeads();
+    await loadRevenueMetrics();
+  }
+
   async function signup() {
+    if (state.authSubmitting) return;
+
     const username = (els.usernameInput?.value || "").trim();
     const password = (els.passwordInput?.value || "").trim();
 
@@ -3184,6 +3291,13 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       return;
     }
 
+    const ruleIssues = describeAuthRuleViolations(username, password);
+    if (ruleIssues.length) {
+      setNotice("warning", "Check account requirements", ruleIssues.join(" "));
+      return;
+    }
+
+    setAuthSubmitting(true);
     try {
       const res = await fetch(`${API}/signup`, {
         method: "POST",
@@ -3192,18 +3306,39 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "Signup failed.");
+      if (!res.ok) {
+        throw new Error(detailFromApiBody(data) || "Signup failed.");
+      }
 
-      setNotice("success", "Account created", "Log in to keep usage, plan status, and workspace state persistent.");
-      state.tier = data.tier || "free";
-      updatePlanUI(state.tier, 0, 50, 50);
-      updateTopbarStatus();
+      const loginRes = await fetch(`${API}/login`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ username, password })
+      });
+      const loginData = await loginRes.json().catch(() => ({}));
+      if (!loginRes.ok) {
+        throw new Error(
+          detailFromApiBody(loginData) ||
+            "Account created but automatic login failed. Use Log in with the same password."
+        );
+      }
+
+      await applyAuthenticatedSession(loginData, username, {
+        kind: "success",
+        title: "Account ready",
+        detail: `Signed in as ${username}. Usage, plan, integrations, and CRM are synced.`
+      });
     } catch (error) {
+      authDebugLog("signup_failed", error);
       setNotice("error", "Signup failed", error.message || "Could not create account.");
+    } finally {
+      setAuthSubmitting(false);
     }
   }
 
   async function login() {
+    if (state.authSubmitting) return;
+
     const username = (els.usernameInput?.value || "").trim();
     const password = (els.passwordInput?.value || "").trim();
 
@@ -3212,6 +3347,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       return;
     }
 
+    setAuthSubmitting(true);
     try {
       const res = await fetch(`${API}/login`, {
         method: "POST",
@@ -3220,31 +3356,23 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "Invalid credentials.");
+      if (!res.ok) {
+        throw new Error(detailFromApiBody(data) || "Invalid credentials.");
+      }
 
-      state.token = data.token || "";
-      state.username = data.username || username;
-      clearGuestUsage();
-      updatePlanUI(
-        data.tier || "free",
-        Number(data.usage || 0),
-        Number(data.limit || 50),
-        Number(data.remaining || 0)
-      );
-
-      persistAuth();
-      updateTopbarStatus();
-      await loadIntegrations();
-      setNotice("success", "Logged in", `Welcome back, ${username}. Your workspace is synced.`);
-      await hydrateMe();
-      await loadDashboardSummary();
-      await loadRefundHistory();
-      await loadCrmLeads();
+      await applyAuthenticatedSession(data, username, {
+        kind: "success",
+        title: "Logged in",
+        detail: `Welcome back, ${username}. Your workspace is synced.`
+      });
     } catch (error) {
+      authDebugLog("login_failed", error);
       clearAuth();
       updateTopbarStatus();
       updatePlanUI("free", 0, 3, 3);
       setNotice("error", "Login failed", error.message || "Could not log in.");
+    } finally {
+      setAuthSubmitting(false);
     }
   }
 
