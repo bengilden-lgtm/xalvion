@@ -7,12 +7,26 @@ from db.py so there is exactly one connection pool for the entire process.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import Column, Float, Integer, String, Text, func
 
 from db import Base, SessionLocal, engine
+
+logger = logging.getLogger("xalvion.analytics")
+
+_DEFAULT_METRICS: dict[str, Any] = {
+    "avg_confidence": 0.0,
+    "avg_quality": 0.0,
+    "total_interactions": 0,
+    "total_refunds": 0,
+    "total_credits": 0,
+    "money_moved": 0.0,
+}
+
+_metrics_failure_logged = False
 
 
 # ---------------------------------------------------------------------------
@@ -67,27 +81,42 @@ def log_event(
 
 
 def get_metrics() -> dict[str, Any]:
+    global _metrics_failure_logged
     db = SessionLocal()
     try:
         total = db.query(AnalyticsEvent).count()
         if not total:
-            return {"total_interactions": 0}
+            out = dict(_DEFAULT_METRICS)
+            out["total_interactions"] = 0
+            return out
 
         avg_conf = db.query(func.avg(AnalyticsEvent.confidence)).scalar() or 0.0
         avg_qual = db.query(func.avg(AnalyticsEvent.quality)).scalar() or 0.0
-        total_refunds = db.query(func.count()).filter(AnalyticsEvent.action == "refund").scalar() or 0
-        total_credits = db.query(func.count()).filter(AnalyticsEvent.action == "credit").scalar() or 0
-        money_moved   = db.query(func.sum(AnalyticsEvent.amount)).filter(
-            AnalyticsEvent.action.in_(["refund", "credit"])
-        ).scalar() or 0.0
+        total_refunds = db.query(AnalyticsEvent).filter(AnalyticsEvent.action == "refund").count()
+        total_credits = db.query(AnalyticsEvent).filter(AnalyticsEvent.action == "credit").count()
+        money_moved = (
+            db.query(func.sum(AnalyticsEvent.amount))
+            .filter(AnalyticsEvent.action.in_(["refund", "credit"]))
+            .scalar()
+            or 0.0
+        )
 
         return {
-            "avg_confidence":     round(float(avg_conf), 2),
-            "avg_quality":        round(float(avg_qual), 2),
+            "avg_confidence": round(float(avg_conf), 2),
+            "avg_quality": round(float(avg_qual), 2),
             "total_interactions": total,
-            "total_refunds":      total_refunds,
-            "total_credits":      total_credits,
-            "money_moved":        round(float(money_moved), 2),
+            "total_refunds": total_refunds,
+            "total_credits": total_credits,
+            "money_moved": round(float(money_moved), 2),
         }
+    except Exception as exc:
+        if not _metrics_failure_logged:
+            _metrics_failure_logged = True
+            logger.warning(
+                "get_metrics_unavailable type=%s detail=%s",
+                type(exc).__name__,
+                str(exc)[:500],
+            )
+        return dict(_DEFAULT_METRICS)
     finally:
         db.close()

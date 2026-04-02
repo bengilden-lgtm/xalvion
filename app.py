@@ -48,6 +48,7 @@ from sqlalchemy import (
     inspect,
     text,
 )
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from agent import run_agent, local_fallback_reply
@@ -62,16 +63,43 @@ except Exception:
     def learn_from_ticket(ticket: dict[str, Any], decision: dict[str, Any], outcome: dict[str, Any]) -> None:
         return None
 
+_METRICS_FALLBACK: dict[str, Any] = {
+    "avg_confidence": 0.0,
+    "avg_quality": 0.0,
+    "total_interactions": 0,
+    "total_refunds": 0,
+    "total_credits": 0,
+    "money_moved": 0.0,
+}
+
 try:
     from analytics import get_metrics
 except Exception:
     def get_metrics() -> dict[str, Any]:
-        return {}
+        return dict(_METRICS_FALLBACK)
 
 
 load_dotenv(override=True)
 
 logger = logging.getLogger("xalvion.api")
+
+_db_issue_last_log: dict[str, float] = {}
+DB_ISSUE_LOG_COOLDOWN_S = 60.0
+
+
+def _log_throttled_db_issue(path_key: str, exc: BaseException) -> None:
+    """Log DB/schema problems without per-request traceback spam."""
+    now = time.time()
+    last = _db_issue_last_log.get(path_key, 0.0)
+    if now - last < DB_ISSUE_LOG_COOLDOWN_S:
+        return
+    _db_issue_last_log[path_key] = now
+    logger.warning(
+        "db_issue path=%s type=%s detail=%s",
+        path_key,
+        type(exc).__name__,
+        str(exc)[:500],
+    )
 
 # =============================================================================
 # 1. CONFIG
@@ -373,7 +401,8 @@ def ensure_user_columns() -> None:
 def _startup_database() -> None:
     _import_orm_submodules()
     init_db()
-    print("DB initialized: tables ensured", flush=True)
+    logger.info("DB schema ensured")
+    print("DB schema ensured", flush=True)
     ensure_user_columns()
 
 
@@ -1982,7 +2011,18 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
 
 def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
     enforce_plan_limits(user)
-    ticket = create_ticket_record(db, user, req)
+    try:
+        ticket = create_ticket_record(db, user, req)
+    except SQLAlchemyError as exc:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        _log_throttled_db_issue("support_ticket_persist", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="Support ticketing database is temporarily unavailable. Please try again shortly.",
+        ) from None
     runtime_ticket = build_runtime_ticket(req, user, db)
     shadow_decision = safe_execute(system_decision, runtime_ticket)
     if not isinstance(shadow_decision, dict) or "error" in shadow_decision:
@@ -2814,6 +2854,51 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
     return {"received": True, "type": event_type, "outcome": outcome}
 
+
+def _dashboard_summary_fallback(user: User, db: Session, file_metrics: dict[str, Any]) -> dict[str, Any]:
+    """Same JSON shape as dashboard_summary when DB aggregations fail."""
+    usage_summary = get_usage_summary(user)
+    public_tier = get_public_plan_name(user)
+    pc = get_plan_config(public_tier)
+    operator_mode = "balanced"
+    try:
+        operator_mode = get_operator_mode(db)
+    except Exception:
+        pass
+    return {
+        "total_interactions": int(file_metrics.get("total_interactions", 0) or 0),
+        "avg_confidence": float(file_metrics.get("avg_confidence", 0) or 0),
+        "avg_quality": float(file_metrics.get("avg_quality", 0) or 0),
+        "total_tickets": 0,
+        "auto_resolved": 0,
+        "escalated": 0,
+        "failed": 0,
+        "high_churn_risk": 0,
+        "pending_approvals": 0,
+        "approved_actions": 0,
+        "auto_resolution_rate": 0.0,
+        "escalation_rate": 0.0,
+        "refund_total": 0.0,
+        "credit_total": 0.0,
+        "money_saved": 0.0,
+        "actions": 0,
+        "by_queue": {},
+        "by_priority": {},
+        "by_risk": {},
+        "by_status": {},
+        "your_usage": usage_summary["usage"],
+        "your_tier": public_tier,
+        "your_limit": pc["monthly_limit"],
+        "remaining": usage_summary["remaining"],
+        "dashboard_access": pc["dashboard_access"],
+        "priority_routing": pc["priority_routing"],
+        "operator_mode": operator_mode,
+        "total_users": 0,
+        "pro_users": 0,
+        "elite_users": 0,
+    }
+
+
 # =============================================================================
 # 17. ROUTES — DASHBOARD & METRICS
 # =============================================================================
@@ -2824,73 +2909,77 @@ def dashboard_summary(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    file_metrics = get_metrics() or {}
+    file_metrics = {**_METRICS_FALLBACK, **(get_metrics() or {})}
 
-    total_tickets = db.query(Ticket).count()
-    auto_resolved = db.query(Ticket).filter(Ticket.status == "resolved").count()
-    escalated = db.query(Ticket).filter(Ticket.status.in_(["waiting", "escalated"])).count()
-    failed_count = db.query(Ticket).filter(Ticket.status == "failed").count()
-    high_risk = db.query(Ticket).filter(Ticket.churn_risk >= 60).count()
-    pending_approvals = db.query(ActionLog).filter(
-        ActionLog.requires_approval == 1,
-        ActionLog.approved == 0,
-    ).count()
+    try:
+        total_tickets = db.query(Ticket).count()
+        auto_resolved = db.query(Ticket).filter(Ticket.status == "resolved").count()
+        escalated = db.query(Ticket).filter(Ticket.status.in_(["waiting", "escalated"])).count()
+        failed_count = db.query(Ticket).filter(Ticket.status == "failed").count()
+        high_risk = db.query(Ticket).filter(Ticket.churn_risk >= 60).count()
+        pending_approvals = db.query(ActionLog).filter(
+            ActionLog.requires_approval == 1,
+            ActionLog.approved == 0,
+        ).count()
 
-    refund_total = float(db.query(func.sum(ActionLog.amount)).filter(ActionLog.action == "refund").scalar() or 0)
-    credit_total = float(db.query(func.sum(ActionLog.amount)).filter(ActionLog.action == "credit").scalar() or 0)
-    actions_done = db.query(ActionLog).filter(ActionLog.action.in_(["refund", "credit"])).count()
-    approved_count = db.query(ActionLog).filter(ActionLog.approved == 1).count()
+        refund_total = float(db.query(func.sum(ActionLog.amount)).filter(ActionLog.action == "refund").scalar() or 0)
+        credit_total = float(db.query(func.sum(ActionLog.amount)).filter(ActionLog.action == "credit").scalar() or 0)
+        actions_done = db.query(ActionLog).filter(ActionLog.action.in_(["refund", "credit"])).count()
+        approved_count = db.query(ActionLog).filter(ActionLog.approved == 1).count()
 
-    db_avg_conf = float(db.query(func.avg(ActionLog.confidence)).filter(ActionLog.confidence > 0).scalar() or 0)
-    db_avg_qual = float(db.query(func.avg(ActionLog.quality)).filter(ActionLog.quality > 0).scalar() or 0)
-    avg_confidence = file_metrics.get("avg_confidence") or round(db_avg_conf, 4)
-    avg_quality = file_metrics.get("avg_quality") or round(db_avg_qual, 4)
+        db_avg_conf = float(db.query(func.avg(ActionLog.confidence)).filter(ActionLog.confidence > 0).scalar() or 0)
+        db_avg_qual = float(db.query(func.avg(ActionLog.quality)).filter(ActionLog.quality > 0).scalar() or 0)
+        avg_confidence = file_metrics.get("avg_confidence") or round(db_avg_conf, 4)
+        avg_quality = file_metrics.get("avg_quality") or round(db_avg_qual, 4)
 
-    queue_rows = db.query(Ticket.queue, func.count(Ticket.id)).group_by(Ticket.queue).all()
-    prio_rows = db.query(Ticket.priority, func.count(Ticket.id)).group_by(Ticket.priority).all()
-    risk_rows = db.query(Ticket.risk_level, func.count(Ticket.id)).group_by(Ticket.risk_level).all()
-    status_rows = db.query(Ticket.status, func.count(Ticket.id)).group_by(Ticket.status).all()
+        queue_rows = db.query(Ticket.queue, func.count(Ticket.id)).group_by(Ticket.queue).all()
+        prio_rows = db.query(Ticket.priority, func.count(Ticket.id)).group_by(Ticket.priority).all()
+        risk_rows = db.query(Ticket.risk_level, func.count(Ticket.id)).group_by(Ticket.risk_level).all()
+        status_rows = db.query(Ticket.status, func.count(Ticket.id)).group_by(Ticket.status).all()
 
-    by_queue = {_safe_queue(q or "new"): int(c) for q, c in queue_rows}
-    by_priority = {_safe_priority(p or "medium"): int(c) for p, c in prio_rows}
-    by_risk = {_safe_risk(r or "medium"): int(c) for r, c in risk_rows}
-    by_status = {_safe_status(s or "new"): int(c) for s, c in status_rows}
+        by_queue = {_safe_queue(q or "new"): int(c) for q, c in queue_rows}
+        by_priority = {_safe_priority(p or "medium"): int(c) for p, c in prio_rows}
+        by_risk = {_safe_risk(r or "medium"): int(c) for r, c in risk_rows}
+        by_status = {_safe_status(s or "new"): int(c) for s, c in status_rows}
 
-    usage_summary = get_usage_summary(user)
-    public_tier = get_public_plan_name(user)
+        usage_summary = get_usage_summary(user)
+        public_tier = get_public_plan_name(user)
 
-    return {
-        "total_interactions": file_metrics.get("total_interactions", 0),
-        "avg_confidence": avg_confidence,
-        "avg_quality": avg_quality,
-        "total_tickets": total_tickets,
-        "auto_resolved": auto_resolved,
-        "escalated": escalated,
-        "failed": failed_count,
-        "high_churn_risk": high_risk,
-        "pending_approvals": pending_approvals,
-        "approved_actions": approved_count,
-        "auto_resolution_rate": round(auto_resolved / max(1, total_tickets) * 100, 2),
-        "escalation_rate": round(escalated / max(1, total_tickets) * 100, 2),
-        "refund_total": round(refund_total, 2),
-        "credit_total": round(credit_total, 2),
-        "money_saved": round(refund_total + credit_total, 2),
-        "actions": actions_done,
-        "by_queue": by_queue,
-        "by_priority": by_priority,
-        "by_risk": by_risk,
-        "by_status": by_status,
-        "your_usage": usage_summary["usage"],
-        "your_tier": public_tier,
-        "your_limit": get_plan_config(public_tier)["monthly_limit"],
-        "remaining": usage_summary["remaining"],
-        "dashboard_access": get_plan_config(public_tier)["dashboard_access"],
-        "priority_routing": get_plan_config(public_tier)["priority_routing"],
-        "operator_mode": get_operator_mode(db),
-        "total_users": db.query(User).count(),
-        "pro_users": db.query(User).filter(User.tier == "pro").count(),
-        "elite_users": db.query(User).filter(User.tier == "elite").count(),
-    }
+        return {
+            "total_interactions": file_metrics.get("total_interactions", 0),
+            "avg_confidence": avg_confidence,
+            "avg_quality": avg_quality,
+            "total_tickets": total_tickets,
+            "auto_resolved": auto_resolved,
+            "escalated": escalated,
+            "failed": failed_count,
+            "high_churn_risk": high_risk,
+            "pending_approvals": pending_approvals,
+            "approved_actions": approved_count,
+            "auto_resolution_rate": round(auto_resolved / max(1, total_tickets) * 100, 2),
+            "escalation_rate": round(escalated / max(1, total_tickets) * 100, 2),
+            "refund_total": round(refund_total, 2),
+            "credit_total": round(credit_total, 2),
+            "money_saved": round(refund_total + credit_total, 2),
+            "actions": actions_done,
+            "by_queue": by_queue,
+            "by_priority": by_priority,
+            "by_risk": by_risk,
+            "by_status": by_status,
+            "your_usage": usage_summary["usage"],
+            "your_tier": public_tier,
+            "your_limit": get_plan_config(public_tier)["monthly_limit"],
+            "remaining": usage_summary["remaining"],
+            "dashboard_access": get_plan_config(public_tier)["dashboard_access"],
+            "priority_routing": get_plan_config(public_tier)["priority_routing"],
+            "operator_mode": get_operator_mode(db),
+            "total_users": db.query(User).count(),
+            "pro_users": db.query(User).filter(User.tier == "pro").count(),
+            "elite_users": db.query(User).filter(User.tier == "elite").count(),
+        }
+    except Exception as exc:
+        _log_throttled_db_issue("GET /dashboard/summary", exc)
+        return _dashboard_summary_fallback(user, db, file_metrics)
 
 # =============================================================================
 # 18. ROUTES — TICKETS
@@ -3409,6 +3498,48 @@ async def support_stream(
                 run_in_threadpool(run_support_for_username, req, username),
                 timeout=28.0,
             )
+        except HTTPException as he:
+            msg = he.detail if isinstance(he.detail, str) else "Request could not be completed."
+            if he.status_code == 503:
+                _log_throttled_db_issue("support_ticket_persist", he)
+            fallback = {
+                "reply": msg,
+                "final": msg,
+                "response": msg,
+                "action": "review",
+                "amount": 0,
+                "reason": "db_unavailable",
+                "issue_type": "general_support",
+                "order_status": "unknown",
+                "tool_status": "db_unavailable",
+                "tool_result": {"status": "db_unavailable"},
+                "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
+                "decision": {
+                    "action": "review",
+                    "queue": "escalated",
+                    "priority": "high",
+                    "risk_level": "medium",
+                    "requires_approval": False,
+                    "status": "waiting",
+                },
+                "execution": {
+                    "action": "review",
+                    "amount": 0,
+                    "status": "db_unavailable",
+                    "auto_resolved": False,
+                    "requires_approval": False,
+                },
+                "meta": {"operator_mode": "balanced"},
+                "triage": {},
+                "history": {},
+                "mode": "db_unavailable",
+                "confidence": 0.0,
+                "quality": 0.0,
+            }
+            yield sse_event("status", {"stage": "finalizing", "label": "Could not save support request"})
+            yield sse_event("result", fallback)
+            yield sse_event("done", {"ok": False, "status": getattr(he, "status_code", 503)})
+            return
         except asyncio.TimeoutError:
             logger.warning("support_stream_timeout username=%s", username or "?")
             fallback = {
