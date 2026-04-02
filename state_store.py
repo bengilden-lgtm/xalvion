@@ -1,132 +1,87 @@
+"""
+state_store.py — Generic key-value state store backed by SQLAlchemy.
+
+FIX: Was creating its own engine.  Now imports the shared engine from db.py
+so all writes go through the same connection pool.
+"""
 from __future__ import annotations
 
 import json
-import os
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any, Callable
 
-from sqlalchemy import Column, String, Text, create_engine, text
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import Column, String, Text
+
+from db import Base, SessionLocal, engine
 
 
-# =========================
-# DATABASE PATH FIX (CRITICAL)
-# =========================
-def _resolve_database_url() -> str:
-    raw = os.getenv("DATABASE_URL", "sqlite:///./aurum.db").strip()
+# ---------------------------------------------------------------------------
+# ORM Model
+# ---------------------------------------------------------------------------
 
-    # If not sqlite, just return (e.g. Postgres)
-    if not raw.startswith("sqlite:///"):
-        return raw
-
-    sqlite_target = raw.replace("sqlite:///", "", 1).strip()
-
-    # Absolute path → ensure directory exists
-    if sqlite_target.startswith("/"):
-        db_path = Path(sqlite_target)
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        return f"sqlite:///{db_path}"
-
-    # Railway / container safe fallback
-    preferred_dir = (
-        os.getenv("STATE_STORE_DIR")
-        or os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
-        or "/tmp/xalvion_state"
-    )
-
-    base_dir = Path(preferred_dir)
-    base_dir.mkdir(parents=True, exist_ok=True)
-
-    db_path = base_dir / sqlite_target
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    return f"sqlite:///{db_path}"
-
-
-DATABASE_URL = _resolve_database_url()
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
-    pool_pre_ping=True,
-)
-
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-Base = declarative_base()
-
-
-# =========================
-# TABLE
-# =========================
 class AgentState(Base):
     __tablename__ = "agent_state"
 
-    key = Column(String, primary_key=True)
-    value = Column(Text, nullable=False, default="{}")
-    updated_at = Column(String, nullable=False)
+    key        = Column(String(120), primary_key=True)
+    value      = Column(Text, nullable=False, default="{}")
+    updated_at = Column(String(32), nullable=False)
 
 
 Base.metadata.create_all(bind=engine)
 
 
-# =========================
-# LOAD
-# =========================
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
 def load_state(key: str, default: dict[str, Any]) -> dict[str, Any]:
     db = SessionLocal()
     try:
         row = db.query(AgentState).filter(AgentState.key == key).first()
         if row is None:
             return default.copy()
-
         try:
             parsed = json.loads(row.value)
             return parsed if isinstance(parsed, dict) else default.copy()
         except Exception:
             return default.copy()
-
     finally:
         db.close()
 
 
-# =========================
-# SAVE
-# =========================
 def save_state(key: str, value: dict[str, Any]) -> None:
     db = SessionLocal()
     try:
+        now     = datetime.now(timezone.utc).isoformat()
         payload = json.dumps(value, ensure_ascii=False)
-        now = datetime.utcnow().isoformat()
 
         row = db.query(AgentState).filter(AgentState.key == key).first()
-
         if row is None:
             db.add(AgentState(key=key, value=payload, updated_at=now))
         else:
-            row.value = payload
+            row.value      = payload
             row.updated_at = now
 
         db.commit()
-
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
 
-# =========================
-# SAFE MUTATION (LOCKED)
-# =========================
 def mutate_state(
-    key: str,
+    key:     str,
     default: dict[str, Any],
     mutator: Callable[[dict[str, Any]], dict[str, Any]],
 ) -> dict[str, Any]:
+    """
+    Load → mutate → save in a single session.
+    Uses a session-level transaction for safety; avoids BEGIN IMMEDIATE
+    which is SQLite-specific and incompatible with Postgres.
+    """
     db = SessionLocal()
-
     try:
-        # Lock row (prevents race conditions)
-        db.execute(text("BEGIN IMMEDIATE"))
-
         row = db.query(AgentState).filter(AgentState.key == key).first()
 
         if row is None:
@@ -134,10 +89,9 @@ def mutate_state(
             row = AgentState(
                 key=key,
                 value=json.dumps(current, ensure_ascii=False),
-                updated_at=datetime.utcnow().isoformat(),
+                updated_at=datetime.now(timezone.utc).isoformat(),
             )
             db.add(row)
-            db.flush()
         else:
             try:
                 current = json.loads(row.value)
@@ -148,8 +102,8 @@ def mutate_state(
 
         updated = mutator(current)
 
-        row.value = json.dumps(updated, ensure_ascii=False)
-        row.updated_at = datetime.utcnow().isoformat()
+        row.value      = json.dumps(updated, ensure_ascii=False)
+        row.updated_at = datetime.now(timezone.utc).isoformat()
 
         db.commit()
         return updated
@@ -157,6 +111,5 @@ def mutate_state(
     except Exception:
         db.rollback()
         raise
-
     finally:
         db.close()

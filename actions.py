@@ -191,6 +191,8 @@ def system_decision(ticket: Dict[str, Any]) -> Dict[str, Any]:
     history = ticket.get("customer_history") or {}
     operator_mode = str(ticket.get("operator_mode", "balanced") or "balanced")
     triage = ticket.get("triage") or triage_ticket(ticket, history)
+    abuse_score = max(0, _to_int(history.get("abuse_score", 0), 0))
+    refund_count = max(0, _to_int(history.get("refund_count", 0), 0))
 
     base = {
         "action": "none",
@@ -202,10 +204,19 @@ def system_decision(ticket: Dict[str, Any]) -> Dict[str, Any]:
         "requires_approval": False,
     }
 
-    if history.get("abuse_score", 0) >= 3:
+    if abuse_score >= 3:
         base.update({
             "action": "review",
             "reason": "Repeat abuse signals detected",
+            "priority": "high",
+            "queue": "refund_risk",
+        })
+        return base
+
+    if refund_count >= 5:
+        base.update({
+            "action": "review",
+            "reason": "Refund count ({}) exceeds safe threshold".format(refund_count),
             "priority": "high",
             "queue": "refund_risk",
         })
@@ -218,7 +229,7 @@ def system_decision(ticket: Dict[str, Any]) -> Dict[str, Any]:
             "reason": "Duplicate-charge protection policy",
             "priority": "high",
             "queue": "refund_risk",
-            "requires_approval": False,
+            "requires_approval": bool(abuse_score >= 2),
         })
     elif sentiment <= 2 and ltv >= 500:
         base.update({

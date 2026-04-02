@@ -789,6 +789,37 @@ def _build_memory_delta(history: Dict[str, Any], ticket: Dict[str, Any]) -> Dict
     }
 
 
+
+
+def compute_quality(
+    confidence: float,
+    triage: Dict[str, Any],
+    executed: Dict[str, Any],
+    history: Dict[str, Any],
+    llm_used: bool,
+) -> float:
+    """
+    Compute a real quality signal from observable execution factors.
+    Replaces the previous hardcoded 0.97 / 0.94 constants.
+    """
+    score = float(confidence)
+    if llm_used:
+        score += 0.04
+    tool_status = str(executed.get("tool_status", executed.get("status", "")) or "")
+    if tool_status in {"success", "credit_issued"}:
+        score += 0.04
+    elif tool_status in {"error", "pending_review"}:
+        score -= 0.06
+    action = str(executed.get("action", "none") or "none")
+    if action == "review":
+        score -= 0.08
+    abuse_likelihood = float(triage.get("abuse_likelihood", 0)) / 100.0
+    score *= (1.0 - abuse_likelihood * 0.25)
+    abuse_score = int(history.get("abuse_score", 0) or 0)
+    if abuse_score > 1:
+        score -= (abuse_score - 1) * 0.05
+    return round(max(0.50, min(0.99, score)), 2)
+
 def _canonicalize_result(
     *,
     customer_message: str,
@@ -993,6 +1024,7 @@ def run_agent(
     mode = "sovereign-local"
     confidence = 0.9
     quality = 0.94
+    llm_used = False
 
     if client is not None:
         try:
@@ -1011,6 +1043,7 @@ def run_agent(
             mode = f"sovereign-{model}"
             confidence = clamp_confidence(parsed.get("confidence", 0.92), 0.92)
             quality = 0.97
+            llm_used = True
             thinking_trace.append(_trace("llm_response", "done", model))
         except Exception:
             parsed = None
@@ -1040,6 +1073,7 @@ def run_agent(
 
     executed = execute_action(ticket, final_action)
     thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
+    quality = compute_quality(confidence, triage, executed, user_memory, llm_used)
 
     customer_note = normalize_text(
         polish_message(str(parsed.get("customer_note", parsed.get("customer_message", "")) or ""))
