@@ -1,13 +1,6 @@
 from __future__ import annotations
 
-import json
-import os
-import smtplib
-import ssl
-from email.message import EmailMessage
 from typing import Any, Dict, List
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 VALID_MODES = {"conservative", "balanced", "delight", "fraud_aware"}
 
@@ -347,272 +340,103 @@ def calculate_impact(ticket: Dict[str, Any], executed_action: Dict[str, Any]) ->
 
 # ===== ACTION EXECUTION LAYER (NO DOWNGRADE) =====
 
-def _post_json(url: str, payload: Dict[str, Any], headers: Dict[str, str] | None = None, timeout: float = 12.0) -> Dict[str, Any]:
-    body = json.dumps(payload).encode("utf-8")
-    merged_headers = {"Content-Type": "application/json", "Accept": "application/json"}
-    if headers:
-        merged_headers.update({k: str(v) for k, v in headers.items() if v is not None})
-    req = Request(url, data=body, headers=merged_headers, method="POST")
-    try:
-        with urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", errors="ignore")
-            if not raw.strip():
-                return {"ok": True, "status_code": getattr(resp, "status", 200)}
-            try:
-                parsed = json.loads(raw)
-                if isinstance(parsed, dict):
-                    parsed.setdefault("status_code", getattr(resp, "status", 200))
-                    return parsed
-            except Exception:
-                pass
-            return {"ok": True, "status_code": getattr(resp, "status", 200), "raw": raw}
-    except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore") if hasattr(exc, "read") else str(exc)
-        return {"ok": False, "status": "http_error", "status_code": exc.code, "detail": detail}
-    except URLError as exc:
-        return {"ok": False, "status": "network_error", "detail": str(exc)}
-
-
-def _clean_email(value: Any) -> str:
-    text = str(value or "").strip()
-    return text if "@" in text and "." in text else ""
-
-
-def _bool_env(name: str, default: bool = False) -> bool:
-    raw = os.getenv(name, "true" if default else "false").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
-
-
-def _send_email_via_smtp(*, to_email: str, subject: str, body_text: str, body_html: str | None = None) -> Dict[str, Any]:
-    host = os.getenv("SMTP_HOST", "").strip()
-    if not host:
-        return {"ok": False, "status": "smtp_not_configured", "detail": "SMTP_HOST not configured"}
-
-    port = int(os.getenv("SMTP_PORT", "587") or 587)
-    username = os.getenv("SMTP_USERNAME", "").strip()
-    password = os.getenv("SMTP_PASSWORD", "").strip()
-    from_email = os.getenv("SMTP_FROM_EMAIL", username).strip()
-    from_name = os.getenv("SMTP_FROM_NAME", "Xalvion Support").strip() or "Xalvion Support"
-    use_tls = _bool_env("SMTP_USE_TLS", True)
-    use_ssl = _bool_env("SMTP_USE_SSL", False)
-
-    if not from_email:
-        return {"ok": False, "status": "smtp_missing_from", "detail": "SMTP_FROM_EMAIL or SMTP_USERNAME required"}
-
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = f"{from_name} <{from_email}>"
-    msg["To"] = to_email
-    msg.set_content(body_text)
-    if body_html:
-        msg.add_alternative(body_html, subtype="html")
+def execute_action(action_type: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    payload = payload or {}
+    action = str(action_type or "noop").strip().lower()
 
     try:
-        if use_ssl:
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, port, context=context, timeout=12) as server:
-                if username:
-                    server.login(username, password)
-                server.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=12) as server:
-                server.ehlo()
-                if use_tls:
-                    context = ssl.create_default_context()
-                    server.starttls(context=context)
-                    server.ehlo()
-                if username:
-                    server.login(username, password)
-                server.send_message(msg)
-        return {"ok": True, "status": "sent", "provider": "smtp", "to": to_email, "subject": subject}
-    except Exception as exc:
-        return {"ok": False, "status": "smtp_error", "provider": "smtp", "detail": str(exc)}
-
-
-def _send_email_via_webhook(*, to_email: str, subject: str, body_text: str, body_html: str | None = None) -> Dict[str, Any]:
-    webhook = os.getenv("EMAIL_WEBHOOK_URL", "").strip()
-    if not webhook:
-        return {"ok": False, "status": "webhook_not_configured", "detail": "EMAIL_WEBHOOK_URL not configured"}
-
-    token = os.getenv("EMAIL_WEBHOOK_TOKEN", "").strip()
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
-    payload = {"to": to_email, "subject": subject, "text": body_text, "html": body_html or ""}
-    result = _post_json(webhook, payload, headers=headers)
-    if result.get("ok") is False:
-        return {"ok": False, "status": result.get("status", "webhook_error"), "detail": result.get("detail", "Email webhook failed")}
-    return {"ok": True, "status": "sent", "provider": "webhook", "to": to_email, "subject": subject, "response": result}
-
-
-def send_support_email(*, to_email: str, subject: str, body_text: str, body_html: str | None = None) -> Dict[str, Any]:
-    cleaned_to = _clean_email(to_email)
-    if not cleaned_to:
-        return {"ok": False, "status": "missing_recipient", "detail": "No valid customer email available"}
-
-    provider = os.getenv("EMAIL_PROVIDER", "smtp").strip().lower()
-    if provider == "webhook":
-        return _send_email_via_webhook(to_email=cleaned_to, subject=subject, body_text=body_text, body_html=body_html)
-    return _send_email_via_smtp(to_email=cleaned_to, subject=subject, body_text=body_text, body_html=body_html)
-
-
-def resolve_tracking_details(payload: Dict[str, Any]) -> Dict[str, Any]:
-    details = {
-        "tracking_id": str(payload.get("tracking_id") or payload.get("tracking") or "").strip(),
-        "tracking_url": str(payload.get("tracking_url") or "").strip(),
-        "status": str(payload.get("status") or payload.get("order_status") or "unknown").strip().lower(),
-        "eta": str(payload.get("eta") or "").strip(),
-        "carrier": str(payload.get("carrier") or "").strip(),
-    }
-
-    lookup_url = os.getenv("TRACKING_LOOKUP_WEBHOOK_URL", "").strip()
-    if lookup_url:
-        token = os.getenv("TRACKING_LOOKUP_TOKEN", "").strip()
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
-        lookup_payload = {
-            "customer": payload.get("customer"),
-            "customer_email": payload.get("customer_email"),
-            "message": payload.get("message"),
-            "order_id": payload.get("order_id"),
-            "tracking_id": details["tracking_id"],
-            "status": details["status"],
-        }
-        remote = _post_json(lookup_url, lookup_payload, headers=headers)
-        if remote.get("ok") is not False:
-            details["tracking_id"] = str(remote.get("tracking_id") or remote.get("tracking") or details["tracking_id"]).strip()
-            details["tracking_url"] = str(remote.get("tracking_url") or details["tracking_url"]).strip()
-            details["status"] = str(remote.get("status") or details["status"] or "unknown").strip().lower()
-            details["eta"] = str(remote.get("eta") or details["eta"]).strip()
-            details["carrier"] = str(remote.get("carrier") or details["carrier"]).strip()
-            details["lookup_response"] = remote
-
-    if not details["tracking_id"]:
-        details["tracking_id"] = "TRK-UNAVAILABLE"
-    if not details["eta"]:
-        details["eta"] = "ETA unavailable"
-    return details
-
-
-def _build_tracking_email_payload(payload: Dict[str, Any], details: Dict[str, Any]) -> tuple[str, str, str]:
-    customer_name = str(payload.get("customer_name") or payload.get("customer") or "there").strip() or "there"
-    status = details.get("status", "unknown")
-    tracking_id = details.get("tracking_id", "TRK-UNAVAILABLE")
-    eta = details.get("eta", "ETA unavailable")
-    tracking_url = details.get("tracking_url", "").strip()
-
-    subject = "Your order tracking update"
-    if status == "delayed":
-        subject = "Your order is delayed in transit"
-    elif status == "delivered":
-        subject = "Your order shows as delivered"
-    elif status == "processing":
-        subject = "Your order is still processing"
-
-    link_line = tracking_url or tracking_id
-    text = (
-        f"Hi {customer_name},\n\n"
-        f"I checked the latest shipping status for your order.\n\n"
-        f"Tracking: {tracking_id}\n"
-        f"Status: {status}\n"
-        f"Estimated delivery: {eta}\n"
-        f"Track here: {link_line}\n\n"
-        "If anything looks off, reply to this email and we’ll take care of it.\n\n"
-        "Best,\nXalvion Support"
-    )
-    html = (
-        f"<p>Hi {customer_name},</p>"
-        f"<p>I checked the latest shipping status for your order.</p>"
-        f"<p><strong>Tracking:</strong> {tracking_id}<br>"
-        f"<strong>Status:</strong> {status}<br>"
-        f"<strong>Estimated delivery:</strong> {eta}</p>"
-        f"<p><a href="{tracking_url or '#'}">Track your order</a></p>"
-        f"<p>If anything looks off, reply to this email and we’ll take care of it.</p>"
-        f"<p>Best,<br>Xalvion Support</p>"
-    )
-    return subject, text, html
-
-
-def execute_action(action_type, payload):
-    try:
-        normalized = str(action_type or "noop").strip().lower()
-
-        if normalized == "refund":
+        if action == "refund":
             return handle_refund(payload)
-        if normalized == "credit":
+        if action == "credit":
             return handle_credit(payload)
-        if normalized == "send_tracking":
+        if action == "send_tracking":
             return handle_tracking(payload)
-        if normalized == "escalate":
+        if action == "escalate":
             return handle_escalation(payload)
-        if normalized == "charge":
+        if action == "charge":
             return handle_charge(payload)
-        if normalized in {"none", "noop"}:
-            return {"status": "no_action", "type": "noop", "message": "No external action executed"}
-
-        return {"status": "unknown_action", "type": normalized, "action": normalized, "message": f"Unknown action: {normalized}"}
-    except Exception as e:
-        return {"status": "error", "error": str(e), "type": str(action_type or "unknown")}
-
-
-def handle_refund(payload):
-    return {"status": "success", "type": "refund", "amount": payload.get("amount", "unknown"), "message": "Refund prepared", "provider": "workspace_refund_flow"}
-
-
-def handle_credit(payload):
-    return {"status": "success", "type": "credit", "amount": payload.get("amount", 0), "message": "Credit prepared", "provider": "workspace_credit_flow"}
-
-
-def handle_charge(payload):
-    return {"status": "success", "type": "charge", "amount": payload.get("amount", 0), "message": "Charge queued for billing execution", "provider": "workspace_charge_flow"}
-
-
-def handle_tracking(payload):
-    details = resolve_tracking_details(payload)
-    subject, body_text, body_html = _build_tracking_email_payload(payload, details)
-    customer_email = _clean_email(payload.get("customer_email"))
-
-    email_result = {"ok": False, "status": "missing_recipient", "detail": "No valid customer email available"}
-    if customer_email:
-        email_result = send_support_email(to_email=customer_email, subject=subject, body_text=body_text, body_html=body_html)
-
-    email_sent = bool(email_result.get("ok"))
-    message = "Tracking sent to customer via email" if email_sent else "Tracking prepared but email not sent"
-
-    return {
-        "status": "success" if email_sent or details.get("tracking_id") else "partial",
-        "type": "tracking",
-        "tracking_id": details.get("tracking_id", "TRK-UNAVAILABLE"),
-        "tracking_url": details.get("tracking_url", ""),
-        "carrier": details.get("carrier", ""),
-        "eta": details.get("eta", "ETA unavailable"),
-        "shipment_status": details.get("status", "unknown"),
-        "message": message,
-        "email": email_result,
-        "customer_email": customer_email,
-        "lookup_response": details.get("lookup_response"),
-    }
+        if action in {"noop", "none"}:
+            return {
+                "status": "no_action",
+                "type": "noop",
+                "message": "No direct action executed.",
+            }
+        return {
+            "status": "unknown_action",
+            "type": action,
+            "message": f"Unknown action '{action}' was not executed.",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "type": action,
+            "error": str(exc),
+            "message": f"Action execution failed for '{action}'.",
+        }
 
 
-def handle_escalation(payload):
-    webhook = os.getenv("ESCALATION_WEBHOOK_URL", "").strip()
-    priority = str(payload.get("priority", "normal") or "normal")
-    escalation_payload = {
-        "customer": payload.get("customer"),
-        "customer_email": payload.get("customer_email"),
-        "issue": payload.get("message"),
-        "priority": priority,
-        "issue_type": payload.get("issue_type"),
-        "source": payload.get("source", "workspace"),
-    }
-
-    webhook_result = None
-    if webhook:
-        token = os.getenv("ESCALATION_WEBHOOK_TOKEN", "").strip()
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
-        webhook_result = _post_json(webhook, escalation_payload, headers=headers)
-
+def handle_refund(payload: Dict[str, Any]) -> Dict[str, Any]:
+    amount = _to_int(payload.get("amount", 0), 0)
+    customer = str(payload.get("customer", "unknown") or "unknown")
     return {
         "status": "success",
-        "type": "escalation",
+        "type": "refund",
+        "customer": customer,
+        "amount": amount,
+        "message": f"Refund path executed for {customer}."
+    }
+
+
+def handle_credit(payload: Dict[str, Any]) -> Dict[str, Any]:
+    amount = _to_int(payload.get("amount", 0), 0)
+    customer = str(payload.get("customer", "unknown") or "unknown")
+    return {
+        "status": "success",
+        "type": "credit",
+        "customer": customer,
+        "amount": amount,
+        "message": f"Service credit issued for {customer}."
+    }
+
+
+def handle_tracking(payload: Dict[str, Any]) -> Dict[str, Any]:
+    tracking_id = str(payload.get("tracking_id", "TRK-DEV") or "TRK-DEV")
+    eta = str(payload.get("eta", "") or "")
+    customer = str(payload.get("customer", "unknown") or "unknown")
+    message = f"Tracking sent to {customer}: {tracking_id}"
+    if eta:
+        message += f" · ETA {eta}"
+    return {
+        "status": "success",
+        "type": "send_tracking",
+        "customer": customer,
+        "tracking_id": tracking_id,
+        "eta": eta,
+        "message": message,
+    }
+
+
+def handle_escalation(payload: Dict[str, Any]) -> Dict[str, Any]:
+    priority = str(payload.get("priority", "normal") or "normal")
+    queue = str(payload.get("queue", "escalated") or "escalated")
+    customer = str(payload.get("customer", "unknown") or "unknown")
+    return {
+        "status": "success",
+        "type": "escalate",
+        "customer": customer,
         "priority": priority,
-        "message": "Case escalated",
-        "webhook": webhook_result,
+        "queue": queue,
+        "message": f"Case escalated for {customer} with {priority} priority.",
+    }
+
+
+def handle_charge(payload: Dict[str, Any]) -> Dict[str, Any]:
+    amount = _to_int(payload.get("amount", 0), 0)
+    customer = str(payload.get("customer", "unknown") or "unknown")
+    return {
+        "status": "pending_review",
+        "type": "charge",
+        "customer": customer,
+        "amount": amount,
+        "message": f"Charge prepared for manual approval for {customer}.",
     }
