@@ -27,9 +27,6 @@ class AgentState(Base):
     updated_at = Column(String(32), nullable=False)
 
 
-Base.metadata.create_all(bind=engine)
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------

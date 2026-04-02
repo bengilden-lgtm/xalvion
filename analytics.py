@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy import Column, Float, Integer, String, Text, func
 
-from db import Base, SessionLocal, engine, init_db
+from db import Base, SessionLocal, engine
 
 
 # ---------------------------------------------------------------------------
@@ -31,9 +31,6 @@ class AnalyticsEvent(Base):
     issue_type      = Column(String(64), default="general_support")
     action          = Column(String(32), default="none")
     amount          = Column(Float, default=0.0)
-
-
-init_db()
 
 
 # ---------------------------------------------------------------------------

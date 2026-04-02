@@ -22,7 +22,7 @@ from typing import Any
 
 from sqlalchemy import Column, Float, Integer, String, Text, func
 
-from db import Base, SessionLocal, engine, init_db
+from db import Base, SessionLocal, engine
 
 
 # ---------------------------------------------------------------------------
@@ -47,9 +47,6 @@ class ActionOutcomeLog(Base):
     tool_response_json = Column(Text, nullable=False, default="{}")
     created_at         = Column(String(32), nullable=False)
     updated_at         = Column(String(32), nullable=False)
-
-
-init_db()
 
 
 # ---------------------------------------------------------------------------

@@ -340,7 +340,12 @@ class ProcessedWebhook(Base):
     detail = Column(Text, default="")
 
 
-init_db()
+def _import_orm_submodules() -> None:
+    """Import modules that register ORM classes on shared Base (required before create_all)."""
+    import analytics  # noqa: F401
+    import outcome_store  # noqa: F401
+    import persistence_layer  # noqa: F401
+    import state_store  # noqa: F401
 
 
 def ensure_user_columns() -> None:
@@ -364,7 +369,13 @@ def ensure_user_columns() -> None:
         pass
 
 
-ensure_user_columns()
+@app.on_event("startup")
+def _startup_database() -> None:
+    _import_orm_submodules()
+    init_db()
+    print("DB initialized: tables ensured", flush=True)
+    ensure_user_columns()
+
 
 # =============================================================================
 # 4. ENUM CONSTANTS & VALIDATORS

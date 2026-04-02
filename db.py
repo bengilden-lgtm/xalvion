@@ -117,16 +117,9 @@ Base = declarative_base()
 # ---------------------------------------------------------------------------
 
 _init_lock = Lock()
-_db_initialized = False
 
 
 def init_db() -> None:
-    """Create all registered tables exactly once per process."""
-    global _db_initialized
-    if _db_initialized:
-        return
+    """Create all tables registered on Base (idempotent). Thread-safe."""
     with _init_lock:
-        if _db_initialized:
-            return
         Base.metadata.create_all(bind=engine)
-        _db_initialized = True
