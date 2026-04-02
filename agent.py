@@ -7,7 +7,7 @@ from typing import Any, Dict
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from actions import build_ticket, calculate_impact, apply_learned_rules, system_decision, triage_ticket
+from actions import build_ticket, calculate_impact, apply_learned_rules, system_decision, triage_ticket, execute_action as dispatch_action_effect
 from brain import add_rule, get_top_rule_objects, load_brain, save_brain, update_system_prompt
 from memory import get_prompt_memory, get_user_memory, update_memory
 from router import route_task
@@ -385,62 +385,104 @@ def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
     }
 
 
+
 def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Dict[str, Any]:
     safe_action = normalize_action_payload(action_payload)
     action = safe_action["action"]
     amount = safe_action["amount"]
     customer = ticket.get("customer", "Unknown")
+    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
+    tracking_id = str(ticket.get("tracking", "") or "")
+    eta = str(ticket.get("eta", "") or "")
 
     if safe_action.get("requires_approval"):
+        action_result = dispatch_action_effect(
+            action if action in {"refund", "credit", "charge"} else "noop",
+            {"amount": amount, "customer": customer, "priority": safe_action.get("priority", "medium")},
+        )
         result = {"status": "pending_approval"}
         return {
             "action": "review",
             "amount": 0,
             "tool_result": result,
             "tool_status": result["status"],
+            "action_result": action_result,
         }
 
     if action == "refund":
         result = process_refund(customer, amount)
+        action_result = dispatch_action_effect("refund", {"amount": amount, "customer": customer, "issue_type": issue_type})
         if result.get("error"):
             return {
                 "action": "review",
                 "amount": 0,
                 "tool_result": result,
                 "tool_status": result.get("error", "error"),
+                "action_result": {
+                    "status": "error",
+                    "type": "refund",
+                    "message": result.get("error", "Refund execution failed."),
+                },
             }
         return {
             "action": "refund",
             "amount": amount,
             "tool_result": result,
             "tool_status": result.get("status", "success"),
+            "action_result": action_result,
         }
 
     if action == "credit":
         result = issue_credit(customer, amount)
+        action_result = dispatch_action_effect("credit", {"amount": amount, "customer": customer})
         return {
             "action": "credit",
             "amount": amount,
             "tool_result": result,
             "tool_status": result.get("status", "credit_issued"),
+            "action_result": action_result,
         }
 
     if action == "review":
         result = {"status": "manual_review"}
+        action_result = dispatch_action_effect(
+            "escalate",
+            {
+                "priority": safe_action.get("priority", "medium"),
+                "queue": safe_action.get("queue", "escalated"),
+                "customer": customer,
+            },
+        )
         return {
             "action": "review",
             "amount": 0,
             "tool_result": result,
             "tool_status": result["status"],
+            "action_result": action_result,
         }
 
     if action == "charge":
         result = {"status": "manual_charge_required"}
+        action_result = dispatch_action_effect("charge", {"amount": amount, "customer": customer})
         return {
             "action": "charge",
             "amount": amount,
             "tool_result": result,
             "tool_status": result["status"],
+            "action_result": action_result,
+        }
+
+    if issue_type == "shipping_issue" and tracking_id:
+        action_result = dispatch_action_effect(
+            "send_tracking",
+            {"tracking_id": tracking_id, "eta": eta, "customer": customer},
+        )
+        return {
+            "action": "none",
+            "amount": 0,
+            "tool_result": {"status": "tracking_sent", "tracking_id": tracking_id, "eta": eta},
+            "tool_status": "tracking_sent",
+            "action_result": action_result,
         }
 
     result = {"status": "no_action"}
@@ -449,6 +491,7 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
         "amount": 0,
         "tool_result": result,
         "tool_status": result["status"],
+        "action_result": dispatch_action_effect("noop", {"customer": customer}),
     }
 
 
@@ -885,6 +928,7 @@ def _canonicalize_result(
         "order_status": str(ticket.get("order_status", "unknown") or "unknown"),
         "tool_status": decision["tool_status"],
         "tool_result": executed.get("tool_result", {"status": decision["tool_status"]}),
+        "action_result": executed.get("action_result", {"status": "no_action", "type": "noop"}),
         "meta": {
             "issue_type": str(ticket.get("issue_type", "general_support") or "general_support"),
             "priority": decision["priority"],

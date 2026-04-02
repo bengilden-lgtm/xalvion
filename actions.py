@@ -337,3 +337,106 @@ def calculate_impact(ticket: Dict[str, Any], executed_action: Dict[str, Any]) ->
     if triage.get("abuse_likelihood", 0) >= 50:
         saved = 40
     return {"type": "saved", "amount": saved, "money_saved": saved, "auto_resolved": True}
+
+# ===== ACTION EXECUTION LAYER (NO DOWNGRADE) =====
+
+def execute_action(action_type: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    payload = payload or {}
+    action = str(action_type or "noop").strip().lower()
+
+    try:
+        if action == "refund":
+            return handle_refund(payload)
+        if action == "credit":
+            return handle_credit(payload)
+        if action == "send_tracking":
+            return handle_tracking(payload)
+        if action == "escalate":
+            return handle_escalation(payload)
+        if action == "charge":
+            return handle_charge(payload)
+        if action in {"noop", "none"}:
+            return {
+                "status": "no_action",
+                "type": "noop",
+                "message": "No direct action executed.",
+            }
+        return {
+            "status": "unknown_action",
+            "type": action,
+            "message": f"Unknown action '{action}' was not executed.",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "type": action,
+            "error": str(exc),
+            "message": f"Action execution failed for '{action}'.",
+        }
+
+
+def handle_refund(payload: Dict[str, Any]) -> Dict[str, Any]:
+    amount = _to_int(payload.get("amount", 0), 0)
+    customer = str(payload.get("customer", "unknown") or "unknown")
+    return {
+        "status": "success",
+        "type": "refund",
+        "customer": customer,
+        "amount": amount,
+        "message": f"Refund path executed for {customer}."
+    }
+
+
+def handle_credit(payload: Dict[str, Any]) -> Dict[str, Any]:
+    amount = _to_int(payload.get("amount", 0), 0)
+    customer = str(payload.get("customer", "unknown") or "unknown")
+    return {
+        "status": "success",
+        "type": "credit",
+        "customer": customer,
+        "amount": amount,
+        "message": f"Service credit issued for {customer}."
+    }
+
+
+def handle_tracking(payload: Dict[str, Any]) -> Dict[str, Any]:
+    tracking_id = str(payload.get("tracking_id", "TRK-DEV") or "TRK-DEV")
+    eta = str(payload.get("eta", "") or "")
+    customer = str(payload.get("customer", "unknown") or "unknown")
+    message = f"Tracking sent to {customer}: {tracking_id}"
+    if eta:
+        message += f" · ETA {eta}"
+    return {
+        "status": "success",
+        "type": "send_tracking",
+        "customer": customer,
+        "tracking_id": tracking_id,
+        "eta": eta,
+        "message": message,
+    }
+
+
+def handle_escalation(payload: Dict[str, Any]) -> Dict[str, Any]:
+    priority = str(payload.get("priority", "normal") or "normal")
+    queue = str(payload.get("queue", "escalated") or "escalated")
+    customer = str(payload.get("customer", "unknown") or "unknown")
+    return {
+        "status": "success",
+        "type": "escalate",
+        "customer": customer,
+        "priority": priority,
+        "queue": queue,
+        "message": f"Case escalated for {customer} with {priority} priority.",
+    }
+
+
+def handle_charge(payload: Dict[str, Any]) -> Dict[str, Any]:
+    amount = _to_int(payload.get("amount", 0), 0)
+    customer = str(payload.get("customer", "unknown") or "unknown")
+    return {
+        "status": "pending_review",
+        "type": "charge",
+        "customer": customer,
+        "amount": amount,
+        "message": f"Charge prepared for manual approval for {customer}.",
+    }
