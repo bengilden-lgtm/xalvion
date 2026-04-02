@@ -1969,36 +1969,30 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function riskLabel(data = {}) {
-    const decision = data.decision || {};
-    const triage = data.triage || {};
+    const decision = data.decision || data.sovereign_decision || {};
+    const triage = data.triage || data.triage_metadata || {};
     return String(decision.risk_level || triage.risk_level || "medium");
   }
 
   function displayActionLabel(data = {}) {
-    const decision = data.decision || {};
+    const decision = data.decision || data.sovereign_decision || {};
+    const issueType = String(data.issue_type || data.type || "general_support").toLowerCase();
     const rawAction = String(data.action || decision.action || "none").toLowerCase();
-    const rawIssueType = String(
-      data.issue_type ||
-      data.meta?.issue_type ||
-      data.runtime_ticket?.issue_type ||
-      decision.issue_type ||
-      "general_support"
-    ).toLowerCase();
     const requiresApproval = Boolean(data.requires_approval || decision.requires_approval || data.execution?.requires_approval);
     if (requiresApproval && rawAction === "refund") return "Refund approval required";
     if (requiresApproval && rawAction === "charge") return "Charge approval required";
     if (requiresApproval && rawAction === "credit") return "Credit approval required";
     if (rawAction === "review") {
-      if (rawIssueType === "shipping_issue") return "Shipping review started";
-      if (rawIssueType === "damaged_order") return "Damage review started";
-      if (rawIssueType === "billing_duplicate_charge" || rawIssueType === "refund_request") return "Billing review started";
+      if (issueType === "shipping_issue") return "Shipping review started";
+      if (issueType.includes("billing") || issueType === "refund_request") return "Billing review started";
       return "Review started";
     }
     return actionLabel(data);
   }
 
   function displayQueueLabel(data = {}) {
-    const rawQueue = String(data?.decision?.queue || "new").toLowerCase();
+    const decision = data.decision || data.sovereign_decision || {};
+    const rawQueue = String(decision.queue || "new").toLowerCase();
     if (rawQueue === "refund_risk") return "Billing check";
     if (rawQueue === "waiting") return "In progress";
     return queueLabel(rawQueue);
@@ -2006,29 +2000,24 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function displayRiskLabel(data = {}) {
     const rawRisk = String(riskLabel(data) || "medium").toLowerCase();
-    const rawAction = String(data.action || "none").toLowerCase();
+    const decision = data.decision || data.sovereign_decision || {};
+    const rawAction = String(data.action || decision.action || "none").toLowerCase();
     if (rawRisk === "medium" && rawAction === "review") return "Needs review";
     return `${rawRisk} risk`;
   }
 
   function noticeTitleForResult(data = {}) {
-    const rawAction = String(data.action || "none").toLowerCase();
-    const rawIssueType = String(
-      data.issue_type ||
-      data.meta?.issue_type ||
-      data.runtime_ticket?.issue_type ||
-      data.decision?.issue_type ||
-      "general_support"
-    ).toLowerCase();
+    const decision = data.decision || data.sovereign_decision || {};
+    const issueType = String(data.issue_type || data.type || "general_support").toLowerCase();
+    const rawAction = String(data.action || decision.action || "none").toLowerCase();
     const toolResult = data?.action_result || data?.tool_result || {};
     const toolType = String(toolResult.type || "").toLowerCase();
     const emailSent = Boolean(toolResult?.email?.ok);
     if (toolType === "tracking") return emailSent ? "Tracking emailed" : "Tracking prepared";
     if (toolType === "escalation") return "Case escalated";
     if (rawAction === "review") {
-      if (rawIssueType === "shipping_issue") return "Shipping review started";
-      if (rawIssueType === "damaged_order") return "Damage review started";
-      if (rawIssueType === "billing_duplicate_charge" || rawIssueType === "refund_request") return "Billing review started";
+      if (issueType === "shipping_issue") return "Shipping review started";
+      if (issueType.includes("billing") || issueType === "refund_request") return "Billing review started";
       return "Review started";
     }
     if (rawAction === "refund") return "Refund processed";
@@ -2678,6 +2667,40 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const decoder = new TextDecoder();
     let buffer = "";
     let finalData = null;
+    let sawDone = false;
+
+    const processEvents = (raw) => {
+      let immediateResult = null;
+      const parsedEvents = parseSseEvents(raw);
+      for (const item of parsedEvents) {
+        if (item.event === "chunk") {
+          appendAssistantChunk(row, item.data.text || "");
+          scrollMessagesToBottom();
+        }
+
+        if (item.event === "status") {
+          const stage = String(item.data.stage || "");
+          const label = item.data.label || stage || "streaming";
+
+          if (stage === "reviewing") advanceStreamStep(stepsEl, 0);
+          else if (stage === "routing") advanceStreamStep(stepsEl, 1);
+          else if (stage === "acting" || stage === "responding") advanceStreamStep(stepsEl, 2);
+          else if (stage === "finalizing") advanceStreamStep(stepsEl, 3);
+
+          updateStreamStatus(`Response: ${label}`);
+        }
+
+        if (item.event === "result") {
+          finalData = item.data;
+          immediateResult = item.data;
+        }
+
+        if (item.event === "done") {
+          sawDone = true;
+        }
+      }
+      return immediateResult;
+    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -2688,37 +2711,17 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       buffer = parts.pop() || "";
 
       for (const part of parts) {
-        const parsedEvents = parseSseEvents(`${part}\n\n`);
-        for (const item of parsedEvents) {
-          if (item.event === "chunk") {
-            appendAssistantChunk(row, item.data.text || "");
-            scrollMessagesToBottom();
-          }
-
-          if (item.event === "status") {
-            const stage = String(item.data.stage || "");
-            const label = item.data.label || stage || "streaming";
-
-            if (stage === "reviewing") advanceStreamStep(stepsEl, 0);
-            else if (stage === "routing") advanceStreamStep(stepsEl, 1);
-            else if (stage === "acting" || stage === "responding") advanceStreamStep(stepsEl, 2);
-            else if (stage === "finalizing") advanceStreamStep(stepsEl, 3);
-
-            updateStreamStatus(`Response: ${label}`);
-          }
-
-          if (item.event === "result") {
-            finalData = item.data;
-          }
+        const immediateResult = processEvents(`${part}\n\n`);
+        if (immediateResult || sawDone) {
+          try { await reader.cancel(); } catch {}
+          return finalData || immediateResult;
         }
       }
     }
 
     if (buffer.trim()) {
-      const parsedEvents = parseSseEvents(buffer);
-      for (const item of parsedEvents) {
-        if (item.event === "result") finalData = item.data;
-      }
+      const immediateResult = processEvents(buffer);
+      if (immediateResult) return immediateResult;
     }
 
     return finalData;
