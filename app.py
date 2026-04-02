@@ -1983,56 +1983,82 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
 
     try:
         msg = (req.message or "").lower()
+        issue_type_rt = str(runtime_ticket.get("issue_type", "general_support") or "general_support")
 
-        if any(x in msg for x in ["where is my order", "late", "tracking", "package", "delivery"]):
-            result = {
-                "reply": "Your order is on the way. You can track it using your tracking link. Let me know if you'd like me to resend it.",
-                "action": "none",
-                "issue_type": "shipping_issue",
-                "confidence": 0.95,
-                "tool_status": "local_fast_path",
-                "tool_result": {"status": "local_fast_path"},
+        shipping_keys = (
+            "where is my order",
+            "my order",
+            "tracking",
+            "package",
+            "delivery",
+            "late",
+        )
+        damaged_keys = ("damaged", "broken", "arrived damaged")
+
+        is_shipping = issue_type_rt == "shipping_issue" or any(k in msg for k in shipping_keys)
+        is_damaged = issue_type_rt == "damaged_order" or any(k in msg for k in damaged_keys)
+
+        triage_rt = runtime_ticket.get("triage") or {}
+        risk_from_ctx = str(
+            shadow_decision.get("risk_level", triage_rt.get("risk_level", "medium")) or "medium"
+        )
+        order_info = {
+            "status": str(runtime_ticket.get("order_status", "unknown") or "unknown"),
+            "tracking": str(runtime_ticket.get("tracking", "") or ""),
+            "eta": str(runtime_ticket.get("eta", "") or ""),
+        }
+
+        if is_damaged:
+            ticket_local = dict(runtime_ticket)
+            ticket_local["issue_type"] = "damaged_order"
+            dam_act = str(shadow_decision.get("action", "review") or "review")
+            if dam_act == "none":
+                dam_act = "review"
+            planned_action = {
+                "action": dam_act,
+                "amount": float(shadow_decision.get("amount", 0) or 0),
+                "reason": str(shadow_decision.get("reason", "") or ""),
+                "queue": str(shadow_decision.get("queue", "escalated") or "escalated"),
+                "priority": str(shadow_decision.get("priority", "high") or "high"),
+                "risk_level": risk_from_ctx,
+                "requires_approval": False,
             }
-        elif any(x in msg for x in ["damaged", "broken", "arrived damaged"]):
-            result = {
-                "reply": "I'm sorry your order arrived damaged. I've flagged this for immediate review and we'll make this right.",
-                "action": "review",
-                "issue_type": "damaged_order",
-                "confidence": 0.95,
-                "tool_status": "local_fast_path",
-                "tool_result": {"status": "local_fast_path"},
+            local_result = local_fallback_reply(ticket_local, planned_action, order_info, req.message)
+            local_result["mode"] = "local_fast_path"
+            local_result["issue_type"] = "damaged_order"
+            local_result["tool_result"] = {
+                "status": "local_fast_path",
+                "type": "escalation",
             }
+            local_result["tool_status"] = "local_fast_path"
+            result = local_result
+        elif is_shipping:
+            ticket_local = dict(runtime_ticket)
+            ticket_local["issue_type"] = "shipping_issue"
+            planned_action = {
+                "action": str(shadow_decision.get("action", "none") or "none"),
+                "amount": float(shadow_decision.get("amount", 0) or 0),
+                "reason": str(shadow_decision.get("reason", "") or ""),
+                "queue": str(shadow_decision.get("queue", "waiting") or "waiting"),
+                "priority": str(shadow_decision.get("priority", "medium") or "medium"),
+                "risk_level": risk_from_ctx,
+                "requires_approval": False,
+            }
+            local_result = local_fallback_reply(ticket_local, planned_action, order_info, req.message)
+            local_result["mode"] = "local_fast_path"
+            local_result["issue_type"] = "shipping_issue"
+            local_result["tool_result"] = {
+                "status": "local_fast_path",
+                "type": "tracking",
+            }
+            local_result["tool_status"] = "local_fast_path"
+            result = local_result
         else:
-            issue_type = str(runtime_ticket.get("issue_type", "general_support") or "general_support")
-            if issue_type in {"shipping_issue", "damaged_order"}:
-                planned_action = {
-                    "action": str(shadow_decision.get("action", "none") or "none"),
-                    "amount": float(shadow_decision.get("amount", 0) or 0),
-                    "reason": str(shadow_decision.get("reason", "") or ""),
-                    "queue": str(shadow_decision.get("queue", "waiting" if issue_type == "shipping_issue" else "escalated") or ("waiting" if issue_type == "shipping_issue" else "escalated")),
-                    "priority": str(shadow_decision.get("priority", "medium" if issue_type == "shipping_issue" else "high") or ("medium" if issue_type == "shipping_issue" else "high")),
-                    "risk_level": str(shadow_decision.get("risk_level", (runtime_ticket.get("triage") or {}).get("risk_level", "medium")) or "medium"),
-                    "requires_approval": False,
-                }
-                order_info = {
-                    "status": str(runtime_ticket.get("order_status", "unknown") or "unknown"),
-                    "tracking": str(runtime_ticket.get("tracking", "") or ""),
-                    "eta": str(runtime_ticket.get("eta", "") or ""),
-                }
-                local_result = local_fallback_reply(runtime_ticket, planned_action, order_info, req.message)
-                local_result["mode"] = "local_fast_path"
-                local_result["tool_result"] = {
-                    "status": "local_fast_path",
-                    "type": "tracking" if issue_type == "shipping_issue" else "escalation",
-                }
-                local_result["tool_status"] = "local_fast_path"
-                result = local_result
-            else:
-                result = run_agent(
-                    req.message,
-                    user_id=str(getattr(user, "username", "guest") or "guest"),
-                    meta=build_agent_meta(req, user, db),
-                )
+            result = run_agent(
+                req.message,
+                user_id=str(getattr(user, "username", "guest") or "guest"),
+                meta=build_agent_meta(req, user, db),
+            )
 
         if not isinstance(result, dict):
             raise RuntimeError("Agent returned invalid payload")

@@ -1976,15 +1976,27 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function displayActionLabel(data = {}) {
     const decision = data.decision || data.sovereign_decision || {};
-    const issueType = String(data.issue_type || data.type || "general_support").toLowerCase();
+    const rawIssueType = String(
+      data.issue_type
+      || data.meta?.issue_type
+      || data.runtime_ticket?.issue_type
+      || decision.issue_type
+      || data.type
+      || "general_support"
+    ).toLowerCase();
     const rawAction = String(data.action || decision.action || "none").toLowerCase();
     const requiresApproval = Boolean(data.requires_approval || decision.requires_approval || data.execution?.requires_approval);
     if (requiresApproval && rawAction === "refund") return "Refund approval required";
     if (requiresApproval && rawAction === "charge") return "Charge approval required";
     if (requiresApproval && rawAction === "credit") return "Credit approval required";
     if (rawAction === "review") {
-      if (issueType === "shipping_issue") return "Shipping review started";
-      if (issueType.includes("billing") || issueType === "refund_request") return "Billing review started";
+      if (rawIssueType === "shipping_issue") return "Shipping review started";
+      if (rawIssueType === "damaged_order") return "Damage review started";
+      if (
+        rawIssueType.includes("billing")
+        || rawIssueType === "refund_request"
+        || rawIssueType === "billing_duplicate_charge"
+      ) return "Billing review started";
       return "Review started";
     }
     return actionLabel(data);
@@ -2008,7 +2020,14 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function noticeTitleForResult(data = {}) {
     const decision = data.decision || data.sovereign_decision || {};
-    const issueType = String(data.issue_type || data.type || "general_support").toLowerCase();
+    const rawIssueType = String(
+      data.issue_type
+      || data.meta?.issue_type
+      || data.runtime_ticket?.issue_type
+      || decision.issue_type
+      || data.type
+      || "general_support"
+    ).toLowerCase();
     const rawAction = String(data.action || decision.action || "none").toLowerCase();
     const toolResult = data?.action_result || data?.tool_result || {};
     const toolType = String(toolResult.type || "").toLowerCase();
@@ -2016,8 +2035,13 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     if (toolType === "tracking") return emailSent ? "Tracking emailed" : "Tracking prepared";
     if (toolType === "escalation") return "Case escalated";
     if (rawAction === "review") {
-      if (issueType === "shipping_issue") return "Shipping review started";
-      if (issueType.includes("billing") || issueType === "refund_request") return "Billing review started";
+      if (rawIssueType === "shipping_issue") return "Shipping review started";
+      if (rawIssueType === "damaged_order") return "Damage review started";
+      if (
+        rawIssueType.includes("billing")
+        || rawIssueType === "refund_request"
+        || rawIssueType === "billing_duplicate_charge"
+      ) return "Billing review started";
       return "Review started";
     }
     if (rawAction === "refund") return "Refund processed";
@@ -2670,7 +2694,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     let sawDone = false;
 
     const processEvents = (raw) => {
-      let immediateResult = null;
       const parsedEvents = parseSseEvents(raw);
       for (const item of parsedEvents) {
         if (item.event === "chunk") {
@@ -2692,14 +2715,14 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
         if (item.event === "result") {
           finalData = item.data;
-          immediateResult = item.data;
+          return item.data;
         }
 
         if (item.event === "done") {
           sawDone = true;
         }
       }
-      return immediateResult;
+      return null;
     };
 
     while (true) {
@@ -2711,19 +2734,24 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       buffer = parts.pop() || "";
 
       for (const part of parts) {
-        const immediateResult = processEvents(`${part}\n\n`);
-        if (immediateResult || sawDone) {
+        const hit = processEvents(`${part}\n\n`);
+        if (hit) {
           try { await reader.cancel(); } catch {}
-          return finalData || immediateResult;
+          return hit;
+        }
+        if (sawDone) {
+          try { await reader.cancel(); } catch {}
+          return finalData;
         }
       }
     }
 
     if (buffer.trim()) {
-      const immediateResult = processEvents(buffer);
-      if (immediateResult) return immediateResult;
+      const hit = processEvents(buffer);
+      if (hit) return hit;
     }
 
+    if (sawDone) return finalData;
     return finalData;
   }
 
