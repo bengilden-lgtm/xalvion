@@ -3219,9 +3219,92 @@ async def support_stream(
     authorization: str | None = Header(None),
 ):
     username = get_current_username_from_header(authorization)
-    result = await run_in_threadpool(run_support_for_username, req, username)
+
+    async def generator() -> AsyncIterator[str]:
+        # Stream visible progress immediately so the UI does not sit on a blank loader
+        # while the support pipeline is still computing the result.
+        initial_steps = [
+            {"stage": "reviewing", "label": "Reviewing request"},
+            {"stage": "routing", "label": "Choosing next step"},
+        ]
+        for item in initial_steps:
+            yield sse_event("status", item)
+            await asyncio.sleep(STATUS_STEP_DELAY)
+
+        try:
+            result = await asyncio.wait_for(
+                run_in_threadpool(run_support_for_username, req, username),
+                timeout=28.0,
+            )
+        except asyncio.TimeoutError:
+            fallback = {
+                "reply": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
+                "final": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
+                "response": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
+                "action": "review",
+                "amount": 0,
+                "reason": "stream_timeout",
+                "issue_type": "general_support",
+                "order_status": "unknown",
+                "tool_status": "timeout",
+                "tool_result": {"status": "timeout"},
+                "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
+                "decision": {"action": "review", "queue": "escalated", "priority": "high", "risk_level": "medium", "requires_approval": False, "status": "waiting"},
+                "execution": {"action": "review", "amount": 0, "status": "timeout", "auto_resolved": False, "requires_approval": False},
+                "meta": {"operator_mode": "balanced"},
+                "triage": {},
+                "history": {},
+                "mode": "timeout",
+                "confidence": 0.0,
+                "quality": 0.0,
+            }
+            yield sse_event("status", {"stage": "finalizing", "label": "Support run timed out"})
+            yield sse_event("result", fallback)
+            yield sse_event("done", {"ok": False, "timeout": True})
+            return
+        except Exception:
+            fallback = {
+                "reply": "I hit a temporary issue while processing this request. Please send it again and I’ll retry cleanly.",
+                "final": "I hit a temporary issue while processing this request. Please send it again and I’ll retry cleanly.",
+                "response": "I hit a temporary issue while processing this request. Please send it again and I’ll retry cleanly.",
+                "action": "review",
+                "amount": 0,
+                "reason": "stream_error",
+                "issue_type": "general_support",
+                "order_status": "unknown",
+                "tool_status": "error",
+                "tool_result": {"status": "error"},
+                "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
+                "decision": {"action": "review", "queue": "escalated", "priority": "high", "risk_level": "medium", "requires_approval": False, "status": "waiting"},
+                "execution": {"action": "review", "amount": 0, "status": "error", "auto_resolved": False, "requires_approval": False},
+                "meta": {"operator_mode": "balanced"},
+                "triage": {},
+                "history": {},
+                "mode": "error",
+                "confidence": 0.0,
+                "quality": 0.0,
+            }
+            yield sse_event("status", {"stage": "finalizing", "label": "Support run failed"})
+            yield sse_event("result", fallback)
+            yield sse_event("done", {"ok": False})
+            return
+
+        for item in build_status_sequence(result):
+            stage = str(item.get("stage", "") or "")
+            if stage in {"reviewing", "routing"}:
+                continue
+            yield sse_event("status", item)
+            await asyncio.sleep(STATUS_STEP_DELAY)
+
+        for part in chunk_text(result.get("reply", ""), STREAM_CHUNK_SIZE):
+            yield sse_event("chunk", {"text": part})
+            await asyncio.sleep(STREAM_CHUNK_DELAY)
+
+        yield sse_event("result", result)
+        yield sse_event("done", {"ok": True})
+
     return StreamingResponse(
-        stream_support_events(result),
+        generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
