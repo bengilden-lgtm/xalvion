@@ -459,12 +459,7 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
     integration_result = dispatch_integrated_action(integrated_action, payload)
     mapped_action = "review" if integrated_action == "escalate" else action
 
-    return {
-        "action": mapped_action,
-        "amount": amount if mapped_action in {"refund", "credit", "charge"} else 0,
-        "tool_result": integration_result,
-        "tool_status": integration_result.get("status", "success"),
-    }
+    return {"action": mapped_action, "amount": amount if mapped_action in {"refund", "credit", "charge"} else 0, "tool_result": integration_result, "tool_status": integration_result.get("status", "success")}
 
 def build_issue_examples(ticket: Dict[str, Any]) -> str:
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
