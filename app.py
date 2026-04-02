@@ -175,7 +175,6 @@ if STRIPE_KEY:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 INDEX_PATH = os.path.join(BASE_DIR, "index.html")
 APP_JS_PATH = os.path.join(BASE_DIR, "app.js")
-WORKSPACE_MODULES_PATH = os.path.join(BASE_DIR, "workspace_modules.js")
 LANDING_PATH = os.path.join(BASE_DIR, "landing.html")
 FLUID_DIR = os.path.join(BASE_DIR, "fluid")
 
@@ -210,6 +209,7 @@ for origin in [FRONTEND_URL, APP_ORIGIN] + [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https://([a-z0-9-]+\.)?xalvion\.tech$|^http://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -2225,14 +2225,6 @@ def serve_app_js():
         return FileResponse(APP_JS_PATH, media_type="application/javascript")
     raise HTTPException(status_code=404, detail="app.js not found")
 
-
-
-
-@app.get("/workspace-modules.js")
-def serve_workspace_modules_js():
-    if os.path.exists(WORKSPACE_MODULES_PATH):
-        return FileResponse(WORKSPACE_MODULES_PATH, media_type="application/javascript")
-    raise HTTPException(status_code=404, detail="workspace_modules.js not found")
 
 @app.get("/landing")
 def serve_landing():
