@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import Column, Float, Integer, String, Text, func
+from sqlalchemy.exc import OperationalError, TimeoutError as SQLTimeoutError
 
 from db import Base, SessionLocal, engine
 
@@ -27,6 +28,19 @@ _DEFAULT_METRICS: dict[str, Any] = {
 }
 
 _metrics_failure_logged = False
+_metrics_pool_timeout_logged = False
+
+
+def _log_metrics_pool_timeout_once(exc: BaseException) -> None:
+    global _metrics_pool_timeout_logged
+    if _metrics_pool_timeout_logged:
+        return
+    _metrics_pool_timeout_logged = True
+    logger.warning(
+        "get_metrics_timeout_fallback type=%s detail=%s",
+        type(exc).__name__,
+        str(exc)[:400],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +123,21 @@ def get_metrics() -> dict[str, Any]:
             "total_credits": total_credits,
             "money_moved": round(float(money_moved), 2),
         }
+    except SQLTimeoutError as exc:
+        _log_metrics_pool_timeout_once(exc)
+        return dict(_DEFAULT_METRICS)
+    except OperationalError as exc:
+        if "timeout" in str(exc).lower() or "timed out" in str(exc).lower():
+            _log_metrics_pool_timeout_once(exc)
+            return dict(_DEFAULT_METRICS)
+        if not _metrics_failure_logged:
+            _metrics_failure_logged = True
+            logger.warning(
+                "get_metrics_unavailable type=%s detail=%s",
+                type(exc).__name__,
+                str(exc)[:500],
+            )
+        return dict(_DEFAULT_METRICS)
     except Exception as exc:
         if not _metrics_failure_logged:
             _metrics_failure_logged = True

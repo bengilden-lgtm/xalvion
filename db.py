@@ -8,8 +8,9 @@ PROBLEM FIXED:
     real load and silently drops writes.
 
 SOLUTION:
-    Every module imports `engine` and `SessionLocal` from here.  One pool,
-    one file handle, no contention.
+    Every module imports `engine` and `SessionLocal` from here.  One shared
+    pool (multi-checkout on SQLite via WAL + busy_timeout) avoids both
+    cross-module pool contention and single-connection starvation under FastAPI.
 
 Postgres-ready:
     Set DATABASE_URL=postgresql+psycopg2://user:pass@host/db and the rest of
@@ -72,14 +73,21 @@ _IS_SQLITE: bool = DATABASE_URL.startswith("sqlite")
 
 _connect_args = {"check_same_thread": False} if _IS_SQLITE else {}
 
+# Pool sizing: a single-connection SQLite pool (pool_size=1, max_overflow=0)
+# starves FastAPI under concurrent requests — each Depends(get_db), threadpool
+# work, and analytics/support compete for one checkout and hit 30s pool timeout.
+# WAL + busy_timeout allow multiple readers; writers briefly wait on the DB lock.
+_SQLITE_POOL_SIZE = int(os.getenv("SQLITE_POOL_SIZE", "8").strip() or "8")
+_SQLITE_MAX_OVERFLOW = int(os.getenv("SQLITE_MAX_OVERFLOW", "12").strip() or "12")
+_POOL_TIMEOUT = float(os.getenv("DB_POOL_TIMEOUT", "12").strip() or "12")
+
 engine = create_engine(
     DATABASE_URL,
     connect_args=_connect_args,
     pool_pre_ping=True,
-    # SQLite: serialize writes through a single connection in WAL mode.
-    # Postgres: use a small pool appropriate for a single-process API.
-    pool_size=1 if _IS_SQLITE else 5,
-    max_overflow=0 if _IS_SQLITE else 10,
+    pool_timeout=_POOL_TIMEOUT,
+    pool_size=_SQLITE_POOL_SIZE if _IS_SQLITE else 5,
+    max_overflow=_SQLITE_MAX_OVERFLOW if _IS_SQLITE else 10,
 )
 
 # ---------------------------------------------------------------------------

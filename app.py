@@ -629,7 +629,6 @@ def decode_token(token: str) -> str | None:
 
 def get_current_user(
     authorization: str | None = Header(None),
-    db: Session = Depends(get_db),
 ) -> User:
     if not authorization:
         return User(username="guest", password="", usage=0, tier="free")
@@ -642,13 +641,18 @@ def get_current_user(
     if not username:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="User not found — this token no longer matches an account. Log in again.",
-        )
-    return user
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            raise HTTPException(
+                status_code=401,
+                detail="User not found — this token no longer matches an account. Log in again.",
+            )
+        db.expunge(user)
+        return user
+    finally:
+        db.close()
 
 
 def get_current_username_from_header(authorization: str | None) -> str:
@@ -791,9 +795,20 @@ def set_operator_mode(db: Session, mode: str, by: str = "admin") -> str:
     return normalized
 
 
-def build_agent_meta(req: SupportRequest, user: User, db: Session | None = None) -> dict[str, Any]:
+def build_agent_meta(
+    req: SupportRequest,
+    user: User,
+    db: Session | None = None,
+    *,
+    operator_mode: str | None = None,
+) -> dict[str, Any]:
     plan_name = get_plan_name(user)
-    operator_mode = get_operator_mode(db) if db is not None else "balanced"
+    if operator_mode is not None:
+        op_mode = _safe_op_mode(operator_mode)
+    elif db is not None:
+        op_mode = get_operator_mode(db)
+    else:
+        op_mode = "balanced"
     return {
         "sentiment": req.sentiment if req.sentiment is not None else 5,
         "ltv": req.ltv if req.ltv is not None else 0,
@@ -802,7 +817,7 @@ def build_agent_meta(req: SupportRequest, user: User, db: Session | None = None)
         "priority_routing": get_plan_config(plan_name)["priority_routing"],
         "payment_intent_id": (req.payment_intent_id or "").strip(),
         "charge_id": (req.charge_id or "").strip(),
-        "operator_mode": operator_mode,
+        "operator_mode": op_mode,
         "channel": _safe_channel(req.channel),
         "source": _safe_source(req.source),
     }
@@ -2009,21 +2024,33 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
     return payload, "approved"
 
 
-def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
+def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
     enforce_plan_limits(user)
-    try:
-        ticket = create_ticket_record(db, user, req)
-    except SQLAlchemyError as exc:
+
+    with db_session() as db:
         try:
-            db.rollback()
-        except Exception:
-            pass
-        _log_throttled_db_issue("support_ticket_persist", exc)
-        raise HTTPException(
-            status_code=503,
-            detail="Support ticketing database is temporarily unavailable. Please try again shortly.",
-        ) from None
-    runtime_ticket = build_runtime_ticket(req, user, db)
+            created = create_ticket_record(db, user, req)
+            ticket_id = int(created.id)
+        except SQLAlchemyError as exc:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            _log_throttled_db_issue("support_ticket_persist", exc)
+            raise HTTPException(
+                status_code=503,
+                detail="Support ticketing database is temporarily unavailable. Please try again shortly.",
+            ) from None
+
+    logger.info(
+        "support_db_released_after_ticket_create ticket_id=%s user=%s",
+        ticket_id,
+        getattr(user, "username", "") or "?",
+    )
+
+    with db_session() as db:
+        runtime_ticket = build_runtime_ticket(req, user, db)
+
     shadow_decision = safe_execute(system_decision, runtime_ticket)
     if not isinstance(shadow_decision, dict) or "error" in shadow_decision:
         shadow_decision = {
@@ -2151,10 +2178,16 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
             local_result["tool_status"] = "local_fast_path"
             result = local_result
         else:
+            op_mode = str(runtime_ticket.get("operator_mode", "balanced") or "balanced")
+            logger.info(
+                "support_agent_phase_start ticket_id=%s user=%s (db not held during LLM)",
+                ticket_id,
+                getattr(user, "username", "") or "?",
+            )
             result = run_agent(
                 req.message,
                 user_id=str(getattr(user, "username", "guest") or "guest"),
-                meta=build_agent_meta(req, user, db),
+                meta=build_agent_meta(req, user, operator_mode=op_mode),
             )
 
         if not isinstance(result, dict):
@@ -2186,57 +2219,83 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         )
         apply_learning_feedback(runtime_ticket, result)
 
-        update_ticket_from_result(db, ticket, result)
-
-        action_entry = log_action(
-            db,
-            username=str(getattr(user, "username", "unknown")),
-            ticket_id=ticket.id,
-            action=str(result.get("action", "none")),
-            amount=float(result.get("amount", 0) or 0),
-            issue_type=str(result.get("issue_type", "general_support")),
-            reason=str(result.get("reason", "")),
-            status=str(result.get("tool_status", "executed")),
-            confidence=float(result.get("confidence", 0) or 0),
-            quality=float(result.get("quality", 0) or 0),
-            message_snippet=(req.message or "")[:200],
-            requires_approval=needs_approval,
-            approved=False,
+        logger.info(
+            "support_db_persist_begin ticket_id=%s user=%s",
+            ticket_id,
+            getattr(user, "username", "") or "?",
         )
+        with db_session() as db:
+            t = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+            if not t:
+                raise RuntimeError("ticket row missing at persist")
+            update_ticket_from_result(db, t, result)
+            action_entry = log_action(
+                db,
+                username=str(getattr(user, "username", "unknown")),
+                ticket_id=t.id,
+                action=str(result.get("action", "none")),
+                amount=float(result.get("amount", 0) or 0),
+                issue_type=str(result.get("issue_type", "general_support")),
+                reason=str(result.get("reason", "")),
+                status=str(result.get("tool_status", "executed")),
+                confidence=float(result.get("confidence", 0) or 0),
+                quality=float(result.get("quality", 0) or 0),
+                message_snippet=(req.message or "")[:200],
+                requires_approval=needs_approval,
+                approved=False,
+            )
 
-        if hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
-            user.usage = int(getattr(user, "usage", 0) or 0) + 1
-            db.commit()
-            db.refresh(user)
+            ser_user: User = user
+            if hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
+                u_row = db.query(User).filter(User.username == user.username).first()
+                if u_row:
+                    u_row.usage = int(u_row.usage or 0) + 1
+                    db.commit()
+                    db.refresh(u_row)
+                    ser_user = u_row
 
-        serialized = serialize_support_result(result, user)
-        serialized["ticket"] = serialize_ticket_with_log(ticket, db)
-        serialized["action_log"] = serialized["ticket"].get("action_log") or {
-            "log_id": action_entry.id,
-            "action": action_entry.action,
-            "amount": action_entry.amount,
-            "status": action_entry.status,
-            "requires_approval": bool(action_entry.requires_approval),
-            "approved": bool(action_entry.approved),
-            "timestamp": action_entry.timestamp,
-        }
-        serialized["operator_mode"] = get_operator_mode(db)
-        serialized["shadow_decision"] = shadow_decision
-        serialized["runtime_ticket"] = runtime_ticket
+            serialized = serialize_support_result(result, ser_user)
+            serialized["ticket"] = serialize_ticket_with_log(t, db)
+            serialized["action_log"] = serialized["ticket"].get("action_log") or {
+                "log_id": action_entry.id,
+                "action": action_entry.action,
+                "amount": action_entry.amount,
+                "status": action_entry.status,
+                "requires_approval": bool(action_entry.requires_approval),
+                "approved": bool(action_entry.approved),
+                "timestamp": action_entry.timestamp,
+            }
+            serialized["operator_mode"] = get_operator_mode(db)
+            serialized["shadow_decision"] = shadow_decision
+            serialized["runtime_ticket"] = runtime_ticket
+
+        logger.info(
+            "support_db_persist_done ticket_id=%s user=%s",
+            ticket_id,
+            getattr(user, "username", "") or "?",
+        )
         return serialized
 
     except HTTPException:
         raise
 
     except Exception as exc:
-        try:
-            ticket.status = "failed"
-            ticket.queue = "escalated"
-            ticket.internal_note = f"Pipeline error: {str(exc)[:500]}"
-            ticket.updated_at = _now_iso()
-            db.commit()
-        except Exception:
-            pass
+        with db_session() as db:
+            try:
+                tt = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+                if tt:
+                    tt.status = "failed"
+                    tt.queue = "escalated"
+                    tt.internal_note = f"Pipeline error: {str(exc)[:500]}"
+                    tt.updated_at = _now_iso()
+                    db.commit()
+            except Exception:
+                pass
+
+        ticket_snapshot: dict[str, Any]
+        with db_session() as db:
+            tt2 = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+            ticket_snapshot = serialize_ticket(tt2) if tt2 else {"id": ticket_id}
 
         fallback = (
             "I encountered an issue processing your request. "
@@ -2268,7 +2327,7 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
             "plan_limit": get_plan_config(plan)["monthly_limit"],
             "usage": int(getattr(user, "usage", 0) or 0),
             "remaining": max(0, get_plan_config(plan)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)),
-            "ticket": serialize_ticket(ticket),
+            "ticket": ticket_snapshot,
             "operator_mode": runtime_ticket.get("operator_mode", "balanced"),
             "shadow_decision": shadow_decision,
             "runtime_ticket": runtime_ticket,
@@ -2278,12 +2337,15 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
 def run_support_for_username(req: SupportRequest, username: str) -> dict[str, Any]:
     with db_session() as db:
         if username and username != "guest":
-            user = db.query(User).filter(User.username == username).first()
-            if not user:
+            row = db.query(User).filter(User.username == username).first()
+            if not row:
                 user = User(username="guest", password="", usage=0, tier="free")
+            else:
+                db.expunge(row)
+                user = row
         else:
             user = User(username="guest", password="", usage=0, tier="free")
-        return run_support(req, user, db)
+    return run_support(req, user)
 
 # =============================================================================
 # 12. STREAMING HELPERS
@@ -3461,10 +3523,9 @@ def update_operator_mode(
 def support(
     req: SupportRequest,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     try:
-        return run_support(req, user, db)
+        return run_support(req, user)
     except HTTPException:
         raise
     except Exception:
@@ -3541,7 +3602,11 @@ async def support_stream(
             yield sse_event("done", {"ok": False, "status": getattr(he, "status_code", 503)})
             return
         except asyncio.TimeoutError:
-            logger.warning("support_stream_timeout username=%s", username or "?")
+            logger.warning(
+                "support_stream_timeout username=%s detail=wait_for_run_support_exceeded_28s "
+                "typical_causes=slow_llm_or_threadpool_queue_db_pool_wait",
+                username or "?",
+            )
             fallback = {
                 "reply": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
                 "final": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
