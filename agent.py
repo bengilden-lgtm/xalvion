@@ -40,8 +40,14 @@ except Exception:
 try:
     from learning import learn_from_ticket
 except Exception:
-    def learn_from_ticket(ticket, decision, outcome):
+    def learn_from_ticket(ticket, decision, outcome, outcome_key=None):
         return None
+
+try:
+    from outcome_store import log_outcome as _log_outcome
+except Exception:
+    def _log_outcome(outcome_key, user_id, action, amount, issue_type, tool_result, auto_resolved=True, approved_by_human=False):
+        return {}
 
 
 load_dotenv(override=True)
@@ -1075,6 +1081,20 @@ def run_agent(
     thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
     quality = compute_quality(confidence, triage, executed, user_memory, llm_used)
 
+    # Log the real outcome — this feeds the learning loop with verified API results
+    _outcome_key = f"{user_id}:{str(ticket.get('issue_type',''))[:20]}:{int(float(final_action.get('amount',0) or 0))}"
+    _tool_result = executed.get("tool_result") or {"status": executed.get("tool_status", "unknown")}
+    _log_outcome(
+        outcome_key=_outcome_key,
+        user_id=user_id,
+        action=str(executed.get("action", "none") or "none"),
+        amount=float(executed.get("amount", 0) or 0),
+        issue_type=str(ticket.get("issue_type", "general_support") or "general_support"),
+        tool_result=_tool_result,
+        auto_resolved=bool(executed.get("action", "none") in {"refund", "credit", "none"}),
+        approved_by_human=False,
+    )
+
     customer_note = normalize_text(
         polish_message(str(parsed.get("customer_note", parsed.get("customer_message", "")) or ""))
     )
@@ -1093,7 +1113,7 @@ def run_agent(
     }
 
     update_memory(user_id, ticket, customer_message, final_payload)
-    learn_from_ticket(ticket, final_payload, executed)
+    learn_from_ticket(ticket, final_payload, executed, outcome_key=_outcome_key)
     process_feedback(clean, customer_message, quality)
     log_event(clean, customer_message, confidence, quality)
     if quality > 0.92:

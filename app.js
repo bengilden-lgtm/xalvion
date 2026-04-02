@@ -2624,6 +2624,12 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     });
 
     const data = await res.json().catch(() => ({}));
+
+    if (res.status === 402) {
+      pushLimitMessage(true);
+      throw new Error(data.detail || "Plan limit reached. Upgrade to continue.");
+    }
+
     if (!res.ok) throw new Error(data.detail || "Request failed");
     return data;
   }
@@ -2637,6 +2643,10 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     if (!res.ok || !res.body) {
       const data = await res.json().catch(() => ({}));
+      if (res.status === 402) {
+        pushLimitMessage(true);
+        throw new Error(data.detail || "Plan limit reached. Upgrade to continue.");
+      }
       throw new Error(data.detail || "Streaming failed");
     }
 
