@@ -23,6 +23,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+from threading import Lock
 
 # ---------------------------------------------------------------------------
 # URL resolution
@@ -109,3 +110,23 @@ SessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+
+
+# ---------------------------------------------------------------------------
+# Metadata initialization
+# ---------------------------------------------------------------------------
+
+_init_lock = Lock()
+_db_initialized = False
+
+
+def init_db() -> None:
+    """Create all registered tables exactly once per process."""
+    global _db_initialized
+    if _db_initialized:
+        return
+    with _init_lock:
+        if _db_initialized:
+            return
+        Base.metadata.create_all(bind=engine)
+        _db_initialized = True

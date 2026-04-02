@@ -43,15 +43,15 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    create_engine,
     func,
     inspect,
     text,
 )
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.orm import Session
 
 from agent import run_agent
 from actions import build_ticket as build_support_ticket, calculate_impact, system_decision, triage_ticket
+from db import Base, SessionLocal, engine, init_db
 from memory import get_user_memory
 from utils import normalize_ticket, safe_execute
 
@@ -219,14 +219,6 @@ app.add_middleware(
 # 2. DATABASE ENGINE
 # =============================================================================
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aurum.db")
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
-    pool_pre_ping=True,
-)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
-Base = declarative_base()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 _rate_log: dict[str, list[float]] = {}
@@ -344,7 +336,7 @@ class ProcessedWebhook(Base):
     detail = Column(Text, default="")
 
 
-Base.metadata.create_all(bind=engine)
+init_db()
 
 
 def ensure_user_columns() -> None:
@@ -1944,6 +1936,16 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
         payload["final"] = payload["reply"]
         payload["tool_status"] = "approved"
         payload["tool_result"] = {"status": "approved"}
+        _log_real_outcome(
+            outcome_key="approve:{}:{}".format(getattr(ticket, 'id', ''), 'credit'),
+            user_id=str(getattr(ticket, 'username', '') or ''),
+            action='credit',
+            amount=proposed_amount,
+            issue_type=str(getattr(ticket, 'issue_type', 'general_support') or 'general_support'),
+            tool_result={'status': 'approved'},
+            auto_resolved=False,
+            approved_by_human=True,
+        )
         return payload, "approved"
 
     if proposed_action == "charge":
@@ -4193,6 +4195,50 @@ def convert_outreach_lead(
         "daily_summary": _get_daily_summary(all_leads),
         "metrics": _compute_revenue_metrics(all_leads),
         "username": user.username,
+    }
+
+
+# =============================================================================
+# METRICS — clean summary endpoint
+# =============================================================================
+
+@app.get("/metrics")
+def public_metrics(
+    user: User = Depends(require_authenticated_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Clean metrics summary.  Returns everything needed to show value and
+    drive plan conversion: tickets handled, money moved, real outcomes,
+    and current plan usage.
+    """
+    total_tickets = db.query(Ticket).count()
+    auto_resolved = db.query(Ticket).filter(Ticket.status == "resolved").count()
+    pending       = db.query(ActionLog).filter(
+        ActionLog.requires_approval == 1, ActionLog.approved == 0
+    ).count()
+    refund_total  = float(db.query(func.sum(ActionLog.amount)).filter(ActionLog.action == "refund").scalar() or 0)
+    credit_total  = float(db.query(func.sum(ActionLog.amount)).filter(ActionLog.action == "credit").scalar() or 0)
+
+    outcome_stats = get_outcome_stats()
+    usage_summary = get_usage_summary(user)
+    public_tier   = get_public_plan_name(user)
+    plan_cfg      = get_plan_config(public_tier)
+
+    return {
+        "tickets_handled":      total_tickets,
+        "auto_resolved":        auto_resolved,
+        "auto_resolution_rate": round(auto_resolved / max(1, total_tickets) * 100, 1),
+        "pending_approvals":    pending,
+        "money_moved":          round(refund_total + credit_total, 2),
+        "refunds_issued":       round(refund_total, 2),
+        "credits_issued":       round(credit_total, 2),
+        "real_outcomes":        outcome_stats,
+        "your_plan":            public_tier,
+        "your_usage":           usage_summary["usage"],
+        "your_limit":           plan_cfg["monthly_limit"],
+        "your_remaining":       usage_summary["remaining"],
+        "upgrade_available":    public_tier in {"free", "pro"},
     }
 
 if __name__ == "__main__":
