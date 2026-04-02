@@ -49,7 +49,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-from agent import run_agent
+from agent import run_agent, local_fallback_reply
 from actions import build_ticket as build_support_ticket, calculate_impact, system_decision, triage_ticket
 from db import Base, SessionLocal, engine, init_db
 from memory import get_user_memory
@@ -1982,11 +1982,36 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         }
 
     try:
-        result = run_agent(
-            req.message,
-            user_id=str(getattr(user, "username", "guest") or "guest"),
-            meta=build_agent_meta(req, user, db),
-        )
+        issue_type = str(runtime_ticket.get("issue_type", "general_support") or "general_support")
+        if issue_type in {"shipping_issue", "damaged_order"}:
+            planned_action = {
+                "action": str(shadow_decision.get("action", "none") or "none"),
+                "amount": float(shadow_decision.get("amount", 0) or 0),
+                "reason": str(shadow_decision.get("reason", "") or ""),
+                "queue": str(shadow_decision.get("queue", "waiting" if issue_type == "shipping_issue" else "escalated") or ("waiting" if issue_type == "shipping_issue" else "escalated")),
+                "priority": str(shadow_decision.get("priority", "medium" if issue_type == "shipping_issue" else "high") or ("medium" if issue_type == "shipping_issue" else "high")),
+                "risk_level": str(shadow_decision.get("risk_level", (runtime_ticket.get("triage") or {}).get("risk_level", "medium")) or "medium"),
+                "requires_approval": False,
+            }
+            order_info = {
+                "status": str(runtime_ticket.get("order_status", "unknown") or "unknown"),
+                "tracking": str(runtime_ticket.get("tracking", "") or ""),
+                "eta": str(runtime_ticket.get("eta", "") or ""),
+            }
+            local_result = local_fallback_reply(runtime_ticket, planned_action, order_info, req.message)
+            local_result["mode"] = "local_fast_path"
+            local_result["tool_result"] = {
+                "status": "local_fast_path",
+                "type": "tracking" if issue_type == "shipping_issue" else "escalation",
+            }
+            local_result["tool_status"] = "local_fast_path"
+            result = local_result
+        else:
+            result = run_agent(
+                req.message,
+                user_id=str(getattr(user, "username", "guest") or "guest"),
+                meta=build_agent_meta(req, user, db),
+            )
 
         if not isinstance(result, dict):
             raise RuntimeError("Agent returned invalid payload")
@@ -3221,6 +3246,8 @@ async def support_stream(
     username = get_current_username_from_header(authorization)
 
     async def generator() -> AsyncIterator[str]:
+        # Stream visible progress immediately so the UI does not sit on a blank loader
+        # while the support pipeline is still computing the result.
         initial_steps = [
             {"stage": "reviewing", "label": "Reviewing request"},
             {"stage": "routing", "label": "Choosing next step"},
@@ -3235,12 +3262,6 @@ async def support_stream(
                 timeout=28.0,
             )
         except asyncio.TimeoutError:
-            lowered = (req.message or "").lower()
-            inferred_issue_type = (
-                "damaged_order" if any(word in lowered for word in ("damage", "damaged", "broken")) else
-                "shipping_issue" if any(word in lowered for word in ("order", "tracking", "package", "late", "delivery")) else
-                "general_support"
-            )
             fallback = {
                 "reply": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
                 "final": "I’m still processing this request. Please try again in a moment or send it once more and I’ll re-run the support flow.",
@@ -3248,8 +3269,8 @@ async def support_stream(
                 "action": "review",
                 "amount": 0,
                 "reason": "stream_timeout",
-                "issue_type": inferred_issue_type,
-                "order_status": str(req.order_status or "unknown"),
+                "issue_type": "general_support",
+                "order_status": "unknown",
                 "tool_status": "timeout",
                 "tool_result": {"status": "timeout"},
                 "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
@@ -3275,7 +3296,7 @@ async def support_stream(
                 "amount": 0,
                 "reason": "stream_error",
                 "issue_type": "general_support",
-                "order_status": str(req.order_status or "unknown"),
+                "order_status": "unknown",
                 "tool_status": "error",
                 "tool_result": {"status": "error"},
                 "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
