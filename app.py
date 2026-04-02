@@ -976,7 +976,7 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "order_status": result.get("order_status", "unknown"),
         "tool_result": tool_result,
         "tool_status": result.get("tool_status", tool_result.get("status", "unknown")),
-        "action_result": result.get("action_result", {"status": "no_action", "type": "noop"}),
+        "action_result": tool_result,
         "impact": impact,
         "execution": execution,
         "decision": result.get("decision", {}),

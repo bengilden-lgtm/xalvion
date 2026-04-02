@@ -1941,14 +1941,15 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const action = String(data?.action || decision.action || "none").toLowerCase();
     const amount = Number(data?.amount || decision.amount || 0);
     const requiresApproval = Boolean(data?.requires_approval || decision.requires_approval || data?.execution?.requires_approval);
-    const actionResult = data?.action_result || {};
-    const actionType = String(actionResult.type || "").toLowerCase();
 
     if (requiresApproval && action === "refund") return amount > 0 ? `Refund ${formatMoney(amount)} pending approval` : "Refund pending approval";
     if (requiresApproval && action === "charge") return amount > 0 ? `Charge ${formatMoney(amount)} pending approval` : "Charge pending approval";
     if (requiresApproval && action === "credit") return amount > 0 ? `Credit ${formatMoney(amount)} pending approval` : "Credit pending approval";
-    if (actionType === "send_tracking") return "Tracking sent";
-    if (actionType === "escalate") return "Case escalated";
+    const toolResult = data?.action_result || data?.tool_result || {};
+    const toolType = String(toolResult.type || "").toLowerCase();
+    const emailSent = Boolean(toolResult?.email?.ok);
+    if (toolType === "tracking") return emailSent ? "Tracking emailed to customer" : "Tracking prepared";
+    if (toolType === "escalation") return "Case escalated";
     if (action === "refund") return amount > 0 ? `Refunded ${formatMoney(amount)}` : "Refund processed";
     if (action === "credit") return amount > 0 ? `Credited ${formatMoney(amount)}` : "Credit applied";
     if (action === "review") return "Escalated to review";
@@ -1977,12 +1978,9 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const decision = data.decision || {};
     const rawAction = String(data.action || decision.action || "none").toLowerCase();
     const requiresApproval = Boolean(data.requires_approval || decision.requires_approval || data.execution?.requires_approval);
-    const actionType = String(data.action_result?.type || "").toLowerCase();
     if (requiresApproval && rawAction === "refund") return "Refund approval required";
     if (requiresApproval && rawAction === "charge") return "Charge approval required";
     if (requiresApproval && rawAction === "credit") return "Credit approval required";
-    if (actionType === "send_tracking") return "Tracking sent to customer";
-    if (actionType === "escalate") return "Case escalated";
     if (rawAction === "review") return "Billing review started";
     return actionLabel(data);
   }
@@ -2003,9 +2001,11 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function noticeTitleForResult(data = {}) {
     const rawAction = String(data.action || "none").toLowerCase();
-    const actionType = String(data.action_result?.type || "").toLowerCase();
-    if (actionType === "send_tracking") return "Tracking sent";
-    if (actionType === "escalate") return "Case escalated";
+    const toolResult = data?.action_result || data?.tool_result || {};
+    const toolType = String(toolResult.type || "").toLowerCase();
+    const emailSent = Boolean(toolResult?.email?.ok);
+    if (toolType === "tracking") return emailSent ? "Tracking emailed" : "Tracking prepared";
+    if (toolType === "escalation") return "Case escalated";
     if (rawAction === "review") return "Billing review started";
     if (rawAction === "refund") return "Refund processed";
     if (rawAction === "credit") return "Credit applied";
@@ -3090,11 +3090,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       const limitReachedAfterRun = usageAfterRun >= limitAfterRun && (String(state.tier || "free").toLowerCase() === "free" || !isAuthenticated());
 
       updateTopbarStatus();
-      const actionResultMessage = String(data?.action_result?.message || "").trim();
-      const noticeDetail = actionResultMessage && actionResultMessage !== replyText
-        ? `${replyText} · ${actionResultMessage}`
-        : replyText;
-      setNotice(data.action === "review" ? "warning" : "success", noticeTitleForResult(data), noticeDetail);
+      setNotice(data.action === "review" ? "warning" : "success", noticeTitleForResult(data), replyText);
 
       if (limitReachedAfterRun) {
         pushLimitMessage(true);
