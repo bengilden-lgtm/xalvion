@@ -1982,36 +1982,57 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         }
 
     try:
-        issue_type = str(runtime_ticket.get("issue_type", "general_support") or "general_support")
-        if issue_type in {"shipping_issue", "damaged_order"}:
-            planned_action = {
-                "action": str(shadow_decision.get("action", "none") or "none"),
-                "amount": float(shadow_decision.get("amount", 0) or 0),
-                "reason": str(shadow_decision.get("reason", "") or ""),
-                "queue": str(shadow_decision.get("queue", "waiting" if issue_type == "shipping_issue" else "escalated") or ("waiting" if issue_type == "shipping_issue" else "escalated")),
-                "priority": str(shadow_decision.get("priority", "medium" if issue_type == "shipping_issue" else "high") or ("medium" if issue_type == "shipping_issue" else "high")),
-                "risk_level": str(shadow_decision.get("risk_level", (runtime_ticket.get("triage") or {}).get("risk_level", "medium")) or "medium"),
-                "requires_approval": False,
+        msg = (req.message or "").lower()
+
+        if any(x in msg for x in ["where is my order", "late", "tracking", "package", "delivery"]):
+            result = {
+                "reply": "Your order is on the way. You can track it using your tracking link. Let me know if you'd like me to resend it.",
+                "action": "none",
+                "issue_type": "shipping_issue",
+                "confidence": 0.95,
+                "tool_status": "local_fast_path",
+                "tool_result": {"status": "local_fast_path"},
             }
-            order_info = {
-                "status": str(runtime_ticket.get("order_status", "unknown") or "unknown"),
-                "tracking": str(runtime_ticket.get("tracking", "") or ""),
-                "eta": str(runtime_ticket.get("eta", "") or ""),
+        elif any(x in msg for x in ["damaged", "broken", "arrived damaged"]):
+            result = {
+                "reply": "I'm sorry your order arrived damaged. I've flagged this for immediate review and we'll make this right.",
+                "action": "review",
+                "issue_type": "damaged_order",
+                "confidence": 0.95,
+                "tool_status": "local_fast_path",
+                "tool_result": {"status": "local_fast_path"},
             }
-            local_result = local_fallback_reply(runtime_ticket, planned_action, order_info, req.message)
-            local_result["mode"] = "local_fast_path"
-            local_result["tool_result"] = {
-                "status": "local_fast_path",
-                "type": "tracking" if issue_type == "shipping_issue" else "escalation",
-            }
-            local_result["tool_status"] = "local_fast_path"
-            result = local_result
         else:
-            result = run_agent(
-                req.message,
-                user_id=str(getattr(user, "username", "guest") or "guest"),
-                meta=build_agent_meta(req, user, db),
-            )
+            issue_type = str(runtime_ticket.get("issue_type", "general_support") or "general_support")
+            if issue_type in {"shipping_issue", "damaged_order"}:
+                planned_action = {
+                    "action": str(shadow_decision.get("action", "none") or "none"),
+                    "amount": float(shadow_decision.get("amount", 0) or 0),
+                    "reason": str(shadow_decision.get("reason", "") or ""),
+                    "queue": str(shadow_decision.get("queue", "waiting" if issue_type == "shipping_issue" else "escalated") or ("waiting" if issue_type == "shipping_issue" else "escalated")),
+                    "priority": str(shadow_decision.get("priority", "medium" if issue_type == "shipping_issue" else "high") or ("medium" if issue_type == "shipping_issue" else "high")),
+                    "risk_level": str(shadow_decision.get("risk_level", (runtime_ticket.get("triage") or {}).get("risk_level", "medium")) or "medium"),
+                    "requires_approval": False,
+                }
+                order_info = {
+                    "status": str(runtime_ticket.get("order_status", "unknown") or "unknown"),
+                    "tracking": str(runtime_ticket.get("tracking", "") or ""),
+                    "eta": str(runtime_ticket.get("eta", "") or ""),
+                }
+                local_result = local_fallback_reply(runtime_ticket, planned_action, order_info, req.message)
+                local_result["mode"] = "local_fast_path"
+                local_result["tool_result"] = {
+                    "status": "local_fast_path",
+                    "type": "tracking" if issue_type == "shipping_issue" else "escalation",
+                }
+                local_result["tool_status"] = "local_fast_path"
+                result = local_result
+            else:
+                result = run_agent(
+                    req.message,
+                    user_id=str(getattr(user, "username", "guest") or "guest"),
+                    meta=build_agent_meta(req, user, db),
+                )
 
         if not isinstance(result, dict):
             raise RuntimeError("Agent returned invalid payload")
