@@ -137,3 +137,156 @@ def issue_credit(customer, amount):
         "customer": customer,
         "amount": amount
     }
+import os as _os
+
+# ---------------------------------------------------------------------------
+# Dual-mode execution
+# ---------------------------------------------------------------------------
+# Set XALVION_EXEC_MODE=live in production to route through real APIs.
+# Default is "mock" — all existing behavior is preserved.
+
+_EXEC_MODE = (_os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+
+
+def execute_tool(
+    action: str,
+    payload: dict,
+    mode: Optional[str] = None,
+) -> dict:
+    """
+    Dual-mode tool dispatcher.
+
+    mode="mock" (default): existing mock functions — no external calls
+    mode="live": real Shopify/Stripe APIs (requires env vars)
+
+    Fails safely: any live error returns {"status": "live_error", ...}
+    which the caller (agent.py) treats as requires_approval=True → review queue.
+    """
+    effective_mode = (mode or _EXEC_MODE or "mock").strip().lower()
+
+    if effective_mode != "live":
+        if action == "refund":
+            return process_refund(
+                payload.get("customer", ""),
+                payload.get("amount", 0),
+            )
+        if action == "credit":
+            return issue_credit(
+                payload.get("customer", ""),
+                payload.get("amount", 0),
+            )
+        if action == "get_order":
+            return get_order(
+                payload.get("customer", ""),
+                payload.get("context"),
+            )
+        return {"status": "no_action", "mode": "mock"}
+
+    try:
+        return _live_dispatch(action, payload)
+    except Exception as _exc:
+        return {
+            "status":   "live_error",
+            "error":    str(_exc),
+            "fallback": "review",
+            "mode":     "live",
+        }
+
+
+def _live_dispatch(action: str, payload: dict) -> dict:
+    """
+    Real Shopify API dispatcher.  Only active when XALVION_EXEC_MODE=live
+    and SHOPIFY_SHOP_DOMAIN + SHOPIFY_ACCESS_TOKEN are set.
+    """
+    import time
+    import requests as _req
+
+    shop    = (_os.getenv("SHOPIFY_SHOP_DOMAIN", "") or "").strip().rstrip("/")
+    token   = (_os.getenv("SHOPIFY_ACCESS_TOKEN", "") or "").strip()
+    api_ver = (_os.getenv("SHOPIFY_API_VERSION", "2024-04") or "2024-04").strip()
+
+    if not shop or not token:
+        raise RuntimeError(
+            "SHOPIFY_SHOP_DOMAIN and SHOPIFY_ACCESS_TOKEN are required for live execution mode"
+        )
+
+    base = f"https://{shop}/admin/api/{api_ver}"
+    hdrs = {
+        "X-Shopify-Access-Token": token,
+        "Content-Type":           "application/json",
+        "Accept":                 "application/json",
+    }
+
+    def _request(method: str, path: str, body: dict | None = None, retries: int = 3) -> dict:
+        url = f"{base}{path}"
+        for attempt in range(retries):
+            try:
+                r = _req.request(method, url, headers=hdrs, json=body, timeout=12.0)
+                if r.status_code == 429:
+                    time.sleep(float(r.headers.get("Retry-After", 2.0)))
+                    continue
+                if r.status_code >= 500:
+                    time.sleep(2 ** attempt)
+                    continue
+                data = r.json() if r.content else {}
+                if not r.ok:
+                    err = data.get("errors") or data.get("error") or r.text[:200]
+                    raise RuntimeError(f"Shopify {r.status_code}: {err}")
+                return data
+            except RuntimeError:
+                raise
+            except Exception as exc:
+                if attempt == retries - 1:
+                    raise RuntimeError(str(exc)) from exc
+                time.sleep(2 ** attempt)
+        raise RuntimeError("Shopify request failed after all retries")
+
+    if action == "refund":
+        amount   = round(float(payload.get("amount", 0) or 0), 2)
+        order_id = str(payload.get("order_id", "") or "").strip()
+        if not order_id:
+            return {"status": "error", "error": "order_id required for live refund", "mode": "live"}
+        body = {
+            "refund": {
+                "currency": "USD",
+                "notify":   True,
+                "note":     "Xalvion auto-refund",
+                "transactions": [{
+                    "order_id": order_id,
+                    "kind":     "refund",
+                    "gateway":  "shopify_payments",
+                    "amount":   f"{amount:.2f}",
+                }],
+            }
+        }
+        data   = _request("POST", f"/orders/{order_id}/refunds.json", body)
+        refund = data.get("refund", {})
+        return {
+            "status":    "success",
+            "customer":  payload.get("customer", ""),
+            "amount":    amount,
+            "refund_id": str(refund.get("id", "")),
+            "order_id":  order_id,
+            "mode":      "live",
+        }
+
+    if action == "credit":
+        amount = round(float(payload.get("amount", 0) or 0), 2)
+        body   = {
+            "gift_card": {
+                "initial_value": f"{amount:.2f}",
+                "currency":      "USD",
+                "note":          f"Xalvion credit for {payload.get('customer', '')}",
+            }
+        }
+        data = _request("POST", "/gift_cards.json", body)
+        gc   = data.get("gift_card", {})
+        return {
+            "status":       "credit_issued",
+            "customer":     payload.get("customer", ""),
+            "amount":       amount,
+            "gift_card_id": str(gc.get("id", "")),
+            "mode":         "live",
+        }
+
+    return {"status": "no_action", "mode": "live"}

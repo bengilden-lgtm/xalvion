@@ -15,7 +15,7 @@ from typing import Any, Iterable
 from sqlalchemy import Column, Float, Index, Integer, String, Text, func
 from sqlalchemy.orm import Session
 
-from db import Base, SessionLocal, engine
+from db import Base, SessionLocal, engine, init_db
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ class KnowledgeEntry(Base):
 Index("ix_crm_leads_user_status",     CRMLead.username, CRMLead.status)
 Index("ix_knowledge_source_type",     KnowledgeEntry.source, KnowledgeEntry.content_type)
 
-Base.metadata.create_all(bind=engine)
+init_db()
 
 
 # ---------------------------------------------------------------------------

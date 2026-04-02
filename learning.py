@@ -7,6 +7,12 @@ from typing import Any, Dict, List
 
 from brain import add_rule, load_brain, register_rule_outcome, save_brain
 
+try:
+    from outcome_store import get_outcome
+except Exception:
+    def get_outcome(outcome_key):
+        return None
+
 RULES_FILE = "learned_rules.json"
 
 
@@ -64,25 +70,50 @@ def _is_closed_outcome(outcome: Dict[str, Any]) -> bool:
     return value == "closed"
 
 
-def _score_outcome(outcome: Dict[str, Any]) -> float:
+def _score_outcome(outcome: Dict[str, Any], outcome_key: str | None = None) -> float:
+    """
+    Score an outcome.  If a real outcome exists in outcome_store, use it.
+    Falls back to the self-reported outcome dict for backwards compatibility.
+    """
+    real: Dict[str, Any] | None = None
+    if outcome_key:
+        try:
+            real = get_outcome(outcome_key)
+        except Exception:
+            real = None
+
     score = 0.0
-    if _is_closed_outcome(outcome):
-        score += 2.0
-    if bool(outcome.get("auto_resolved", False)):
-        score += 1.0
-    score += min(2.0, float(outcome.get("money_saved", 0.0) or 0.0) / 50.0)
-    score += min(1.0, float(outcome.get("agent_minutes_saved", 0) or 0) / 10.0)
+
+    if real is not None:
+        # Real outcome path — use verified API result
+        if real.get("success"):
+            score += 2.5
+        if real.get("auto_resolved"):
+            score += 1.0
+        if real.get("approved_by_human"):
+            score += 0.5
+        if real.get("refund_reversed") or real.get("dispute_filed"):
+            score -= 3.0  # strong negative signal — rule was wrong
+    else:
+        # Self-reported fallback — original logic preserved
+        if _is_closed_outcome(outcome):
+            score += 2.0
+        if bool(outcome.get("auto_resolved", False)):
+            score += 1.0
+        score += min(2.0, float(outcome.get("money_saved", 0.0) or 0.0) / 50.0)
+        score += min(1.0, float(outcome.get("agent_minutes_saved", 0) or 0) / 10.0)
+
     return round(score, 4)
 
 
-def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome: Dict[str, Any]) -> None:
+def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome: Dict[str, Any], outcome_key: str | None = None) -> None:
     rules = load_rules()
     candidate = _candidate_rule(ticket, decision)
     if not candidate:
         return
     if not validate_rule(candidate) or not simulate_rule(candidate):
         return
-    conversion_weight = 1.0 + _score_outcome(outcome)
+    conversion_weight = 1.0 + _score_outcome(outcome, outcome_key=outcome_key)
     for rule in rules:
         if rule["trigger"] == candidate["trigger"]:
             rule["weight"] = round(float(rule.get("weight", 1.0)) + (0.5 * conversion_weight), 4)

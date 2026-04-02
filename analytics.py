@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy import Column, Float, Integer, String, Text, func
 
-from db import Base, SessionLocal, engine
+from db import Base, SessionLocal, engine, init_db
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ class AnalyticsEvent(Base):
     amount          = Column(Float, default=0.0)
 
 
-Base.metadata.create_all(bind=engine)
+init_db()
 
 
 # ---------------------------------------------------------------------------
