@@ -439,7 +439,6 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
 
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
 
-    # True fast paths: do not call downstream integrations for shipping or damage flows.
     if issue_type == "shipping_issue":
         return {
             "action": "none",

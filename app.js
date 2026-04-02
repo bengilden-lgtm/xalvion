@@ -1977,12 +1977,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   function displayActionLabel(data = {}) {
     const decision = data.decision || {};
     const rawAction = String(data.action || decision.action || "none").toLowerCase();
-    const rawIssueType = String(
-      data.issue_type ||
-      data.meta?.issue_type ||
-      data.decision?.issue_type ||
-      "general_support"
-    ).toLowerCase();
+    const rawIssueType = String(data.issue_type || decision.issue_type || data.meta?.issue_type || "").toLowerCase();
     const requiresApproval = Boolean(data.requires_approval || decision.requires_approval || data.execution?.requires_approval);
     if (requiresApproval && rawAction === "refund") return "Refund approval required";
     if (requiresApproval && rawAction === "charge") return "Charge approval required";
@@ -1993,8 +1988,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       if (rawIssueType === "billing_duplicate_charge" || rawIssueType === "refund_request") return "Billing review started";
       return "Review started";
     }
-    return actionLabel(data);
-  }
     return actionLabel(data);
   }
 
@@ -2014,12 +2007,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function noticeTitleForResult(data = {}) {
     const rawAction = String(data.action || "none").toLowerCase();
-    const rawIssueType = String(
-      data.issue_type ||
-      data.meta?.issue_type ||
-      data.decision?.issue_type ||
-      "general_support"
-    ).toLowerCase();
+    const rawIssueType = String(data.issue_type || data.meta?.issue_type || data.decision?.issue_type || "").toLowerCase();
     const toolResult = data?.action_result || data?.tool_result || {};
     const toolType = String(toolResult.type || "").toLowerCase();
     const emailSent = Boolean(toolResult?.email?.ok);
