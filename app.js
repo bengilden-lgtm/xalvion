@@ -2034,6 +2034,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const emailSent = Boolean(toolResult?.email?.ok);
     if (toolType === "tracking") return emailSent ? "Tracking emailed" : "Tracking prepared";
     if (toolType === "escalation") return "Case escalated";
+    if (toolType === "billing") return "Billing update prepared";
     if (rawAction === "review") {
       if (rawIssueType === "shipping_issue") return "Shipping review started";
       if (rawIssueType === "damaged_order") return "Damage review started";

@@ -452,6 +452,22 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
             "tool_status": "local_damage_flow",
         }
 
+    if issue_type in {"billing_duplicate_charge", "billing_issue", "payment_issue"}:
+        return {
+            "action": "none",
+            "amount": 0,
+            "tool_result": {"status": "local_billing_flow", "type": "billing", "message": "Billing handled locally"},
+            "tool_status": "local_billing_flow",
+        }
+
+    if issue_type == "refund_request":
+        return {
+            "action": "none",
+            "amount": 0,
+            "tool_result": {"status": "local_refund_request", "type": "billing", "message": "Refund request handled locally"},
+            "tool_status": "local_refund_request",
+        }
+
     if action == "charge":
         integration_result = dispatch_integrated_action("charge", payload)
         return {"action": "charge", "amount": amount, "tool_result": integration_result, "tool_status": integration_result.get("status", "manual_charge_required")}
@@ -598,6 +614,16 @@ Return valid JSON using this exact schema:
 
 
 def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any], order_info: Dict[str, Any], message: str) -> Dict[str, Any]:
+    def _finalize_local_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+        cm = str(payload.get("customer_message") or "").strip()
+        conf = float(payload.get("confidence") or 0.9)
+        payload["reply"] = payload.get("reply") or cm
+        payload["response"] = payload.get("response") or cm
+        payload["final"] = payload.get("final") or cm
+        if payload.get("quality") is None:
+            payload["quality"] = conf
+        return payload
+
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
     action = str(planned_action.get("action", "none") or "none")
     amount = int(planned_action.get("amount", 0) or 0)
@@ -654,7 +680,7 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
             customer_message += f"\n\nI’ve also added a ${amount} credit to help make up for the delay."
 
         internal_note = f"Shipping case with status={status}, tracking={tracking or 'none'}, eta={eta or 'none'}, triage={triage}."
-        return {
+        return _finalize_local_payload({
             "customer_message": customer_message,
             "customer_note": customer_message,
             "internal_note": internal_note,
@@ -666,7 +692,7 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
             "priority": priority,
             "queue": queue or "waiting",
             "requires_approval": bool(planned_action.get("requires_approval", False)),
-        }
+        })
 
     if issue_type == "damaged_order":
         if action == "credit" and amount > 0:
@@ -675,7 +701,7 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
             customer_message = "I’ve reviewed the damage case and pushed it into priority handling so it’s resolved correctly."
         else:
             customer_message = "I’ve reviewed the damage case and moved it into the right recovery path so it can be resolved quickly."
-        return {
+        return _finalize_local_payload({
             "customer_message": customer_message,
             "customer_note": customer_message,
             "internal_note": f"Damage flow used. Reason={reason or 'Damaged-order recovery'}.",
@@ -687,7 +713,64 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
             "priority": "high",
             "queue": queue or "escalated",
             "requires_approval": bool(planned_action.get("requires_approval", False)),
-        }
+        })
+
+    if issue_type == "billing_duplicate_charge":
+        customer_message = (
+            "You were charged twice — I’ve flagged this for billing correction and duplicate-charge review "
+            "so the extra charge is removed or refunded properly. You’ll get a confirmation once it’s resolved."
+        )
+        return _finalize_local_payload({
+            "customer_message": customer_message,
+            "customer_note": customer_message,
+            "internal_note": "Billing duplicate fast path — customer-safe reply, no automatic execution.",
+            "action": "none",
+            "amount": 0,
+            "reason": reason or "Duplicate charge acknowledgment",
+            "confidence": 0.94,
+            "risk_level": risk_level,
+            "priority": priority,
+            "queue": queue or "refund_risk",
+            "requires_approval": False,
+        })
+
+    if issue_type == "refund_request":
+        customer_message = (
+            "I’ve received your refund request and I’m reviewing the order details now — "
+            "I’ll confirm the next step shortly, including timing and what to expect on your statement."
+        )
+        return _finalize_local_payload({
+            "customer_message": customer_message,
+            "customer_note": customer_message,
+            "internal_note": "Refund request fast path — customer-safe reply, no automatic execution.",
+            "action": "none",
+            "amount": 0,
+            "reason": reason or "Refund request acknowledgment",
+            "confidence": 0.93,
+            "risk_level": risk_level,
+            "priority": priority,
+            "queue": queue or "refund_risk",
+            "requires_approval": False,
+        })
+
+    if issue_type in {"billing_issue", "payment_issue"}:
+        customer_message = (
+            "I’ve reviewed your billing concern and I’m on it — I’ll confirm what happened with the charge "
+            "and the fastest path to fix it, including any correction or refund if it applies."
+        )
+        return _finalize_local_payload({
+            "customer_message": customer_message,
+            "customer_note": customer_message,
+            "internal_note": "Billing/payment fast path — customer-safe reply, no automatic execution.",
+            "action": "none",
+            "amount": 0,
+            "reason": reason or "Billing issue acknowledgment",
+            "confidence": 0.92,
+            "risk_level": risk_level,
+            "priority": priority,
+            "queue": queue or "waiting",
+            "requires_approval": False,
+        })
 
     if action == "refund" and amount > 0:
         customer_message = f"I’ve approved a refund of ${amount} and the correction is now in motion."
@@ -700,7 +783,7 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
     else:
         customer_message = "I checked this and I’m already on the next step."
 
-    return {
+    return _finalize_local_payload({
         "customer_message": customer_message,
         "customer_note": customer_message,
         "internal_note": f"Local fallback path used for {issue_type}. Message={message[:120]}",
@@ -712,7 +795,7 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
         "priority": priority,
         "queue": queue,
         "requires_approval": bool(planned_action.get("requires_approval", False)),
-    }
+    })
 
 
 def rewrite_output_for_issue(ticket: Dict[str, Any], executed: Dict[str, Any], parsed: Dict[str, Any], message: str) -> str:

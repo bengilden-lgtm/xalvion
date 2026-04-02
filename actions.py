@@ -24,7 +24,15 @@ def _clamp(value: Any, low: int, high: int, default: int = 0) -> int:
 def classify_issue(issue: str) -> str:
     text = (issue or "").lower()
 
-    if "charged twice" in text or "double charge" in text or "billed twice" in text or "duplicate charge" in text:
+    if (
+        "charged twice" in text
+        or "double charge" in text
+        or "billed twice" in text
+        or "duplicate charge" in text
+        or "overcharged" in text
+        or "over charged" in text
+        or "wrong charge" in text
+    ):
         return "billing_duplicate_charge"
     if "damaged" in text or "broken" in text:
         return "damaged_order"
@@ -222,7 +230,16 @@ def system_decision(ticket: Dict[str, Any]) -> Dict[str, Any]:
         })
         return base
 
-    if issue_type == "billing_duplicate_charge" or "charged twice" in issue or "double charge" in issue:
+    billing_dup_signals = (
+        "charged twice",
+        "double charge",
+        "duplicate charge",
+        "billed twice",
+        "overcharged",
+        "over charged",
+        "wrong charge",
+    )
+    if issue_type == "billing_duplicate_charge" or any(s in issue for s in billing_dup_signals):
         base.update({
             "action": "refund",
             "amount": 25,

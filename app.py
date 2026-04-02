@@ -1995,8 +1995,20 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
         )
         damaged_keys = ("damaged", "broken", "arrived damaged")
 
-        is_shipping = issue_type_rt == "shipping_issue" or any(k in msg for k in shipping_keys)
+        billing_types_rt = {"billing_duplicate_charge", "billing_issue", "payment_issue", "refund_request"}
+        billing_msg_keys = (
+            "charged twice",
+            "double charge",
+            "duplicate charge",
+            "billed twice",
+            "overcharged",
+            "over charged",
+            "wrong charge",
+        )
+
         is_damaged = issue_type_rt == "damaged_order" or any(k in msg for k in damaged_keys)
+        is_billing = issue_type_rt in billing_types_rt or any(k in msg for k in billing_msg_keys)
+        is_shipping = issue_type_rt == "shipping_issue" or any(k in msg for k in shipping_keys)
 
         triage_rt = runtime_ticket.get("triage") or {}
         risk_from_ctx = str(
@@ -2029,6 +2041,36 @@ def run_support(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
             local_result["tool_result"] = {
                 "status": "local_fast_path",
                 "type": "escalation",
+            }
+            local_result["tool_status"] = "local_fast_path"
+            result = local_result
+        elif is_billing:
+            ticket_local = dict(runtime_ticket)
+            if issue_type_rt in billing_types_rt:
+                it = issue_type_rt
+            elif any(k in msg for k in billing_msg_keys):
+                it = "billing_duplicate_charge"
+            elif "refund" in msg:
+                it = "refund_request"
+            else:
+                it = "billing_issue"
+            ticket_local["issue_type"] = it
+            q_default = "refund_risk" if it in {"billing_duplicate_charge", "refund_request"} else "waiting"
+            planned_action = {
+                "action": "none",
+                "amount": 0,
+                "reason": str(shadow_decision.get("reason", "") or ""),
+                "queue": str(shadow_decision.get("queue", q_default) or q_default),
+                "priority": str(shadow_decision.get("priority", "high") or "high"),
+                "risk_level": risk_from_ctx,
+                "requires_approval": False,
+            }
+            local_result = local_fallback_reply(ticket_local, planned_action, order_info, req.message)
+            local_result["mode"] = "local_fast_path"
+            local_result["issue_type"] = it
+            local_result["tool_result"] = {
+                "status": "local_fast_path",
+                "type": "billing",
             }
             local_result["tool_status"] = "local_fast_path"
             result = local_result
