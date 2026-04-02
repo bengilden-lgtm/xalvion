@@ -2440,7 +2440,16 @@ def signup(req: AuthRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username already taken")
 
     try:
-        db.add(User(username=username, password=hash_password(password), usage=0, tier="free"))
+        password_hash = hash_password(password)
+    except Exception:
+        logger.exception("signup_password_hash_failed username=%s", username)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not process password. Try a different password or contact support.",
+        )
+
+    try:
+        db.add(User(username=username, password=password_hash, usage=0, tier="free"))
         db.commit()
     except Exception:
         logger.exception("signup_db_error username=%s", username)
@@ -2469,7 +2478,12 @@ def login(req: AuthRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
 
-    token = create_token(user.username)
+    try:
+        token = create_token(user.username)
+    except Exception:
+        logger.exception("login_jwt_failed username=%s", username)
+        raise HTTPException(status_code=500, detail="Could not issue session. Try again.")
+
     usage_summary = get_usage_summary(user)
     logger.info("login_ok username=%s tier=%s", username, usage_summary.get("tier"))
     return {

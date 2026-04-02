@@ -1169,6 +1169,7 @@ function setText(el, value) {
   function clearGuestUsage() {
     localStorage.removeItem(GUEST_USAGE_KEY);
     localStorage.removeItem(GUEST_USAGE_RESET_KEY);
+    state.lastLimitNoticeKey = "";
   }
 
   function maybeResetGuestUsage(force = false) {
@@ -1392,6 +1393,32 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       if (parts.length) return parts.join(" ");
     }
     return "";
+  }
+
+  async function parseApiResponse(res) {
+    const text = await res.text();
+    const trimmed = (text || "").trim();
+    if (!trimmed) return {};
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return { detail: trimmed.slice(0, 800) };
+    }
+  }
+
+  function isStreamFailureResult(data) {
+    if (!data || typeof data !== "object") return false;
+    const mode = String(data.mode || "").toLowerCase();
+    const reason = String(data.reason || "").toLowerCase();
+    const tool = String(data.tool_status || (data.tool_result && data.tool_result.status) || "").toLowerCase();
+    return (
+      mode === "error"
+      || mode === "timeout"
+      || reason === "stream_error"
+      || reason === "stream_timeout"
+      || tool === "error"
+      || tool === "timeout"
+    );
   }
 
   function describeAuthRuleViolations(username, password) {
@@ -2716,7 +2743,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       body: JSON.stringify(payload)
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await parseApiResponse(res);
 
     if (res.status === 402) {
       pushLimitMessage(true);
@@ -2737,7 +2764,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     });
 
     if (!res.ok || !res.body) {
-      const data = await res.json().catch(() => ({}));
+      const data = await parseApiResponse(res);
       if (res.status === 402) {
         pushLimitMessage(true);
         throw new Error(detailFromApiBody(data) || "Plan limit reached. Upgrade to continue.");
@@ -3161,6 +3188,20 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         }
       }
 
+      if (data && isStreamFailureResult(data)) {
+        authDebugLog("support_stream_failure_payload", data.reason || data.mode || data.tool_status);
+        try {
+          const std = await handleStandardReply(payload);
+          if (std && !isStreamFailureResult(std)) {
+            data = std;
+            const fb = std.reply || std.response || std.final || "";
+            if (fb) setAssistantCopy(row, fb);
+          }
+        } catch (retryErr) {
+          authDebugLog("support_standard_after_stream_payload_failed", retryErr);
+        }
+      }
+
       stepTimers.forEach((timer) => window.clearTimeout(timer));
       removeStreamSteps(stepsEl);
 
@@ -3261,12 +3302,12 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     state.token = data.token || "";
     state.username = data.username || username;
     clearGuestUsage();
-    updatePlanUI(
-      data.tier || "free",
-      Number(data.usage || 0),
-      Number(data.limit || 50),
-      Number(data.remaining || 0)
-    );
+    const limRaw = Number(data.limit);
+    const lim = Number.isFinite(limRaw) && limRaw > 0 ? limRaw : FREE_USAGE_LIMIT;
+    const use = Math.max(0, Number(data.usage || 0) || 0);
+    const remRaw = Number(data.remaining);
+    const rem = Number.isFinite(remRaw) ? Math.max(0, remRaw) : Math.max(0, lim - use);
+    updatePlanUI(data.tier || "free", use, lim, rem);
     persistAuth();
     updateTopbarStatus();
     await loadIntegrations();
@@ -3305,9 +3346,11 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         body: JSON.stringify({ username, password })
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await parseApiResponse(res);
       if (!res.ok) {
-        throw new Error(detailFromApiBody(data) || "Signup failed.");
+        throw new Error(
+          detailFromApiBody(data) || `Signup failed (${res.status}).`
+        );
       }
 
       const loginRes = await fetch(`${API}/login`, {
@@ -3315,7 +3358,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         headers: headers(),
         body: JSON.stringify({ username, password })
       });
-      const loginData = await loginRes.json().catch(() => ({}));
+      const loginData = await parseApiResponse(loginRes);
       if (!loginRes.ok) {
         throw new Error(
           detailFromApiBody(loginData) ||
@@ -3355,9 +3398,9 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         body: JSON.stringify({ username, password })
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await parseApiResponse(res);
       if (!res.ok) {
-        throw new Error(detailFromApiBody(data) || "Invalid credentials.");
+        throw new Error(detailFromApiBody(data) || `Login failed (${res.status}).`);
       }
 
       await applyAuthenticatedSession(data, username, {
