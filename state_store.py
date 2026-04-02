@@ -10,27 +10,37 @@ from sqlalchemy import Column, String, Text, create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 
+# =========================
+# DATABASE PATH FIX (CRITICAL)
+# =========================
 def _resolve_database_url() -> str:
     raw = os.getenv("DATABASE_URL", "sqlite:///./aurum.db").strip()
+
+    # If not sqlite, just return (e.g. Postgres)
     if not raw.startswith("sqlite:///"):
         return raw
 
     sqlite_target = raw.replace("sqlite:///", "", 1).strip()
 
+    # Absolute path → ensure directory exists
     if sqlite_target.startswith("/"):
         db_path = Path(sqlite_target)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return f"sqlite:///{db_path}"
 
+    # Railway / container safe fallback
     preferred_dir = (
         os.getenv("STATE_STORE_DIR")
         or os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
         or "/tmp/xalvion_state"
     )
+
     base_dir = Path(preferred_dir)
     base_dir.mkdir(parents=True, exist_ok=True)
+
     db_path = base_dir / sqlite_target
     db_path.parent.mkdir(parents=True, exist_ok=True)
+
     return f"sqlite:///{db_path}"
 
 
@@ -41,10 +51,14 @@ engine = create_engine(
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
     pool_pre_ping=True,
 )
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 
 
+# =========================
+# TABLE
+# =========================
 class AgentState(Base):
     __tablename__ = "agent_state"
 
@@ -56,42 +70,65 @@ class AgentState(Base):
 Base.metadata.create_all(bind=engine)
 
 
+# =========================
+# LOAD
+# =========================
 def load_state(key: str, default: dict[str, Any]) -> dict[str, Any]:
     db = SessionLocal()
     try:
         row = db.query(AgentState).filter(AgentState.key == key).first()
         if row is None:
             return default.copy()
+
         try:
             parsed = json.loads(row.value)
             return parsed if isinstance(parsed, dict) else default.copy()
         except Exception:
             return default.copy()
+
     finally:
         db.close()
 
 
+# =========================
+# SAVE
+# =========================
 def save_state(key: str, value: dict[str, Any]) -> None:
     db = SessionLocal()
     try:
         payload = json.dumps(value, ensure_ascii=False)
         now = datetime.utcnow().isoformat()
+
         row = db.query(AgentState).filter(AgentState.key == key).first()
+
         if row is None:
             db.add(AgentState(key=key, value=payload, updated_at=now))
         else:
             row.value = payload
             row.updated_at = now
+
         db.commit()
+
     finally:
         db.close()
 
 
-def mutate_state(key: str, default: dict[str, Any], mutator: Callable[[dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
+# =========================
+# SAFE MUTATION (LOCKED)
+# =========================
+def mutate_state(
+    key: str,
+    default: dict[str, Any],
+    mutator: Callable[[dict[str, Any]], dict[str, Any]],
+) -> dict[str, Any]:
     db = SessionLocal()
+
     try:
+        # Lock row (prevents race conditions)
         db.execute(text("BEGIN IMMEDIATE"))
+
         row = db.query(AgentState).filter(AgentState.key == key).first()
+
         if row is None:
             current = default.copy()
             row = AgentState(
@@ -110,12 +147,16 @@ def mutate_state(key: str, default: dict[str, Any], mutator: Callable[[dict[str,
                 current = default.copy()
 
         updated = mutator(current)
+
         row.value = json.dumps(updated, ensure_ascii=False)
         row.updated_at = datetime.utcnow().isoformat()
+
         db.commit()
         return updated
+
     except Exception:
         db.rollback()
         raise
+
     finally:
         db.close()
