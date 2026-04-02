@@ -7,9 +7,17 @@
   const TIER_KEY = "xalvion_tier";
   const DRAFT_KEY = "xalvion_workspace_draft";
   const GUEST_USAGE_KEY = "xalvion_guest_usage";
+  const GUEST_USAGE_RESET_KEY = "xalvion_guest_usage_reset_at";
   const GUEST_USAGE_LIMIT = 3;
   const FREE_USAGE_LIMIT = 12;
+  const GUEST_USAGE_RESET_WINDOW_MS = 12 * 60 * 60 * 1000;
 
+// ===== SAFE FALLBACK FOR pulseRail =====
+if (typeof window.pulseRail !== "function") {
+  window.pulseRail = function () {
+    console.warn("pulseRail fallback triggered");
+  };
+}
   const els = {
     messages: document.getElementById("messages"),
     messageInput: document.getElementById("messageInput"),
@@ -130,8 +138,6 @@
     revenueMetrics: { totals: {}, by_source: [], best_source: "manual", forecast: {} },
     lastLimitNoticeKey: ""
   };
-
-  let phase2Core = null;
 
   const ICONS = {
     copy: `
@@ -525,9 +531,6 @@
         height:13px;
         flex:0 0 13px;
         margin-top:1px;
-      }
-        width:24px;
-        padding:0;
       }
 
       .details-wrap{
@@ -1150,6 +1153,24 @@ function setText(el, value) {
 
   function clearGuestUsage() {
     localStorage.removeItem(GUEST_USAGE_KEY);
+    localStorage.removeItem(GUEST_USAGE_RESET_KEY);
+  }
+
+  function maybeResetGuestUsage(force = false) {
+    if (isAuthenticated()) return false;
+
+    const now = Date.now();
+    const lastReset = Number(localStorage.getItem(GUEST_USAGE_RESET_KEY) || 0) || 0;
+    const shouldReset = force || !lastReset || (now - lastReset) >= GUEST_USAGE_RESET_WINDOW_MS;
+
+    if (!shouldReset) return false;
+
+    localStorage.setItem(GUEST_USAGE_RESET_KEY, String(now));
+    setGuestUsage(0);
+    state.usage = 0;
+    state.remaining = GUEST_USAGE_LIMIT;
+    state.lastLimitNoticeKey = "";
+    return true;
   }
 
   function getEffectiveLimit(tier = state.tier, providedLimit = state.limit) {
@@ -1270,31 +1291,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     return out;
   }
 
-
-  async function loadPhase2Core() {
-    try {
-      const mod = await import('/workspace-modules.js');
-      if (mod && typeof mod.createPhase2Core === 'function') {
-        phase2Core = mod.createPhase2Core({ fetchImpl: window.fetch.bind(window) });
-      }
-    } catch (error) {
-      console.warn('[xalvion] phase2 core unavailable, continuing with inline runtime', error);
-      phase2Core = null;
-    }
-  }
-
   async function apiPost(path, body) {
-    if (phase2Core?.api?.post) {
-      return phase2Core.api.post({
-        baseUrl: API,
-        path,
-        body,
-        headers: headers(true),
-        onUnauthorized: invalidateSessionFrom401,
-        extractDetail: detailFromApiBody
-      });
-    }
-
     const res = await fetch(`${API}${path}`, {
       method: "POST",
       headers: headers(true),
@@ -1315,16 +1312,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     return data;
   }
   async function apiGet(path) {
-    if (phase2Core?.api?.get) {
-      return phase2Core.api.get({
-        baseUrl: API,
-        path,
-        headers: headers(false),
-        onUnauthorized: invalidateSessionFrom401,
-        extractDetail: detailFromApiBody
-      });
-    }
-
     const res = await fetch(`${API}${path}`, {
       headers: headers(false)
     });
@@ -1377,9 +1364,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function detailFromApiBody(data) {
-    if (phase2Core?.format?.detailFromApiBody) {
-      return phase2Core.format.detailFromApiBody(data);
-    }
     const d = data && data.detail;
     if (typeof d === "string") return d;
     if (Array.isArray(d) && d.length && typeof d[0]?.msg === "string") return d[0].msg;
@@ -1402,41 +1386,26 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function formatTier(value) {
-    if (phase2Core?.format?.formatTier) {
-      return phase2Core.format.formatTier(value);
-    }
     const tier = String(value || "free").toLowerCase();
     return tier.charAt(0).toUpperCase() + tier.slice(1);
   }
 
   function formatMetric(value, digits = 0) {
-    if (phase2Core?.format?.formatMetric) {
-      return phase2Core.format.formatMetric(value, digits);
-    }
     const num = Number(value || 0);
     return Number.isFinite(num) ? num.toFixed(digits) : digits ? (0).toFixed(digits) : "0";
   }
 
   function formatMoney(value) {
-    if (phase2Core?.format?.formatMoney) {
-      return phase2Core.format.formatMoney(value);
-    }
     const num = Number(value || 0);
     return `$${Number.isFinite(num) ? num.toFixed(0) : "0"}`;
   }
 
   function relativeTime(date = new Date()) {
-    if (phase2Core?.format?.relativeTime) {
-      return phase2Core.format.relativeTime(date);
-    }
     const d = date instanceof Date ? date : new Date(date);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
   function planCopy(tier) {
-    if (phase2Core?.store?.planCopy) {
-      return phase2Core.store.planCopy(tier);
-    }
     switch (String(tier || "free").toLowerCase()) {
       case "pro":
         return "Priority handling, larger usage limits, and a more serious operating surface for real support volume.";
@@ -2551,6 +2520,30 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     if (el) el.remove();
   }
 
+  function hardBindCoreButtons() {
+    const send = els.sendBtn;
+    const input = els.messageInput;
+
+    if (send && !send.dataset.xalvionBound) {
+      send.dataset.xalvionBound = "true";
+      send.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void sendMessage();
+      });
+    }
+
+    if (input && !input.dataset.xalvionEnterBound) {
+      input.dataset.xalvionEnterBound = "true";
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
+          event.preventDefault();
+          void sendMessage();
+        }
+      });
+    }
+  }
+
   function buildSupportPayload() {
     return {
       message: (els.messageInput?.value || "").trim(),
@@ -2964,7 +2957,17 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   async function sendMessage() {
     const payload = buildSupportPayload();
     if (!payload.message || state.sending) return;
-    if (!enforceWorkspaceLimit()) return;
+
+    if (!enforceWorkspaceLimit()) {
+      if (!isAuthenticated()) {
+        const reset = maybeResetGuestUsage(true);
+        if (reset) {
+          updatePlanUI("free", getGuestUsage(), GUEST_USAGE_LIMIT, Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()));
+          setNotice("info", "Preview reset", "Guest preview access was refreshed for this session.");
+        }
+      }
+      if (!enforceWorkspaceLimit()) return;
+    }
 
     ensureInjectedStyles();
     clearEmptyState();
@@ -3183,6 +3186,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function activatePreviewAccess() {
+    maybeResetGuestUsage(true);
+    updatePlanUI("free", getGuestUsage(), GUEST_USAGE_LIMIT, Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()));
     const demoText = "A customer says: I was charged twice for one order and wants it fixed today.";
     if (els.messageInput) {
       els.messageInput.value = demoText;
@@ -3759,12 +3764,6 @@ function bindEvents() {
       saveDraft(els.messageInput.value || "");
     });
 
-    els.messageInput?.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
-        event.preventDefault();
-        sendMessage();
-      }
-    });
 
     els.usernameInput?.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
@@ -3948,7 +3947,6 @@ function bindEvents() {
   }
 
   async function init() {
-    await loadPhase2Core();
     ensureInjectedStyles();
     ensureCrmStyles();
     hydrateStripeCallbackState();
@@ -3999,9 +3997,38 @@ function bindEvents() {
     }
   }
 
+  function hardBindCoreComposer() {
+    if (!els.sendBtn) return;
+
+    const triggerSend = async (event) => {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      try {
+        await sendMessage();
+      } catch (error) {
+        console.error("Xalvion send failed", error);
+        setNotice("error", "Send failed", error?.message || "Could not run the support request.");
+      }
+    };
+
+    els.sendBtn.onclick = triggerSend;
+    els.sendBtn.addEventListener("click", triggerSend, true);
+    els.messageInput?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        triggerSend(event);
+      }
+    }, true);
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
+    document.addEventListener("DOMContentLoaded", () => {
+      hardBindCoreComposer();
+      init();
+    }, { once: true });
   } else {
+    hardBindCoreComposer();
     init();
   }
 })();
