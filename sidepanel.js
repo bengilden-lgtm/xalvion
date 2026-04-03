@@ -78,8 +78,43 @@ const explainSessionValue = document.getElementById("explainSessionValue");
 
 let lastReply = "";
 let explainabilityOpen = false;
+let explainabilityCanonicalMode = false;
 let thinkingRunId = 0;
 
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Maps API execution_tier to consequence badge — uses existing signal-* classes. */
+function getTierDisplay(result) {
+  const raw =
+    result && typeof result.execution_tier === "string"
+      ? result.execution_tier.toLowerCase()
+      : "";
+  if (raw === "safe_autopilot_ready") {
+    return {
+      label: "✓ Safe to automate",
+      cssClass: "signal-safe",
+      tooltip: "Meets all automation safety criteria",
+    };
+  }
+  if (raw === "assist_only") {
+    return {
+      label: "○ Manual review",
+      cssClass: "signal-review",
+      tooltip: "Risk signals require human decision",
+    };
+  }
+  return {
+    label: "⚡ Approval required",
+    cssClass: "signal-approval",
+    tooltip: "Awaiting operator approval",
+  };
+}
 
 function mapCanonicalToLegacy(data) {
   if (!data || typeof data !== "object" || !data.sovereign_decision) return data;
@@ -135,6 +170,8 @@ function mapCanonicalToLegacy(data) {
       value_generated: Number(impact.money_saved || 0),
       avg_confidence: decision.confidence || 0,
     },
+    execution_tier: data.execution_tier || "approval_required",
+    decision_explainability: data.decision_explainability || null,
     note: decision.requires_approval ? "Approval required" : "Sovereign decision",
   };
 }
@@ -631,11 +668,76 @@ function normalizeExplainability(data) {
 function renderExplainability(data) {
   if (!explainabilityWrap) return;
 
+  const ex = data.decision_explainability;
+  const panel = document.getElementById("explainabilityPanel");
+  const titleEl = document.querySelector(".explainability-title");
+
+  if (ex && typeof ex === "object") {
+    explainabilityCanonicalMode = true;
+    explainabilityOpen = false;
+    if (explainabilityWrap) explainabilityWrap.classList.remove("open");
+    if (panel) {
+      panel.querySelectorAll(".card").forEach((c) => {
+        c.style.display = "none";
+      });
+      let host = document.getElementById("explainabilityCanonicalHost");
+      if (!host) {
+        host = document.createElement("div");
+        host.id = "explainabilityCanonicalHost";
+        panel.insertBefore(host, panel.firstChild);
+      }
+      host.style.display = "";
+      const rows = [];
+      const push = (label, text) => {
+        const t = text != null && String(text).trim() !== "" ? String(text).trim() : "";
+        if (!t) return;
+        rows.push(
+          `<div class="card full"><span class="label">${escapeHtml(label)}</span><div class="value muted reply-box">${escapeHtml(t)}</div></div>`
+        );
+      };
+      push("Classification", ex.classification && ex.classification.signal);
+      push("Risk", ex.risk_reasoning && ex.risk_reasoning.signal);
+      push("Policy", ex.policy_trigger && ex.policy_trigger.signal);
+      push("Memory", ex.memory_influence && ex.memory_influence.signal);
+      push("Pattern expectation", ex.outcome_expectation && ex.outcome_expectation.signal);
+      if (ex.why_not_other_actions) {
+        rows.push(
+          `<div class="card full"><span class="label">Alternatives</span><div class="value muted reply-box" style="font-size:12px;opacity:0.85">${escapeHtml(String(ex.why_not_other_actions))}</div></div>`
+        );
+      }
+      if (ex.summary) {
+        rows.push(
+          `<div class="card full" style="margin-top:4px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08)"><span class="label">Summary</span><div class="value muted reply-box">${escapeHtml(String(ex.summary))}</div></div>`
+        );
+      }
+      host.innerHTML = rows.join("");
+    }
+    if (explainabilitySummary) {
+      explainabilitySummary.textContent = ex.summary
+        ? String(ex.summary).slice(0, 220)
+        : "Structured decision rationale.";
+    }
+    if (titleEl) titleEl.textContent = "Why this decision ↓";
+    explainabilityWrap.classList.remove("hidden");
+    return;
+  }
+
+  explainabilityCanonicalMode = false;
+  const host = document.getElementById("explainabilityCanonicalHost");
+  if (host) host.style.display = "none";
+  if (panel) {
+    panel.querySelectorAll(".card").forEach((c) => {
+      c.style.display = "";
+    });
+  }
+  if (titleEl) titleEl.textContent = "Why this decision?";
+
   const explainability = normalizeExplainability(data);
   const sections = explainability.sections;
 
   if (explainabilitySummary) {
-    explainabilitySummary.textContent = explainability.summary || "Decision confidence, policy fit, learned behavior, and execution rationale.";
+    explainabilitySummary.textContent =
+      explainability.summary || "Decision confidence, policy fit, learned behavior, and execution rationale.";
   }
 
   const decisionText = toBullets(sections.decision);
@@ -659,7 +761,14 @@ function renderExplainability(data) {
   setVisible(explainImpactCard, !!impactText);
   setVisible(explainSessionCard, !!sessionText);
 
-  const hasAny = !!(decisionText || confidenceText || learningText || executionText || impactText || sessionText);
+  const hasAny = !!(
+    decisionText ||
+    confidenceText ||
+    learningText ||
+    executionText ||
+    impactText ||
+    sessionText
+  );
   explainabilityWrap.classList.toggle("hidden", !hasAny);
   if (!hasAny) {
     explainabilityWrap.classList.remove("open");
@@ -671,6 +780,10 @@ function toggleExplainability(forceOpen = null) {
   if (!explainabilityWrap || explainabilityWrap.classList.contains("hidden")) return;
   explainabilityOpen = typeof forceOpen === "boolean" ? forceOpen : !explainabilityOpen;
   explainabilityWrap.classList.toggle("open", explainabilityOpen);
+  const titleEl = document.querySelector(".explainability-title");
+  if (titleEl && explainabilityCanonicalMode) {
+    titleEl.textContent = explainabilityOpen ? "Close ↑" : "Why this decision ↓";
+  }
 }
 
 function hideThinkingPanel() {
@@ -841,12 +954,23 @@ function render(data) {
   setConfidence(confidence);
 
   if (notePill) {
-    if (note) {
-      notePill.textContent = note;
+    const tierDisp = getTierDisplay(data);
+    const noteLine =
+      tierDisp && tierDisp.label
+        ? note
+          ? `${tierDisp.label} · ${note}`
+          : tierDisp.label
+        : note;
+    if (noteLine) {
+      notePill.textContent = noteLine;
+      notePill.className = "pill";
+      if (tierDisp && tierDisp.tooltip) notePill.setAttribute("title", tierDisp.tooltip);
+      else notePill.removeAttribute("title");
       notePill.classList.remove("hidden");
     } else {
       notePill.textContent = "";
-      notePill.classList.add("hidden");
+      notePill.className = "pill hidden";
+      notePill.removeAttribute("title");
     }
   }
 

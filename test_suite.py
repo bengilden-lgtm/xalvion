@@ -1,7 +1,7 @@
 """
-tests/test_suite.py — core pipeline tests.
+test_suite.py — core pipeline tests.
 
-Run with:  pytest tests/test_suite.py -v
+Run with:  pytest test_suite.py -v
 
 Covers the four areas that were untested:
   - actions.py  (classify, triage, decision, impact)
@@ -18,7 +18,7 @@ import sys
 import time
 
 # ── Point imports at the project root ────────────────────────────────────────
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pytest
 
@@ -280,3 +280,291 @@ class TestNormalizeTicket:
         assert result["customer"] == "Unknown"
         assert result["issue_type"] == "general_support"
         assert result["operator_mode"] == "balanced"
+
+
+# =============================================================================
+# outcome_store.py — impact scoring
+# =============================================================================
+
+
+class TestOutcomeImpactScoring:
+    def test_excellent_outcome(self):
+        from outcome_store import compute_outcome_impact
+
+        result = compute_outcome_impact({
+            "success": True,
+            "auto_resolved": True,
+            "approved_by_human": False,
+            "refund_reversed": False,
+            "dispute_filed": False,
+            "ticket_reopened": False,
+            "crm_closed": False,
+        })
+        assert result["impact_score"] >= 0.80
+        assert result["impact_label"] == "excellent"
+        assert "success" in result["component_scores"]
+
+    def test_bad_outcome_reversal(self):
+        from outcome_store import compute_outcome_impact
+
+        result = compute_outcome_impact({
+            "success": True,
+            "auto_resolved": True,
+            "refund_reversed": True,
+            "dispute_filed": False,
+            "ticket_reopened": False,
+        })
+        assert result["impact_score"] < 0.38
+        assert result["impact_label"] == "bad"
+
+    def test_empty_dict_returns_neutral(self):
+        from outcome_store import compute_outcome_impact
+
+        result = compute_outcome_impact({})
+        assert 0.0 <= result["impact_score"] <= 1.0
+        assert result["impact_label"] in {"bad", "neutral", "good", "excellent"}
+
+    def test_none_dict_does_not_raise(self):
+        from outcome_store import compute_outcome_impact
+
+        result = compute_outcome_impact(None)
+        assert result["impact_score"] == 0.5
+        assert result["impact_label"] == "neutral"
+
+
+# =============================================================================
+# actions.py — execution tier
+# =============================================================================
+
+
+class TestExecutionTier:
+    def test_assist_only_high_abuse(self):
+        from actions import compute_execution_tier
+
+        assert compute_execution_tier(
+            "refund",
+            25,
+            0.95,
+            0.95,
+            "low",
+            abuse_score=3,
+            refund_count=1,
+            operator_mode="balanced",
+            requires_approval=False,
+        ) == "assist_only"
+
+    def test_assist_only_conservative_mode(self):
+        from actions import compute_execution_tier
+
+        assert compute_execution_tier(
+            "none",
+            0,
+            0.95,
+            0.95,
+            "low",
+            abuse_score=0,
+            refund_count=0,
+            operator_mode="conservative",
+            requires_approval=False,
+        ) == "assist_only"
+
+    def test_approval_required_refund(self):
+        from actions import compute_execution_tier
+
+        assert compute_execution_tier(
+            "refund",
+            25,
+            0.92,
+            0.90,
+            "low",
+            abuse_score=0,
+            refund_count=0,
+            operator_mode="balanced",
+            requires_approval=False,
+        ) == "approval_required"
+
+    def test_safe_autopilot_ready(self):
+        from actions import compute_execution_tier
+
+        assert compute_execution_tier(
+            "none",
+            0,
+            0.92,
+            0.90,
+            "low",
+            abuse_score=0,
+            refund_count=0,
+            operator_mode="balanced",
+            requires_approval=False,
+        ) == "safe_autopilot_ready"
+
+    def test_low_confidence_prevents_autopilot(self):
+        from actions import compute_execution_tier
+
+        result = compute_execution_tier(
+            "none",
+            0,
+            0.60,
+            0.90,
+            "low",
+            abuse_score=0,
+            refund_count=0,
+            operator_mode="balanced",
+            requires_approval=False,
+        )
+        assert result != "safe_autopilot_ready"
+
+
+# =============================================================================
+# agent.py — decision explainability
+# =============================================================================
+
+
+class TestDecisionExplainability:
+    @staticmethod
+    def _make_context():
+        ticket = {
+            "issue_type": "billing_duplicate_charge",
+            "sentiment": 4,
+            "ltv": 200,
+            "operator_mode": "balanced",
+            "plan_tier": "free",
+            "triage": {
+                "urgency": 68,
+                "churn_risk": 45,
+                "abuse_likelihood": 20,
+                "refund_likelihood": 60,
+                "risk_level": "medium",
+            },
+            "customer_history": {},
+        }
+        final_action = {
+            "action": "refund",
+            "amount": 25,
+            "reason": "Duplicate-charge protection policy",
+            "requires_approval": False,
+            "confidence": 0.92,
+        }
+        executed = {"action": "refund", "amount": 25, "tool_status": "success"}
+        history = {
+            "refund_count": 2,
+            "abuse_score": 0,
+            "repeat_customer": True,
+            "sentiment_avg": 5.0,
+        }
+        return ticket, final_action, executed, history
+
+    def test_explainability_has_required_keys(self):
+        from agent import build_decision_explainability
+
+        ticket, final_action, executed, history = self._make_context()
+        result = build_decision_explainability(
+            ticket=ticket,
+            triage=ticket["triage"],
+            hard_decision=final_action,
+            learned_action=None,
+            final_action=final_action,
+            executed=executed,
+            history=history,
+            top_rules=[],
+            confidence=0.92,
+            quality=0.95,
+            pattern_expectation=None,
+        )
+        required = {
+            "classification",
+            "risk_reasoning",
+            "policy_trigger",
+            "memory_influence",
+            "learned_rule_influence",
+            "outcome_expectation",
+            "why_not_other_actions",
+            "approval_rationale",
+            "summary",
+        }
+        assert required.issubset(set(result.keys()))
+
+    def test_explainability_summary_is_string(self):
+        from agent import build_decision_explainability
+
+        ticket, final_action, executed, history = self._make_context()
+        result = build_decision_explainability(
+            ticket=ticket,
+            triage=ticket["triage"],
+            hard_decision=final_action,
+            learned_action=None,
+            final_action=final_action,
+            executed=executed,
+            history=history,
+            top_rules=[],
+            confidence=0.92,
+            quality=0.95,
+            pattern_expectation=None,
+        )
+        assert isinstance(result["summary"], str)
+        assert len(result["summary"]) > 20
+
+    def test_explainability_does_not_raise_on_empty_inputs(self):
+        from agent import build_decision_explainability
+
+        try:
+            result = build_decision_explainability(
+                ticket={},
+                triage={},
+                hard_decision={},
+                learned_action=None,
+                final_action={},
+                executed={},
+                history={},
+                top_rules=[],
+                confidence=0.5,
+                quality=0.5,
+                pattern_expectation=None,
+            )
+            assert isinstance(result, dict)
+        except Exception as e:
+            raise AssertionError(f"Should not raise: {e}") from e
+
+
+# =============================================================================
+# learning.py — pattern key + scoring
+# =============================================================================
+
+
+class TestLearningLoopIntegration:
+    def test_pattern_key_is_deterministic(self):
+        from learning import _pattern_key
+
+        ticket = {
+            "issue_type": "shipping_issue",
+            "plan_tier": "free",
+            "triage": {"risk_level": "low"},
+        }
+        decision = {"action": "credit"}
+        k1 = _pattern_key(ticket, decision)
+        k2 = _pattern_key(ticket, decision)
+        assert k1 == k2
+        assert isinstance(k1, str)
+        assert ":" in k1
+
+    def test_get_pattern_expectation_returns_none_before_threshold(self):
+        from learning import get_pattern_expectation
+
+        ticket = {
+            "issue_type": "general_support",
+            "plan_tier": "free",
+            "triage": {"risk_level": "low"},
+        }
+        decision = {"action": "none"}
+        result = get_pattern_expectation(ticket, decision)
+        assert result is None or (
+            isinstance(result, dict) and result.get("sample_count", 0) >= 3
+        )
+
+    def test_score_outcome_returns_float(self):
+        from learning import _score_outcome
+
+        outcome = {"auto_resolved": True, "crm_status": ""}
+        score = _score_outcome(outcome)
+        assert isinstance(score, (int, float))
+        assert score >= 0.0
