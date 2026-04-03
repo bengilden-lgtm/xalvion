@@ -5,7 +5,7 @@ import os
 import time
 from typing import Any, Dict, List
 
-from brain import add_rule, load_brain, register_rule_outcome, save_brain
+from brain import add_rule, get_top_rule_objects, load_brain, register_rule_outcome, save_brain
 
 try:
     from outcome_store import get_outcome
@@ -123,7 +123,7 @@ def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome:
             add_rule(brain, candidate)
             register_rule_outcome(brain, candidate["trigger"], closed=_is_closed_outcome(outcome), positive=True)
             return
-    candidate["weight"] = round(conversion_weight, 4)
+    candidate["weight"] = round(max(0.05, conversion_weight), 4)
     rules.append(candidate)
     save_rules(rules)
     brain = load_brain()
@@ -132,7 +132,16 @@ def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome:
 
 
 def apply_learned_rules(ticket: Dict[str, Any], top_rules: List[Dict[str, Any]] | None = None) -> Dict[str, Any] | None:
-    rules = top_rules or load_rules()
+    if top_rules is not None:
+        rules = top_rules
+    else:
+        try:
+            brain = load_brain()
+            rules = get_top_rule_objects(brain, 10)
+            if not rules:
+                rules = load_rules()
+        except Exception:
+            rules = load_rules()
     if not rules:
         return None
     rules = sorted(rules, key=lambda x: float(x.get("weight", 0)), reverse=True)
@@ -172,21 +181,27 @@ def update_rule_feedback(ticket: Dict[str, Any], decision: Dict[str, Any], outco
 
 
 def sync_rules_to_brain() -> None:
-    """One-way sync: push JSON rules into brain if brain is missing them."""
+    """
+    One-way sync on startup: push rules from learned_rules.json
+    into brain state if brain is missing them. Safe to call multiple
+    times — add_rule() is idempotent for existing triggers.
+    """
     rules = load_rules()
     if not rules:
         return
-    brain = load_brain()
-    for rule in rules:
-        trigger = rule.get("trigger", "")
-        if not trigger:
-            continue
-        existing = next(
-            (r for r in brain.get("learned_rules", []) if r.get("trigger") == trigger),
-            None,
-        )
-        if existing is None:
-            add_rule(brain, rule)
+    try:
+        brain = load_brain()
+        for rule in rules:
+            trigger = rule.get("trigger", "")
+            if not trigger:
+                continue
+            already_in_brain = any(
+                r.get("trigger") == trigger for r in brain.get("learned_rules", [])
+            )
+            if not already_in_brain:
+                add_rule(brain, rule)
+    except Exception:
+        pass
 
 
 def decay_rules() -> None:

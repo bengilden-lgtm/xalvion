@@ -73,4 +73,4 @@ def safe_execute(func, *args, **kwargs) -> Any:
         print("\n🚨 SYSTEM ERROR CAUGHT:")
         print(str(exc))
         traceback.print_exc()
-        return {"error": str(exc)}
+        return {"__safe_execute_error__": True, "error": str(exc)}

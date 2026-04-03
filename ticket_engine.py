@@ -63,7 +63,7 @@ def process_ticket(raw_ticket: Dict[str, Any]) -> None:
 
     # --- Hard business decision -------------------------------------------
     decision = safe_execute(system_decision, ticket)
-    if isinstance(decision, dict) and "error" in decision:
+    if isinstance(decision, dict) and decision.get("__safe_execute_error__"):
         print("❌ system_decision error:", decision["error"])
         decision = {"action": "none", "amount": 0, "reason": "fallback"}
 
@@ -79,7 +79,7 @@ def process_ticket(raw_ticket: Dict[str, Any]) -> None:
     )
 
     result = safe_execute(run_agent, ai_input, user_id)
-    if isinstance(result, dict) and "error" in result:
+    if isinstance(result, dict) and result.get("__safe_execute_error__"):
         print("❌ AI Error:", result["error"])
         return
 
@@ -87,7 +87,7 @@ def process_ticket(raw_ticket: Dict[str, Any]) -> None:
 
     # --- Impact: correct two-arg call -------------------------------------
     impact = safe_execute(calculate_impact, ticket, decision)
-    if isinstance(impact, dict) and "error" in impact:
+    if isinstance(impact, dict) and impact.get("__safe_execute_error__"):
         impact = {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False}
 
     # --- Learning ---------------------------------------------------------

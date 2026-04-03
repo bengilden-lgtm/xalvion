@@ -413,18 +413,22 @@ def _startup_database() -> None:
         from security import assert_production_runtime_safety
 
         assert_production_runtime_safety()
+        logger.info("runtime_security_check_passed")
     except RuntimeError as exc:
         logger.error("startup_security_check_failed detail=%s", exc)
         raise
+    except Exception as exc:
+        logger.warning("runtime_security_check_skipped detail=%s", str(exc)[:200])
     logger.info("DB schema ensured")
     print("DB schema ensured", flush=True)
+    ensure_user_columns()
     try:
         from learning import sync_rules_to_brain
 
         sync_rules_to_brain()
-    except Exception as exc:
-        logger.warning("rule_sync_failed detail=%s", str(exc)[:200])
-    ensure_user_columns()
+        logger.info("rule_sync_complete")
+    except Exception as _sync_exc:
+        logger.warning("rule_sync_failed detail=%s", str(_sync_exc)[:200])
 
 
 # =============================================================================
@@ -439,8 +443,9 @@ VALID_OP_MODES = {"conservative", "balanced", "delight", "fraud_aware"}
 VALID_CHANNELS = {"web", "email", "api", "chat", "mobile"}
 VALID_SOURCES = {"workspace", "sdk", "api", "webhook", "import"}
 
-# Issue types handled by local fast-path in run_support.
-# Keep in sync with local_fallback_reply() in agent.py.
+# Issue types handled by the local fast-path in run_support().
+# These must match the issue types handled in local_fallback_reply()
+# in agent.py. If you add a new type to one, add it to the other.
 _LOCAL_FAST_PATH_ISSUE_TYPES = frozenset({
     "shipping_issue",
     "damaged_order",
@@ -661,6 +666,18 @@ def decode_token(token: str) -> str | None:
         return None
 
 
+# AUTH DEPENDENCY GUIDE:
+# get_current_user()           → returns guest User if no token.
+#                                Use for routes that allow preview/guest access.
+#                                Currently: /support, /analyze, /dashboard/summary,
+#                                /tickets, /billing/plans
+# require_authenticated_user() → raises 401 if no token.
+#                                Use for routes that require an account.
+# require_admin()              → raises 403 unless ADMIN_USERNAME.
+#
+# REVIEW: Confirm guest access is intentional for each route using
+# get_current_user(). Routes that should not allow guest access must
+# be changed to require_authenticated_user().
 def get_current_user(
     authorization: str | None = Header(None),
 ) -> User:
@@ -2038,16 +2055,23 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
         payload["final"] = payload["reply"]
         payload["tool_status"] = "approved"
         payload["tool_result"] = {"status": "approved"}
-        _log_real_outcome(
-            outcome_key="approve:{}:{}".format(getattr(ticket, 'id', ''), 'credit'),
-            user_id=str(getattr(ticket, 'username', '') or ''),
-            action='credit',
-            amount=proposed_amount,
-            issue_type=str(getattr(ticket, 'issue_type', 'general_support') or 'general_support'),
-            tool_result={'status': 'approved'},
-            auto_resolved=False,
-            approved_by_human=True,
-        )
+        try:
+            _log_real_outcome(
+                outcome_key="approve:{}:{}".format(getattr(ticket, "id", ""), "credit"),
+                user_id=str(getattr(ticket, "username", "") or ""),
+                action="credit",
+                amount=proposed_amount,
+                issue_type=str(getattr(ticket, "issue_type", "general_support") or "general_support"),
+                tool_result={"status": "approved"},
+                auto_resolved=False,
+                approved_by_human=True,
+            )
+        except Exception as _log_exc:
+            logger.warning(
+                "outcome_log_failed action=%s detail=%s",
+                proposed_action,
+                str(_log_exc)[:200],
+            )
         return payload, "approved"
 
     if proposed_action == "charge":
@@ -2095,7 +2119,7 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
         runtime_ticket = build_runtime_ticket(req, user, db)
 
     shadow_decision = safe_execute(system_decision, runtime_ticket)
-    if not isinstance(shadow_decision, dict) or "error" in shadow_decision:
+    if not isinstance(shadow_decision, dict) or shadow_decision.get("__safe_execute_error__"):
         shadow_decision = {
             "action": "none",
             "amount": 0,
@@ -2264,7 +2288,14 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
             impact=impact,
             user=user,
         )
-        apply_learning_feedback(runtime_ticket, result)
+        try:
+            apply_learning_feedback(runtime_ticket, result)
+        except Exception as _learn_exc:
+            logger.warning(
+                "learning_feedback_failed ticket_id=%s detail=%s",
+                ticket_id,
+                str(_learn_exc)[:200],
+            )
 
         logger.info(
             "support_db_persist_begin ticket_id=%s user=%s",
@@ -3864,6 +3895,7 @@ def analyze_extension_ticket(
             raise HTTPException(
                 status_code=429,
                 detail="Too many requests. Please slow down.",
+                headers={"Retry-After": "60"},
             )
         plan_tier = "free"
         priority_routing = False
@@ -3916,6 +3948,8 @@ def analyze_extension_ticket(
 # =============================================================================
 
 OUTREACH_QUEUE_PATH = os.path.join(BASE_DIR, "outreach_queue.json")
+# NOTE: _outreach_queue_lock is a thread-level lock only.
+# If running multiple worker processes, migrate to DB persistence.
 _outreach_queue_lock = threading.Lock()
 LEAD_STATUS_ORDER = {"new", "contacted", "replied", "closed"}
 LEAD_STAGE_ORDER = {"lead", "contacted", "replied", "demo", "closed"}
@@ -4052,8 +4086,10 @@ def _read_outreach_queue() -> list[dict[str, Any]]:
 
 def _write_outreach_queue(leads: list[dict[str, Any]]) -> None:
     with _outreach_queue_lock:
-        with open(OUTREACH_QUEUE_PATH, "w", encoding="utf-8") as f:
+        tmp_path = OUTREACH_QUEUE_PATH + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(leads, f, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, OUTREACH_QUEUE_PATH)
 
 
 def _lead_score(text: str, source: str = "manual") -> int:

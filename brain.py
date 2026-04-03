@@ -168,6 +168,7 @@ def decay_rules(brain: Dict[str, Any]) -> None:
     for rule in brain.get("learned_rules", []):
         trigger = rule.get("trigger", "unknown_rule")
         current = float(brain["rule_scores"].get(trigger, 1.0)) * 0.992
+        current = min(current, 50.0)
         brain["rule_scores"][trigger] = round(current, 4)
         if current < 0.30:
             to_remove.append(trigger)

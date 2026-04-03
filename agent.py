@@ -63,6 +63,17 @@ ALLOWED_ACTIONS = {"none", "refund", "credit", "review", "charge"}
 MAX_REFUND = 50
 MAX_CREDIT = 30
 
+# Issue types handled by local_fallback_reply().
+# Must stay in sync with _LOCAL_FAST_PATH_ISSUE_TYPES in app.py.
+_FALLBACK_HANDLED_ISSUE_TYPES = frozenset({
+    "shipping_issue",
+    "damaged_order",
+    "billing_duplicate_charge",
+    "billing_issue",
+    "payment_issue",
+    "refund_request",
+})
+
 
 def choose_model(message: str) -> str:
     tier = route_task(message)
@@ -1190,7 +1201,10 @@ def run_agent(
     quality = compute_quality(confidence, triage, executed, user_memory, llm_used)
 
     # Log the real outcome — this feeds the learning loop with verified API results
-    _outcome_key = f"{user_id}:{str(ticket.get('issue_type',''))[:20]}:{uuid.uuid4().hex[:8]}"
+    _outcome_key = (
+        f"{user_id}:{str(ticket.get('issue_type', ''))[:20]}"
+        f":{uuid.uuid4().hex[:12]}"
+    )
     _tool_result = executed.get("tool_result") or {"status": executed.get("tool_status", "unknown")}
     _log_outcome(
         outcome_key=_outcome_key,
