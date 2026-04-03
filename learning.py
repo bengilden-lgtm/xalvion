@@ -171,6 +171,24 @@ def update_rule_feedback(ticket: Dict[str, Any], decision: Dict[str, Any], outco
     save_rules(rules)
 
 
+def sync_rules_to_brain() -> None:
+    """One-way sync: push JSON rules into brain if brain is missing them."""
+    rules = load_rules()
+    if not rules:
+        return
+    brain = load_brain()
+    for rule in rules:
+        trigger = rule.get("trigger", "")
+        if not trigger:
+            continue
+        existing = next(
+            (r for r in brain.get("learned_rules", []) if r.get("trigger") == trigger),
+            None,
+        )
+        if existing is None:
+            add_rule(brain, rule)
+
+
 def decay_rules() -> None:
     rules = load_rules()
     now = time.time()

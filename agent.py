@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 from typing import Any, Dict
 
 from dotenv import load_dotenv
@@ -1189,7 +1190,7 @@ def run_agent(
     quality = compute_quality(confidence, triage, executed, user_memory, llm_used)
 
     # Log the real outcome — this feeds the learning loop with verified API results
-    _outcome_key = f"{user_id}:{str(ticket.get('issue_type',''))[:20]}:{int(float(final_action.get('amount',0) or 0))}"
+    _outcome_key = f"{user_id}:{str(ticket.get('issue_type',''))[:20]}:{uuid.uuid4().hex[:8]}"
     _tool_result = executed.get("tool_result") or {"status": executed.get("tool_status", "unknown")}
     _log_outcome(
         outcome_key=_outcome_key,

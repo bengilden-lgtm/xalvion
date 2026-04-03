@@ -2578,20 +2578,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       .join("\n");
   }
 
-  function operatorReviewAssist(data = {}) {
-    const approval = getApprovalContext(data);
-    if (approval.requiresApproval) return false;
-    const action = String(data.action || data.decision?.action || "none").toLowerCase();
-    const r = String(riskLabel(data) || "medium").toLowerCase();
-    const c = Number(data.confidence || 0);
-    const mode = String(data.mode || "").toLowerCase();
-    if (action === "review") return true;
-    if (r === "high") return true;
-    if (c > 0 && c < 0.62) return true;
-    if (mode === "local_fast_path") return true;
-    return false;
-  }
-
   function createApprovalBanner(data = {}) {
     const approval = getApprovalContext(data);
     if (!approval.requiresApproval || approval.approved) return null;
@@ -2668,44 +2654,261 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     };
   }
 
-  function getLiveReplyText(row, fallback = "") {
-    const wrap = row?.querySelector(".operator-reply-editor-wrap");
-    const ta = wrap?.querySelector(".operator-reply-editor");
-    if (ta && wrap && !wrap.hidden && String(ta.value || "").trim()) {
-      return String(ta.value || "").trim();
-    }
+  function getCopyTextFromRow(row, fallback = "") {
+    const ta = row?.querySelector(".decision-edit-textarea");
+    if (ta && String(ta.value || "").trim()) return String(ta.value).trim();
     const fromDom = (getAssistantCopyNode(row)?.innerText || "").trim();
     if (fromDom) return fromDom;
     return String(fallback || "").trim();
   }
 
-  function ensureReplyEditor(row, seedText = "") {
-    const body = row?.querySelector(".msg-body");
-    if (!body) return null;
-    let wrap = row.querySelector(".operator-reply-editor-wrap");
-    if (!wrap) {
-      wrap = document.createElement("div");
-      wrap.className = "operator-reply-editor-wrap";
-      wrap.hidden = true;
-      const label = document.createElement("div");
-      label.className = "operator-editor-label";
-      label.textContent = "Customer-facing reply";
-      const ta = document.createElement("textarea");
-      ta.className = "operator-reply-editor";
-      ta.setAttribute("aria-label", "Edit customer-facing reply");
-      wrap.appendChild(label);
-      wrap.appendChild(ta);
-      body.appendChild(wrap);
+  function deriveConsequenceSignal(data = {}) {
+    const dec = data.decision || data.sovereign_decision || {};
+    const action = String(data.action || dec.action || "none").toLowerCase();
+    const risk = String(dec.risk_level || data.triage?.risk_level || "medium").toLowerCase();
+    const req = Boolean(
+      data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision"
+    );
+    const money = action === "refund" || action === "charge" || action === "credit";
+    if (req && money) return { cls: "signal-approval", text: "⚡ Approval required" };
+    if (action === "review" || risk === "high" || risk === "medium") {
+      return { cls: "signal-review", text: "⚠ Review recommended" };
     }
-    const ta = wrap.querySelector("textarea");
-    const seed = String(seedText || (getAssistantCopyNode(row)?.innerText || "").trim() || "");
-    if (ta && seed && !String(ta.value || "").trim()) {
-      ta.value = seed;
+    return { cls: "signal-safe", text: "✓ Safe to send" };
+  }
+
+  function mountOperatorDecisionPanel(row, data, initialReply) {
+    row.querySelector(".decision-panel")?.remove();
+    const msgBody = row.querySelector(".msg-body");
+    if (!msgBody || !data) return;
+
+    const ticket = data.ticket || {};
+    const ticketId = Number(ticket.id || 0) || null;
+    const approval = getApprovalContext(data);
+    const pendingGate = Boolean(approval.requiresApproval && !approval.approved);
+    const sig = deriveConsequenceSignal(data);
+    const originalAi = String(initialReply || getAssistantCopyNode(row)?.innerText || "").trim();
+
+    const panel = document.createElement("div");
+    panel.className = "decision-panel";
+    panel.innerHTML = `
+      <div class="decision-panel-top">
+        <span class="consequence-signal ${sig.cls}">${escapeHtml(sig.text)}</span>
+        <div class="decision-controls" data-role="controls"></div>
+      </div>
+      <div class="decision-panel-note" data-role="note" style="display:none"></div>
+      <div class="decision-panel-error" data-role="err" style="display:none"></div>
+      <div class="edit-mode-container" data-role="edit" style="display:none"></div>
+    `;
+    msgBody.appendChild(panel);
+
+    const controls = panel.querySelector("[data-role='controls']");
+    const noteEl = panel.querySelector("[data-role='note']");
+    const errEl = panel.querySelector("[data-role='err']");
+    const editWrap = panel.querySelector("[data-role='edit']");
+
+    const showErr = (t) => {
+      errEl.textContent = t || "";
+      errEl.style.display = t ? "block" : "none";
+    };
+
+    const setTerminal = (pill, note) => {
+      controls.innerHTML = `<span class="decision-state-pill">${escapeHtml(pill)}</span>`;
+      if (note) {
+        noteEl.textContent = note;
+        noteEl.style.display = "block";
+      }
+    };
+
+    const postPill = row.dataset.opPostPill;
+    if (postPill) {
+      delete row.dataset.opPostPill;
+      setTerminal(postPill, "Sent to customer.");
+      return;
     }
-    return wrap;
+    const tst = String(data.tool_status || "").toLowerCase();
+    const st = String(data.status || ticket.status || "").toLowerCase();
+    if (tst === "rejected" || st === "escalated") {
+      setTerminal("Rejected", "Response held. Ticket escalated.");
+      return;
+    }
+    if (approval.approved) {
+      setTerminal("Approved", "Sent to customer.");
+      return;
+    }
+
+    const wireActions = () => {
+      controls.innerHTML = "";
+      const rej = document.createElement("button");
+      rej.type = "button";
+      rej.className = "btn-reject";
+      rej.textContent = "Reject";
+      const ed = document.createElement("button");
+      ed.type = "button";
+      ed.className = "btn-edit";
+      ed.textContent = "Edit";
+      const ap = document.createElement("button");
+      ap.type = "button";
+      ap.className = "btn-approve";
+      ap.textContent = "Approve";
+      controls.append(rej, ed, ap);
+
+      ed.addEventListener("click", () => {
+        showErr("");
+        editWrap.style.display = "grid";
+        editWrap.innerHTML = `
+          <div>
+            <div class="original-response-label">Original AI response</div>
+            <div class="original-response">${escapeHtml(originalAi)}</div>
+          </div>
+          <textarea class="decision-edit-textarea" aria-label="Edited reply">${escapeHtml(getCopyTextFromRow(row, initialReply))}</textarea>
+          <div class="edit-actions">
+            <button type="button" class="btn-cancel-edit" data-act="cancel">Cancel</button>
+            <button type="button" class="btn-send-edited" data-act="send">Send Edited</button>
+          </div>
+        `;
+        const ta = editWrap.querySelector(".decision-edit-textarea");
+        ta?.focus();
+        editWrap.querySelector("[data-act='cancel']")?.addEventListener("click", () => {
+          editWrap.style.display = "none";
+          editWrap.innerHTML = "";
+        });
+        editWrap.querySelector("[data-act='send']")?.addEventListener("click", async () => {
+          const next = String(ta?.value || "").trim();
+          if (!next) {
+            showErr("Edited reply cannot be empty.");
+            return;
+          }
+          if (pendingGate && ticketId && approval.canApprove) {
+            [rej, ed, ap].forEach((b) => {
+              b.disabled = true;
+            });
+            ap.textContent = "…";
+            try {
+              const response = await resolveApproval(ticketId, "approve", {
+                payment_intent_id: approval.paymentIntentId,
+                charge_id: approval.chargeId,
+                refund_reason: "requested_by_customer",
+                final_reply: next
+              });
+              const normalized = normalizeWorkspaceResult(normalizeApprovalResponse(response, data));
+              state.latestRun = normalized;
+              row.dataset.opPostPill = "Sent as edited";
+              setAssistantCopy(row, normalized.reply || next);
+              editWrap.style.display = "none";
+              editWrap.innerHTML = "";
+              rebindResultFooter(row, normalized);
+              updateStatsFromResult(normalized);
+              updateRevenueCard(normalized);
+              updateLatestRunCard(normalized);
+              updateSystemNarrative(normalized);
+              updateTopbarStatus();
+              setNotice("success", "Approved", response.message || "Edited reply saved.");
+            } catch (error) {
+              showErr(error.message || "Approve failed.");
+              [rej, ed, ap].forEach((b) => {
+                b.disabled = false;
+              });
+              ap.textContent = "Approve";
+            }
+          } else {
+            setAssistantCopy(row, next);
+            editWrap.style.display = "none";
+            editWrap.innerHTML = "";
+            setTerminal("Edited", "Copy the card text when you send to the customer.");
+            setNotice("info", "Reply updated", "No server gate on this run — text updated on the card.");
+          }
+        });
+      });
+
+      rej.addEventListener("click", async () => {
+        showErr("");
+        if (!ticketId) {
+          showErr("No ticket id — cannot reject.");
+          return;
+        }
+        if (!pendingGate) {
+          setTerminal("Rejected", "Response held for manual review.");
+          setNotice("warning", "Marked for review", "Log this case in your helpdesk — no server rejection for this run.");
+          return;
+        }
+        if (!approval.canApprove) {
+          showErr("Sign in as the ticket owner to reject.");
+          return;
+        }
+        rej.disabled = true;
+        ed.disabled = true;
+        ap.disabled = true;
+        try {
+          const response = await resolveApproval(ticketId, "reject", {
+            internal_note: "Rejected by operator"
+          });
+            const normalized = normalizeWorkspaceResult(normalizeApprovalResponse(response, data));
+            state.latestRun = normalized;
+            rebindResultFooter(row, normalized);
+          updateStatsFromResult(normalized);
+          updateRevenueCard(normalized);
+          updateLatestRunCard(normalized);
+          updateSystemNarrative(normalized);
+          updateTopbarStatus();
+          setNotice("warning", "Rejected", response.message || "Ticket escalated.");
+        } catch (error) {
+          showErr(error.message || "Reject failed.");
+          rej.disabled = false;
+          ed.disabled = false;
+          ap.disabled = false;
+        }
+      });
+
+      ap.addEventListener("click", async () => {
+        showErr("");
+        if (!ticketId && pendingGate) {
+          showErr("No ticket id.");
+          return;
+        }
+        if (pendingGate && !approval.canApprove) {
+          showErr("Sign in as the ticket owner to approve.");
+          return;
+        }
+        if (pendingGate && approval.canApprove) {
+          [rej, ed, ap].forEach((b) => {
+            b.disabled = true;
+          });
+          ap.textContent = "…";
+          try {
+            const response = await resolveApproval(ticketId, "approve", {
+              payment_intent_id: approval.paymentIntentId,
+              charge_id: approval.chargeId,
+              refund_reason: "requested_by_customer"
+            });
+            const normalized = normalizeWorkspaceResult(normalizeApprovalResponse(response, data));
+            state.latestRun = normalized;
+            rebindResultFooter(row, normalized);
+            updateStatsFromResult(normalized);
+            updateRevenueCard(normalized);
+            updateLatestRunCard(normalized);
+            updateSystemNarrative(normalized);
+            updateTopbarStatus();
+            setNotice("success", "Approved", response.message || "Operator approved.");
+          } catch (error) {
+            showErr(error.message || "Approve failed.");
+            [rej, ed, ap].forEach((b) => {
+              b.disabled = false;
+            });
+            ap.textContent = "Approve";
+          }
+          return;
+        }
+        setTerminal("Approved", "Sent to customer.");
+        setNotice("success", "Cleared", "Operator cleared this response — copy when ready.");
+      });
+    };
+
+    wireActions();
   }
 
   function rebindResultFooter(row, normalized) {
+    row.querySelector(".decision-panel")?.remove();
     const replyText = normalized.reply || normalized.response || normalized.final || "";
     setAssistantCopy(row, replyText);
     const footer = getAssistantFooterNode(row);
@@ -2713,171 +2916,15 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       footer.innerHTML = "";
       footer.appendChild(createMetaRow(normalized));
       const toolsWrap = document.createElement("div");
-      addCopyControl(toolsWrap, replyText, normalized, row);
+      addCopyControl(toolsWrap, replyText, row);
       footer.appendChild(toolsWrap);
     }
     const details = row.querySelector(".details-wrap");
     if (details) details.replaceWith(createDetailsPanel(normalized));
+    mountOperatorDecisionPanel(row, normalized, replyText);
   }
 
-  function wireOperatorControls(container, data, row, copyFallback = "") {
-    const approval = getApprovalContext(data);
-    const ticketId = approval.ticketId;
-    const fallback = copyFallback || "";
-
-    if (approval.canApprove) {
-      const approveBtn = document.createElement("button");
-      approveBtn.type = "button";
-      approveBtn.className = "mini-btn approve-btn";
-      approveBtn.innerHTML = `${ICONS.approve}<span>Approve</span>`;
-
-      const editBtn = document.createElement("button");
-      editBtn.type = "button";
-      editBtn.className = "mini-btn edit-btn";
-      editBtn.innerHTML = `${ICONS.edit}<span>Edit reply</span>`;
-
-      const rejectBtn = document.createElement("button");
-      rejectBtn.type = "button";
-      rejectBtn.className = "mini-btn reject-btn";
-      rejectBtn.innerHTML = `${ICONS.reject}<span>Reject</span>`;
-
-      const setBusy = (busy) => {
-        [approveBtn, rejectBtn, editBtn].forEach((btn) => {
-          btn.disabled = busy;
-        });
-      };
-
-      editBtn.addEventListener("click", () => {
-        const wrap = ensureReplyEditor(row, getLiveReplyText(row, fallback));
-        if (!wrap) return;
-        wrap.hidden = !wrap.hidden;
-        const ta = wrap.querySelector("textarea");
-        if (!wrap.hidden && ta) {
-          if (!String(ta.value || "").trim()) ta.value = getLiveReplyText(row, fallback);
-          ta.focus();
-        }
-        setNotice(
-          "info",
-          "Edit reply",
-          wrap.hidden ? "Editor hidden — visible reply is what the customer sees." : "Changes are sent when you approve; copy uses the refined text when the editor is open."
-        );
-      });
-
-      approveBtn.addEventListener("click", async () => {
-        if (!approval.ticketId) return;
-        setBusy(true);
-        try {
-          const refined = getLiveReplyText(row, fallback);
-          const response = await resolveApproval(approval.ticketId, "approve", {
-            payment_intent_id: approval.paymentIntentId,
-            charge_id: approval.chargeId,
-            refund_reason: "requested_by_customer",
-            final_reply: refined.length ? refined : undefined
-          });
-          const normalized = normalizeWorkspaceResult(normalizeApprovalResponse(response, data));
-          state.latestRun = normalized;
-          rebindResultFooter(row, normalized);
-          updateStatsFromResult(normalized);
-          updateRevenueCard(normalized);
-          updateLatestRunCard(normalized);
-          updateSystemNarrative(normalized);
-          updateTopbarStatus();
-          setNotice("success", "Approved", response.message || "Operator approved — prepared path released.");
-        } catch (error) {
-          setNotice("error", "Approval failed", error.message || "Could not approve this action.");
-        } finally {
-          setBusy(false);
-        }
-      });
-
-      rejectBtn.addEventListener("click", async () => {
-        if (!approval.ticketId) return;
-        const note = window.prompt("Optional internal note for this rejection (visible on ticket):", "");
-        if (note === null) return;
-        setBusy(true);
-        try {
-          const response = await resolveApproval(approval.ticketId, "reject", {
-            internal_note: String(note || "").trim() || "Rejected from workspace — held for manual review."
-          });
-          const normalized = normalizeWorkspaceResult(normalizeApprovalResponse(response, data));
-          state.latestRun = normalized;
-          rebindResultFooter(row, normalized);
-          updateStatsFromResult(normalized);
-          updateRevenueCard(normalized);
-          updateLatestRunCard(normalized);
-          updateSystemNarrative(normalized);
-          updateTopbarStatus();
-          setNotice("warning", "Sent to review", response.message || "Ticket moved to manual review posture.");
-        } catch (error) {
-          setNotice("error", "Reject failed", error.message || "Could not reject this action.");
-        } finally {
-          setBusy(false);
-        }
-      });
-
-      container.appendChild(approveBtn);
-      container.appendChild(editBtn);
-      container.appendChild(rejectBtn);
-      return;
-    }
-
-    if (isAuthenticated() && ticketId && operatorReviewAssist(data)) {
-      const refineBtn = document.createElement("button");
-      refineBtn.type = "button";
-      refineBtn.className = "mini-btn edit-btn";
-      refineBtn.innerHTML = `${ICONS.edit}<span>Refine</span>`;
-
-      const applyBtn = document.createElement("button");
-      applyBtn.type = "button";
-      applyBtn.className = "mini-btn apply-edit-btn";
-      applyBtn.innerHTML = `${ICONS.check}<span>Apply</span>`;
-
-      const followBtn = document.createElement("button");
-      followBtn.type = "button";
-      followBtn.className = "mini-btn";
-      followBtn.innerHTML = `${ICONS.ticket}<span>Prep follow-up</span>`;
-
-      refineBtn.addEventListener("click", () => {
-        const wrap = ensureReplyEditor(row, getLiveReplyText(row, fallback));
-        if (!wrap) return;
-        wrap.hidden = false;
-        const ta = wrap.querySelector("textarea");
-        if (ta) {
-          if (!String(ta.value || "").trim()) ta.value = getLiveReplyText(row, fallback);
-          ta.focus();
-        }
-        setNotice("info", "Refine mode", "Edit the customer-visible reply, then Apply to update the card.");
-      });
-
-      applyBtn.addEventListener("click", () => {
-        const wrap = row.querySelector(".operator-reply-editor-wrap");
-        const ta = wrap?.querySelector(".operator-reply-editor");
-        const next = String(ta?.value || "").trim() || getLiveReplyText(row, fallback);
-        if (!next) return;
-        setAssistantCopy(row, next);
-        if (wrap) wrap.hidden = true;
-        setNotice("success", "Reply updated", "Card text updated — copy uses this version.");
-      });
-
-      followBtn.addEventListener("click", () => {
-        const anchor = `[Ticket #${ticketId}] Follow-up:\n`;
-        if (els.messageInput) {
-          const cur = String(els.messageInput.value || "");
-          els.messageInput.value = cur.trim() ? `${cur.trim()}\n\n${anchor}` : anchor;
-          els.messageInput.focus();
-          autoResizeTextarea();
-          saveDraft(els.messageInput.value);
-        }
-        setNotice("info", "Follow-up scaffold", "Composer pre-filled with a ticket anchor for the next operator run.");
-      });
-
-      container.appendChild(refineBtn);
-      container.appendChild(applyBtn);
-      container.appendChild(followBtn);
-    }
-  }
-
-  function addCopyControl(container, replyText, data = null, row = null) {
+  function addCopyControl(container, replyText, row = null) {
     const tools = document.createElement("div");
     tools.className = "assistant-tools";
 
@@ -2889,7 +2936,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     copyBtn.addEventListener("click", async () => {
       try {
-        const text = row ? getLiveReplyText(row, replyText) : String(replyText || "");
+        const text = row ? getCopyTextFromRow(row, replyText) : String(replyText || "");
         await navigator.clipboard.writeText(text);
         copyBtn.innerHTML = ICONS.check;
         window.setTimeout(() => {
@@ -2899,9 +2946,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     });
 
     tools.appendChild(copyBtn);
-    if (data && row) {
-      wireOperatorControls(tools, data, row, replyText);
-    }
     container.appendChild(tools);
   }
 
@@ -3607,11 +3651,12 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         footer.appendChild(createMetaRow(data));
 
         const toolsWrap = document.createElement("div");
-        addCopyControl(toolsWrap, replyText, data, row);
+        addCopyControl(toolsWrap, replyText, row);
         footer.appendChild(toolsWrap);
 
         const details = createDetailsPanel(data);
         footer.parentElement.appendChild(details);
+        mountOperatorDecisionPanel(row, data, replyText);
       }
 
       updateStatsFromResult(data);

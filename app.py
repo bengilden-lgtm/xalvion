@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -77,6 +78,12 @@ try:
 except Exception:
     def get_metrics() -> dict[str, Any]:
         return dict(_METRICS_FALLBACK)
+
+try:
+    from outcome_store import log_outcome as _log_real_outcome
+except Exception:
+    def _log_real_outcome(*_a: Any, **_k: Any) -> None:
+        return None
 
 
 load_dotenv(override=True)
@@ -207,6 +214,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals()
 INDEX_PATH = os.path.join(BASE_DIR, "index.html")
 APP_JS_PATH = os.path.join(BASE_DIR, "app.js")
 WORKSPACE_MODULES_JS_PATH = os.path.join(BASE_DIR, "workspace_modules.js")
+STYLES_CSS_PATH = os.path.join(BASE_DIR, "styles.css")
 LANDING_PATH = os.path.join(BASE_DIR, "landing.html")
 FLUID_DIR = os.path.join(BASE_DIR, "fluid")
 
@@ -401,8 +409,21 @@ def ensure_user_columns() -> None:
 def _startup_database() -> None:
     _import_orm_submodules()
     init_db()
+    try:
+        from security import assert_production_runtime_safety
+
+        assert_production_runtime_safety()
+    except RuntimeError as exc:
+        logger.error("startup_security_check_failed detail=%s", exc)
+        raise
     logger.info("DB schema ensured")
     print("DB schema ensured", flush=True)
+    try:
+        from learning import sync_rules_to_brain
+
+        sync_rules_to_brain()
+    except Exception as exc:
+        logger.warning("rule_sync_failed detail=%s", str(exc)[:200])
     ensure_user_columns()
 
 
@@ -417,6 +438,17 @@ VALID_RISKS = {"low", "medium", "high"}
 VALID_OP_MODES = {"conservative", "balanced", "delight", "fraud_aware"}
 VALID_CHANNELS = {"web", "email", "api", "chat", "mobile"}
 VALID_SOURCES = {"workspace", "sdk", "api", "webhook", "import"}
+
+# Issue types handled by local fast-path in run_support.
+# Keep in sync with local_fallback_reply() in agent.py.
+_LOCAL_FAST_PATH_ISSUE_TYPES = frozenset({
+    "shipping_issue",
+    "damaged_order",
+    "billing_duplicate_charge",
+    "billing_issue",
+    "payment_issue",
+    "refund_request",
+})
 
 
 def _safe_queue(value: Any, default: str = "new") -> str:
@@ -1044,6 +1076,9 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "remaining": max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"]),
         "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
         "stripe_account_id": getattr(user, "stripe_account_id", None),
+        "decision_state": "pending_decision"
+        if bool((result.get("decision") or {}).get("requires_approval", False))
+        else "approved",
     }
 
 # =============================================================================
@@ -1894,6 +1929,7 @@ def build_ticket_response_payload(
         "reply": reply,
         "response": reply,
         "final": reply,
+        "status": str(ticket.status or "new"),
         "action": action,
         "amount": amount,
         "reason": reason,
@@ -2084,7 +2120,7 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
         )
         damaged_keys = ("damaged", "broken", "arrived damaged")
 
-        billing_types_rt = {"billing_duplicate_charge", "billing_issue", "payment_issue", "refund_request"}
+        _billing_fast_types = _LOCAL_FAST_PATH_ISSUE_TYPES - {"shipping_issue", "damaged_order"}
         billing_msg_keys = (
             "charged twice",
             "double charge",
@@ -2095,9 +2131,13 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
             "wrong charge",
         )
 
-        is_damaged = issue_type_rt == "damaged_order" or any(k in msg for k in damaged_keys)
-        is_billing = issue_type_rt in billing_types_rt or any(k in msg for k in billing_msg_keys)
-        is_shipping = issue_type_rt == "shipping_issue" or any(k in msg for k in shipping_keys)
+        is_damaged = (issue_type_rt in _LOCAL_FAST_PATH_ISSUE_TYPES and issue_type_rt == "damaged_order") or any(
+            k in msg for k in damaged_keys
+        )
+        is_billing = issue_type_rt in _billing_fast_types or any(k in msg for k in billing_msg_keys)
+        is_shipping = (issue_type_rt in _LOCAL_FAST_PATH_ISSUE_TYPES and issue_type_rt == "shipping_issue") or any(
+            k in msg for k in shipping_keys
+        )
 
         triage_rt = runtime_ticket.get("triage") or {}
         risk_from_ctx = str(
@@ -2135,7 +2175,7 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
             result = local_result
         elif is_billing:
             ticket_local = dict(runtime_ticket)
-            if issue_type_rt in billing_types_rt:
+            if issue_type_rt in _billing_fast_types:
                 it = issue_type_rt
             elif any(k in msg for k in billing_msg_keys):
                 it = "billing_duplicate_charge"
@@ -2472,6 +2512,13 @@ def serve_workspace_modules_js():
     if os.path.exists(WORKSPACE_MODULES_JS_PATH):
         return FileResponse(WORKSPACE_MODULES_JS_PATH, media_type="application/javascript")
     raise HTTPException(status_code=404, detail="workspace_modules.js not found")
+
+
+@app.get("/styles.css")
+def serve_styles_css():
+    if os.path.exists(STYLES_CSS_PATH):
+        return FileResponse(STYLES_CSS_PATH, media_type="text/css; charset=utf-8")
+    raise HTTPException(status_code=404, detail="styles.css not found")
 
 
 @app.get("/landing")
@@ -3813,6 +3860,11 @@ def analyze_extension_ticket(
         operator_mode = get_operator_mode(db)
     else:
         username = "extension_guest"
+        if not check_rate_limit("__ext_guest__"):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many requests. Please slow down.",
+            )
         plan_tier = "free"
         priority_routing = False
         operator_mode = get_operator_mode(db)
@@ -3864,6 +3916,7 @@ def analyze_extension_ticket(
 # =============================================================================
 
 OUTREACH_QUEUE_PATH = os.path.join(BASE_DIR, "outreach_queue.json")
+_outreach_queue_lock = threading.Lock()
 LEAD_STATUS_ORDER = {"new", "contacted", "replied", "closed"}
 LEAD_STAGE_ORDER = {"lead", "contacted", "replied", "demo", "closed"}
 
@@ -3986,19 +4039,21 @@ def _normalize_lead_stage(value: str | None, status: str | None = None) -> str:
 
 
 def _read_outreach_queue() -> list[dict[str, Any]]:
-    try:
-        if not os.path.exists(OUTREACH_QUEUE_PATH):
+    with _outreach_queue_lock:
+        try:
+            if not os.path.exists(OUTREACH_QUEUE_PATH):
+                return []
+            with open(OUTREACH_QUEUE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, list) else []
+        except Exception:
             return []
-        with open(OUTREACH_QUEUE_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, list) else []
-    except Exception:
-        return []
 
 
 def _write_outreach_queue(leads: list[dict[str, Any]]) -> None:
-    with open(OUTREACH_QUEUE_PATH, "w", encoding="utf-8") as f:
-        json.dump(leads, f, indent=2, ensure_ascii=False)
+    with _outreach_queue_lock:
+        with open(OUTREACH_QUEUE_PATH, "w", encoding="utf-8") as f:
+            json.dump(leads, f, indent=2, ensure_ascii=False)
 
 
 def _lead_score(text: str, source: str = "manual") -> int:
