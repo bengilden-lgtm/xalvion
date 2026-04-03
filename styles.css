@@ -2081,6 +2081,50 @@ h4{font-size:var(--text-base);font-weight:var(--weight-medium);color:var(--text-
       .crm-btn.close{border-color:rgba(248,113,113,.18);background:rgba(248,113,113,.08);color:rgba(255,228,228,.96);}
     
 
+/* Decision Resolution Animations */
+@keyframes xv-panel-settle{
+  0%{transform:scale(0.985);opacity:0.96}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes xv-decision-pulse-approved{
+  0%,100%{
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 4px 5px rgba(0,0,0,0.33),
+      0 12px 21px rgba(0,0,0,0.45),
+      0 0 24px 0 var(--id-approved-tint),
+      inset 0 0 0 0 rgba(124,92,252,0);
+  }
+  35%{
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 4px 5px rgba(0,0,0,0.33),
+      0 12px 21px rgba(0,0,0,0.45),
+      0 0 24px 0 var(--id-approved-tint),
+      inset 0 0 70px 0 rgba(124,92,252,0.055);
+  }
+}
+@keyframes xv-decision-pulse-reject{
+  0%,100%{
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 4px 5px rgba(0,0,0,0.33),
+      0 12px 21px rgba(0,0,0,0.45),
+      inset 0 0 0 0 rgba(140,140,180,0);
+  }
+  35%{
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 4px 5px rgba(0,0,0,0.33),
+      0 12px 21px rgba(0,0,0,0.45),
+      inset 0 0 56px 0 rgba(140,140,180,0.065);
+  }
+}
+@keyframes xv-pill-reveal{
+  from{opacity:0;transform:translateY(4px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
 /* Decision panel — operator approval */
 .decision-panel{
   margin:var(--sp-3) var(--sp-4) 0;
@@ -2112,12 +2156,15 @@ h4{font-size:var(--text-base);font-weight:var(--weight-medium);color:var(--text-
     0 12px 21px rgba(0,0,0,0.50);
 }
 .decision-panel.decision-state-approved{
-  border-top-color:rgba(56,217,150,0.22);
+  border-top-color:rgba(56,217,150,0.275);
   box-shadow:
     0 0 0 1px rgba(255,255,255,0.08),
     0 4px 5px rgba(0,0,0,0.33),
     0 12px 21px rgba(0,0,0,0.45),
     0 0 24px 0 var(--id-approved-tint);
+  animation:
+    xv-panel-settle 200ms var(--id-curve) 0ms 1 normal both,
+    xv-decision-pulse-approved 280ms ease-out 0ms 1 normal both;
   transition:
     box-shadow var(--id-duration-state) var(--id-curve),
     border-top-color var(--id-duration-state) var(--id-curve);
@@ -2131,7 +2178,10 @@ h4{font-size:var(--text-base);font-weight:var(--weight-medium);color:var(--text-
 }
 .decision-panel.decision-state-rejected{
   border-top-color:rgba(140,140,165,0.18);
-  filter:saturate(0.88);
+  filter:saturate(0.83);
+  animation:
+    xv-panel-settle 200ms var(--id-curve) 0ms 1 normal both,
+    xv-decision-pulse-reject 280ms ease-out 0ms 1 normal both;
   transition:
     filter var(--id-duration-state) var(--id-curve),
     border-top-color var(--id-duration-state) var(--id-curve),
@@ -2142,7 +2192,7 @@ h4{font-size:var(--text-base);font-weight:var(--weight-medium);color:var(--text-
     0 0 0 1px rgba(255,255,255,0.10),
     0 4px 5px rgba(0,0,0,0.36),
     0 12px 21px rgba(0,0,0,0.50);
-  filter:saturate(0.88);
+  filter:saturate(0.83);
 }
 .decision-panel-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--sp-3)}
 .consequence-signal{display:inline-flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-4);border-radius:var(--r-pill);font-size:var(--text-xs);font-weight:var(--w-semibold);letter-spacing:0.06em;text-transform:uppercase;border:1px solid var(--border-subtle);background:var(--bg-elevated);color:var(--text-secondary)}
@@ -2150,6 +2200,10 @@ h4{font-size:var(--text-base);font-weight:var(--weight-medium);color:var(--text-
 .signal-review{border:1px solid var(--warning-border);background:var(--warning-soft);color:var(--warning)}
 .signal-approval{border:1px solid rgba(124,92,252,0.34);background:var(--accent-soft);color:#a78bfa}
 .decision-controls{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-2)}
+.decision-panel.decision-state-approved .decision-state-pill,
+.decision-panel.decision-state-rejected .decision-state-pill{
+  animation:xv-pill-reveal 180ms ease 80ms 1 normal both;
+}
 .decision-controls button{
   height:36px;
   min-height:36px;
