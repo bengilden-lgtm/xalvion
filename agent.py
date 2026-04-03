@@ -64,7 +64,8 @@ MAX_REFUND = 50
 MAX_CREDIT = 30
 
 # Issue types handled by local_fallback_reply().
-# Must stay in sync with _LOCAL_FAST_PATH_ISSUE_TYPES in app.py.
+# SYNC REQUIRED: Must match _LOCAL_FAST_PATH_ISSUE_TYPES in app.py.
+# When adding a new issue type here, update both constants.
 _FALLBACK_HANDLED_ISSUE_TYPES = frozenset({
     "shipping_issue",
     "damaged_order",
@@ -1202,7 +1203,8 @@ def run_agent(
 
     # Log the real outcome — this feeds the learning loop with verified API results
     _outcome_key = (
-        f"{user_id}:{str(ticket.get('issue_type', ''))[:20]}"
+        f"{user_id}"
+        f":{str(ticket.get('issue_type', ''))[:20]}"
         f":{uuid.uuid4().hex[:12]}"
     )
     _tool_result = executed.get("tool_result") or {"status": executed.get("tool_status", "unknown")}

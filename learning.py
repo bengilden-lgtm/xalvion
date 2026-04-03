@@ -136,8 +136,11 @@ def apply_learned_rules(ticket: Dict[str, Any], top_rules: List[Dict[str, Any]] 
         rules = top_rules
     else:
         try:
-            brain = load_brain()
-            rules = get_top_rule_objects(brain, 10)
+            from brain import get_top_rule_objects as _get_top_rule_objects
+            from brain import load_brain as _load_brain
+
+            _brain = _load_brain()
+            rules = _get_top_rule_objects(_brain, 10)
             if not rules:
                 rules = load_rules()
         except Exception:
@@ -182,24 +185,27 @@ def update_rule_feedback(ticket: Dict[str, Any], decision: Dict[str, Any], outco
 
 def sync_rules_to_brain() -> None:
     """
-    One-way sync on startup: push rules from learned_rules.json
-    into brain state if brain is missing them. Safe to call multiple
-    times — add_rule() is idempotent for existing triggers.
+    Startup sync: push rules from learned_rules.json into brain
+    state if brain is missing them. add_rule() is idempotent for
+    existing triggers — safe to call multiple times.
+    Does not modify the JSON file.
     """
     rules = load_rules()
     if not rules:
         return
     try:
-        brain = load_brain()
+        from brain import add_rule as _add_rule
+        from brain import load_brain as _load_brain
+
+        brain = _load_brain()
+        existing_triggers = {
+            r.get("trigger", "")
+            for r in brain.get("learned_rules", [])
+        }
         for rule in rules:
             trigger = rule.get("trigger", "")
-            if not trigger:
-                continue
-            already_in_brain = any(
-                r.get("trigger") == trigger for r in brain.get("learned_rules", [])
-            )
-            if not already_in_brain:
-                add_rule(brain, rule)
+            if trigger and trigger not in existing_triggers:
+                _add_rule(brain, rule)
     except Exception:
         pass
 

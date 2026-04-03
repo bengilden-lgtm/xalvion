@@ -138,11 +138,11 @@ def add_rule(brain: Dict[str, Any], rule: Dict[str, Any] | str) -> None:
     else:
         brain["rule_weights"][trigger] = min(
             500,
-            brain["rule_weights"].get(trigger, 1) + 1,
+            int(brain["rule_weights"].get(trigger, 1)) + 1,
         )
         brain["rule_scores"][trigger] = min(
             50.0,
-            round(brain["rule_scores"].get(trigger, 1.0) + 0.2, 4),
+            round(float(brain["rule_scores"].get(trigger, 1.0)) + 0.2, 4),
         )
     update_system_prompt(brain)
     save_brain(brain)

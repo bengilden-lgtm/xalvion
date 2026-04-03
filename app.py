@@ -18,7 +18,6 @@ import json
 import logging
 import os
 import re
-import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -444,8 +443,8 @@ VALID_CHANNELS = {"web", "email", "api", "chat", "mobile"}
 VALID_SOURCES = {"workspace", "sdk", "api", "webhook", "import"}
 
 # Issue types handled by the local fast-path in run_support().
-# These must match the issue types handled in local_fallback_reply()
-# in agent.py. If you add a new type to one, add it to the other.
+# SYNC REQUIRED: Must match _FALLBACK_HANDLED_ISSUE_TYPES in agent.py.
+# When adding a new issue type, update both constants.
 _LOCAL_FAST_PATH_ISSUE_TYPES = frozenset({
     "shipping_issue",
     "damaged_order",
@@ -666,18 +665,24 @@ def decode_token(token: str) -> str | None:
         return None
 
 
-# AUTH DEPENDENCY GUIDE:
-# get_current_user()           → returns guest User if no token.
-#                                Use for routes that allow preview/guest access.
-#                                Currently: /support, /analyze, /dashboard/summary,
-#                                /tickets, /billing/plans
-# require_authenticated_user() → raises 401 if no token.
-#                                Use for routes that require an account.
-# require_admin()              → raises 403 unless ADMIN_USERNAME.
+# ── AUTH DEPENDENCY SELECTION GUIDE ────────────────────────────
+# get_current_user()            Returns guest User if no valid token.
+#                               Use for routes that intentionally
+#                               support unauthenticated/preview access.
 #
-# REVIEW: Confirm guest access is intentional for each route using
-# get_current_user(). Routes that should not allow guest access must
-# be changed to require_authenticated_user().
+# require_authenticated_user()  Raises HTTP 401 if no valid token.
+#                               Use for routes that require an account.
+#
+# require_admin()               Raises HTTP 403 unless ADMIN_USERNAME.
+#
+# Routes currently using get_current_user() that allow guest access:
+#   POST /support, POST /analyze, GET /dashboard/summary,
+#   GET /tickets, GET /billing/plans
+#
+# Review: confirm guest access is intentional for each of these.
+# To lock a route down, change its dependency to
+# require_authenticated_user().
+# ────────────────────────────────────────────────────────────────
 def get_current_user(
     authorization: str | None = Header(None),
 ) -> User:
@@ -2057,19 +2062,26 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
         payload["tool_result"] = {"status": "approved"}
         try:
             _log_real_outcome(
-                outcome_key="approve:{}:{}".format(getattr(ticket, "id", ""), "credit"),
+                outcome_key="approve:{}:{}".format(
+                    getattr(ticket, "id", ""),
+                    proposed_action,
+                ),
                 user_id=str(getattr(ticket, "username", "") or ""),
-                action="credit",
+                action=proposed_action,
                 amount=proposed_amount,
-                issue_type=str(getattr(ticket, "issue_type", "general_support") or "general_support"),
+                issue_type=str(
+                    getattr(ticket, "issue_type", "general_support")
+                    or "general_support"
+                ),
                 tool_result={"status": "approved"},
                 auto_resolved=False,
                 approved_by_human=True,
             )
         except Exception as _log_exc:
             logger.warning(
-                "outcome_log_failed action=%s detail=%s",
+                "outcome_log_failed action=%s ticket_id=%s detail=%s",
                 proposed_action,
+                getattr(ticket, "id", ""),
                 str(_log_exc)[:200],
             )
         return payload, "approved"
@@ -2119,7 +2131,7 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
         runtime_ticket = build_runtime_ticket(req, user, db)
 
     shadow_decision = safe_execute(system_decision, runtime_ticket)
-    if not isinstance(shadow_decision, dict) or shadow_decision.get("__safe_execute_error__"):
+    if not isinstance(shadow_decision, dict) or shadow_decision.get("__xalvion_exec_error__"):
         shadow_decision = {
             "action": "none",
             "amount": 0,
@@ -3948,9 +3960,13 @@ def analyze_extension_ticket(
 # =============================================================================
 
 OUTREACH_QUEUE_PATH = os.path.join(BASE_DIR, "outreach_queue.json")
-# NOTE: _outreach_queue_lock is a thread-level lock only.
-# If running multiple worker processes, migrate to DB persistence.
-_outreach_queue_lock = threading.Lock()
+# Thread-level lock for outreach_queue.json file I/O.
+# IMPORTANT: This protects against intra-process concurrency only.
+# If running multiple Uvicorn worker processes (gunicorn --workers N),
+# migrate outreach queue persistence to the SQLite DB.
+import threading as _threading
+
+_outreach_queue_lock = _threading.Lock()
 LEAD_STATUS_ORDER = {"new", "contacted", "replied", "closed"}
 LEAD_STAGE_ORDER = {"lead", "contacted", "replied", "demo", "closed"}
 
@@ -4077,18 +4093,18 @@ def _read_outreach_queue() -> list[dict[str, Any]]:
         try:
             if not os.path.exists(OUTREACH_QUEUE_PATH):
                 return []
-            with open(OUTREACH_QUEUE_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            with open(OUTREACH_QUEUE_PATH, "r", encoding="utf-8") as _f:
+                data = json.load(_f)
             return data if isinstance(data, list) else []
         except Exception:
             return []
 
 
 def _write_outreach_queue(leads: list[dict[str, Any]]) -> None:
+    tmp_path = OUTREACH_QUEUE_PATH + ".tmp"
     with _outreach_queue_lock:
-        tmp_path = OUTREACH_QUEUE_PATH + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(leads, f, indent=2, ensure_ascii=False)
+        with open(tmp_path, "w", encoding="utf-8") as _f:
+            json.dump(leads, _f, indent=2, ensure_ascii=False)
         os.replace(tmp_path, OUTREACH_QUEUE_PATH)
 
 
