@@ -172,51 +172,75 @@ def compute_outcome_impact(row_dict: dict[str, Any] | None) -> dict[str, Any]:
     """
     Authoritative normalized impact for an outcome record (dict from get_outcome()
     or equivalent booleans).
+
+    If refund_reversed is set, success / auto / human completion bonuses do not
+    count toward impact (the favorable outcome did not hold).
+
+    Never raises — returns a neutral default on any error.
     """
-    if not row_dict:
+    try:
+        if not row_dict:
+            return {
+                "impact_score":     0.5,
+                "impact_label":     "neutral",
+                "component_scores": {},
+            }
+
+        reversed_flag = bool(row_dict.get("refund_reversed"))
+        success_val = (
+            0.0
+            if reversed_flag
+            else (2.5 if row_dict.get("success") else 0.0)
+        )
+        auto_val = (
+            0.0
+            if reversed_flag
+            else (1.0 if row_dict.get("auto_resolved") else 0.0)
+        )
+        human_val = (
+            0.0
+            if reversed_flag
+            else (0.5 if row_dict.get("approved_by_human") else 0.0)
+        )
+        reversal_val = -3.0 if row_dict.get("refund_reversed") else 0.0
+        dispute_val = -2.0 if row_dict.get("dispute_filed") else 0.0
+        reopen_val = -1.5 if row_dict.get("ticket_reopened") else 0.0
+        crm_val = 0.8 if row_dict.get("crm_closed") else 0.0
+
+        components = {
+            "success":          success_val,
+            "auto_resolved":    auto_val,
+            "human_approved":   human_val,
+            "reversal_penalty": reversal_val,
+            "dispute_penalty":  dispute_val,
+            "reopen_penalty":   reopen_val,
+            "crm_bonus":        crm_val,
+        }
+
+        raw = sum(components.values())
+        normalized = (raw + 5.5) / 10.3
+        normalized = round(max(0.0, min(1.0, normalized)), 4)
+
+        if normalized >= 0.80:
+            label = "excellent"
+        elif normalized >= 0.58:
+            label = "good"
+        elif normalized >= 0.38:
+            label = "neutral"
+        else:
+            label = "bad"
+
+        return {
+            "impact_score":     normalized,
+            "impact_label":     label,
+            "component_scores": components,
+        }
+    except Exception:
         return {
             "impact_score":     0.5,
             "impact_label":     "neutral",
             "component_scores": {},
         }
-
-    raw = 0.0
-    success_val = 2.5 if row_dict.get("success") else 0.0
-    auto_val = 1.0 if row_dict.get("auto_resolved") else 0.0
-    human_val = 0.5 if row_dict.get("approved_by_human") else 0.0
-    reversal_val = -3.0 if row_dict.get("refund_reversed") else 0.0
-    dispute_val = -2.0 if row_dict.get("dispute_filed") else 0.0
-    reopen_val = -1.5 if row_dict.get("ticket_reopened") else 0.0
-    crm_val = 0.8 if row_dict.get("crm_closed") else 0.0
-
-    components = {
-        "success":          success_val,
-        "auto_resolved":    auto_val,
-        "human_approved":   human_val,
-        "reversal_penalty": reversal_val,
-        "dispute_penalty":  dispute_val,
-        "reopen_penalty":   reopen_val,
-        "crm_bonus":        crm_val,
-    }
-
-    raw = sum(components.values())
-    normalized = (raw + 5.5) / 10.3
-    normalized = round(max(0.0, min(1.0, normalized)), 4)
-
-    if normalized >= 0.80:
-        label = "excellent"
-    elif normalized >= 0.58:
-        label = "good"
-    elif normalized >= 0.38:
-        label = "neutral"
-    else:
-        label = "bad"
-
-    return {
-        "impact_score":     normalized,
-        "impact_label":     label,
-        "component_scores": components,
-    }
 
 
 def get_outcome(outcome_key: str) -> dict[str, Any] | None:
