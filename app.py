@@ -531,6 +531,8 @@ class ApprovalDecisionRequest(BaseModel):
     charge_id: str | None = None
     refund_reason: str | None = None
     internal_note: str | None = None
+    # Customer-facing reply refined in workspace before approve (optional, capped).
+    final_reply: str | None = None
 
 
 class ChargeActionRequest(BaseModel):
@@ -1874,7 +1876,12 @@ def serialize_pending_approval_result(result: dict[str, Any], *, action: str, am
     return pending
 
 
-def build_ticket_response_payload(ticket: Ticket, log: ActionLog | None = None) -> dict[str, Any]:
+def build_ticket_response_payload(
+    ticket: Ticket,
+    log: ActionLog | None = None,
+    *,
+    db: Session | None = None,
+) -> dict[str, Any]:
     action = str(ticket.action or "none")
     amount = round(float(ticket.amount or 0), 2)
     tool_status = str(log.status if log else ticket.status or "unknown")
@@ -1912,7 +1919,7 @@ def build_ticket_response_payload(ticket: Ticket, log: ActionLog | None = None) 
             "money_saved": 0,
             "auto_resolved": str(ticket.status or "").lower() == "resolved" and not bool(ticket.requires_approval),
         },
-        "ticket": serialize_ticket_with_log(ticket, db),
+        "ticket": serialize_ticket_with_log(ticket, db) if db is not None else {**serialize_ticket(ticket), "action_log": None},
     }
 
 
@@ -3418,6 +3425,10 @@ def approve_ticket(
     if not log:
         raise HTTPException(status_code=404, detail="Pending approval log not found")
 
+    edited_reply = (req.final_reply or "").strip()
+    if edited_reply:
+        ticket.final_reply = edited_reply[:8000]
+
     append_ticket_internal_note(ticket, req.internal_note or "")
     payload, log_status = approve_ticket_action(ticket, log, req, user)
 
@@ -3441,7 +3452,7 @@ def approve_ticket(
     db.refresh(ticket)
     db.refresh(log)
 
-    response = build_ticket_response_payload(ticket, log)
+    response = build_ticket_response_payload(ticket, log, db=db)
     response["message"] = f"Ticket {ticket.id} approved"
     return response
 
@@ -3492,7 +3503,7 @@ def reject_ticket(
     db.refresh(ticket)
     db.refresh(log)
 
-    response = build_ticket_response_payload(ticket, log)
+    response = build_ticket_response_payload(ticket, log, db=db)
     response["message"] = f"Ticket {ticket.id} rejected"
     return response
 

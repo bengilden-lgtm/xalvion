@@ -665,6 +665,100 @@ if (typeof window.pulseRail !== "function") {
         word-break:break-word;
       }
 
+      .details-insight-stack{
+        display:grid;
+        gap:6px;
+        padding:2px 0 4px;
+      }
+
+      .details-insight{
+        display:grid;
+        gap:3px;
+        padding:8px 9px;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,.04);
+        background:rgba(5,8,16,.42);
+      }
+
+      .details-insight-k{
+        font-size:8px;
+        letter-spacing:.14em;
+        text-transform:uppercase;
+        font-weight:800;
+        color:rgba(139,111,255,.72);
+      }
+
+      .details-insight-v{
+        font-size:11px;
+        line-height:1.42;
+        color:rgba(228,235,255,.88);
+        word-break:break-word;
+      }
+
+      .details-trace{
+        font-size:10px;
+        line-height:1.4;
+        color:rgba(198,210,240,.62);
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        white-space:pre-wrap;
+        word-break:break-word;
+        max-height:96px;
+        overflow:auto;
+      }
+
+      .operator-reply-editor-wrap{
+        margin-top:10px;
+        display:grid;
+        gap:6px;
+      }
+
+      .operator-reply-editor-wrap[hidden]{
+        display:none !important;
+      }
+
+      .operator-editor-label{
+        font-size:9px;
+        letter-spacing:.12em;
+        text-transform:uppercase;
+        font-weight:800;
+        color:rgba(188,201,238,.5);
+      }
+
+      .operator-reply-editor{
+        width:100%;
+        min-height:80px;
+        max-height:220px;
+        padding:10px 12px;
+        border-radius:12px;
+        border:1px solid rgba(255,255,255,.09);
+        background:rgba(6,8,15,.55);
+        color:rgba(240,245,255,.95);
+        font-size:12px;
+        line-height:1.45;
+        resize:vertical;
+        font-family:inherit;
+      }
+
+      .operator-reply-editor:focus{
+        outline:none;
+        border-color:rgba(139,111,255,.28);
+        box-shadow:0 0 0 1px rgba(139,111,255,.12);
+      }
+
+      .mini-btn.apply-edit-btn{
+        background:rgba(52,211,153,.08);
+        border-color:rgba(52,211,153,.16);
+        color:rgba(220,255,236,.92);
+        padding:0 10px;
+      }
+
+      .approval-hint{
+        font-size:10px;
+        color:rgba(206,219,250,.55);
+        padding:4px 2px 0;
+        line-height:1.35;
+      }
+
       .stream-steps{
         display:flex;
         flex-wrap:wrap;
@@ -2134,18 +2228,19 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   function updateTopbarStatus() {
     if (els.workspaceHeadline) {
       els.workspaceHeadline.textContent = state.username
-        ? `AI support operator for ${state.username}`
-        : "AI support that resolves cases with visible reasoning and controlled action flow";
+        ? `Operator workspace · ${state.username}`
+        : "Operator workspace · AI prepares, you approve";
     }
 
     if (els.workspaceSubcopy) {
       if (state.latestRun) {
         const decision = state.latestRun.decision || {};
-        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} plan · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
+        const posture = operatorPostureLabel(state.latestRun);
+        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} operator · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${posture} · ${formatMetric(state.latestRun.confidence || 0, 2)} conf.`;
       } else {
         els.workspaceSubcopy.textContent = state.username
-          ? `${formatTier(state.tier)} plan · live response loop · action visibility · premium support execution.`
-          : "Guest preview · response ready · visible action handling and premium support presentation.";
+          ? `${formatTier(state.tier)} plan · approval-first operator workspace · sovereign routing visible on every run.`
+          : "Guest preview · run a case to see routing, posture, and the operator brief.";
       }
     }
 
@@ -2168,14 +2263,15 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     const decision = data.decision || {};
     const triage = data.triage || {};
+    const approval = getApprovalContext(data);
     const parts = [
-      `${displayActionLabel(data)} selected`,
+      `${displayActionLabel(data)}`,
       `${displayQueueLabel({ decision })}`,
       `${String(decision.risk_level || triage.risk_level || "medium")} risk`,
-      `${decision.requires_approval ? "approval gate active" : "safe to continue"}`
+      `${approval.requiresApproval && !approval.approved ? "approval gate" : operatorPostureLabel(data)}`
     ];
 
-    els.systemPanelCopy.textContent = parts.join(" · ");
+    els.systemPanelCopy.textContent = `${parts.join(" · ")}. ${explainWhyAction(data)}`;
   }
 
   function updateStickiness() {
@@ -2378,6 +2474,124 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     };
   }
 
+  function operatorPostureLabel(data = {}) {
+    const approval = getApprovalContext(data);
+    if (approval.requiresApproval && !approval.approved) return "Approval gate";
+    const action = String(data.action || data.decision?.action || "none").toLowerCase();
+    if (action === "review") return "Human review";
+    if (Number(data.confidence || 0) > 0 && Number(data.confidence || 0) < 0.62) return "Verify signals";
+    return "Clear to send";
+  }
+
+  function normalizeWorkspaceResult(data) {
+    if (!data || typeof data !== "object") return data;
+    const out = { ...data };
+    const sov = out.sovereign_decision;
+    if (sov && typeof sov === "object") {
+      out.decision = { ...(out.decision || {}), ...sov };
+    }
+    const imp = out.impact_projections;
+    if (imp && typeof imp === "object") {
+      out.impact = { ...(out.impact || {}), ...imp };
+    }
+    const tri = out.triage_metadata;
+    if (tri && typeof tri === "object") {
+      out.triage = { ...(out.triage || {}), ...tri };
+    }
+    return out;
+  }
+
+  function explainWhyAction(data = {}) {
+    const d = data.decision || data.sovereign_decision || {};
+    const reason = String(data.reason || d.reason || "").trim();
+    if (reason) return reason;
+    const action = String(data.action || d.action || "none").toLowerCase();
+    if (action === "none") return "Response-only path: no billing motion selected.";
+    return `Prepared motion: ${action} · routed to ${displayQueueLabel({ decision: d })}.`;
+  }
+
+  function signalsSummaryLine(data = {}) {
+    const t = data.triage || data.triage_metadata || {};
+    const parts = [];
+    const u = Number(t.urgency);
+    const c = Number(t.churn_risk);
+    const rf = Number(t.refund_likelihood);
+    const ab = Number(t.abuse_likelihood);
+    if (u > 0) parts.push(`urgency ${u}`);
+    if (c > 0) parts.push(`churn ${c}`);
+    if (rf > 0) parts.push(`refund exposure ${rf}`);
+    if (ab > 0) parts.push(`abuse signal ${ab}`);
+    return parts.length ? parts.join(" · ") : "Triage signals within a normal band for this lane.";
+  }
+
+  function queueMeansLine(data = {}) {
+    const decision = data.decision || {};
+    const q = String(decision.queue || "new").toLowerCase();
+    const map = {
+      new: "Intake lane — case is staged; no execution commitment yet.",
+      waiting: "Active lane — work in progress before closure.",
+      escalated: "Human lane — judgment or policy check expected.",
+      refund_risk: "Billing-risk lane — verify ledger detail before money movement.",
+      vip: "Priority lane — higher visibility handling.",
+      resolved: "Closed lane — outcome recorded."
+    };
+    return map[q] || `${queueLabel(q)} — routed per policy.`;
+  }
+
+  function safetyVerdictLine(data = {}) {
+    const approval = getApprovalContext(data);
+    const c = Number(data.confidence || 0);
+    const tone = confidenceTone(c);
+    if (approval.requiresApproval && !approval.approved) {
+      return "Financial or policy gate active — explicit approval before execution.";
+    }
+    if (tone === "risky") return "Confidence is low — read signals before customer send.";
+    if (tone === "review") return "Borderline confidence — quick scan recommended.";
+    return "Posture is safe to continue with standard operator review.";
+  }
+
+  function nextOperatorStepLine(data = {}) {
+    const approval = getApprovalContext(data);
+    if (approval.requiresApproval && !approval.approved && approval.canApprove) {
+      return "Refine the reply if needed, then approve or reject the prepared action.";
+    }
+    if (approval.requiresApproval && !approval.approved && !approval.canApprove) {
+      return "Sign in with the ticket owner account to release the approval gate.";
+    }
+    const action = String(data.action || data.decision?.action || "none").toLowerCase();
+    if (action === "review") return "Copy the reply into your helpdesk thread and own the follow-up.";
+    return "Copy the customer-ready reply, confirm notes, and mark the loop closed.";
+  }
+
+  function thinkingTraceSnippet(data = {}, maxSteps = 4) {
+    const tr = data.thinking_trace;
+    if (!Array.isArray(tr) || !tr.length) return "";
+    return tr
+      .slice(0, maxSteps)
+      .map((step) => {
+        const s = step && typeof step === "object" ? step : {};
+        const name = String(s.step || s.name || "step");
+        const st = String(s.status || "");
+        const det = String(s.detail || "").trim();
+        return det ? `${name}: ${st} (${det})` : `${name}: ${st}`;
+      })
+      .join("\n");
+  }
+
+  function operatorReviewAssist(data = {}) {
+    const approval = getApprovalContext(data);
+    if (approval.requiresApproval) return false;
+    const action = String(data.action || data.decision?.action || "none").toLowerCase();
+    const r = String(riskLabel(data) || "medium").toLowerCase();
+    const c = Number(data.confidence || 0);
+    const mode = String(data.mode || "").toLowerCase();
+    if (action === "review") return true;
+    if (r === "high") return true;
+    if (c > 0 && c < 0.62) return true;
+    if (mode === "local_fast_path") return true;
+    return false;
+  }
+
   function createApprovalBanner(data = {}) {
     const approval = getApprovalContext(data);
     if (!approval.requiresApproval || approval.approved) return null;
@@ -2386,7 +2600,11 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     banner.className = "approval-banner";
     const amountText = approval.amount > 0 ? ` ${formatMoney(approval.amount)}` : "";
     const actionText = approval.action && approval.action !== "none" ? `${approval.action}${amountText}` : "prepared action";
-    banner.innerHTML = `${ICONS.warn}<div><strong>Approval required</strong><br>${escapeHtml(`Xalvion prepared ${actionText} and is holding execution until you approve it.`)}</div>`;
+    const gateHint =
+      !approval.canApprove && approval.ticketId
+        ? `<div class="approval-hint">Sign in as the ticket owner to enable Approve / Reject from this workspace.</div>`
+        : "";
+    banner.innerHTML = `${ICONS.warn}<div><strong>Approval gate</strong><br>${escapeHtml(`Prepared ${actionText} — execution is held until an operator approves.`)}${gateHint}</div>`;
     return banner;
   }
 
@@ -2450,106 +2668,213 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     };
   }
 
-  function wireApprovalButtons(container, data, row) {
+  function getLiveReplyText(row, fallback = "") {
+    const wrap = row?.querySelector(".operator-reply-editor-wrap");
+    const ta = wrap?.querySelector(".operator-reply-editor");
+    if (ta && wrap && !wrap.hidden && String(ta.value || "").trim()) {
+      return String(ta.value || "").trim();
+    }
+    const fromDom = (getAssistantCopyNode(row)?.innerText || "").trim();
+    if (fromDom) return fromDom;
+    return String(fallback || "").trim();
+  }
+
+  function ensureReplyEditor(row, seedText = "") {
+    const body = row?.querySelector(".msg-body");
+    if (!body) return null;
+    let wrap = row.querySelector(".operator-reply-editor-wrap");
+    if (!wrap) {
+      wrap = document.createElement("div");
+      wrap.className = "operator-reply-editor-wrap";
+      wrap.hidden = true;
+      const label = document.createElement("div");
+      label.className = "operator-editor-label";
+      label.textContent = "Customer-facing reply";
+      const ta = document.createElement("textarea");
+      ta.className = "operator-reply-editor";
+      ta.setAttribute("aria-label", "Edit customer-facing reply");
+      wrap.appendChild(label);
+      wrap.appendChild(ta);
+      body.appendChild(wrap);
+    }
+    const ta = wrap.querySelector("textarea");
+    const seed = String(seedText || (getAssistantCopyNode(row)?.innerText || "").trim() || "");
+    if (ta && seed && !String(ta.value || "").trim()) {
+      ta.value = seed;
+    }
+    return wrap;
+  }
+
+  function rebindResultFooter(row, normalized) {
+    const replyText = normalized.reply || normalized.response || normalized.final || "";
+    setAssistantCopy(row, replyText);
+    const footer = getAssistantFooterNode(row);
+    if (footer) {
+      footer.innerHTML = "";
+      footer.appendChild(createMetaRow(normalized));
+      const toolsWrap = document.createElement("div");
+      addCopyControl(toolsWrap, replyText, normalized, row);
+      footer.appendChild(toolsWrap);
+    }
+    const details = row.querySelector(".details-wrap");
+    if (details) details.replaceWith(createDetailsPanel(normalized));
+  }
+
+  function wireOperatorControls(container, data, row, copyFallback = "") {
     const approval = getApprovalContext(data);
-    if (!approval.canApprove) return;
+    const ticketId = approval.ticketId;
+    const fallback = copyFallback || "";
 
-    const approveBtn = document.createElement("button");
-    approveBtn.type = "button";
-    approveBtn.className = "mini-btn approve-btn";
-    approveBtn.innerHTML = `${ICONS.approve}<span>Approve</span>`;
+    if (approval.canApprove) {
+      const approveBtn = document.createElement("button");
+      approveBtn.type = "button";
+      approveBtn.className = "mini-btn approve-btn";
+      approveBtn.innerHTML = `${ICONS.approve}<span>Approve</span>`;
 
-    const rejectBtn = document.createElement("button");
-    rejectBtn.type = "button";
-    rejectBtn.className = "mini-btn reject-btn";
-    rejectBtn.innerHTML = `${ICONS.reject}<span>Reject</span>`;
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "mini-btn edit-btn";
+      editBtn.innerHTML = `${ICONS.edit}<span>Edit reply</span>`;
 
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "mini-btn edit-btn";
-    editBtn.innerHTML = `${ICONS.edit}<span>Edit</span>`;
+      const rejectBtn = document.createElement("button");
+      rejectBtn.type = "button";
+      rejectBtn.className = "mini-btn reject-btn";
+      rejectBtn.innerHTML = `${ICONS.reject}<span>Reject</span>`;
 
-    const setBusy = (busy) => {
-      [approveBtn, rejectBtn, editBtn].forEach((btn) => { btn.disabled = busy; });
-    };
-
-    approveBtn.addEventListener("click", async () => {
-      if (!approval.ticketId) return;
-      setBusy(true);
-      try {
-        const response = await resolveApproval(approval.ticketId, "approve", {
-          payment_intent_id: approval.paymentIntentId,
-          charge_id: approval.chargeId,
-          refund_reason: "requested_by_customer",
+      const setBusy = (busy) => {
+        [approveBtn, rejectBtn, editBtn].forEach((btn) => {
+          btn.disabled = busy;
         });
-        const normalized = normalizeApprovalResponse(response, data);
-        state.latestRun = normalized;
-        setAssistantCopy(row, normalized.reply || normalized.response || "Approved.");
-        const footer = getAssistantFooterNode(row);
-        if (footer) {
-          footer.innerHTML = "";
-          footer.appendChild(createMetaRow(normalized));
-          const toolsWrap = document.createElement("div");
-          addCopyControl(toolsWrap, normalized.reply || normalized.response || "");
-          footer.appendChild(toolsWrap);
+      };
+
+      editBtn.addEventListener("click", () => {
+        const wrap = ensureReplyEditor(row, getLiveReplyText(row, fallback));
+        if (!wrap) return;
+        wrap.hidden = !wrap.hidden;
+        const ta = wrap.querySelector("textarea");
+        if (!wrap.hidden && ta) {
+          if (!String(ta.value || "").trim()) ta.value = getLiveReplyText(row, fallback);
+          ta.focus();
         }
-        const details = row.querySelector(".details-wrap");
-        if (details) details.replaceWith(createDetailsPanel(normalized));
-        updateStatsFromResult(normalized);
-        updateRevenueCard(normalized);
-        updateLatestRunCard(normalized);
-        updateSystemNarrative(normalized);
-        updateTopbarStatus();
-        setNotice("success", "Action approved", response.message || "Prepared action approved.");
-      } catch (error) {
-        setNotice("error", "Approval failed", error.message || "Could not approve this action.");
-      } finally {
-        setBusy(false);
-      }
-    });
+        setNotice(
+          "info",
+          "Edit reply",
+          wrap.hidden ? "Editor hidden — visible reply is what the customer sees." : "Changes are sent when you approve; copy uses the refined text when the editor is open."
+        );
+      });
 
-    rejectBtn.addEventListener("click", async () => {
-      if (!approval.ticketId) return;
-      setBusy(true);
-      try {
-        const response = await resolveApproval(approval.ticketId, "reject", {
-          internal_note: "Rejected from workspace approval controls.",
-        });
-        const normalized = normalizeApprovalResponse(response, data);
-        state.latestRun = normalized;
-        setAssistantCopy(row, normalized.reply || normalized.response || "Rejected.");
-        const footer = getAssistantFooterNode(row);
-        if (footer) {
-          footer.innerHTML = "";
-          footer.appendChild(createMetaRow(normalized));
-          const toolsWrap = document.createElement("div");
-          addCopyControl(toolsWrap, normalized.reply || normalized.response || "");
-          footer.appendChild(toolsWrap);
+      approveBtn.addEventListener("click", async () => {
+        if (!approval.ticketId) return;
+        setBusy(true);
+        try {
+          const refined = getLiveReplyText(row, fallback);
+          const response = await resolveApproval(approval.ticketId, "approve", {
+            payment_intent_id: approval.paymentIntentId,
+            charge_id: approval.chargeId,
+            refund_reason: "requested_by_customer",
+            final_reply: refined.length ? refined : undefined
+          });
+          const normalized = normalizeWorkspaceResult(normalizeApprovalResponse(response, data));
+          state.latestRun = normalized;
+          rebindResultFooter(row, normalized);
+          updateStatsFromResult(normalized);
+          updateRevenueCard(normalized);
+          updateLatestRunCard(normalized);
+          updateSystemNarrative(normalized);
+          updateTopbarStatus();
+          setNotice("success", "Approved", response.message || "Operator approved — prepared path released.");
+        } catch (error) {
+          setNotice("error", "Approval failed", error.message || "Could not approve this action.");
+        } finally {
+          setBusy(false);
         }
-        const details = row.querySelector(".details-wrap");
-        if (details) details.replaceWith(createDetailsPanel(normalized));
-        updateStatsFromResult(normalized);
-        updateRevenueCard(normalized);
-        updateLatestRunCard(normalized);
-        updateSystemNarrative(normalized);
-        updateTopbarStatus();
-        setNotice("warning", "Action rejected", response.message || "Prepared action moved to manual follow-up.");
-      } catch (error) {
-        setNotice("error", "Reject failed", error.message || "Could not reject this action.");
-      } finally {
-        setBusy(false);
-      }
-    });
+      });
 
-    editBtn.addEventListener("click", () => {
-      els.paymentIntentInput?.focus();
-      els.messageInput?.focus();
-      setNotice("info", "Edit before approval", "Adjust the composer or add a payment reference, then rerun or approve when ready.");
-    });
+      rejectBtn.addEventListener("click", async () => {
+        if (!approval.ticketId) return;
+        const note = window.prompt("Optional internal note for this rejection (visible on ticket):", "");
+        if (note === null) return;
+        setBusy(true);
+        try {
+          const response = await resolveApproval(approval.ticketId, "reject", {
+            internal_note: String(note || "").trim() || "Rejected from workspace — held for manual review."
+          });
+          const normalized = normalizeWorkspaceResult(normalizeApprovalResponse(response, data));
+          state.latestRun = normalized;
+          rebindResultFooter(row, normalized);
+          updateStatsFromResult(normalized);
+          updateRevenueCard(normalized);
+          updateLatestRunCard(normalized);
+          updateSystemNarrative(normalized);
+          updateTopbarStatus();
+          setNotice("warning", "Sent to review", response.message || "Ticket moved to manual review posture.");
+        } catch (error) {
+          setNotice("error", "Reject failed", error.message || "Could not reject this action.");
+        } finally {
+          setBusy(false);
+        }
+      });
 
-    container.appendChild(approveBtn);
-    container.appendChild(rejectBtn);
-    container.appendChild(editBtn);
+      container.appendChild(approveBtn);
+      container.appendChild(editBtn);
+      container.appendChild(rejectBtn);
+      return;
+    }
+
+    if (isAuthenticated() && ticketId && operatorReviewAssist(data)) {
+      const refineBtn = document.createElement("button");
+      refineBtn.type = "button";
+      refineBtn.className = "mini-btn edit-btn";
+      refineBtn.innerHTML = `${ICONS.edit}<span>Refine</span>`;
+
+      const applyBtn = document.createElement("button");
+      applyBtn.type = "button";
+      applyBtn.className = "mini-btn apply-edit-btn";
+      applyBtn.innerHTML = `${ICONS.check}<span>Apply</span>`;
+
+      const followBtn = document.createElement("button");
+      followBtn.type = "button";
+      followBtn.className = "mini-btn";
+      followBtn.innerHTML = `${ICONS.ticket}<span>Prep follow-up</span>`;
+
+      refineBtn.addEventListener("click", () => {
+        const wrap = ensureReplyEditor(row, getLiveReplyText(row, fallback));
+        if (!wrap) return;
+        wrap.hidden = false;
+        const ta = wrap.querySelector("textarea");
+        if (ta) {
+          if (!String(ta.value || "").trim()) ta.value = getLiveReplyText(row, fallback);
+          ta.focus();
+        }
+        setNotice("info", "Refine mode", "Edit the customer-visible reply, then Apply to update the card.");
+      });
+
+      applyBtn.addEventListener("click", () => {
+        const wrap = row.querySelector(".operator-reply-editor-wrap");
+        const ta = wrap?.querySelector(".operator-reply-editor");
+        const next = String(ta?.value || "").trim() || getLiveReplyText(row, fallback);
+        if (!next) return;
+        setAssistantCopy(row, next);
+        if (wrap) wrap.hidden = true;
+        setNotice("success", "Reply updated", "Card text updated — copy uses this version.");
+      });
+
+      followBtn.addEventListener("click", () => {
+        const anchor = `[Ticket #${ticketId}] Follow-up:\n`;
+        if (els.messageInput) {
+          const cur = String(els.messageInput.value || "");
+          els.messageInput.value = cur.trim() ? `${cur.trim()}\n\n${anchor}` : anchor;
+          els.messageInput.focus();
+          autoResizeTextarea();
+          saveDraft(els.messageInput.value);
+        }
+        setNotice("info", "Follow-up scaffold", "Composer pre-filled with a ticket anchor for the next operator run.");
+      });
+
+      container.appendChild(refineBtn);
+      container.appendChild(applyBtn);
+      container.appendChild(followBtn);
+    }
   }
 
   function addCopyControl(container, replyText, data = null, row = null) {
@@ -2564,7 +2889,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     copyBtn.addEventListener("click", async () => {
       try {
-        await navigator.clipboard.writeText(replyText || "");
+        const text = row ? getLiveReplyText(row, replyText) : String(replyText || "");
+        await navigator.clipboard.writeText(text);
         copyBtn.innerHTML = ICONS.check;
         window.setTimeout(() => {
           copyBtn.innerHTML = ICONS.copy;
@@ -2574,7 +2900,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     tools.appendChild(copyBtn);
     if (data && row) {
-      wireApprovalButtons(tools, data, row);
+      wireOperatorControls(tools, data, row, replyText);
     }
     container.appendChild(tools);
   }
@@ -2596,26 +2922,72 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const decision = data.decision || {};
     const output = data.output || {};
     const impact = data.impact || {};
-    const toolStatus = String(data.tool_status || "resolved");
-    const internalNote = data.reason || output.internal_note || "";
+    const toolStatus = String(data.tool_status || data.execution?.status || "resolved");
+    const internalNote = String(output.internal_note || "").trim();
+    const policyNote = String(data.reason || decision.reason || "").trim();
+    const trace = thinkingTraceSnippet(data, 5);
+    const execDetail = String(data.execution?.detail || data.tool_result?.message || "").trim();
 
     const approvalBanner = createApprovalBanner(data);
 
+    const insightBlock = `
+      <div class="details-insight-stack">
+        <div class="details-insight">
+          <div class="details-insight-k">Why this path</div>
+          <div class="details-insight-v">${escapeHtml(explainWhyAction(data))}</div>
+        </div>
+        <div class="details-insight">
+          <div class="details-insight-k">Signals</div>
+          <div class="details-insight-v">${escapeHtml(signalsSummaryLine(data))}</div>
+        </div>
+        <div class="details-insight">
+          <div class="details-insight-k">Queue meaning</div>
+          <div class="details-insight-v">${escapeHtml(queueMeansLine(data))}</div>
+        </div>
+        <div class="details-insight">
+          <div class="details-insight-k">Safety</div>
+          <div class="details-insight-v">${escapeHtml(safetyVerdictLine(data))}</div>
+        </div>
+        <div class="details-insight">
+          <div class="details-insight-k">Next operator step</div>
+          <div class="details-insight-v">${escapeHtml(nextOperatorStepLine(data))}</div>
+        </div>
+        ${
+          execDetail
+            ? `<div class="details-insight">
+          <div class="details-insight-k">Execution</div>
+          <div class="details-insight-v">${escapeHtml(execDetail)}</div>
+        </div>`
+            : ""
+        }
+        ${
+          trace
+            ? `<div class="details-insight">
+          <div class="details-insight-k">Decision trace</div>
+          <div class="details-trace">${escapeHtml(trace)}</div>
+        </div>`
+            : ""
+        }
+      </div>
+    `;
+
     details.innerHTML = `
       <summary class="details-toggle">
-        <span>View details</span>
+        <span>Operator brief</span>
         <span class="chev">${ICONS.chevron}</span>
       </summary>
       <div class="details-panel">
         ${approvalBanner ? approvalBanner.outerHTML : ""}
+        ${insightBlock}
         <div class="details-grid">
-          ${createDetailBox("Action", actionLabel(data))}
+          ${createDetailBox("Surface action", displayActionLabel(data))}
           ${createDetailBox("Queue", queueLabel(decision.queue || "new"))}
           ${createDetailBox("Risk", riskLabel(data))}
           ${createDetailBox("Priority", String(decision.priority || "medium"))}
           ${createDetailBox("Tool status", toolStatus)}
-          ${createDetailBox("Value", formatMoney(impact.money_saved || impact.amount || data.amount || 0))}
+          ${createDetailBox("Value surfaced", formatMoney(impact.money_saved || impact.amount || data.amount || 0))}
         </div>
+        ${policyNote && policyNote !== internalNote ? `<div class="details-note">${escapeHtml(policyNote)}</div>` : ""}
         ${internalNote ? `<div class="details-note">${escapeHtml(internalNote)}</div>` : ""}
       </div>
     `;
@@ -2872,8 +3244,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     card.innerHTML = `
       <div class="panel-head">
         <div>
-          <div class="panel-title">Latest run</div>
-          <div class="panel-copy">Visible operating output makes the product feel real, not hidden behind a reply.</div>
+          <div class="panel-title">Latest operator run</div>
+          <div class="panel-copy">Posture, value surfaced, and time saved — same signals your sidepanel traces, condensed for the rail.</div>
         </div>
       </div>
       <div class="ops-grid">
@@ -2893,8 +3265,16 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
           <div class="ops-metric-label">Protected</div>
           <div class="ops-metric-value" id="opsLatestValue">$0</div>
         </div>
+        <div class="ops-metric">
+          <div class="ops-metric-label">Est. time saved</div>
+          <div class="ops-metric-value" id="opsTimeSaved">—</div>
+        </div>
+        <div class="ops-metric">
+          <div class="ops-metric-label">Posture</div>
+          <div class="ops-metric-value" id="opsPosture">—</div>
+        </div>
       </div>
-      <div class="ops-run-line" id="opsRunNarrative">${ICONS.spark}<span>Waiting for the next support run.</span></div>
+      <div class="ops-run-line" id="opsRunNarrative">${ICONS.spark}<span>Waiting for the next operator run.</span></div>
     `;
 
     if (els.railInner) els.railInner.appendChild(card);
@@ -2910,22 +3290,30 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const latestQueue = document.getElementById("opsLatestQueue");
     const latestConfidence = document.getElementById("opsLatestConfidence");
     const latestValue = document.getElementById("opsLatestValue");
+    const latestTime = document.getElementById("opsTimeSaved");
+    const latestPosture = document.getElementById("opsPosture");
     const latestNarrative = document.getElementById("opsRunNarrative");
 
     const decision = data.decision || {};
     const triage = data.triage || {};
     const impact = data.impact || {};
+    const mins = Number(impact.agent_minutes_saved || impact.time_saved_est_min || 0);
 
     if (latestAction) latestAction.textContent = displayActionLabel(data);
     if (latestQueue) latestQueue.textContent = displayQueueLabel({ decision });
     if (latestConfidence) latestConfidence.textContent = formatMetric(data.confidence || 0, 2);
     if (latestValue) latestValue.textContent = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
+    if (latestTime) {
+      latestTime.textContent = mins > 0 ? `${Math.round(mins)} min` : "—";
+    }
+    if (latestPosture) latestPosture.textContent = operatorPostureLabel(data);
 
     if (latestNarrative) {
-      const reason = data.reason || "No explicit reasoning returned.";
-      const approval = decision.requires_approval ? "Approval gate active" : "Automated flow complete";
+      const reason = explainWhyAction(data);
+      const value = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
+      const posture = operatorPostureLabel(data);
       const risk = String(decision.risk_level || triage.risk_level || "medium");
-      latestNarrative.innerHTML = `${ICONS.spark}<span>${escapeHtml(`${reason} · ${approval} · ${risk} risk.`)}</span>`;
+      latestNarrative.innerHTML = `${ICONS.spark}<span>${escapeHtml(`Operator system · ${posture} · ${risk} risk · value surfaced ${value}. ${reason}`)}</span>`;
     }
   }
 
@@ -3207,6 +3595,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
       if (!data) throw new Error("No response returned.");
 
+      data = normalizeWorkspaceResult(data);
       state.latestRun = data;
 
       const replyText = data.reply || data.response || data.final || "No response returned.";
