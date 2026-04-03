@@ -1906,6 +1906,12 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     };
 
     const setTerminal = (pill, note) => {
+      panel.classList.remove("decision-state-approved", "decision-state-rejected");
+      if (pill === "Approved" || pill === "Sent as edited") {
+        panel.classList.add("decision-state-approved");
+      } else if (pill === "Rejected") {
+        panel.classList.add("decision-state-rejected");
+      }
       controls.innerHTML = `<span class="decision-state-pill">${escapeHtml(pill)}</span>`;
       if (note) {
         noteEl.textContent = note;
