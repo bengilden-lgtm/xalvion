@@ -80,6 +80,10 @@ _METRICS_FALLBACK: dict[str, Any] = {
     "money_moved": 0.0,
 }
 
+_dashboard_cache: dict[str, Any] = {}
+_dashboard_cache_ts: float = 0.0
+_DASHBOARD_TTL: float = 30.0
+
 try:
     from analytics import get_metrics
 except Exception:
@@ -93,6 +97,7 @@ try:
         mark_ticket_reopened,
         mark_crm_closed,
         ensure_outcome_log_columns,
+        ensure_outcome_columns,
     )
 except Exception:
 
@@ -105,6 +110,9 @@ except Exception:
             "avg_outcome_quality": 0.0,
             "reopened_rate": 0.0,
             "crm_close_rate": 0.0,
+            "avg_impact_score": 0.5,
+            "excellent_rate": 0.0,
+            "bad_rate": 0.0,
         }
 
     def mark_ticket_reopened(_k: str) -> bool:
@@ -114,6 +122,9 @@ except Exception:
         return False
 
     def ensure_outcome_log_columns() -> None:
+        return None
+
+    def ensure_outcome_columns() -> None:
         return None
 
 
@@ -455,6 +466,10 @@ def _startup_database() -> None:
     ensure_user_columns()
     try:
         ensure_outcome_log_columns()
+    except Exception:
+        pass
+    try:
+        ensure_outcome_columns()
     except Exception:
         pass
     try:
@@ -1125,6 +1140,7 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         if bool((result.get("decision") or {}).get("requires_approval", False))
         else "approved",
         "decision_explanation": result.get("decision_explanation"),
+        "decision_explainability": result.get("decision_explainability"),
         "execution_tier": str(result.get("execution_tier") or "approval_required"),
     }
 
@@ -2659,11 +2675,35 @@ def _me_capacity_message(tier: str, remaining: int) -> str:
 
 def _build_me_value_signals(user: User, usage_summary: dict[str, Any]) -> dict[str, Any]:
     tier = get_public_plan_name(user)
+    tkey = str(tier or "free").strip().lower()
     rem = int(max(0, usage_summary.get("remaining", 0) or 0))
+    usage = int(usage_summary.get("usage", 0) or 0)
+    unlock_map = {
+        "free":  "500 tickets/month, full dashboard, priority routing",
+        "pro":   "5,000 tickets/month, advanced dashboard, 20 seats",
+        "elite": "",
+    }
+    capacity_map = {
+        "free":  f"Free tier — {rem} tickets left this month",
+        "pro":   f"Pro tier — {rem} tickets remaining",
+        "elite": "Elite tier — full capacity",
+    }
+    try:
+        metrics = get_metrics()
+        money_moved = float(metrics.get("money_moved", 0) or 0)
+        total_actions = int(metrics.get("total_refunds", 0) or 0) + int(metrics.get("total_credits", 0) or 0)
+        time_saved_mins = total_actions * 6
+    except Exception:
+        money_moved = 0.0
+        total_actions = 0
+        time_saved_mins = 0
     return {
-        "tickets_handled": int(usage_summary.get("usage", 0) or 0),
-        "upgrade_unlocks": _tier_upgrade_unlocks(tier),
-        "capacity_message": _me_capacity_message(tier, rem),
+        "tickets_handled":    usage,
+        "upgrade_unlocks":    unlock_map.get(tkey, _tier_upgrade_unlocks(tier)),
+        "capacity_message":   capacity_map.get(tkey, _me_capacity_message(tier, rem)),
+        "money_moved":        round(money_moved, 2),
+        "actions_taken":      total_actions,
+        "time_saved_minutes": time_saved_mins,
     }
 
 
@@ -2686,11 +2726,14 @@ def _stream_usage_warning_payload(username: str) -> dict[str, Any] | None:
         if pct < 0.75:
             return None
         tier = get_public_plan_name(user_row)
+        if str(tier).strip().lower() in {"elite", "dev"}:
+            return None
         return {
             "approaching_limit": True,
             "usage_pct": round(pct, 2),
             "remaining": int(summary["remaining"]),
             "upgrade_unlocks": _tier_upgrade_unlocks(tier),
+            "tickets_handled": int(summary.get("usage", 0) or 0),
         }
     except Exception:
         return None
@@ -3157,6 +3200,11 @@ def _dashboard_summary_fallback(user: User, db: Session, file_metrics: dict[str,
         "outcome_quality": 0.0,
         "reopened_rate": 0.0,
         "crm_close_rate": 0.0,
+        "value_generated": {
+            "money_saved":        0.0,
+            "time_saved_minutes": 0,
+            "actions_taken":      0,
+        },
     }
 
 
@@ -3176,6 +3224,27 @@ def dashboard_summary(
         outcome_stats = get_outcome_stats()
     except Exception:
         outcome_stats = {}
+
+    import time as _time_mod
+
+    global _dashboard_cache, _dashboard_cache_ts
+    _now = _time_mod.time()
+    if _dashboard_cache and (_now - _dashboard_cache_ts) < _DASHBOARD_TTL:
+        cached = dict(_dashboard_cache)
+        usage_summary = get_usage_summary(user)
+        public_tier = get_public_plan_name(user)
+        pc = get_plan_config(public_tier)
+        cached.update({
+            "your_usage": usage_summary["usage"],
+            "your_tier": public_tier,
+            "your_limit": pc["monthly_limit"],
+            "remaining": usage_summary["remaining"],
+        })
+        try:
+            cached["operator_mode"] = get_operator_mode(db)
+        except Exception:
+            pass
+        return cached
 
     try:
         total_tickets = db.query(Ticket).count()
@@ -3211,7 +3280,7 @@ def dashboard_summary(
         usage_summary = get_usage_summary(user)
         public_tier = get_public_plan_name(user)
 
-        return {
+        result = {
             "total_interactions": file_metrics.get("total_interactions", 0),
             "avg_confidence": avg_confidence,
             "avg_quality": avg_quality,
@@ -3245,7 +3314,16 @@ def dashboard_summary(
             "outcome_quality": float(outcome_stats.get("avg_outcome_quality", 0.0) or 0.0),
             "reopened_rate": float(outcome_stats.get("reopened_rate", 0.0) or 0.0),
             "crm_close_rate": float(outcome_stats.get("crm_close_rate", 0.0) or 0.0),
+            "value_generated": {
+                "money_saved":        round(refund_total + credit_total, 2),
+                "time_saved_minutes": int(actions_done * 6),
+                "actions_taken":      actions_done,
+            },
         }
+        _dashboard_cache.clear()
+        _dashboard_cache.update(result)
+        _dashboard_cache_ts = _now
+        return result
     except Exception as exc:
         _log_throttled_db_issue("GET /dashboard/summary", exc)
         return _dashboard_summary_fallback(user, db, file_metrics)
@@ -3883,10 +3961,10 @@ async def support_stream(
             await asyncio.sleep(STREAM_CHUNK_DELAY)
 
         yield sse_event("result", result)
+        yield sse_event("done", {"ok": True})
         usage_warn = _stream_usage_warning_payload(username)
         if usage_warn:
             yield sse_event("usage_warning", usage_warn)
-        yield sse_event("done", {"ok": True})
 
     return StreamingResponse(
         generator(),
@@ -4889,25 +4967,25 @@ def convert_outreach_lead(
 
 
 @app.post("/outcomes/{outcome_key}/reopen")
-def outcome_mark_reopen(
+def mark_outcome_reopened(
     outcome_key: str,
     _user: User = Depends(require_authenticated_user),
 ):
-    ok = mark_ticket_reopened(outcome_key)
-    if ok:
-        return {"ok": True}
-    return {"ok": False, "detail": "Outcome key not found or update failed."}
+    """Signal that a ticket was reopened after this outcome."""
+    if not mark_ticket_reopened(outcome_key):
+        raise HTTPException(status_code=404, detail="Outcome not found for this key.")
+    return {"ok": True, "outcome_key": outcome_key}
 
 
 @app.post("/outcomes/{outcome_key}/crm-close")
-def outcome_mark_crm_close(
+def mark_outcome_crm_closed(
     outcome_key: str,
     _user: User = Depends(require_authenticated_user),
 ):
-    ok = mark_crm_closed(outcome_key)
-    if ok:
-        return {"ok": True}
-    return {"ok": False, "detail": "Outcome key not found or update failed."}
+    """Signal that a CRM lead was closed/won linked to this outcome."""
+    if not mark_crm_closed(outcome_key):
+        raise HTTPException(status_code=404, detail="Outcome not found for this key.")
+    return {"ok": True, "outcome_key": outcome_key}
 
 
 # =============================================================================
@@ -4946,6 +5024,9 @@ def public_metrics(
         "refunds_issued":       round(refund_total, 2),
         "credits_issued":       round(credit_total, 2),
         "real_outcomes":        outcome_stats,
+        "avg_impact_score":     float(outcome_stats.get("avg_impact_score", 0.5) or 0.5),
+        "excellent_rate":       float(outcome_stats.get("excellent_rate", 0.0) or 0.0),
+        "bad_rate":             float(outcome_stats.get("bad_rate", 0.0) or 0.0),
         "your_plan":            public_tier,
         "your_usage":           usage_summary["usage"],
         "your_limit":           plan_cfg["monthly_limit"],

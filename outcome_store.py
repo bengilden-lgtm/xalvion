@@ -27,6 +27,11 @@ from sqlalchemy import inspect, text
 from db import Base, SessionLocal, engine
 
 
+_outcome_stats_cache: dict[str, Any] = {}
+_outcome_stats_cache_ts: float = 0.0
+_OUTCOME_STATS_TTL: float = 30.0
+
+
 # ---------------------------------------------------------------------------
 # ORM Model
 # ---------------------------------------------------------------------------
@@ -81,6 +86,11 @@ def ensure_outcome_log_columns() -> None:
                     conn.execute(text(stmt))
     except Exception:
         pass
+
+
+def ensure_outcome_columns() -> None:
+    """Alias for lazy outcome table migration (startup hook name)."""
+    ensure_outcome_log_columns()
 
 
 _SUCCESS_STATUSES = {"success", "credit_issued", "approved", "refunded"}
@@ -146,6 +156,69 @@ def log_outcome(
         db.close()
 
 
+def _outcome_orm_to_dict(row: ActionOutcomeLog) -> dict[str, Any]:
+    return {
+        "success":          bool(row.success),
+        "auto_resolved":    bool(row.auto_resolved),
+        "approved_by_human": bool(row.approved_by_human),
+        "refund_reversed":  bool(row.refund_reversed),
+        "dispute_filed":    bool(row.dispute_filed),
+        "ticket_reopened":  bool(getattr(row, "ticket_reopened", 0)),
+        "crm_closed":       bool(getattr(row, "crm_closed", 0)),
+    }
+
+
+def compute_outcome_impact(row_dict: dict[str, Any] | None) -> dict[str, Any]:
+    """
+    Authoritative normalized impact for an outcome record (dict from get_outcome()
+    or equivalent booleans).
+    """
+    if not row_dict:
+        return {
+            "impact_score":     0.5,
+            "impact_label":     "neutral",
+            "component_scores": {},
+        }
+
+    raw = 0.0
+    success_val = 2.5 if row_dict.get("success") else 0.0
+    auto_val = 1.0 if row_dict.get("auto_resolved") else 0.0
+    human_val = 0.5 if row_dict.get("approved_by_human") else 0.0
+    reversal_val = -3.0 if row_dict.get("refund_reversed") else 0.0
+    dispute_val = -2.0 if row_dict.get("dispute_filed") else 0.0
+    reopen_val = -1.5 if row_dict.get("ticket_reopened") else 0.0
+    crm_val = 0.8 if row_dict.get("crm_closed") else 0.0
+
+    components = {
+        "success":          success_val,
+        "auto_resolved":    auto_val,
+        "human_approved":   human_val,
+        "reversal_penalty": reversal_val,
+        "dispute_penalty":  dispute_val,
+        "reopen_penalty":   reopen_val,
+        "crm_bonus":        crm_val,
+    }
+
+    raw = sum(components.values())
+    normalized = (raw + 5.5) / 10.3
+    normalized = round(max(0.0, min(1.0, normalized)), 4)
+
+    if normalized >= 0.80:
+        label = "excellent"
+    elif normalized >= 0.58:
+        label = "good"
+    elif normalized >= 0.38:
+        label = "neutral"
+    else:
+        label = "bad"
+
+    return {
+        "impact_score":     normalized,
+        "impact_label":     label,
+        "component_scores": components,
+    }
+
+
 def get_outcome(outcome_key: str) -> dict[str, Any] | None:
     """Retrieve the real outcome for a given key. Returns None if not found."""
     db = SessionLocal()
@@ -175,6 +248,13 @@ def get_outcome(outcome_key: str) -> dict[str, Any] | None:
         }
     finally:
         db.close()
+
+
+def get_impact_for_key(outcome_key: str) -> dict[str, Any] | None:
+    row = get_outcome(outcome_key)
+    if not row:
+        return None
+    return compute_outcome_impact(row)
 
 
 def compute_outcome_quality(row: ActionOutcomeLog) -> float:
@@ -216,9 +296,12 @@ def get_outcome_quality_for_key(outcome_key: str) -> float | None:
 def mark_ticket_reopened(outcome_key: str) -> bool:
     db = SessionLocal()
     try:
-        row = db.query(ActionOutcomeLog).filter(
-            ActionOutcomeLog.outcome_key == str(outcome_key or "")[:64]
-        ).first()
+        row = (
+            db.query(ActionOutcomeLog)
+            .filter(ActionOutcomeLog.outcome_key == str(outcome_key or "")[:64])
+            .order_by(ActionOutcomeLog.id.desc())
+            .first()
+        )
         if not row:
             return False
         row.ticket_reopened = 1
@@ -235,9 +318,12 @@ def mark_ticket_reopened(outcome_key: str) -> bool:
 def mark_crm_closed(outcome_key: str) -> bool:
     db = SessionLocal()
     try:
-        row = db.query(ActionOutcomeLog).filter(
-            ActionOutcomeLog.outcome_key == str(outcome_key or "")[:64]
-        ).first()
+        row = (
+            db.query(ActionOutcomeLog)
+            .filter(ActionOutcomeLog.outcome_key == str(outcome_key or "")[:64])
+            .order_by(ActionOutcomeLog.id.desc())
+            .first()
+        )
         if not row:
             return False
         row.crm_closed = 1
@@ -273,11 +359,44 @@ def mark_reversed(outcome_key: str) -> bool:
 
 def get_outcome_stats() -> dict[str, Any]:
     """Aggregate real outcome stats. Used by the /metrics endpoint."""
+    import time as _time
+
+    global _outcome_stats_cache, _outcome_stats_cache_ts
+
+    now = _time.time()
+    if _outcome_stats_cache and (now - _outcome_stats_cache_ts) < _OUTCOME_STATS_TTL:
+        return dict(_outcome_stats_cache)
+
     db = SessionLocal()
     try:
+        avg_impact_score = 0.5
+        excellent_rate = 0.0
+        bad_rate = 0.0
+        try:
+            sample_rows = (
+                db.query(ActionOutcomeLog)
+                .order_by(ActionOutcomeLog.id.desc())
+                .limit(500)
+                .all()
+            )
+            if sample_rows:
+                impacts = [compute_outcome_impact(_outcome_orm_to_dict(r)) for r in sample_rows]
+                n = len(impacts)
+                avg_impact_score = round(
+                    sum(i["impact_score"] for i in impacts) / max(1, n), 4
+                )
+                excellent_rate = round(
+                    sum(1 for i in impacts if i["impact_label"] == "excellent") / max(1, n) * 100, 2
+                )
+                bad_rate = round(
+                    sum(1 for i in impacts if i["impact_label"] == "bad") / max(1, n) * 100, 2
+                )
+        except Exception:
+            avg_impact_score, excellent_rate, bad_rate = 0.5, 0.0, 0.0
+
         total = db.query(ActionOutcomeLog).count()
         if not total:
-            return {
+            result = {
                 "total":               0,
                 "success_rate":        0.0,
                 "auto_resolution_rate": 0.0,
@@ -287,7 +406,14 @@ def get_outcome_stats() -> dict[str, Any]:
                 "avg_outcome_quality": 0.0,
                 "reopened_rate":       0.0,
                 "crm_close_rate":      0.0,
+                "avg_impact_score":    0.5,
+                "excellent_rate":      0.0,
+                "bad_rate":            0.0,
             }
+            _outcome_stats_cache.clear()
+            _outcome_stats_cache.update(result)
+            _outcome_stats_cache_ts = now
+            return result
 
         successes      = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.success == 1).count()
         auto           = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.auto_resolved == 1).count()
@@ -304,7 +430,7 @@ def get_outcome_stats() -> dict[str, Any]:
         qualities = [compute_outcome_quality(r) for r in success_rows]
         avg_q = round(sum(qualities) / max(1, len(qualities)), 4) if qualities else 0.0
 
-        return {
+        result = {
             "total":               total,
             "successes":           successes,
             "success_rate":        round(successes / max(1, total) * 100, 1),
@@ -316,6 +442,13 @@ def get_outcome_stats() -> dict[str, Any]:
             "avg_outcome_quality": avg_q,
             "reopened_rate":       round(reopened_n / max(1, total) * 100, 2),
             "crm_close_rate":      round(crm_closed_n / max(1, total) * 100, 2),
+            "avg_impact_score":    avg_impact_score,
+            "excellent_rate":      excellent_rate,
+            "bad_rate":            bad_rate,
         }
+        _outcome_stats_cache.clear()
+        _outcome_stats_cache.update(result)
+        _outcome_stats_cache_ts = now
+        return result
     finally:
         db.close()

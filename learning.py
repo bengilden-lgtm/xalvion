@@ -14,6 +14,7 @@ except Exception:
         return None
 
 RULES_FILE = "learned_rules.json"
+PATTERN_STORE_KEY = "decision_patterns_v1"
 
 
 def load_rules() -> List[Dict[str, Any]]:
@@ -86,15 +87,12 @@ def _score_outcome(outcome: Dict[str, Any], outcome_key: str | None = None) -> f
 
     if real is not None:
         try:
-            from outcome_store import get_outcome_quality_for_key
+            from outcome_store import compute_outcome_impact
 
-            if outcome_key:
-                q = get_outcome_quality_for_key(outcome_key)
-                if q is not None:
-                    return float(q)
+            impact = compute_outcome_impact(real)
+            return round(float(impact["impact_score"]) * 5.0, 4)
         except Exception:
             pass
-        # Real outcome path — use verified API result
         if real.get("success"):
             score += 2.5
         if real.get("auto_resolved"):
@@ -121,6 +119,83 @@ def _score_outcome(outcome: Dict[str, Any], outcome_key: str | None = None) -> f
     return round(score, 4)
 
 
+def _pattern_key(ticket: Dict[str, Any], decision: Dict[str, Any]) -> str:
+    triage = ticket.get("triage") or {}
+    issue = str(ticket.get("issue_type", "general") or "general")[:20]
+    action = str(decision.get("action", "none") or "none")[:10]
+    risk = str(triage.get("risk_level", "medium") or "medium")[:8]
+    tier = str(ticket.get("plan_tier", "free") or "free")[:8]
+    return f"{issue}:{action}:{risk}:{tier}"
+
+
+def _load_patterns() -> dict:
+    try:
+        from state_store import load_state
+
+        return load_state(PATTERN_STORE_KEY, {})
+    except Exception:
+        return {}
+
+
+def _save_patterns(patterns: dict) -> None:
+    try:
+        from state_store import save_state
+
+        if len(patterns) > 200:
+            sorted_keys = sorted(
+                patterns.keys(),
+                key=lambda k: float(patterns[k].get("last_updated", 0) or 0),
+            )
+            for old_key in sorted_keys[: len(patterns) - 200]:
+                del patterns[old_key]
+        save_state(PATTERN_STORE_KEY, patterns)
+    except Exception:
+        pass
+
+
+def record_pattern_outcome(
+    ticket: Dict[str, Any],
+    decision: Dict[str, Any],
+    impact_score: float,
+) -> None:
+    key = _pattern_key(ticket, decision)
+    patterns = _load_patterns()
+
+    if key not in patterns:
+        patterns[key] = {
+            "ema_score":    float(impact_score),
+            "sample_count": 1,
+            "last_updated": time.time(),
+        }
+    else:
+        alpha = 0.25
+        prev = float(patterns[key].get("ema_score", 0.5))
+        patterns[key]["ema_score"] = round(alpha * float(impact_score) + (1 - alpha) * prev, 4)
+        patterns[key]["sample_count"] = int(patterns[key].get("sample_count", 0)) + 1
+        patterns[key]["last_updated"] = time.time()
+
+    _save_patterns(patterns)
+
+
+def get_pattern_expectation(
+    ticket: Dict[str, Any], decision: Dict[str, Any]
+) -> dict | None:
+    key = _pattern_key(ticket, decision)
+    patterns = _load_patterns()
+    entry = patterns.get(key)
+    if not entry or int(entry.get("sample_count", 0)) < 3:
+        return None
+    score = float(entry.get("ema_score", 0.5))
+    return {
+        "pattern_key":  key,
+        "ema_score":    score,
+        "sample_count": int(entry.get("sample_count", 0)),
+        "expectation":  (
+            "high" if score >= 0.75 else "medium" if score >= 0.45 else "low"
+        ),
+    }
+
+
 def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome: Dict[str, Any], outcome_key: str | None = None) -> None:
     rules = load_rules()
     candidate = _candidate_rule(ticket, decision)
@@ -137,6 +212,18 @@ def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome:
             brain = load_brain()
             add_rule(brain, candidate)
             register_rule_outcome(brain, candidate["trigger"], closed=_is_closed_outcome(outcome), positive=True)
+            try:
+                from outcome_store import compute_outcome_impact
+
+                rowd: Dict[str, Any] = dict(outcome or {})
+                if outcome_key:
+                    real_o = get_outcome(outcome_key)
+                    if real_o:
+                        rowd = {**rowd, **real_o}
+                _impact = compute_outcome_impact(rowd)
+                record_pattern_outcome(ticket, decision, float(_impact["impact_score"]))
+            except Exception:
+                pass
             return
     candidate["weight"] = round(max(0.05, conversion_weight), 4)
     rules.append(candidate)
@@ -144,6 +231,18 @@ def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome:
     brain = load_brain()
     add_rule(brain, candidate)
     register_rule_outcome(brain, candidate["trigger"], closed=_is_closed_outcome(outcome), positive=True)
+    try:
+        from outcome_store import compute_outcome_impact
+
+        rowd_new: Dict[str, Any] = dict(outcome or {})
+        if outcome_key:
+            real_on = get_outcome(outcome_key)
+            if real_on:
+                rowd_new = {**rowd_new, **real_on}
+        _impact_n = compute_outcome_impact(rowd_new)
+        record_pattern_outcome(ticket, decision, float(_impact_n["impact_score"]))
+    except Exception:
+        pass
 
 
 def apply_learned_rules(ticket: Dict[str, Any], top_rules: List[Dict[str, Any]] | None = None) -> Dict[str, Any] | None:

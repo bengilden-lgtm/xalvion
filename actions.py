@@ -496,13 +496,7 @@ def compute_execution_tier(
     requires_approval: bool,
 ) -> str:
     """
-    Returns one of:
-      "assist_only"          — system helps but human must act
-      "approval_required"    — system proposes, human must approve before execution
-      "safe_autopilot_ready" — meets all criteria for future full automation
-
-    This does NOT enable autopilot. It classifies readiness only.
-    The approval flow is unchanged.
+    Classify execution safety tier. Read-only — does not change approval behavior.
     """
     act = str(action or "none").strip().lower()
     risk = str(risk_level or "medium").strip().lower()
@@ -514,16 +508,18 @@ def compute_execution_tier(
         return "assist_only"
     if mode == "conservative":
         return "assist_only"
+    if risk == "high":
+        return "assist_only"
 
     if requires_approval:
         return "approval_required"
     if act in {"refund", "charge"} and float(amount or 0) > 0:
         return "approval_required"
-    if risk == "high":
+    if float(confidence or 0) < 0.78:
         return "approval_required"
-    if float(confidence or 0) < 0.75:
+    if float(quality or 0) < 0.72:
         return "approval_required"
-    if float(quality or 0) < 0.70:
+    if abuse_score >= 2:
         return "approval_required"
 
     if (

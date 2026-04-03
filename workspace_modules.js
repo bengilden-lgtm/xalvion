@@ -25,11 +25,13 @@ export function createPhase2Core({ fetchImpl }) {
       return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     },
     formatExecutionTier(tier) {
-      const t = String(tier || "").toLowerCase();
-      if (t === "safe_autopilot_ready") return "Safe to automate";
-      if (t === "approval_required") return "Approval required";
-      if (t === "assist_only") return "Review manually";
-      return "Unknown";
+      const map = {
+        safe_autopilot_ready: "Safe to automate",
+        approval_required: "Approval required",
+        assist_only: "Manual review",
+      };
+      const k = String(tier || "").toLowerCase();
+      return map[k] || "Unknown";
     },
     formatOutcomeQuality(score) {
       const n = Number(score);
@@ -38,6 +40,25 @@ export function createPhase2Core({ fetchImpl }) {
       if (n < 3.5) return "Moderate";
       if (n < 4.5) return "Strong";
       return "Excellent";
+    },
+    formatImpactScore(score) {
+      if (score === null || score === undefined) return "—";
+      const n = Number(score);
+      if (!Number.isFinite(n)) return "—";
+      if (n >= 0.8) return "Excellent";
+      if (n >= 0.58) return "Good";
+      if (n >= 0.38) return "Neutral";
+      return "Poor";
+    },
+    formatImpactLabel(label) {
+      const map = {
+        excellent: "Excellent outcome",
+        good: "Good outcome",
+        neutral: "Neutral outcome",
+        bad: "Poor outcome",
+      };
+      const k = String(label || "").toLowerCase();
+      return map[k] || label || "—";
     },
     buildExplanationSummary(explanation) {
       if (!explanation || typeof explanation !== "object") return "";

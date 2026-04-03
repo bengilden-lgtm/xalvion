@@ -117,4 +117,5 @@ class CanonicalAgentResponse(BaseModel):
     request_context: AgentRequestContext | None = None
     output: OutputEnvelope
     decision_explanation: dict[str, Any] | None = None
+    decision_explainability: dict[str, Any] | None = None
     execution_tier: str = "approval_required"

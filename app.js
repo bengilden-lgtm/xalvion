@@ -2159,32 +2159,51 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     return el;
   }
 
-  function syncUsageApproachNotice() {
+  function renderUsageIntelligence(userData) {
     const el = ensureUsageApproachNoticeEl();
     if (!el) return;
-    const tier = String(state.tier || "free").toLowerCase();
-    const show =
-      isAuthenticated() && state.approachingLimit && !state.atLimit && tier !== "elite";
-    if (!show) {
+    if (!userData || !userData.approaching_limit || userData.at_limit) {
       el.style.display = "none";
       el.innerHTML = "";
       return;
     }
-    const vs = state.valueSignals || {};
-    const th = Number.isFinite(Number(vs.tickets_handled)) ? Number(vs.tickets_handled) : state.usage;
-    const d = state.dashboardStats || {};
-    const money = formatMoney(Number(d.money_saved || 0));
-    const ar = Number(d.auto_resolved || 0);
+    const tier = String(userData.tier || state.tier || "free").toLowerCase();
+    if (tier === "elite") {
+      el.style.display = "none";
+      el.innerHTML = "";
+      return;
+    }
+    const vs = userData.value_signals || state.valueSignals || {};
+    const th = Number(vs.tickets_handled ?? userData.usage ?? state.usage ?? 0);
+    const money = formatMoney(Number(vs.money_moved ?? 0));
+    const tm = Number(vs.time_saved_minutes ?? 0);
     const unlock = String(vs.upgrade_unlocks || "").trim();
-    const tail = unlock ? `${unlock}. Upgrade to keep the system running.` : "Upgrade to keep the system running.";
     el.style.display = "block";
-    el.innerHTML = `<div>You've handled ${th} tickets this month; ${money} in billing actions, ${ar} auto-resolved.</div>
-<div>${escapeHtml(tail)}</div>
-<button type="button" class="ghost-btn" style="margin-top:6px;padding:6px 10px;font-size:12px">Upgrade for more capacity →</button>`;
+    el.innerHTML = `<div>${th} tickets handled · ${money} in actions · ~${tm} min saved</div>
+<div>${escapeHtml(unlock)}</div>
+<button type="button" class="ghost-btn" style="margin-top:6px;padding:6px 10px;font-size:12px">Upgrade for continuous coverage →</button>`;
     const btn = el.querySelector("button");
     if (btn) {
       btn.onclick = () => upgradePlan("pro");
     }
+  }
+
+  function syncUsageApproachNotice() {
+    if (!isAuthenticated()) {
+      const el = ensureUsageApproachNoticeEl();
+      if (el) {
+        el.style.display = "none";
+        el.innerHTML = "";
+      }
+      return;
+    }
+    renderUsageIntelligence({
+      approaching_limit: state.approachingLimit,
+      at_limit: state.atLimit,
+      tier: state.tier,
+      usage: state.usage,
+      value_signals: state.valueSignals,
+    });
   }
 
   function applyUsageWarningFromStream(payload) {
@@ -2198,14 +2217,22 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       if (Number.isFinite(r)) state.remaining = Math.max(0, r);
     }
     const unlock = String(payload.upgrade_unlocks || "").trim();
+    const thRaw = payload.tickets_handled;
+    const ticketsHandled =
+      thRaw !== undefined && thRaw !== null ? Number(thRaw) : state.usage;
     state.valueSignals = {
       ...(state.valueSignals && typeof state.valueSignals === "object" ? state.valueSignals : {}),
-      tickets_handled: state.usage,
+      tickets_handled: Number.isFinite(ticketsHandled) ? ticketsHandled : state.usage,
       upgrade_unlocks: unlock || (state.valueSignals && state.valueSignals.upgrade_unlocks) || "",
-      capacity_message:
-        (state.valueSignals && state.valueSignals.capacity_message) || ""
+      capacity_message: (state.valueSignals && state.valueSignals.capacity_message) || "",
     };
-    syncUsageApproachNotice();
+    renderUsageIntelligence({
+      approaching_limit: true,
+      at_limit: state.atLimit,
+      tier: state.tier,
+      usage: state.usage,
+      value_signals: state.valueSignals,
+    });
   }
 
   function actionLabel(data) {
@@ -2766,18 +2793,22 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       return {
         cls: "signal-safe",
         text: "✓ Safe to automate",
-        title: "Meets all autopilot safety criteria"
+        title: "Meets all automation safety criteria"
       };
     }
     if (tier === "assist_only") {
       return {
         cls: "signal-review",
-        text: "○ Review manually",
-        title: "Risk signals prevent automation"
+        text: "○ Manual review",
+        title: "Risk signals require human decision"
       };
     }
     if (tier === "approval_required") {
-      return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
+      return {
+        cls: "signal-approval",
+        text: "⚡ Approval required",
+        title: "Awaiting operator approval"
+      };
     }
 
     const action = String(data.action || dec.action || "none").toLowerCase();
@@ -3078,6 +3109,30 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     `;
   }
 
+  function buildExplainabilityBriefHtml(ex) {
+    if (!ex || typeof ex !== "object") return "";
+    const sum = ex.summary ? `<p class="details-note" style="margin-bottom:10px">${escapeHtml(String(ex.summary))}</p>` : "";
+    const rr = ex.risk_reasoning || {};
+    const pt = ex.policy_trigger || {};
+    const mi = ex.memory_influence || {};
+    const memFull = mi.signal ? String(mi.signal) : "—";
+    const memTrunc = memFull.length > 40 ? `${memFull.slice(0, 40)}…` : memFull;
+    const stats = `<div class="details-grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:10px;gap:8px">
+      ${createDetailBox("Risk", String(rr.level || "—"))}
+      ${createDetailBox("Policy", pt.triggered ? "Applied" : "None")}
+      ${createDetailBox("Memory", memTrunc)}
+    </div>`;
+    const oe = ex.outcome_expectation;
+    const oeBlock =
+      oe && oe.signal
+        ? `<div class="details-insight"><div class="details-insight-k">Pattern expectation</div><div class="details-insight-v">${escapeHtml(String(oe.signal))}</div></div>`
+        : "";
+    const why = ex.why_not_other_actions
+      ? `<div class="muted-copy" style="font-size:12px;margin-top:8px;line-height:1.45">${escapeHtml(String(ex.why_not_other_actions))}</div>`
+      : "";
+    return sum + stats + oeBlock + why;
+  }
+
   function buildDecisionExplanationInsightsHtml(ex) {
     if (!ex || typeof ex !== "object") return "";
     const rows = [];
@@ -3125,10 +3180,14 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const execDetail = String(data.execution?.detail || data.tool_result?.message || "").trim();
 
     const approvalBanner = createApprovalBanner(data);
-    const explanationInsightsHtml = buildDecisionExplanationInsightsHtml(data.decision_explanation);
+    const explainabilityBrief = buildExplainabilityBriefHtml(data.decision_explainability);
+    const explanationInsightsHtml = explainabilityBrief
+      ? ""
+      : buildDecisionExplanationInsightsHtml(data.decision_explanation);
 
     const insightBlock = `
       <div class="details-insight-stack">
+        ${explainabilityBrief}
         ${explanationInsightsHtml}
         <div class="details-insight">
           <div class="details-insight-k">Why this path</div>
@@ -3346,7 +3405,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const decoder = new TextDecoder();
     let buffer = "";
     let finalData = null;
-    let sawDone = false;
 
     const processEvents = (raw) => {
       const parsedEvents = parseSseEvents(raw);
@@ -3377,7 +3435,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         }
 
         if (item.event === "done") {
-          sawDone = true;
+          /* stream may emit usage_warning after done */
         }
       }
     };
@@ -3392,12 +3450,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
       for (const part of parts) {
         processEvents(`${part}\n\n`);
-        if (sawDone) {
-          try {
-            await reader.cancel();
-          } catch {}
-          return finalData;
-        }
       }
     }
 

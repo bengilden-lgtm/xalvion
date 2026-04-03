@@ -312,7 +312,47 @@ def build_structured_response(
         quality=float(quality or 0),
         impact_projection=impact_projection,
     )
-    execution_tier = str(decision_explanation.get("execution_tier") or "approval_required")
+    try:
+        from actions import compute_execution_tier as _cet
+
+        execution_tier = _cet(
+            str(final_like["action"]),
+            float(final_like.get("amount", 0) or 0),
+            conf_val,
+            float(quality or 0),
+            str(final_like.get("risk_level", "medium") or "medium"),
+            int(history.get("abuse_score", 0) or 0),
+            int(history.get("refund_count", 0) or 0),
+            str(ticket.get("operator_mode", "balanced") or "balanced"),
+            bool(final_like.get("requires_approval", False)),
+        )
+    except Exception:
+        execution_tier = "approval_required"
+    decision_explanation["execution_tier"] = execution_tier
+
+    try:
+        from learning import get_pattern_expectation as _gpat
+
+        pat = _gpat({**ticket, "triage": triage}, final_like)
+    except Exception:
+        pat = None
+
+    try:
+        decision_explainability = build_decision_explainability(
+            ticket=ticket,
+            triage=triage,
+            hard_decision=final_like,
+            learned_action=None,
+            final_action=final_like,
+            executed=executed_like,
+            history=history,
+            top_rules=[],
+            confidence=conf_val,
+            quality=float(quality or 0),
+            pattern_expectation=pat,
+        )
+    except Exception:
+        decision_explainability = None
 
     return {
         "response": customer_message,
@@ -364,6 +404,7 @@ def build_structured_response(
             "sentiment_avg": float(history.get("sentiment_avg", 5.0) or 5.0),
         },
         "decision_explanation": decision_explanation,
+        "decision_explainability": decision_explainability,
         "execution_tier": execution_tier,
     }
 
@@ -993,6 +1034,224 @@ def _human_issue_label(issue_type: str) -> str:
     return raw[:1].upper() + raw[1:] if raw else "General support"
 
 
+def build_decision_explainability(
+    *,
+    ticket: Dict[str, Any],
+    triage: Dict[str, Any],
+    hard_decision: Dict[str, Any],
+    learned_action: Dict[str, Any] | None,
+    final_action: Dict[str, Any],
+    executed: Dict[str, Any],
+    history: Dict[str, Any],
+    top_rules: list,
+    confidence: float,
+    quality: float,
+    pattern_expectation: dict | None = None,
+) -> dict[str, Any]:
+    """Deterministic operator explainability — no LLM."""
+    ticket = ticket or {}
+    triage = triage or {}
+    hard_decision = hard_decision or {}
+    final_action = final_action or {}
+    history = history or {}
+    top_rules = top_rules or []
+
+    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
+    action = str(final_action.get("action", "none") or "none")
+    amount = float(final_action.get("amount", 0) or 0)
+    risk_level = str(triage.get("risk_level", "medium") or "medium")
+    urgency = int(triage.get("urgency", 0) or 0)
+    churn_risk = int(triage.get("churn_risk", 0) or 0)
+    abuse_lh = int(triage.get("abuse_likelihood", 0) or 0)
+    refund_lh = int(triage.get("refund_likelihood", 0) or 0)
+    req_approval = bool(final_action.get("requires_approval", False))
+    refund_count = int(history.get("refund_count", 0) or 0)
+    abuse_score = int(history.get("abuse_score", 0) or 0)
+    repeat = bool(history.get("repeat_customer", False))
+    sentiment = float(history.get("sentiment_avg", 5.0) or 5.0)
+
+    classification_signals = {
+        "billing_duplicate_charge": "Matched duplicate charge pattern",
+        "damaged_order":            "Matched damaged order pattern",
+        "shipping_issue":           "Matched shipping inquiry pattern",
+        "refund_request":           "Matched explicit refund request",
+        "billing_issue":            "Matched billing issue pattern",
+        "payment_issue":            "Matched payment issue pattern",
+        "auth_issue":               "Matched authentication issue",
+        "export_error":             "Matched export/data error",
+        "general_support":          "No specific pattern matched",
+    }
+    classification_signal = classification_signals.get(
+        issue_type, "Classified as general support"
+    )
+
+    risk_factors: list[str] = []
+    if abuse_lh >= 50:
+        risk_factors.append("high abuse likelihood")
+    if refund_count >= 3:
+        risk_factors.append(f"{refund_count} prior refunds")
+    if abuse_score >= 2:
+        risk_factors.append("elevated abuse score")
+    if churn_risk >= 60:
+        risk_factors.append("high churn risk")
+    if urgency >= 70:
+        risk_factors.append("high urgency")
+    risk_reasoning = (
+        f"{risk_level.title()} risk"
+        + (f" — {', '.join(risk_factors)}" if risk_factors else "")
+    )
+
+    policy_triggered = str(hard_decision.get("action", "none")) != "none"
+    policy_reason = str(hard_decision.get("reason", "") or "")
+    policy_signal = (
+        f"Policy applied: {policy_reason}" if policy_triggered and policy_reason
+        else "No hard policy triggered — learning rules applied"
+        if not policy_triggered
+        else "Policy triggered"
+    )
+
+    memory_parts: list[str] = []
+    if repeat:
+        memory_parts.append("returning customer")
+    if sentiment < 4.0:
+        memory_parts.append("historically frustrated")
+    elif sentiment > 7.0:
+        memory_parts.append("historically positive")
+    if refund_count >= 2:
+        memory_parts.append(f"{refund_count} refunds on record")
+    memory_signal = (
+        "Memory: " + ", ".join(memory_parts)
+        if memory_parts
+        else "No significant memory signals"
+    )
+
+    learned_trigger = None
+    learned_weight = None
+    if learned_action and str(learned_action.get("action", "none")) != "none":
+        lat = learned_action.get("action")
+        if top_rules:
+            matched = next(
+                (
+                    r for r in top_rules
+                    if r.get("action", {}).get("type") == lat
+                ),
+                None,
+            )
+            if matched:
+                learned_trigger = matched.get("trigger")
+                learned_weight = matched.get("weight")
+
+    if pattern_expectation:
+        exp_label = pattern_expectation.get("expectation", "medium")
+        exp_count = pattern_expectation.get("sample_count", 0)
+        outcome_expectation = (
+            f"Pattern history: {exp_label} outcomes "
+            f"({exp_count} similar decisions observed)"
+        )
+    else:
+        outcome_expectation = "No pattern history available for this decision type"
+
+    alternatives: list[str] = []
+    if action != "refund":
+        if refund_lh >= 60:
+            alternatives.append(
+                "Refund was considered but "
+                + (
+                    "abuse signals blocked it" if abuse_score >= 2
+                    else "policy routed to review"
+                    if req_approval else "not triggered by current policy"
+                )
+            )
+    if action != "credit" and issue_type in {"shipping_issue", "damaged_order"}:
+        alternatives.append(
+            "Credit was available but not triggered by current sentiment/policy thresholds"
+        )
+    if action == "none":
+        alternatives.append(
+            "No financial action taken — issue type does not meet action thresholds"
+        )
+    why_not = (
+        "; ".join(alternatives)
+        if alternatives
+        else "Other actions were not applicable to this issue type"
+    )
+
+    if req_approval:
+        approval_reason = (
+            "Abuse score elevated" if abuse_score >= 2
+            else f"Refund amount ${amount:.0f} above auto-approval threshold"
+            if action == "refund" and amount > 0
+            else "Risk level or policy requires operator confirmation"
+        )
+    else:
+        approval_reason = "Within automatic handling thresholds"
+
+    summary_parts = [
+        f"{issue_type.replace('_', ' ').title()} detected.",
+        f"Risk: {risk_level}.",
+    ]
+    if policy_triggered:
+        summary_parts.append(f"Policy: {policy_reason}.")
+    if memory_parts:
+        summary_parts.append(f"Customer context: {', '.join(memory_parts)}.")
+    summary_parts.append(
+        f"Action: {action}"
+        + (f" (${amount:.0f})" if amount > 0 else "")
+        + (" — requires approval." if req_approval else " — auto-handled.")
+    )
+    summary = " ".join(summary_parts)
+
+    return {
+        "classification": {
+            "issue_type": issue_type,
+            "signal":     classification_signal,
+        },
+        "risk_reasoning": {
+            "level":            risk_level,
+            "urgency":          urgency,
+            "churn_risk":       churn_risk,
+            "abuse_likelihood": abuse_lh,
+            "signal":           risk_reasoning,
+        },
+        "policy_trigger": {
+            "triggered": policy_triggered,
+            "reason":    policy_reason,
+            "signal":    policy_signal,
+        },
+        "memory_influence": {
+            "repeat_customer": repeat,
+            "refund_count":    refund_count,
+            "abuse_score":     abuse_score,
+            "sentiment_avg":   round(sentiment, 1),
+            "signal":          memory_signal,
+        },
+        "learned_rule_influence": {
+            "applied": bool(
+                learned_action and str(learned_action.get("action", "none") or "none") != "none"
+            ),
+            "trigger": learned_trigger,
+            "weight":  learned_weight,
+        },
+        "outcome_expectation": {
+            "pattern_key": (
+                pattern_expectation.get("pattern_key")
+                if pattern_expectation else None
+            ),
+            "ema_score": (
+                pattern_expectation.get("ema_score")
+                if pattern_expectation else None
+            ),
+            "signal": outcome_expectation,
+        },
+        "why_not_other_actions": why_not,
+        "approval_rationale": {
+            "required": req_approval,
+            "reason":   approval_reason,
+        },
+        "summary": summary,
+    }
+
+
 def build_decision_explanation(
     *,
     ticket: Dict[str, Any],
@@ -1190,6 +1449,7 @@ def _canonicalize_result(
     learned_action: Dict[str, Any] | None = None,
     brain_rules: list[Dict[str, Any]] | None = None,
     hard_decision: Dict[str, Any] | None = None,
+    pattern_expectation: dict | None = None,
 ) -> Dict[str, Any]:
     impact = calculate_impact(ticket, final_action)
     tool_status = str(executed.get("tool_status", executed.get("status", "no_action")) or "no_action")
@@ -1216,6 +1476,23 @@ def _canonicalize_result(
         "tool_status": tool_status,
     }
 
+    try:
+        from actions import compute_execution_tier as _compute_exec_tier
+
+        _exec_tier = _compute_exec_tier(
+            action=str(decision["action"]),
+            amount=float(decision.get("amount", 0) or 0),
+            confidence=float(decision.get("confidence", 0.9) or 0.9),
+            quality=float(quality or 0),
+            risk_level=str(decision.get("risk_level", "medium") or "medium"),
+            abuse_score=int(history.get("abuse_score", 0) or 0),
+            refund_count=int(history.get("refund_count", 0) or 0),
+            operator_mode=str(ticket.get("operator_mode", "balanced") or "balanced"),
+            requires_approval=bool(decision.get("requires_approval", False)),
+        )
+    except Exception:
+        _exec_tier = "approval_required"
+
     impact_projection = {
         "type": str(impact.get("type", "saved") or "saved"),
         "amount": float(impact.get("amount", 0) or 0),
@@ -1241,7 +1518,25 @@ def _canonicalize_result(
         quality=float(quality or 0),
         impact_projection=impact_projection,
     )
-    execution_tier = str(decision_explanation.get("execution_tier") or "approval_required")
+    decision_explanation["execution_tier"] = _exec_tier
+    execution_tier = _exec_tier
+
+    try:
+        decision_explainability = build_decision_explainability(
+            ticket=ticket,
+            triage=triage,
+            hard_decision=hd,
+            learned_action=learned_action,
+            final_action=final_action,
+            executed=executed,
+            history=history,
+            top_rules=br_list,
+            confidence=conf_val,
+            quality=float(quality or 0),
+            pattern_expectation=pattern_expectation,
+        )
+    except Exception:
+        decision_explainability = None
 
     safe_message = normalize_text(customer_message)
 
@@ -1285,6 +1580,7 @@ def _canonicalize_result(
             "queue": decision["queue"],
         },
         "decision_explanation": decision_explanation,
+        "decision_explainability": decision_explainability,
         "execution_tier": execution_tier,
     }
     validated = CanonicalAgentResponse.model_validate(canonical).model_dump()
@@ -1319,6 +1615,7 @@ def run_agent(
             request_context=ctx,
             output=OutputEnvelope(internal_note="Security layer blocked unsafe input.", customer_note=blocked_reason, audit_log="blocked_input"),
             decision_explanation=None,
+            decision_explainability=None,
             execution_tier="assist_only",
         ).model_dump()
         payload.update({
@@ -1488,6 +1785,13 @@ def run_agent(
         "confidence": confidence,
     }
 
+    try:
+        from learning import get_pattern_expectation as _get_pattern_expectation
+
+        _pattern_exp = _get_pattern_expectation(ticket, final_payload)
+    except Exception:
+        _pattern_exp = None
+
     update_memory(user_id, ticket, customer_message, final_payload)
     learn_from_ticket(ticket, final_payload, executed, outcome_key=_outcome_key)
     process_feedback(clean, customer_message, quality)
@@ -1516,4 +1820,5 @@ def run_agent(
         learned_action=learned_action,
         brain_rules=top_rules,
         hard_decision=hard_decision,
+        pattern_expectation=_pattern_exp,
     )

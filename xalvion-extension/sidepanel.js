@@ -889,6 +889,110 @@ function renderDecisionExplanation(explanation) {
   det.classList.remove("open");
 }
 
+function ensureOperatorExplainabilityHost() {
+  const panel = document.getElementById("resultPanel");
+  const explain = document.getElementById("explainabilityWrap");
+  if (!panel) return null;
+  let host = document.getElementById("operatorExplainabilityHost");
+  if (host) return host;
+  host = document.createElement("div");
+  host.id = "operatorExplainabilityHost";
+  host.style.marginBottom = "10px";
+  const wrap = document.createElement("div");
+  wrap.className = "explainability-wrap";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.id = "explainToggleBtn";
+  btn.className = "explainability-toggle";
+  btn.style.width = "100%";
+  btn.textContent = "Why this decision ↓";
+  const panelBody = document.createElement("div");
+  panelBody.id = "operatorExplainabilityBody";
+  panelBody.className = "explainability-panel";
+  panelBody.style.display = "none";
+  wrap.appendChild(btn);
+  wrap.appendChild(panelBody);
+  host.appendChild(wrap);
+  if (explain && explain.parentNode === panel) {
+    panel.insertBefore(host, explain);
+  } else {
+    const grid = panel.querySelector(".grid");
+    if (grid) panel.insertBefore(host, grid);
+    else panel.appendChild(host);
+  }
+  return host;
+}
+
+function renderExplainability(explainability) {
+  const host = ensureOperatorExplainabilityHost();
+  const body = document.getElementById("operatorExplainabilityBody");
+  const btn = document.getElementById("explainToggleBtn");
+  if (!host || !body || !btn) return;
+
+  if (!explainability || typeof explainability !== "object") {
+    host.style.display = "none";
+    body.replaceChildren();
+    body.style.display = "none";
+    btn.textContent = "Why this decision ↓";
+    return;
+  }
+
+  const lines = [];
+  const cl = explainability.classification;
+  if (cl && cl.signal) lines.push(String(cl.signal));
+  const rr = explainability.risk_reasoning;
+  if (rr && rr.signal) lines.push(String(rr.signal));
+  const pt = explainability.policy_trigger;
+  if (pt && pt.signal) lines.push(String(pt.signal));
+  const mi = explainability.memory_influence;
+  if (mi && mi.signal) lines.push(String(mi.signal));
+  const oe = explainability.outcome_expectation;
+  if (oe && oe.signal) lines.push(String(oe.signal));
+
+  host.style.display = "";
+  body.replaceChildren();
+  lines.forEach((text) => {
+    const row = document.createElement("div");
+    row.className = "value muted reply-box";
+    row.style.marginBottom = "8px";
+    row.textContent = text;
+    body.appendChild(row);
+  });
+  if (explainability.why_not_other_actions) {
+    const wrow = document.createElement("div");
+    wrow.className = "value muted reply-box";
+    wrow.style.marginBottom = "8px";
+    wrow.style.opacity = "0.85";
+    wrow.style.fontSize = "12px";
+    wrow.textContent = String(explainability.why_not_other_actions);
+    body.appendChild(wrow);
+  }
+  if (explainability.summary) {
+    const sep = document.createElement("div");
+    sep.style.borderTop = "1px solid var(--line)";
+    sep.style.margin = "12px 0 10px";
+    body.appendChild(sep);
+    const sum = document.createElement("div");
+    sum.className = "value reply-box";
+    sum.style.fontSize = "13px";
+    sum.style.lineHeight = "1.5";
+    sum.textContent = String(explainability.summary);
+    body.appendChild(sum);
+  }
+
+  const wrapEl = host.querySelector(".explainability-wrap");
+  let open = false;
+  btn.onclick = () => {
+    open = !open;
+    body.style.display = open ? "grid" : "none";
+    btn.textContent = open ? "Close ↑" : "Why this decision ↓";
+    if (wrapEl) wrapEl.classList.toggle("open", open);
+  };
+  body.style.display = "none";
+  btn.textContent = "Why this decision ↓";
+  if (wrapEl) wrapEl.classList.remove("open");
+}
+
 function ensureExecutionTierPill() {
   const top = document.querySelector("#resultPanel .panel-top");
   if (!top) return null;
@@ -912,18 +1016,22 @@ function deriveExecutionTierPresentation(data) {
     return {
       text: "✓ Safe to automate",
       cls: "resolved",
-      title: "Meets all autopilot safety criteria"
+      title: "Meets all automation safety criteria"
     };
   }
   if (raw === "assist_only") {
     return {
-      text: "○ Review manually",
+      text: "○ Manual review",
       cls: "pending",
-      title: "Risk signals prevent automation"
+      title: "Risk signals require human decision"
     };
   }
   if (raw === "approval_required") {
-    return { text: "⚡ Approval required", cls: "waiting", title: "" };
+    return {
+      text: "⚡ Approval required",
+      cls: "waiting",
+      title: "Awaiting operator approval"
+    };
   }
 
   const dec = getDecisionData(data);
@@ -1006,7 +1114,13 @@ function render(data) {
   }
 
   renderExecutionTierSignal(data);
-  renderDecisionExplanation(data.decision_explanation);
+  if (data.decision_explainability && typeof data.decision_explainability === "object") {
+    renderExplainability(data.decision_explainability);
+    renderDecisionExplanation(null);
+  } else {
+    renderExplainability(null);
+    renderDecisionExplanation(data.decision_explanation);
+  }
 
   setVisible(statusCard, !!status);
   setVisible(confidenceCard, confidence !== "" && confidence !== null && confidence !== undefined);
