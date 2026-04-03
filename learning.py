@@ -85,6 +85,15 @@ def _score_outcome(outcome: Dict[str, Any], outcome_key: str | None = None) -> f
     score = 0.0
 
     if real is not None:
+        try:
+            from outcome_store import get_outcome_quality_for_key
+
+            if outcome_key:
+                q = get_outcome_quality_for_key(outcome_key)
+                if q is not None:
+                    return float(q)
+        except Exception:
+            pass
         # Real outcome path — use verified API result
         if real.get("success"):
             score += 2.5
@@ -92,8 +101,14 @@ def _score_outcome(outcome: Dict[str, Any], outcome_key: str | None = None) -> f
             score += 1.0
         if real.get("approved_by_human"):
             score += 0.5
-        if real.get("refund_reversed") or real.get("dispute_filed"):
-            score -= 3.0  # strong negative signal — rule was wrong
+        if real.get("refund_reversed"):
+            score -= 3.0
+        if real.get("dispute_filed"):
+            score -= 2.0
+        if real.get("ticket_reopened"):
+            score -= 1.5
+        if real.get("crm_closed"):
+            score += 0.8
     else:
         # Self-reported fallback — original logic preserved
         if _is_closed_outcome(outcome):

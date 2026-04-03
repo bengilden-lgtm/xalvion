@@ -52,7 +52,15 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from agent import run_agent, local_fallback_reply
-from actions import build_ticket as build_support_ticket, calculate_impact, system_decision, triage_ticket
+from actions import (
+    build_ticket as build_support_ticket,
+    calculate_impact,
+    system_decision,
+    triage_ticket,
+    HANDLED_ISSUE_TYPES,
+    MAX_AUTO_REFUND_AMOUNT,
+    MAX_APPROVAL_THRESHOLD,
+)
 from db import Base, SessionLocal, engine, init_db
 from memory import get_user_memory
 from utils import normalize_ticket, safe_execute
@@ -79,9 +87,33 @@ except Exception:
         return dict(_METRICS_FALLBACK)
 
 try:
-    from outcome_store import log_outcome as _log_real_outcome
+    from outcome_store import (
+        log_outcome as _log_real_outcome,
+        get_outcome_stats,
+        mark_ticket_reopened,
+        mark_crm_closed,
+        ensure_outcome_log_columns,
+    )
 except Exception:
+
     def _log_real_outcome(*_a: Any, **_k: Any) -> None:
+        return None
+
+    def get_outcome_stats() -> dict[str, Any]:
+        return {
+            "total": 0,
+            "avg_outcome_quality": 0.0,
+            "reopened_rate": 0.0,
+            "crm_close_rate": 0.0,
+        }
+
+    def mark_ticket_reopened(_k: str) -> bool:
+        return False
+
+    def mark_crm_closed(_k: str) -> bool:
+        return False
+
+    def ensure_outcome_log_columns() -> None:
         return None
 
 
@@ -140,9 +172,9 @@ STRIPE_CONNECT_REDIRECT_URI = os.getenv(
 STREAM_CHUNK_SIZE = int(os.getenv("STREAM_CHUNK_SIZE", "18"))
 STREAM_CHUNK_DELAY = float(os.getenv("STREAM_CHUNK_DELAY", "0.02"))
 STATUS_STEP_DELAY = float(os.getenv("STATUS_STEP_DELAY", "0.22"))
-MAX_AUTO_REFUND = float(os.getenv("MAX_AUTO_REFUND", "50"))
+MAX_AUTO_REFUND = float(os.getenv("MAX_AUTO_REFUND", str(MAX_AUTO_REFUND_AMOUNT)))
 
-APPROVAL_THRESHOLD = float(os.getenv("APPROVAL_THRESHOLD", "25.00"))
+APPROVAL_THRESHOLD = float(os.getenv("APPROVAL_THRESHOLD", str(MAX_APPROVAL_THRESHOLD)))
 LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
 
 REFUND_RULES: dict[str, Any] = {
@@ -422,6 +454,10 @@ def _startup_database() -> None:
     print("DB schema ensured", flush=True)
     ensure_user_columns()
     try:
+        ensure_outcome_log_columns()
+    except Exception:
+        pass
+    try:
         from learning import sync_rules_to_brain
 
         sync_rules_to_brain()
@@ -441,19 +477,6 @@ VALID_RISKS = {"low", "medium", "high"}
 VALID_OP_MODES = {"conservative", "balanced", "delight", "fraud_aware"}
 VALID_CHANNELS = {"web", "email", "api", "chat", "mobile"}
 VALID_SOURCES = {"workspace", "sdk", "api", "webhook", "import"}
-
-# Issue types handled by the local fast-path in run_support().
-# SYNC REQUIRED: Must match _FALLBACK_HANDLED_ISSUE_TYPES in agent.py.
-# When adding a new issue type, update both constants.
-_LOCAL_FAST_PATH_ISSUE_TYPES = frozenset({
-    "shipping_issue",
-    "damaged_order",
-    "billing_duplicate_charge",
-    "billing_issue",
-    "payment_issue",
-    "refund_request",
-})
-
 
 def _safe_queue(value: Any, default: str = "new") -> str:
     v = str(value or default).strip().lower()
@@ -1101,6 +1124,8 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "decision_state": "pending_decision"
         if bool((result.get("decision") or {}).get("requires_approval", False))
         else "approved",
+        "decision_explanation": result.get("decision_explanation"),
+        "execution_tier": str(result.get("execution_tier") or "approval_required"),
     }
 
 # =============================================================================
@@ -2156,7 +2181,7 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
         )
         damaged_keys = ("damaged", "broken", "arrived damaged")
 
-        _billing_fast_types = _LOCAL_FAST_PATH_ISSUE_TYPES - {"shipping_issue", "damaged_order"}
+        _billing_fast_types = HANDLED_ISSUE_TYPES - {"shipping_issue", "damaged_order"}
         billing_msg_keys = (
             "charged twice",
             "double charge",
@@ -2167,11 +2192,11 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
             "wrong charge",
         )
 
-        is_damaged = (issue_type_rt in _LOCAL_FAST_PATH_ISSUE_TYPES and issue_type_rt == "damaged_order") or any(
+        is_damaged = (issue_type_rt in HANDLED_ISSUE_TYPES and issue_type_rt == "damaged_order") or any(
             k in msg for k in damaged_keys
         )
         is_billing = issue_type_rt in _billing_fast_types or any(k in msg for k in billing_msg_keys)
-        is_shipping = (issue_type_rt in _LOCAL_FAST_PATH_ISSUE_TYPES and issue_type_rt == "shipping_issue") or any(
+        is_shipping = (issue_type_rt in HANDLED_ISSUE_TYPES and issue_type_rt == "shipping_issue") or any(
             k in msg for k in shipping_keys
         )
 
@@ -2614,6 +2639,63 @@ def health_deep(db: Session = Depends(get_db)):
 # =============================================================================
 
 
+def _tier_upgrade_unlocks(tier: str) -> str:
+    t = str(tier or "free").strip().lower()
+    if t == "free":
+        return "500 tickets/month, full dashboard, priority routing"
+    if t == "pro":
+        return "5,000 tickets/month, advanced analytics, 20 team seats"
+    return ""
+
+
+def _me_capacity_message(tier: str, remaining: int) -> str:
+    t = str(tier or "free").strip().lower()
+    if t == "elite":
+        return "Elite tier: unlimited capacity"
+    if t == "pro":
+        return f"Pro tier: {remaining} tickets remaining"
+    return f"Free tier: {remaining} tickets left this month"
+
+
+def _build_me_value_signals(user: User, usage_summary: dict[str, Any]) -> dict[str, Any]:
+    tier = get_public_plan_name(user)
+    rem = int(max(0, usage_summary.get("remaining", 0) or 0))
+    return {
+        "tickets_handled": int(usage_summary.get("usage", 0) or 0),
+        "upgrade_unlocks": _tier_upgrade_unlocks(tier),
+        "capacity_message": _me_capacity_message(tier, rem),
+    }
+
+
+def _stream_usage_warning_payload(username: str) -> dict[str, Any] | None:
+    if not username or username in {"guest", "dev_user", ""}:
+        return None
+    try:
+        with db_session() as db:
+            row = db.query(User).filter(User.username == username).first()
+            if not row:
+                return None
+            db.expunge(row)
+            user_row = row
+        summary = get_usage_summary(user_row)
+        limit = int(summary["limit"])
+        if limit >= 10**9:
+            return None
+        usage = int(summary["usage"])
+        pct = float(usage) / float(max(1, limit))
+        if pct < 0.75:
+            return None
+        tier = get_public_plan_name(user_row)
+        return {
+            "approaching_limit": True,
+            "usage_pct": round(pct, 2),
+            "remaining": int(summary["remaining"]),
+            "upgrade_unlocks": _tier_upgrade_unlocks(tier),
+        }
+    except Exception:
+        return None
+
+
 @app.get("/me")
 def me(user: User = Depends(get_current_user)):
     usage_summary = get_usage_summary(user)
@@ -2621,18 +2703,35 @@ def me(user: User = Depends(get_current_user)):
     public_tier = get_public_plan_name(user)
     public_plan = get_plan_config(public_tier)
     public_limit = int(public_plan["monthly_limit"])
+    usage = int(usage_summary["usage"])
+    remaining = max(0, public_limit - usage)
+    if public_limit >= 10**9:
+        usage_pct = 0.0
+        approaching_limit = False
+        at_limit = False
+    else:
+        usage_pct = float(usage) / float(max(1, public_limit))
+        approaching_limit = usage_pct >= 0.75
+        at_limit = usage >= public_limit
     return {
         "username": public_username,
         "tier": public_tier,
         "usage": usage_summary["usage"],
         "limit": public_limit,
-        "remaining": max(0, public_limit - usage_summary["usage"]),
+        "remaining": remaining,
         "dashboard_access": public_plan["dashboard_access"],
         "priority_routing": public_plan["priority_routing"],
         "is_dev": usage_summary["tier"] == "dev" and user.username == ADMIN_USERNAME,
         "is_admin": user.username == ADMIN_USERNAME,
         "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
         "stripe_account_id": getattr(user, "stripe_account_id", None),
+        "usage_pct": round(usage_pct, 4),
+        "approaching_limit": approaching_limit,
+        "at_limit": at_limit,
+        "value_signals": _build_me_value_signals(
+            user,
+            {**usage_summary, "remaining": remaining},
+        ),
     }
 
 
@@ -3055,6 +3154,9 @@ def _dashboard_summary_fallback(user: User, db: Session, file_metrics: dict[str,
         "total_users": 0,
         "pro_users": 0,
         "elite_users": 0,
+        "outcome_quality": 0.0,
+        "reopened_rate": 0.0,
+        "crm_close_rate": 0.0,
     }
 
 
@@ -3069,6 +3171,11 @@ def dashboard_summary(
     db: Session = Depends(get_db),
 ):
     file_metrics = {**_METRICS_FALLBACK, **(get_metrics() or {})}
+    outcome_stats: dict[str, Any] = {}
+    try:
+        outcome_stats = get_outcome_stats()
+    except Exception:
+        outcome_stats = {}
 
     try:
         total_tickets = db.query(Ticket).count()
@@ -3135,6 +3242,9 @@ def dashboard_summary(
             "total_users": db.query(User).count(),
             "pro_users": db.query(User).filter(User.tier == "pro").count(),
             "elite_users": db.query(User).filter(User.tier == "elite").count(),
+            "outcome_quality": float(outcome_stats.get("avg_outcome_quality", 0.0) or 0.0),
+            "reopened_rate": float(outcome_stats.get("reopened_rate", 0.0) or 0.0),
+            "crm_close_rate": float(outcome_stats.get("crm_close_rate", 0.0) or 0.0),
         }
     except Exception as exc:
         _log_throttled_db_issue("GET /dashboard/summary", exc)
@@ -3773,6 +3883,9 @@ async def support_stream(
             await asyncio.sleep(STREAM_CHUNK_DELAY)
 
         yield sse_event("result", result)
+        usage_warn = _stream_usage_warning_payload(username)
+        if usage_warn:
+            yield sse_event("usage_warning", usage_warn)
         yield sse_event("done", {"ok": True})
 
     return StreamingResponse(
@@ -4768,6 +4881,33 @@ def convert_outreach_lead(
         "metrics": _compute_revenue_metrics(all_leads),
         "username": user.username,
     }
+
+
+# =============================================================================
+# OUTCOMES — post-hoc signals (authenticated)
+# =============================================================================
+
+
+@app.post("/outcomes/{outcome_key}/reopen")
+def outcome_mark_reopen(
+    outcome_key: str,
+    _user: User = Depends(require_authenticated_user),
+):
+    ok = mark_ticket_reopened(outcome_key)
+    if ok:
+        return {"ok": True}
+    return {"ok": False, "detail": "Outcome key not found or update failed."}
+
+
+@app.post("/outcomes/{outcome_key}/crm-close")
+def outcome_mark_crm_close(
+    outcome_key: str,
+    _user: User = Depends(require_authenticated_user),
+):
+    ok = mark_crm_closed(outcome_key)
+    if ok:
+        return {"ok": True}
+    return {"ok": False, "detail": "Outcome key not found or update failed."}
 
 
 # =============================================================================

@@ -22,6 +22,8 @@ from typing import Any
 
 from sqlalchemy import Column, Float, Integer, String, Text, func
 
+from sqlalchemy import inspect, text
+
 from db import Base, SessionLocal, engine
 
 
@@ -44,6 +46,8 @@ class ActionOutcomeLog(Base):
     approved_by_human  = Column(Integer, nullable=False, default=0)   # 1=operator approved
     refund_reversed    = Column(Integer, nullable=False, default=0)   # future: chargeback signal
     dispute_filed      = Column(Integer, nullable=False, default=0)   # future: dispute signal
+    ticket_reopened    = Column(Integer, nullable=False, default=0)
+    crm_closed         = Column(Integer, nullable=False, default=0)
     tool_response_json = Column(Text, nullable=False, default="{}")
     created_at         = Column(String(32), nullable=False)
     updated_at         = Column(String(32), nullable=False)
@@ -55,6 +59,28 @@ class ActionOutcomeLog(Base):
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def ensure_outcome_log_columns() -> None:
+    """Lazy migration for action_outcome_log — same pattern as app.ensure_user_columns."""
+    try:
+        insp = inspect(engine)
+        cols = {c["name"] for c in insp.get_columns("action_outcome_log")}
+        additions: list[str] = []
+        if "ticket_reopened" not in cols:
+            additions.append(
+                "ALTER TABLE action_outcome_log ADD COLUMN ticket_reopened INTEGER DEFAULT 0 NOT NULL"
+            )
+        if "crm_closed" not in cols:
+            additions.append(
+                "ALTER TABLE action_outcome_log ADD COLUMN crm_closed INTEGER DEFAULT 0 NOT NULL"
+            )
+        if additions:
+            with engine.begin() as conn:
+                for stmt in additions:
+                    conn.execute(text(stmt))
+    except Exception:
+        pass
 
 
 _SUCCESS_STATUSES = {"success", "credit_issued", "approved", "refunded"}
@@ -98,6 +124,8 @@ def log_outcome(
             approved_by_human=int(approved_by_human),
             refund_reversed=0,
             dispute_filed=0,
+            ticket_reopened=0,
+            crm_closed=0,
             tool_response_json=json.dumps(tool_result, ensure_ascii=False)[:4000],
             created_at=now,
             updated_at=now,
@@ -141,8 +169,84 @@ def get_outcome(outcome_key: str) -> dict[str, Any] | None:
             "approved_by_human": bool(row.approved_by_human),
             "refund_reversed":  bool(row.refund_reversed),
             "dispute_filed":    bool(row.dispute_filed),
+            "ticket_reopened":  bool(getattr(row, "ticket_reopened", 0)),
+            "crm_closed":       bool(getattr(row, "crm_closed", 0)),
             "created_at":       row.created_at,
         }
+    finally:
+        db.close()
+
+
+def compute_outcome_quality(row: ActionOutcomeLog) -> float:
+    score = 0.0
+    if int(row.success or 0):
+        score += 2.5
+    if int(row.auto_resolved or 0):
+        score += 1.0
+    if int(row.approved_by_human or 0):
+        score += 0.5
+    if int(row.refund_reversed or 0):
+        score -= 3.0
+    if int(row.dispute_filed or 0):
+        score -= 2.0
+    if int(getattr(row, "ticket_reopened", 0) or 0):
+        score -= 1.5
+    if int(getattr(row, "crm_closed", 0) or 0):
+        score += 0.8
+    score = max(0.0, min(5.0, score))
+    return round(score, 4)
+
+
+def get_outcome_quality_for_key(outcome_key: str) -> float | None:
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(ActionOutcomeLog)
+            .filter(ActionOutcomeLog.outcome_key == str(outcome_key or "")[:64])
+            .order_by(ActionOutcomeLog.id.desc())
+            .first()
+        )
+        if not row:
+            return None
+        return compute_outcome_quality(row)
+    finally:
+        db.close()
+
+
+def mark_ticket_reopened(outcome_key: str) -> bool:
+    db = SessionLocal()
+    try:
+        row = db.query(ActionOutcomeLog).filter(
+            ActionOutcomeLog.outcome_key == str(outcome_key or "")[:64]
+        ).first()
+        if not row:
+            return False
+        row.ticket_reopened = 1
+        row.updated_at = _now_iso()
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
+def mark_crm_closed(outcome_key: str) -> bool:
+    db = SessionLocal()
+    try:
+        row = db.query(ActionOutcomeLog).filter(
+            ActionOutcomeLog.outcome_key == str(outcome_key or "")[:64]
+        ).first()
+        if not row:
+            return False
+        row.crm_closed = 1
+        row.updated_at = _now_iso()
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
     finally:
         db.close()
 
@@ -180,16 +284,25 @@ def get_outcome_stats() -> dict[str, Any]:
                 "human_approved":      0,
                 "reversed":            0,
                 "money_moved":         0.0,
+                "avg_outcome_quality": 0.0,
+                "reopened_rate":       0.0,
+                "crm_close_rate":      0.0,
             }
 
         successes      = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.success == 1).count()
         auto           = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.auto_resolved == 1).count()
         human_approved = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.approved_by_human == 1).count()
         reversed_count = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.refund_reversed == 1).count()
+        reopened_n     = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.ticket_reopened == 1).count()
+        crm_closed_n   = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.crm_closed == 1).count()
         money_moved    = db.query(func.sum(ActionOutcomeLog.amount)).filter(
             ActionOutcomeLog.action.in_(["refund", "credit"]),
             ActionOutcomeLog.success == 1,
         ).scalar() or 0.0
+
+        success_rows = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.success == 1).all()
+        qualities = [compute_outcome_quality(r) for r in success_rows]
+        avg_q = round(sum(qualities) / max(1, len(qualities)), 4) if qualities else 0.0
 
         return {
             "total":               total,
@@ -200,6 +313,9 @@ def get_outcome_stats() -> dict[str, Any]:
             "human_approved":      human_approved,
             "reversed":            reversed_count,
             "money_moved":         round(float(money_moved), 2),
+            "avg_outcome_quality": avg_q,
+            "reopened_rate":       round(reopened_n / max(1, total) * 100, 2),
+            "crm_close_rate":      round(crm_closed_n / max(1, total) * 100, 2),
         }
     finally:
         db.close()

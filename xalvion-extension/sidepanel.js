@@ -790,6 +790,174 @@ function hideInboxSummary() {
   inboxSummary.style.display = "none";
 }
 
+function ensureDecisionExplanationHost() {
+  const panel = document.getElementById("resultPanel");
+  const explain = document.getElementById("explainabilityWrap");
+  if (!panel) return null;
+  let host = document.getElementById("decisionExplanationHost");
+  if (host) return host;
+  host = document.createElement("div");
+  host.id = "decisionExplanationHost";
+  const det = document.createElement("details");
+  det.className = "explainability-wrap";
+  const sum = document.createElement("summary");
+  sum.className = "explainability-toggle";
+  sum.type = "button";
+  const titleCol = document.createElement("div");
+  titleCol.className = "explainability-toggle-title";
+  const title = document.createElement("div");
+  title.className = "explainability-title";
+  title.textContent = "Why?";
+  titleCol.appendChild(title);
+  const preview = document.createElement("div");
+  preview.id = "decisionExplanationPreview";
+  preview.className = "explainability-summary";
+  titleCol.appendChild(preview);
+  const chev = document.createElement("div");
+  chev.className = "chevron";
+  chev.textContent = "⌄";
+  sum.appendChild(titleCol);
+  sum.appendChild(chev);
+  const inner = document.createElement("div");
+  inner.className = "explainability-panel";
+  inner.id = "decisionExplanationBody";
+  det.appendChild(sum);
+  det.appendChild(inner);
+  host.appendChild(det);
+  det.addEventListener("toggle", () => {
+    det.classList.toggle("open", det.open);
+  });
+  if (explain && explain.parentNode === panel) {
+    panel.insertBefore(host, explain);
+  } else {
+    const grid = panel.querySelector(".grid");
+    if (grid) panel.insertBefore(host, grid);
+    else panel.appendChild(host);
+  }
+  return host;
+}
+
+function renderDecisionExplanation(explanation) {
+  const host = ensureDecisionExplanationHost();
+  const preview = document.getElementById("decisionExplanationPreview");
+  const body = document.getElementById("decisionExplanationBody");
+  const det = host?.querySelector("details");
+  if (!host || !preview || !body || !det) return;
+
+  if (!explanation || typeof explanation !== "object") {
+    host.style.display = "none";
+    det.open = false;
+    preview.textContent = "";
+    body.replaceChildren();
+    return;
+  }
+
+  const lines = [];
+  const ic = explanation.issue_classification;
+  if (ic && ic.signal) lines.push(String(ic.signal));
+  const ra = explanation.risk_assessment;
+  if (ra && ra.signal) lines.push(String(ra.signal));
+  const pi = explanation.policy_influence;
+  if (pi && pi.signal) lines.push(String(pi.signal));
+  const mi = explanation.memory_influence;
+  if (mi && mi.signal) lines.push(String(mi.signal));
+  const appr = explanation.approval_rationale;
+  if (appr && appr.reason) lines.push(String(appr.reason));
+  if (explanation.summary) lines.push(String(explanation.summary));
+
+  if (!lines.length) {
+    host.style.display = "none";
+    det.open = false;
+    preview.textContent = "";
+    body.replaceChildren();
+    return;
+  }
+
+  host.style.display = "";
+  const sumText = explanation.summary ? String(explanation.summary) : lines[0];
+  preview.textContent = sumText.length > 140 ? `${sumText.slice(0, 140)}…` : sumText;
+
+  body.replaceChildren();
+  lines.forEach((text) => {
+    const row = document.createElement("div");
+    row.className = "value muted reply-box";
+    row.style.marginBottom = "8px";
+    row.textContent = text;
+    body.appendChild(row);
+  });
+  det.open = false;
+  det.classList.remove("open");
+}
+
+function ensureExecutionTierPill() {
+  const top = document.querySelector("#resultPanel .panel-top");
+  if (!top) return null;
+  let el = document.getElementById("executionTierPill");
+  if (el) return el;
+  el = document.createElement("span");
+  el.id = "executionTierPill";
+  el.className = "status-badge hidden";
+  const badge = document.getElementById("statusBadge");
+  if (badge && badge.parentNode === top) {
+    top.insertBefore(el, badge);
+  } else {
+    top.appendChild(el);
+  }
+  return el;
+}
+
+function deriveExecutionTierPresentation(data) {
+  const raw = String(data.execution_tier || "").toLowerCase();
+  if (raw === "safe_autopilot_ready") {
+    return {
+      text: "✓ Safe to automate",
+      cls: "resolved",
+      title: "Meets all autopilot safety criteria"
+    };
+  }
+  if (raw === "assist_only") {
+    return {
+      text: "○ Review manually",
+      cls: "pending",
+      title: "Risk signals prevent automation"
+    };
+  }
+  if (raw === "approval_required") {
+    return { text: "⚡ Approval required", cls: "waiting", title: "" };
+  }
+
+  const dec = getDecisionData(data);
+  const triage = getTriageData(data);
+  const req = Boolean(dec.requires_approval || data.requires_approval);
+  const action = String(dec.action || data.action || "none").toLowerCase();
+  const amt = Number(dec.amount ?? data.amount ?? 0);
+  const risk = String(dec.risk_level || triage.risk_level || data.risk_level || "medium").toLowerCase();
+  const money = action === "refund" || action === "charge" || action === "credit";
+
+  if (req && money) {
+    return { text: "⚡ Approval required", cls: "waiting", title: "" };
+  }
+  if (action === "review" || risk === "high" || risk === "medium") {
+    return { text: "⚠ Review recommended", cls: "pending", title: "" };
+  }
+  return { text: "✓ Safe to send", cls: "resolved", title: "" };
+}
+
+function renderExecutionTierSignal(data) {
+  const el = ensureExecutionTierPill();
+  if (!el) return;
+  const pres = deriveExecutionTierPresentation(data);
+  if (!pres.text) {
+    el.classList.add("hidden");
+    return;
+  }
+  el.textContent = pres.text;
+  el.className = `status-badge ${pres.cls}`.trim();
+  if (pres.title) el.setAttribute("title", pres.title);
+  else el.removeAttribute("title");
+  el.classList.remove("hidden");
+}
+
 function render(data) {
   ensureEnterpriseCards();
 
@@ -836,6 +1004,9 @@ function render(data) {
       notePill.classList.add("hidden");
     }
   }
+
+  renderExecutionTierSignal(data);
+  renderDecisionExplanation(data.decision_explanation);
 
   setVisible(statusCard, !!status);
   setVisible(confidenceCard, confidence !== "" && confidence !== null && confidence !== undefined);

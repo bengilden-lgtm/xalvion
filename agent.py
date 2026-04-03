@@ -8,7 +8,19 @@ from typing import Any, Dict
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from actions import build_ticket, calculate_impact, apply_learned_rules, system_decision, triage_ticket, execute_action as dispatch_integrated_action
+from actions import (
+    MAX_APPROVAL_THRESHOLD,
+    MAX_AUTO_CREDIT_AMOUNT,
+    MAX_AUTO_REFUND_AMOUNT,
+    HANDLED_ISSUE_TYPES,
+    apply_learned_rules,
+    build_ticket,
+    calculate_impact,
+    compute_execution_tier,
+    execute_action as dispatch_integrated_action,
+    system_decision,
+    triage_ticket,
+)
 from brain import add_rule, get_top_rule_objects, load_brain, save_brain, update_system_prompt
 from memory import get_prompt_memory, get_user_memory, update_memory
 from router import route_task
@@ -60,20 +72,8 @@ MODEL_EXPENSIVE = os.getenv("MODEL_EXPENSIVE", "gpt-4o-mini")
 client = OpenAI(api_key=API_KEY, timeout=14.0) if API_KEY else None
 
 ALLOWED_ACTIONS = {"none", "refund", "credit", "review", "charge"}
-MAX_REFUND = 50
-MAX_CREDIT = 30
-
-# Issue types handled by local_fallback_reply().
-# SYNC REQUIRED: Must match _LOCAL_FAST_PATH_ISSUE_TYPES in app.py.
-# When adding a new issue type here, update both constants.
-_FALLBACK_HANDLED_ISSUE_TYPES = frozenset({
-    "shipping_issue",
-    "damaged_order",
-    "billing_duplicate_charge",
-    "billing_issue",
-    "payment_issue",
-    "refund_request",
-})
+MAX_REFUND = int(MAX_AUTO_REFUND_AMOUNT)
+MAX_CREDIT = int(MAX_AUTO_CREDIT_AMOUNT)
 
 
 def choose_model(message: str) -> str:
@@ -275,13 +275,52 @@ def build_structured_response(
     priority = str(action_payload.get("priority", "medium") or "medium")
     risk_level = str(action_payload.get("risk_level", triage.get("risk_level", "medium")) or "medium")
 
+    conf_val = float(clamp_confidence(confidence, 0.9))
+    final_like = {
+        "action": safe_action["action"],
+        "amount": safe_action["amount"],
+        "reason": str(action_payload.get("reason", "") or ""),
+        "priority": priority,
+        "queue": queue,
+        "risk_level": risk_level,
+        "requires_approval": bool(action_payload.get("requires_approval", False)),
+        "confidence": conf_val,
+    }
+    executed_like = {
+        "action": safe_action["action"],
+        "amount": safe_action["amount"],
+        "tool_status": tool_payload.get("tool_status", "no_action"),
+        "tool_result": tool_payload.get("tool_result", {"status": "no_action"}),
+    }
+    impact_projection = {
+        "type": str(impact.get("type", "saved") or "saved"),
+        "amount": float(impact.get("amount", 0) or 0),
+        "money_saved": float(impact.get("money_saved", 0) or 0),
+        "agent_minutes_saved": int(impact.get("agent_minutes_saved", 0) or 0),
+        "auto_resolved": bool(impact.get("auto_resolved", False)),
+    }
+    decision_explanation = build_decision_explanation(
+        ticket=ticket,
+        triage=triage,
+        hard_decision=final_like,
+        learned_action=None,
+        final_action=final_like,
+        executed=executed_like,
+        history=history,
+        brain_rules=[],
+        confidence=conf_val,
+        quality=float(quality or 0),
+        impact_projection=impact_projection,
+    )
+    execution_tier = str(decision_explanation.get("execution_tier") or "approval_required")
+
     return {
         "response": customer_message,
         "final": customer_message,
         "reply": customer_message,
         "mode": mode,
         "quality": round(float(quality or 0), 2),
-        "confidence": clamp_confidence(confidence, 0.9),
+        "confidence": conf_val,
         "action": safe_action["action"],
         "amount": safe_action["amount"],
         "reason": str(action_payload.get("reason", "") or ""),
@@ -293,7 +332,7 @@ def build_structured_response(
         "decision": {
             "action": safe_action["action"],
             "amount": safe_action["amount"],
-            "confidence": clamp_confidence(confidence, 0.9),
+            "confidence": conf_val,
             "risk_level": risk_level,
             "reason": str(action_payload.get("reason", "") or ""),
             "priority": priority,
@@ -324,6 +363,8 @@ def build_structured_response(
             "repeat_customer": bool(history.get("repeat_customer", False)),
             "sentiment_avg": float(history.get("sentiment_avg", 5.0) or 5.0),
         },
+        "decision_explanation": decision_explanation,
+        "execution_tier": execution_tier,
     }
 
 
@@ -370,7 +411,7 @@ def conversational_reply(message: str) -> Dict[str, Any]:
 
 
 def should_attach_order_context(issue_type: str) -> bool:
-    return issue_type in {"shipping_issue", "damaged_order"}
+    return issue_type in HANDLED_ISSUE_TYPES and issue_type in {"shipping_issue", "damaged_order"}
 
 
 def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
@@ -946,6 +987,192 @@ def compute_quality(
         score -= (abuse_score - 1) * 0.05
     return round(max(0.50, min(0.99, score)), 2)
 
+
+def _human_issue_label(issue_type: str) -> str:
+    raw = str(issue_type or "general_support").replace("_", " ").strip()
+    return raw[:1].upper() + raw[1:] if raw else "General support"
+
+
+def build_decision_explanation(
+    *,
+    ticket: Dict[str, Any],
+    triage: Dict[str, Any],
+    hard_decision: Dict[str, Any],
+    learned_action: Dict[str, Any] | None,
+    final_action: Dict[str, Any],
+    executed: Dict[str, Any],
+    history: Dict[str, Any],
+    brain_rules: list[Dict[str, Any]],
+    confidence: float,
+    quality: float,
+    impact_projection: Dict[str, Any],
+) -> Dict[str, Any]:
+    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
+    triage = triage or {}
+    hard_decision = hard_decision or {}
+    final_action = final_action or {}
+    executed = executed or {}
+    history = history or {}
+    brain_rules = brain_rules or []
+
+    complexity = int(triage.get("complexity", 0) or 0)
+    class_conf = round(min(0.99, 0.55 + complexity / 200.0), 2)
+    dup_hint = issue_type == "billing_duplicate_charge" or "duplicate" in str(ticket.get("issue", "")).lower()
+    issue_signal = (
+        f"Matched {_human_issue_label(issue_type)} pattern"
+        + (" with duplicate-charge wording" if dup_hint else "")
+    )
+
+    risk_level = str(final_action.get("risk_level", triage.get("risk_level", "medium")) or "medium")
+    urgency = int(triage.get("urgency", 0) or 0)
+    churn = int(triage.get("churn_risk", 0) or 0)
+    abuse_like = int(triage.get("abuse_likelihood", 0) or 0)
+    refund_hist = int(history.get("refund_count", 0) or 0)
+    risk_bits = []
+    if refund_hist >= 3:
+        risk_bits.append("repeat refund history detected")
+    if int(history.get("abuse_score", 0) or 0) >= 2:
+        risk_bits.append("elevated abuse signals")
+    risk_signal = f"{risk_level.capitalize()} risk"
+    if risk_bits:
+        risk_signal += " — " + ", ".join(risk_bits)
+
+    hard_act = str(hard_decision.get("action", "none") or "none").lower()
+    policy_triggered = hard_act != "none"
+    policy_rule = str(hard_decision.get("reason", "") or "").strip() or "No hard policy lane fired"
+    if issue_type == "billing_duplicate_charge" and policy_triggered:
+        policy_rule = "Duplicate-charge protection"
+    overridable = not bool(final_action.get("requires_approval", False)) and hard_act in {"none", "credit"}
+    policy_signal = (
+        "Hard policy applied — " + str(hard_decision.get("reason", "policy routing")) if policy_triggered else "No hard policy override — LLM/local path drove the motion"
+    )
+
+    repeat_customer = bool(history.get("repeat_customer", False))
+    refund_count = int(history.get("refund_count", 0) or 0)
+    abuse_score = int(history.get("abuse_score", 0) or 0)
+    sentiment_now = int(ticket.get("sentiment", 5) or 5)
+    sentiment_avg = float(history.get("sentiment_avg", 5.0) or 5.0)
+    if sentiment_now < sentiment_avg - 0.75:
+        trend = "declining"
+    elif sentiment_now > sentiment_avg + 0.75:
+        trend = "improving"
+    else:
+        trend = "stable"
+    mem_signal = (
+        f"{'Repeat' if repeat_customer else 'New'} customer · {refund_count} prior refunds · abuse score {abuse_score}"
+    )
+
+    applied_learned = bool(learned_action) and str(hard_decision.get("action", "none") or "none") == "none"
+    trigger = None
+    weight = None
+    if applied_learned and brain_rules:
+        trigger = str(brain_rules[0].get("trigger", "") or "") or None
+        try:
+            weight = float(brain_rules[0].get("weight", 0) or 0)
+        except Exception:
+            weight = None
+    learned_signal = (
+        f"Learned rule {trigger} applied (weight {weight})" if applied_learned and trigger else "No learned rule override applied"
+    )
+
+    requires = bool(final_action.get("requires_approval", False))
+    fact_action = str(final_action.get("action", "none") or "none").lower()
+    amount = float(final_action.get("amount", 0) or 0)
+    appr_reasons: list[str] = []
+    threshold: str | None = None
+    if requires and fact_action in {"refund", "charge"}:
+        appr_reasons.append("Refund or charge motion requires operator approval before execution.")
+        threshold = f"${MAX_APPROVAL_THRESHOLD:.0f}"
+    elif requires and fact_action == "credit" and amount > float(MAX_APPROVAL_THRESHOLD):
+        appr_reasons.append(f"Credit amount exceeds ${MAX_APPROVAL_THRESHOLD:.0f} approval threshold.")
+        threshold = f"${MAX_APPROVAL_THRESHOLD:.0f}"
+    elif requires:
+        appr_reasons.append("Risk or policy flags require explicit operator approval.")
+    if abuse_score >= 2:
+        appr_reasons.append(f"Abuse score {abuse_score} keeps a human gate recommended.")
+        threshold = threshold or "abuse_score >= 2"
+    appr_reason = " ".join(appr_reasons) if appr_reasons else "No approval gate on this path."
+
+    execution_tier = compute_execution_tier(
+        fact_action,
+        amount,
+        float(confidence or 0),
+        float(quality or 0),
+        risk_level,
+        abuse_score,
+        refund_count,
+        str(ticket.get("operator_mode", "balanced") or "balanced"),
+        requires,
+    )
+
+    summary_parts = [
+        f"{_human_issue_label(issue_type)} with {risk_level} risk",
+        f"urgency {urgency} and churn exposure near {churn}",
+        mem_signal + ".",
+    ]
+    if policy_triggered:
+        summary_parts.append(str(hard_decision.get("reason", "Hard policy fired.")))
+    if applied_learned and trigger:
+        summary_parts.append(f"Top learned signal: {trigger}.")
+    if requires:
+        summary_parts.append(appr_reason)
+    summary_parts.append(
+        f"Projected value: {impact_projection.get('type', 'saved')} · "
+        f"${float(impact_projection.get('money_saved', 0) or 0):.0f} surfaced · "
+        f"~{int(impact_projection.get('agent_minutes_saved', 0) or 0)} min saved."
+    )
+    summary_parts.append(f"Execution posture: {execution_tier.replace('_', ' ')}.")
+    summary = " ".join(summary_parts)
+
+    return {
+        "issue_classification": {
+            "type": issue_type,
+            "confidence": class_conf,
+            "signal": issue_signal,
+        },
+        "risk_assessment": {
+            "level": risk_level,
+            "urgency": urgency,
+            "churn_risk": churn,
+            "abuse_likelihood": abuse_like,
+            "signal": risk_signal,
+        },
+        "policy_influence": {
+            "triggered": policy_triggered,
+            "rule": policy_rule,
+            "overridable": overridable,
+            "signal": policy_signal,
+        },
+        "memory_influence": {
+            "repeat_customer": repeat_customer,
+            "refund_count": refund_count,
+            "abuse_score": abuse_score,
+            "sentiment_trend": trend,
+            "signal": mem_signal,
+        },
+        "learned_rule_influence": {
+            "applied": applied_learned,
+            "trigger": trigger,
+            "weight": weight,
+            "signal": learned_signal,
+        },
+        "approval_rationale": {
+            "required": requires,
+            "reason": appr_reason,
+            "threshold": threshold,
+        },
+        "projected_impact": {
+            "type": str(impact_projection.get("type", "saved") or "saved"),
+            "amount": float(impact_projection.get("amount", 0) or 0),
+            "money_saved": float(impact_projection.get("money_saved", 0) or 0),
+            "agent_minutes_saved": int(impact_projection.get("agent_minutes_saved", 0) or 0),
+            "auto_resolved": bool(impact_projection.get("auto_resolved", False)),
+        },
+        "execution_tier": execution_tier,
+        "summary": summary,
+    }
+
+
 def _canonicalize_result(
     *,
     customer_message: str,
@@ -960,6 +1187,9 @@ def _canonicalize_result(
     internal_note: str,
     customer_note: str,
     thinking_trace: list[dict[str, Any]],
+    learned_action: Dict[str, Any] | None = None,
+    brain_rules: list[Dict[str, Any]] | None = None,
+    hard_decision: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     impact = calculate_impact(ticket, final_action)
     tool_status = str(executed.get("tool_status", executed.get("status", "no_action")) or "no_action")
@@ -994,6 +1224,24 @@ def _canonicalize_result(
         "agent_minutes_saved": int(impact.get("agent_minutes_saved", 6 if decision["action"] != "review" else 0) or 0),
         "signals": list(impact.get("signals", [])) if isinstance(impact.get("signals", []), list) else [],
     }
+
+    hd = hard_decision if hard_decision is not None else final_action
+    br_list = brain_rules or []
+    conf_val = float(final_action.get("confidence", decision.get("confidence", 0.9)) or 0.9)
+    decision_explanation = build_decision_explanation(
+        ticket=ticket,
+        triage=triage,
+        hard_decision=hd,
+        learned_action=learned_action,
+        final_action=final_action,
+        executed=executed,
+        history=history,
+        brain_rules=br_list,
+        confidence=conf_val,
+        quality=float(quality or 0),
+        impact_projection=impact_projection,
+    )
+    execution_tier = str(decision_explanation.get("execution_tier") or "approval_required")
 
     safe_message = normalize_text(customer_message)
 
@@ -1036,6 +1284,8 @@ def _canonicalize_result(
             "operator_mode": str(ticket.get("operator_mode", "balanced") or "balanced"),
             "queue": decision["queue"],
         },
+        "decision_explanation": decision_explanation,
+        "execution_tier": execution_tier,
     }
     validated = CanonicalAgentResponse.model_validate(canonical).model_dump()
     validated.update({k: v for k, v in canonical.items() if k not in validated})
@@ -1068,6 +1318,8 @@ def run_agent(
             thinking_trace=[ThinkingTraceStep(step="sanitize_input", status="error", detail="blocked_input")],
             request_context=ctx,
             output=OutputEnvelope(internal_note="Security layer blocked unsafe input.", customer_note=blocked_reason, audit_log="blocked_input"),
+            decision_explanation=None,
+            execution_tier="assist_only",
         ).model_dump()
         payload.update({
             "action": "none",
@@ -1261,4 +1513,7 @@ def run_agent(
         internal_note=internal_note,
         customer_note=customer_note or customer_message,
         thinking_trace=thinking_trace,
+        learned_action=learned_action,
+        brain_rules=top_rules,
+        hard_decision=hard_decision,
     )

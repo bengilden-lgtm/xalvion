@@ -4,6 +4,20 @@ from typing import Any, Dict, List
 
 VALID_MODES = {"conservative", "balanced", "delight", "fraud_aware"}
 
+# Authoritative fast-path issue types (workspace + agent must stay aligned).
+HANDLED_ISSUE_TYPES = frozenset({
+    "shipping_issue",
+    "damaged_order",
+    "billing_duplicate_charge",
+    "billing_issue",
+    "payment_issue",
+    "refund_request",
+})
+
+MAX_AUTO_REFUND_AMOUNT: float = 50.0
+MAX_AUTO_CREDIT_AMOUNT: float = 30.0
+MAX_APPROVAL_THRESHOLD: float = 25.0
+
 
 def _to_int(value: Any, default: int = 0) -> int:
     try:
@@ -468,3 +482,58 @@ def handle_charge(payload: Dict[str, Any]) -> Dict[str, Any]:
         "amount": amount,
         "message": f"Charge prepared for manual approval for {customer}.",
     }
+
+
+def compute_execution_tier(
+    action: str,
+    amount: float,
+    confidence: float,
+    quality: float,
+    risk_level: str,
+    abuse_score: int,
+    refund_count: int,
+    operator_mode: str,
+    requires_approval: bool,
+) -> str:
+    """
+    Returns one of:
+      "assist_only"          — system helps but human must act
+      "approval_required"    — system proposes, human must approve before execution
+      "safe_autopilot_ready" — meets all criteria for future full automation
+
+    This does NOT enable autopilot. It classifies readiness only.
+    The approval flow is unchanged.
+    """
+    act = str(action or "none").strip().lower()
+    risk = str(risk_level or "medium").strip().lower()
+    mode = str(operator_mode or "balanced").strip().lower()
+
+    if abuse_score >= 3:
+        return "assist_only"
+    if refund_count >= 5:
+        return "assist_only"
+    if mode == "conservative":
+        return "assist_only"
+
+    if requires_approval:
+        return "approval_required"
+    if act in {"refund", "charge"} and float(amount or 0) > 0:
+        return "approval_required"
+    if risk == "high":
+        return "approval_required"
+    if float(confidence or 0) < 0.75:
+        return "approval_required"
+    if float(quality or 0) < 0.70:
+        return "approval_required"
+
+    if (
+        act in {"none", "credit"}
+        and float(confidence or 0) >= 0.88
+        and float(quality or 0) >= 0.85
+        and risk == "low"
+        and int(abuse_score or 0) == 0
+        and mode in {"balanced", "delight"}
+    ):
+        return "safe_autopilot_ready"
+
+    return "approval_required"

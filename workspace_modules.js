@@ -24,6 +24,26 @@ export function createPhase2Core({ fetchImpl }) {
       const d = date instanceof Date ? date : new Date(date);
       return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     },
+    formatExecutionTier(tier) {
+      const t = String(tier || "").toLowerCase();
+      if (t === "safe_autopilot_ready") return "Safe to automate";
+      if (t === "approval_required") return "Approval required";
+      if (t === "assist_only") return "Review manually";
+      return "Unknown";
+    },
+    formatOutcomeQuality(score) {
+      const n = Number(score);
+      if (!Number.isFinite(n)) return "Unknown";
+      if (n < 2.0) return "Low";
+      if (n < 3.5) return "Moderate";
+      if (n < 4.5) return "Strong";
+      return "Excellent";
+    },
+    buildExplanationSummary(explanation) {
+      if (!explanation || typeof explanation !== "object") return "";
+      const s = explanation.summary;
+      return typeof s === "string" ? s : "";
+    },
   };
 
   const store = {

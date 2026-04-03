@@ -125,7 +125,8 @@ if (typeof window.pulseRail !== "function") {
     forecastProjectedRevenue: document.getElementById("forecastProjectedRevenue"),
     forecastCoverage: document.getElementById("forecastCoverage"),
     forecastStageList: document.getElementById("forecastStageList"),
-    forecastDealList: document.getElementById("forecastDealList")
+    forecastDealList: document.getElementById("forecastDealList"),
+    upgradeValueSummary: document.getElementById("upgradeValueSummary")
   };
 
   const state = {
@@ -151,7 +152,12 @@ if (typeof window.pulseRail !== "function") {
     crmDailySummary: { due_followups: 0, new_today: 0, closed_today: 0, best_source: "manual", hottest_open: [], reminders: [] },
     revenueMetrics: { totals: {}, by_source: [], best_source: "manual", forecast: {} },
     lastLimitNoticeKey: "",
-    authSubmitting: false
+    authSubmitting: false,
+    usagePct: 0,
+    approachingLimit: false,
+    atLimit: false,
+    valueSignals: null,
+    dashboardStats: null
   };
 
   const ICONS = {
@@ -1314,11 +1320,20 @@ You just felt the core workflow. Create a free account to unlock ${FREE_USAGE_LI
       };
     }
 
+    const vs = state.valueSignals;
+    const d = state.dashboardStats || {};
+    const money = Number(d.money_saved || 0);
+    const prefix =
+      vs && typeof vs.tickets_handled === "number"
+        ? `You've handled ${vs.tickets_handled} tickets this month. ${formatMoney(money)} in actions surfaced. `
+        : money > 0
+          ? `${formatMoney(money)} already moved through billing actions. `
+          : "";
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
       title: "You’ve hit the free plan limit",
-      detail: "Upgrade to Pro to keep approval-first automation running and unlock more capacity.",
-      body: `You’ve used all ${FREE_USAGE_LIMIT} free runs.
+      detail: `${prefix}Upgrade to Pro to keep approval-first automation running and unlock more capacity.`,
+      body: `${prefix}You’ve used all ${FREE_USAGE_LIMIT} free runs.
 
 You just saved real support effort. Upgrade to Pro to keep the approval-first operator live, unlock more capacity, and continue scanning tickets without interruption.`
     };
@@ -2109,6 +2124,88 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     if (els.usagePanelCopy) els.usagePanelCopy.textContent = planCopy(state.tier);
     updateRefundUI();
     persistAuth();
+    syncUsageApproachNotice();
+  }
+
+  function estimateAgentMinutesSavedFromDashboard(d = {}) {
+    const actions = Number(d.actions || state.actionsCount || 0);
+    const auto = Number(d.auto_resolved || 0);
+    return Math.round(actions * 6 + auto * 2);
+  }
+
+  function refreshUpgradeValueSummary() {
+    const el = els.upgradeValueSummary;
+    if (!el) return;
+    const d = state.dashboardStats || {};
+    const tickets = Number(d.total_tickets ?? d.total_interactions ?? state.totalInteractions ?? 0);
+    const money = Number(d.money_saved ?? 0);
+    const mins = estimateAgentMinutesSavedFromDashboard(d);
+    el.textContent = `${tickets} tickets handled · ${formatMoney(money)} in actions · ~${mins} min saved`;
+    el.style.display = tickets > 0 || money > 0 || mins > 0 ? "block" : "none";
+  }
+
+  function ensureUsageApproachNoticeEl() {
+    if (!els.usagePanelCopy || !els.usagePanelCopy.parentNode) return null;
+    let el = document.getElementById("usageApproachNotice");
+    if (el) return el;
+    el = document.createElement("div");
+    el.id = "usageApproachNotice";
+    el.className = "muted-copy";
+    el.style.marginTop = "8px";
+    el.style.fontSize = "12px";
+    el.style.lineHeight = "1.45";
+    el.style.display = "none";
+    els.usagePanelCopy.insertAdjacentElement("afterend", el);
+    return el;
+  }
+
+  function syncUsageApproachNotice() {
+    const el = ensureUsageApproachNoticeEl();
+    if (!el) return;
+    const tier = String(state.tier || "free").toLowerCase();
+    const show =
+      isAuthenticated() && state.approachingLimit && !state.atLimit && tier !== "elite";
+    if (!show) {
+      el.style.display = "none";
+      el.innerHTML = "";
+      return;
+    }
+    const vs = state.valueSignals || {};
+    const th = Number.isFinite(Number(vs.tickets_handled)) ? Number(vs.tickets_handled) : state.usage;
+    const d = state.dashboardStats || {};
+    const money = formatMoney(Number(d.money_saved || 0));
+    const ar = Number(d.auto_resolved || 0);
+    const unlock = String(vs.upgrade_unlocks || "").trim();
+    const tail = unlock ? `${unlock}. Upgrade to keep the system running.` : "Upgrade to keep the system running.";
+    el.style.display = "block";
+    el.innerHTML = `<div>You've handled ${th} tickets this month; ${money} in billing actions, ${ar} auto-resolved.</div>
+<div>${escapeHtml(tail)}</div>
+<button type="button" class="ghost-btn" style="margin-top:6px;padding:6px 10px;font-size:12px">Upgrade for more capacity →</button>`;
+    const btn = el.querySelector("button");
+    if (btn) {
+      btn.onclick = () => upgradePlan("pro");
+    }
+  }
+
+  function applyUsageWarningFromStream(payload) {
+    if (!payload || typeof payload !== "object") return;
+    if (payload.approaching_limit) state.approachingLimit = true;
+    if (typeof payload.usage_pct === "number" && Number.isFinite(payload.usage_pct)) {
+      state.usagePct = payload.usage_pct;
+    }
+    if (payload.remaining !== undefined && payload.remaining !== null) {
+      const r = Number(payload.remaining);
+      if (Number.isFinite(r)) state.remaining = Math.max(0, r);
+    }
+    const unlock = String(payload.upgrade_unlocks || "").trim();
+    state.valueSignals = {
+      ...(state.valueSignals && typeof state.valueSignals === "object" ? state.valueSignals : {}),
+      tickets_handled: state.usage,
+      upgrade_unlocks: unlock || (state.valueSignals && state.valueSignals.upgrade_unlocks) || "",
+      capacity_message:
+        (state.valueSignals && state.valueSignals.capacity_message) || ""
+    };
+    syncUsageApproachNotice();
   }
 
   function actionLabel(data) {
@@ -2664,17 +2761,36 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function deriveConsequenceSignal(data = {}) {
     const dec = data.decision || data.sovereign_decision || {};
+    const tier = String(data.execution_tier || "").toLowerCase();
+    if (tier === "safe_autopilot_ready") {
+      return {
+        cls: "signal-safe",
+        text: "✓ Safe to automate",
+        title: "Meets all autopilot safety criteria"
+      };
+    }
+    if (tier === "assist_only") {
+      return {
+        cls: "signal-review",
+        text: "○ Review manually",
+        title: "Risk signals prevent automation"
+      };
+    }
+    if (tier === "approval_required") {
+      return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
+    }
+
     const action = String(data.action || dec.action || "none").toLowerCase();
     const risk = String(dec.risk_level || data.triage?.risk_level || "medium").toLowerCase();
     const req = Boolean(
       data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision"
     );
     const money = action === "refund" || action === "charge" || action === "credit";
-    if (req && money) return { cls: "signal-approval", text: "⚡ Approval required" };
+    if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
     if (action === "review" || risk === "high" || risk === "medium") {
-      return { cls: "signal-review", text: "⚠ Review recommended" };
+      return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
     }
-    return { cls: "signal-safe", text: "✓ Safe to send" };
+    return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
   }
 
   function mountOperatorDecisionPanel(row, data, initialReply) {
@@ -2693,7 +2809,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     panel.className = "decision-panel";
     panel.innerHTML = `
       <div class="decision-panel-top">
-        <span class="consequence-signal ${sig.cls}">${escapeHtml(sig.text)}</span>
+        <span class="consequence-signal ${sig.cls}" data-role="consequence">${escapeHtml(sig.text)}</span>
         <div class="decision-controls" data-role="controls"></div>
       </div>
       <div class="decision-panel-note" data-role="note" style="display:none"></div>
@@ -2701,6 +2817,9 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       <div class="edit-mode-container" data-role="edit" style="display:none"></div>
     `;
     msgBody.appendChild(panel);
+
+    const cons = panel.querySelector("[data-role='consequence']");
+    if (cons && sig.title) cons.setAttribute("title", sig.title);
 
     const controls = panel.querySelector("[data-role='controls']");
     const noteEl = panel.querySelector("[data-role='note']");
@@ -2959,6 +3078,39 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     `;
   }
 
+  function buildDecisionExplanationInsightsHtml(ex) {
+    if (!ex || typeof ex !== "object") return "";
+    const rows = [];
+    const ra = ex.risk_assessment;
+    if (ra && typeof ra === "object" && ra.signal) {
+      rows.push({ k: "Risk assessment", v: String(ra.signal) });
+    }
+    const pi = ex.policy_influence;
+    if (pi && typeof pi === "object" && pi.signal) {
+      rows.push({ k: "Policy influence", v: String(pi.signal) });
+    }
+    const mi = ex.memory_influence;
+    if (mi && typeof mi === "object" && mi.signal) {
+      rows.push({ k: "Memory influence", v: String(mi.signal) });
+    }
+    const ar = ex.approval_rationale;
+    if (ar && typeof ar === "object" && ar.reason) {
+      rows.push({ k: "Approval rationale", v: String(ar.reason) });
+    }
+    if (ex.summary) {
+      rows.push({ k: "Decision narrative", v: String(ex.summary) });
+    }
+    if (!rows.length) return "";
+    return rows
+      .map(
+        (r) => `<div class="details-insight">
+          <div class="details-insight-k">${escapeHtml(r.k)}</div>
+          <div class="details-insight-v">${escapeHtml(r.v)}</div>
+        </div>`
+      )
+      .join("");
+  }
+
   function createDetailsPanel(data = {}) {
     const details = document.createElement("details");
     details.className = "details-wrap";
@@ -2973,9 +3125,11 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const execDetail = String(data.execution?.detail || data.tool_result?.message || "").trim();
 
     const approvalBanner = createApprovalBanner(data);
+    const explanationInsightsHtml = buildDecisionExplanationInsightsHtml(data.decision_explanation);
 
     const insightBlock = `
       <div class="details-insight-stack">
+        ${explanationInsightsHtml}
         <div class="details-insight">
           <div class="details-insight-k">Why this path</div>
           <div class="details-insight-v">${escapeHtml(explainWhyAction(data))}</div>
@@ -3216,14 +3370,16 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
         if (item.event === "result") {
           finalData = item.data;
-          return item.data;
+        }
+
+        if (item.event === "usage_warning" && item.data) {
+          applyUsageWarningFromStream(item.data);
         }
 
         if (item.event === "done") {
           sawDone = true;
         }
       }
-      return null;
     };
 
     while (true) {
@@ -3235,24 +3391,20 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       buffer = parts.pop() || "";
 
       for (const part of parts) {
-        const hit = processEvents(`${part}\n\n`);
-        if (hit) {
-          try { await reader.cancel(); } catch {}
-          return hit;
-        }
+        processEvents(`${part}\n\n`);
         if (sawDone) {
-          try { await reader.cancel(); } catch {}
+          try {
+            await reader.cancel();
+          } catch {}
           return finalData;
         }
       }
     }
 
     if (buffer.trim()) {
-      const hit = processEvents(buffer);
-      if (hit) return hit;
+      processEvents(buffer);
     }
 
-    if (sawDone) return finalData;
     return finalData;
   }
 
@@ -3888,6 +4040,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     }
 
     try {
+      await loadDashboardSummary();
+
       const res = await fetch(`${API}/billing/upgrade`, {
         method: "POST",
         headers: headers(),
@@ -3898,6 +4052,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       if (!res.ok) throw new Error(data.detail || "Upgrade failed.");
 
       if (data.checkout_url) {
+        refreshUpgradeValueSummary();
         window.location.href = data.checkout_url;
         return;
       }
@@ -3939,8 +4094,13 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   async function hydrateMe() {
     if (!state.token) {
+      state.usagePct = 0;
+      state.approachingLimit = false;
+      state.atLimit = false;
+      state.valueSignals = null;
       updatePlanUI("free", getGuestUsage(), GUEST_USAGE_LIMIT, Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()));
       updateAuthStatus();
+      syncUsageApproachNotice();
       return { ok: true, staleCleared: false };
     }
 
@@ -3956,6 +4116,13 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       if (!res.ok) throw new Error("me failed");
 
       state.username = data.username || state.username;
+      const upct = Number(data.usage_pct);
+      state.usagePct = Number.isFinite(upct) ? upct : 0;
+      state.approachingLimit = Boolean(data.approaching_limit);
+      state.atLimit = Boolean(data.at_limit);
+      state.valueSignals =
+        data.value_signals && typeof data.value_signals === "object" ? data.value_signals : null;
+
       updatePlanUI(
         data.tier || state.tier,
         Number(data.usage || state.usage),
@@ -3965,6 +4132,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
       persistAuth();
       updateTopbarStatus();
+      syncUsageApproachNotice();
       return { ok: true, staleCleared: false };
     } catch {
       updateTopbarStatus();
@@ -4010,6 +4178,9 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
           Number(data.remaining || state.remaining)
         );
       }
+
+      state.dashboardStats = data;
+      refreshUpgradeValueSummary();
     } catch {
       setText(els.statInteractions, formatMetric(state.totalInteractions, 0));
       setText(els.statQuality, formatMetric(state.avgQuality, 2));
@@ -4461,6 +4632,8 @@ function bindEvents() {
     });
 
     els.upgradeButtons.forEach((button) => {
+      button.addEventListener("mouseenter", refreshUpgradeValueSummary);
+      button.addEventListener("focus", refreshUpgradeValueSummary);
       button.addEventListener("click", () => {
         upgradePlan(button.dataset.upgrade || "");
       });

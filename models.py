@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -116,3 +116,5 @@ class CanonicalAgentResponse(BaseModel):
     thinking_trace: list[ThinkingTraceStep] = Field(default_factory=list)
     request_context: AgentRequestContext | None = None
     output: OutputEnvelope
+    decision_explanation: dict[str, Any] | None = None
+    execution_tier: str = "approval_required"
