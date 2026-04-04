@@ -13,7 +13,7 @@
 <body>
   <div class="workspace-atmosphere" aria-hidden="true"></div>
 
-  <div class="workspace-root">
+  <div class="workspace-root" id="workspaceRoot">
     <header class="command-strip glass" id="commandStrip">
       <div class="command-strip-left">
         <a class="command-brand" href="/landing" title="Xalvion">
@@ -36,19 +36,22 @@
     </header>
 
     <div class="app workspace-grid workspace-body">
-      <aside class="sidebar glass rail-col rail-col-left" id="sidebarShell">
+      <aside class="sidebar glass rail-col rail-col-left" id="sidebarShell" data-sidebar-active="workspace">
         <div class="sidebar-chrome">
-          <div class="sidebar-tab-dock" aria-hidden="true">
-            <span class="sidebar-tab-pill is-active">Overview</span>
-            <span class="sidebar-tab-pill">Account</span>
-            <span class="sidebar-tab-pill">Growth</span>
-          </div>
+          <nav class="sidebar-nav" role="tablist" aria-label="Workspace areas">
+            <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace">Workspace</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount">Access</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans">Plans</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations">Integrations</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm">CRM</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue">Revenue</button>
+          </nav>
         </div>
         <div class="sidebar-scroll-host scroll-shell" id="sidebarScrollShell" data-show-top="false" data-show-bottom="false">
         <div class="sidebar-scroll scroll-area" id="sidebarScroll">
-          <div class="sidebar-inner">
+          <div class="sidebar-inner sidebar-panels-host">
 
-            <section class="sidebar-panel" id="sidebarPanelOverview" data-sidebar-panel="overview" aria-label="Overview">
+            <section class="sidebar-panel is-active" id="sidebarPanelWorkspace" data-sidebar-panel="workspace" role="tabpanel" aria-labelledby="sidebarTabWorkspace" aria-label="Workspace" aria-hidden="false">
               <div class="brand">
                 <svg width="200" height="36" viewBox="0 0 200 36" aria-hidden="true">
                   <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="currentColor" letter-spacing="-0.5">X</text>
@@ -70,8 +73,8 @@
               </div>
             </section>
 
-            <section class="sidebar-panel" id="sidebarPanelAccount" data-sidebar-panel="account" aria-label="Account access">
-              <div class="section-label">Access</div>
+            <section class="sidebar-panel" id="sidebarPanelAccount" data-sidebar-panel="account" role="tabpanel" aria-labelledby="sidebarTabAccount" aria-label="Account access" hidden aria-hidden="true">
+              <div class="section-label">Account / access</div>
               <div class="auth-card">
                 <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
                 <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
@@ -90,7 +93,17 @@
               </div>
             </section>
 
-            <section class="sidebar-panel" id="sidebarPanelGrowth" data-sidebar-panel="growth" aria-label="Integrations and plans">
+            <section class="sidebar-panel" id="sidebarPanelPlans" data-sidebar-panel="plans" role="tabpanel" aria-labelledby="sidebarTabPlans" aria-label="Plans" hidden aria-hidden="true">
+              <div class="section-label">Plans &amp; capacity</div>
+              <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
+              <div class="tier-card tier-card-plans">
+                <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Handle more tickets · Upgrade to Pro</span><span>→</span></button>
+                <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Maximum capacity · Upgrade to Elite</span><span>→</span></button>
+              </div>
+              <p class="muted-copy sidebar-panel-hint">Usage meters and limits also appear in the operator rail while you work.</p>
+            </section>
+
+            <section class="sidebar-panel" id="sidebarPanelIntegrations" data-sidebar-panel="integrations" role="tabpanel" aria-labelledby="sidebarTabIntegrations" aria-label="Integrations" hidden aria-hidden="true">
               <div class="section-label">Integrations</div>
               <div class="tier-card stripe-card" id="stripeCard">
                 <div class="stripe-card-head">
@@ -121,13 +134,30 @@
                   </button>
                 </div>
               </div>
+            </section>
 
-              <div class="section-label">Plans</div>
-              <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
-              <div class="tier-card tier-card-plans">
-                <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Handle more tickets · Upgrade to Pro</span><span>→</span></button>
-                <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Maximum capacity · Upgrade to Elite</span><span>→</span></button>
+            <section class="sidebar-panel" id="sidebarPanelCrm" data-sidebar-panel="crm" role="tabpanel" aria-labelledby="sidebarTabCrm" aria-label="CRM snapshot" hidden aria-hidden="true">
+              <div class="section-label">CRM snapshot</div>
+              <div class="sidebar-capability-card">
+                <div class="sidebar-cap-row"><span class="sidebar-cap-label">New leads</span><span id="sidebarCrmNew" class="sidebar-cap-value">0</span></div>
+                <div class="sidebar-cap-row"><span class="sidebar-cap-label">Due follow-ups</span><span id="sidebarCrmDue" class="sidebar-cap-value">0</span></div>
+                <div class="sidebar-cap-row"><span class="sidebar-cap-label">Due today</span><span id="sidebarCrmTodayDue" class="sidebar-cap-value">0</span></div>
+                <div class="sidebar-cap-row"><span class="sidebar-cap-label">Closed today</span><span id="sidebarCrmTodayClosed" class="sidebar-cap-value">0</span></div>
               </div>
+              <p class="muted-copy sidebar-panel-hint">Full queue, hottest deals, and lead entry live in the operator rail — scroll the right column.</p>
+              <button type="button" class="ghost-btn sidebar-jump-btn" id="sidebarJumpCrmBtn">Focus CRM in rail</button>
+            </section>
+
+            <section class="sidebar-panel" id="sidebarPanelRevenue" data-sidebar-panel="revenue" role="tabpanel" aria-labelledby="sidebarTabRevenue" aria-label="Revenue snapshot" hidden aria-hidden="true">
+              <div class="section-label">Revenue snapshot</div>
+              <div class="sidebar-capability-card">
+                <div class="sidebar-cap-row"><span class="sidebar-cap-label">Tracked revenue</span><span id="sidebarRevenueTotal" class="sidebar-cap-value">$0.00</span></div>
+                <div class="sidebar-cap-row"><span class="sidebar-cap-label">Reply rate</span><span id="sidebarRevenueReply" class="sidebar-cap-value">0.0%</span></div>
+                <div class="sidebar-cap-row"><span class="sidebar-cap-label">Win rate</span><span id="sidebarRevenueWin" class="sidebar-cap-value">0.0%</span></div>
+                <div class="sidebar-cap-row"><span class="sidebar-cap-label">Best source</span><span id="sidebarRevenueSource" class="sidebar-cap-value">manual</span></div>
+              </div>
+              <p class="muted-copy sidebar-panel-hint">Source performance and forecast detail stay in the operator rail.</p>
+              <button type="button" class="ghost-btn sidebar-jump-btn" id="sidebarJumpRevenueBtn">Focus revenue in rail</button>
             </section>
 
           </div>
@@ -189,8 +219,16 @@
         <div class="rail-scroll scroll-area" id="railScroll">
           <div class="rail-inner rail-stack" id="railInner">
 
-            <div class="rail-card rail-surface rail-elevated" id="latestRunRailCard">
-              <div class="rail-title">Latest run</div>
+            <div class="rail-brief is-open" data-rail-brief="latest">
+              <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleLatest">
+                <span class="rail-brief-toggle-text">
+                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-heading">Latest run</span>
+                </span>
+                <span class="rail-brief-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="rail-brief-panel" id="railBriefPanelLatest">
+            <div class="rail-card rail-surface rail-elevated rail-card-nested" id="latestRunRailCard">
               <div class="rail-run-summary muted-copy" id="railRunSummary">Issue type, action, confidence — updates after each support run.</div>
               <div class="ops-grid">
                 <div class="ops-metric">
@@ -220,9 +258,19 @@
               </div>
               <div class="ops-run-line" id="opsRunNarrative"><span class="ops-narrative-text">Waiting for the next operator run.</span></div>
             </div>
+              </div>
+            </div>
 
-            <div class="rail-card rail-surface rail-subtle">
-              <div class="rail-title">Value generated</div>
+            <div class="rail-brief is-open" data-rail-brief="value">
+              <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleValue">
+                <span class="rail-brief-toggle-text">
+                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-heading">Value generated</span>
+                </span>
+                <span class="rail-brief-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="rail-brief-panel" id="railBriefPanelValue">
+            <div class="rail-card rail-surface rail-subtle rail-card-nested">
               <p class="muted-copy rail-teaser" id="valueRailTeaser">Session and billing impact from your workspace activity.</p>
               <div class="value-gen-grid">
                 <div class="value-gen-cell">
@@ -243,9 +291,19 @@
                 </div>
               </div>
             </div>
+              </div>
+            </div>
 
-            <div class="rail-card rail-surface rail-metrics-card" id="dashboardCard">
-              <div class="rail-title">Throughput</div>
+            <div class="rail-brief" data-rail-brief="throughput">
+              <button type="button" class="rail-brief-toggle" aria-expanded="false" id="railBriefToggleThroughput">
+                <span class="rail-brief-toggle-text">
+                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-heading">Throughput</span>
+                </span>
+                <span class="rail-brief-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="rail-brief-panel" id="railBriefPanelThroughput">
+            <div class="rail-card rail-surface rail-metrics-card rail-card-nested" id="dashboardCard">
               <div class="stat-grid stat-grid-split">
                 <div class="stat-box">
                   <div id="statInteractions" class="stat-value">0</div>
@@ -260,9 +318,19 @@
                 </div>
               </div>
             </div>
+              </div>
+            </div>
 
-            <div class="rail-card rail-surface refund-card" id="refundCenterCard">
-              <div class="rail-title">Refund center</div>
+            <div class="rail-brief is-open" data-rail-brief="refund">
+              <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleRefund">
+                <span class="rail-brief-toggle-text">
+                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-heading">Refund center · lock state</span>
+                </span>
+                <span class="rail-brief-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="rail-brief-panel" id="railBriefPanelRefund">
+            <div class="rail-card rail-surface refund-card rail-card-nested" id="refundCenterCard">
               <div class="refund-summary refund-summary-top">
                 <div class="refund-col refund-col-tier">
                   <div class="refund-metric-label">Tier access</div>
@@ -291,9 +359,19 @@
                 <div class="refund-empty">No refund activity yet. Refunds will appear here with status and timestamp.</div>
               </div>
             </div>
+              </div>
+            </div>
 
-            <div class="rail-card rail-surface" id="usageCard">
-              <div class="rail-title">Plan usage</div>
+            <div class="rail-brief is-open" data-rail-brief="usage">
+              <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleUsage">
+                <span class="rail-brief-toggle-text">
+                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-heading">Plan usage</span>
+                </span>
+                <span class="rail-brief-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="rail-brief-panel" id="railBriefPanelUsage">
+            <div class="rail-card rail-surface rail-card-nested" id="usageCard">
               <div class="usage-block">
                 <div class="plan-grid">
                   <div class="plan-box">
@@ -315,6 +393,24 @@
                 </div>
                 <div class="usage-bar"><div id="planBar"></div></div>
                 <div id="usagePanelCopy" class="muted-copy">Your plan sets the amount of support usage available each month.</div>
+              </div>
+            </div>
+              </div>
+            </div>
+
+            <div class="rail-brief is-open" data-rail-brief="approval" id="approvalRailWrap" hidden>
+              <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleApproval">
+                <span class="rail-brief-toggle-text">
+                  <span class="rail-brief-eyebrow">Gate</span>
+                  <span class="rail-brief-heading">Approval state</span>
+                </span>
+                <span class="rail-brief-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="rail-brief-panel" id="railBriefPanelApproval">
+                <div class="rail-card rail-surface rail-card-nested approval-rail-card">
+                  <p class="muted-copy" id="approvalRailSummary">No approval gate on the latest run.</p>
+                  <div class="approval-rail-meta" id="approvalRailMeta"></div>
+                </div>
               </div>
             </div>
 

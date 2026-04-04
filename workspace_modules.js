@@ -1,6 +1,11 @@
 (function (global) {
   "use strict";
 
+  /**
+   * Shared fetch/format helpers for the workspace. Phase 2 operator chrome (rails, decision hierarchy,
+   * monetization surfaces) lives in app.js + styles.css; extend this module only when a shared primitive
+   * is required across bundles.
+   */
   function createPhase2Core(config) {
     const fetchImpl =
       config && typeof config.fetchImpl === "function"

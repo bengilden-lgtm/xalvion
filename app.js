@@ -118,6 +118,7 @@ if (typeof window.pulseRail !== "function") {
     revenueWinRate: document.getElementById("revenueWinRate"),
     revenueTotalValue: document.getElementById("revenueTotalValue"),
     revenueBestSource: document.getElementById("revenueBestSource"),
+    revenueCard: document.getElementById("revenueCard"),
     sourceList: document.getElementById("sourceList"),
     forecastSummary: document.getElementById("forecastSummary"),
     forecastPipelineValue: document.getElementById("forecastPipelineValue"),
@@ -137,7 +138,23 @@ if (typeof window.pulseRail !== "function") {
     railValueTime: document.getElementById("railValueTime"),
     railValueActions: document.getElementById("railValueActions"),
     railSessionTier: document.getElementById("railSessionTier"),
-    latestRunRailCard: document.getElementById("latestRunRailCard")
+    latestRunRailCard: document.getElementById("latestRunRailCard"),
+    workspaceRoot: document.getElementById("workspaceRoot"),
+    commandStrip: document.getElementById("commandStrip"),
+    sidebarShell: document.getElementById("sidebarShell"),
+    approvalRailWrap: document.getElementById("approvalRailWrap"),
+    approvalRailSummary: document.getElementById("approvalRailSummary"),
+    approvalRailMeta: document.getElementById("approvalRailMeta"),
+    sidebarCrmNew: document.getElementById("sidebarCrmNew"),
+    sidebarCrmDue: document.getElementById("sidebarCrmDue"),
+    sidebarCrmTodayDue: document.getElementById("sidebarCrmTodayDue"),
+    sidebarCrmTodayClosed: document.getElementById("sidebarCrmTodayClosed"),
+    sidebarRevenueTotal: document.getElementById("sidebarRevenueTotal"),
+    sidebarRevenueReply: document.getElementById("sidebarRevenueReply"),
+    sidebarRevenueWin: document.getElementById("sidebarRevenueWin"),
+    sidebarRevenueSource: document.getElementById("sidebarRevenueSource"),
+    sidebarJumpCrmBtn: document.getElementById("sidebarJumpCrmBtn"),
+    sidebarJumpRevenueBtn: document.getElementById("sidebarJumpRevenueBtn")
   };
 
   const state = {
@@ -749,6 +766,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         ? "Open the refund UI, paste a PaymentIntent or Charge ID, and run a refund from the workspace."
         : "Upgrade to Pro or Elite to unlock live refund execution from the workspace.";
     }
+    syncMonetizationChrome();
   }
 
   function openRefundModal() {
@@ -1182,28 +1200,59 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     syncCommandStripCapacity();
   }
 
+  function syncMonetizationChrome() {
+    const root = els.workspaceRoot;
+    const strip = els.commandStrip;
+    const cap = els.commandPlanCapacity;
+    const guest = !isAuthenticated();
+    const pct = state.limit > 0 ? state.usage / state.limit : 0;
+    const approaching =
+      guest
+        ? pct >= 0.75 && state.remaining > 0
+        : (state.approachingLimit || pct >= 0.75) && !state.atLimit && state.remaining > 0;
+    const atCap = guest ? state.remaining <= 0 : Boolean(state.atLimit);
+    const tier = String(state.tier || "free").toLowerCase();
+    let lockedPremium = false;
+    try {
+      lockedPremium = !canUseRefundCenter();
+    } catch {
+      lockedPremium = true;
+    }
+
+    const surfaces = [root, strip, cap, els.usageCard].filter(Boolean);
+    surfaces.forEach((el) => {
+      el.classList.toggle("mono-guest-preview", guest);
+      el.classList.toggle("mono-approaching-limit", approaching && !atCap);
+      el.classList.toggle("mono-at-limit", atCap);
+      el.classList.toggle("mono-locked-premium-surface", lockedPremium && tier === "free");
+    });
+    if (root) {
+      root.classList.toggle("mono-tier-pro", tier === "pro");
+      root.classList.toggle("mono-tier-elite", tier === "elite" || tier === "dev");
+    }
+    els.commandAuthChip?.classList.toggle("is-guest-chip", guest);
+  }
+
   function syncCommandStripCapacity() {
     const el = els.commandPlanCapacity;
-    if (!el) return;
-    el.classList.remove("is-warning", "is-limit");
-    const pct = state.limit > 0 ? state.usage / state.limit : 0;
-    if (!isAuthenticated()) {
-      el.textContent = `Preview · ${state.remaining} run${state.remaining === 1 ? "" : "s"} remaining`;
-      if (state.remaining <= 0) el.classList.add("is-limit");
-      else if (pct >= 0.75) el.classList.add("is-warning");
-      return;
+    if (el) {
+      el.classList.remove("is-warning", "is-limit");
+      const pct = state.limit > 0 ? state.usage / state.limit : 0;
+      if (!isAuthenticated()) {
+        el.textContent = `Preview · ${state.remaining} run${state.remaining === 1 ? "" : "s"} remaining`;
+        if (state.remaining <= 0) el.classList.add("is-limit");
+        else if (pct >= 0.75) el.classList.add("is-warning");
+      } else if (state.atLimit) {
+        el.classList.add("is-limit");
+        el.textContent = `${state.usage} of ${state.limit} runs used · 0 remaining this month`;
+      } else if (state.approachingLimit || pct >= 0.75) {
+        el.classList.add("is-warning");
+        el.textContent = `${state.usage} of ${state.limit} runs used · ${state.remaining} remaining this month`;
+      } else {
+        el.textContent = `${formatTier(state.tier)} · ${state.usage} / ${state.limit} runs · ${state.remaining} left`;
+      }
     }
-    if (state.atLimit) {
-      el.classList.add("is-limit");
-      el.textContent = `${state.usage} of ${state.limit} runs used · 0 remaining this month`;
-      return;
-    }
-    if (state.approachingLimit || pct >= 0.75) {
-      el.classList.add("is-warning");
-      el.textContent = `${state.usage} of ${state.limit} runs used · ${state.remaining} remaining this month`;
-      return;
-    }
-    el.textContent = `${formatTier(state.tier)} · ${state.usage} / ${state.limit} runs · ${state.remaining} left`;
+    syncMonetizationChrome();
   }
 
   function syncCommandAuthChip() {
@@ -1511,6 +1560,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     }
 
     updateAuthStatus();
+    syncApprovalRail();
     syncPhase2Stores();
   }
 
@@ -1586,11 +1636,15 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       role === "assistant"
         ? `<div class="msg-body assistant-canvas">
         <div class="stream-trace-host"></div>
-        <div class="customer-message-block">
-          <div class="customer-message-label">Customer message</div>
-          <div class="reply-text js-reply-text">${bodyHtml}</div>
+        <div class="assistant-result-stack">
+          <div class="assistant-decision-slot" data-slot="decision"></div>
+          <div class="assistant-brief-slot" data-slot="brief"></div>
+          <div class="customer-message-block">
+            <div class="customer-message-label">Customer-facing message</div>
+            <div class="reply-text js-reply-text">${bodyHtml}</div>
+          </div>
+          <div class="assistant-footer js-assistant-footer"></div>
         </div>
-        <div class="assistant-footer js-assistant-footer"></div>
       </div>`
         : `<div class="msg-body">
         <div class="reply-text js-reply-text">${bodyHtml}</div>
@@ -1617,11 +1671,11 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const previewLeft = guest ? Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()) : state.remaining;
     const teaser =
       guest || String(state.tier).toLowerCase() === "free"
-        ? `<div class="empty-panel">
+        ? `<div class="empty-panel empty-panel-elevated">
             <div class="empty-panel-label">At Pro / Elite</div>
             <p class="empty-panel-copy">500+ runs · live refund execution · full dashboard · priority routing.</p>
           </div>`
-        : `<div class="empty-panel">
+        : `<div class="empty-panel empty-panel-elevated">
             <div class="empty-panel-label">Elite</div>
             <p class="empty-panel-copy">5,000 runs · advanced analytics · maximum operator throughput.</p>
           </div>`;
@@ -1629,32 +1683,38 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     if (atCap) {
       const n = guest ? getGuestUsage() : state.usage;
       return `
-      <div class="empty-card limit-moment-card">
+      <div class="empty-card limit-moment-card empty-card-premium">
+        <div class="empty-cap-eyebrow">${guest ? "Guest preview" : "Capacity"}</div>
         <h2>${guest ? "Preview capacity reached" : "Plan limit reached"}</h2>
         <p>Processed <strong>${n}</strong> support ${guest ? "preview " : ""}scenarios · decisions prepared with full approval controls.</p>
-        <p>${guest ? `12 free runs/month · full decision layer · operator workspace after signup.` : `Upgrade to Pro to keep the operator workspace running without interruption.`}</p>
+        <p>${guest ? `Create an account for ${FREE_USAGE_LIMIT} free runs/month · keep threads and approval gates.` : `Upgrade to Pro to keep the operator workspace running without interruption.`}</p>
         <button type="button" class="limit-cta" id="emptySignupCta">${guest ? "Create your free account →" : "Keep operations running · Upgrade to Pro"}</button>
         ${guest ? `<button type="button" class="limit-secondary-link" id="emptyLoginLink">Already have an account? Log in</button>` : ""}
       </div>`;
     }
 
     return `
-      <div class="empty-card">
+      <div class="empty-card empty-card-premium">
+        <div class="empty-hero-mark" aria-hidden="true"></div>
         <div class="empty-eyebrow">
           <div class="empty-eyebrow-dot" aria-hidden="true"></div>
-          Operator workspace
+          Operator console
         </div>
         <h1>AI prepares. You approve.</h1>
-        <p>Paste a customer issue — Xalvion classifies risk, applies policy, drafts the customer-ready message, and holds billing moves until you approve.</p>
+        <p class="empty-lead">Paste a customer issue — Xalvion classifies risk, applies policy, drafts the customer-ready message, and holds billing moves until you release them.</p>
         <div class="empty-grid">
+          <div class="empty-panel empty-panel-elevated">
+            <div class="empty-panel-label">Consequence-first canvas</div>
+            <p class="empty-panel-copy">Each result opens with the consequence signal, approval controls, operator brief, then the customer-facing text — so nothing risky ships by accident.</p>
+          </div>
           <div class="empty-panel">
             <div class="empty-panel-label">Recent posture</div>
-            <p class="empty-panel-copy">${state.latestRun ? `${displayActionLabel(state.latestRun)} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence` : "No runs yet — your next case appears here with consequence, controls, and brief."}</p>
+            <p class="empty-panel-copy">${state.latestRun ? `${displayActionLabel(state.latestRun)} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence` : "No runs yet — your next case lands with signal, controls, brief, and reply in that order."}</p>
           </div>
           ${teaser}
         </div>
         <div class="empty-actions">
-          <span class="empty-chip-hint">${guest ? `Preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} remaining` : `${formatTier(state.tier)} · ${state.remaining} runs left this period`}</span>
+          <span class="empty-chip-hint">${guest ? `Guest preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} remaining` : `${formatTier(state.tier)} · ${state.remaining} runs left this period`}</span>
         </div>
       </div>`;
   }
@@ -2016,13 +2076,13 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     }
 
     const action = String(data.action || dec.action || "none").toLowerCase();
-    const risk = String(dec.risk_level || data.triage?.risk_level || "medium").toLowerCase();
+    const actionRisk = String(dec.risk_level || data.triage?.risk_level || "medium").toLowerCase();
     const req = Boolean(
       data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision"
     );
     const money = action === "refund" || action === "charge" || action === "credit";
     if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
-    if (action === "review" || risk === "high" || risk === "medium") {
+    if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
       return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
     }
     return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
@@ -2032,13 +2092,17 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     row.querySelector(".decision-panel")?.remove();
     const msgBody = row.querySelector(".msg-body");
     if (!msgBody || !data) return;
+    const decisionSlot = row.querySelector("[data-slot='decision']");
+    const mountTarget = decisionSlot || msgBody;
 
     const ticket = data.ticket || {};
     const ticketId = Number(ticket.id || 0) || null;
     const approval = getApprovalContext(data);
     const pendingGate = Boolean(approval.requiresApproval && !approval.approved);
     const sig = deriveConsequenceSignal(data);
-    const originalAi = String(initialReply || getAssistantCopyNode(row)?.innerText || "").trim();
+    const originalAi = String(
+      initialReply || getAssistantCopyNode(row)?.innerText || getAssistantCopyNode(row)?.textContent || ""
+    ).trim();
 
     const panel = document.createElement("div");
     panel.className = "decision-panel";
@@ -2051,7 +2115,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       <div class="decision-panel-error" data-role="err" style="display:none"></div>
       <div class="edit-mode-container" data-role="edit" style="display:none"></div>
     `;
-    msgBody.appendChild(panel);
+    mountTarget.appendChild(panel);
 
     const cons = panel.querySelector("[data-role='consequence']");
     if (cons && sig.title) cons.setAttribute("title", sig.title);
@@ -2121,24 +2185,37 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       ed.addEventListener("click", () => {
         showErr("");
         editWrap.style.display = "grid";
+        const draftSeed = String(
+          getCopyTextFromRow(row, initialReply) || originalAi || ""
+        ).trim();
         editWrap.innerHTML = `
-          <div>
-            <div class="original-response-label">Original AI response</div>
-            <div class="original-response">${escapeHtml(originalAi)}</div>
-          </div>
-          <textarea class="decision-edit-textarea" aria-label="Edited reply">${escapeHtml(getCopyTextFromRow(row, initialReply))}</textarea>
-          <div class="edit-actions">
-            <button type="button" class="btn-cancel-edit" data-act="cancel">Cancel</button>
-            <button type="button" class="btn-send-edited" data-act="send">Send Edited</button>
+          <div class="edit-mode-sheet">
+            <div class="edit-mode-header">
+              <div class="edit-mode-title">Edit customer-facing reply</div>
+              <p class="edit-mode-sub">Adjust tone or facts — the original stays visible for context.</p>
+            </div>
+            <div class="original-response-block">
+              <div class="original-response-label">Original prepared reply</div>
+              <div class="original-response" data-original-anchor="true">${escapeHtml(originalAi)}</div>
+            </div>
+            <label class="edit-compose-label">Your edited version
+              <textarea class="decision-edit-textarea" aria-label="Edited reply">${escapeHtml(draftSeed)}</textarea>
+            </label>
+            <div class="edit-actions">
+              <button type="button" class="btn-cancel-edit" data-act="cancel">Cancel edit</button>
+              <button type="button" class="btn-send-edited" data-act="send">Send edited reply</button>
+            </div>
           </div>
         `;
         const ta = editWrap.querySelector(".decision-edit-textarea");
         ta?.focus();
+        ta?.setSelectionRange(ta.value.length, ta.value.length);
         editWrap.querySelector("[data-act='cancel']")?.addEventListener("click", () => {
           editWrap.style.display = "none";
           editWrap.innerHTML = "";
         });
-        editWrap.querySelector("[data-act='send']")?.addEventListener("click", async () => {
+        const sendEdited = editWrap.querySelector("[data-act='send']");
+        sendEdited?.addEventListener("click", async () => {
           const next = String(ta?.value || "").trim();
           if (!next) {
             showErr("Edited reply cannot be empty.");
@@ -2148,6 +2225,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
             [rej, ed, ap].forEach((b) => {
               b.disabled = true;
             });
+            sendEdited.disabled = true;
+            sendEdited.textContent = "Sending…";
             ap.textContent = "…";
             try {
               const response = await resolveApproval(ticketId, "approve", {
@@ -2175,13 +2254,19 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
                 b.disabled = false;
               });
               ap.textContent = "Approve";
+              sendEdited.disabled = false;
+              sendEdited.textContent = "Send edited reply";
             }
           } else {
-            setAssistantCopy(row, next);
-            editWrap.style.display = "none";
-            editWrap.innerHTML = "";
-            setTerminal("Edited", "Copy the card text when you send to the customer.");
-            setNotice("info", "Reply updated", "No server gate on this run — text updated on the card.");
+            sendEdited.disabled = true;
+            sendEdited.textContent = "Applying…";
+            window.setTimeout(() => {
+              setAssistantCopy(row, next);
+              editWrap.style.display = "none";
+              editWrap.innerHTML = "";
+              setTerminal("Edited", "Copy the card text when you send to the customer.");
+              setNotice("info", "Reply updated", "No server gate on this run — text updated on the card.");
+            }, 120);
           }
         });
       });
@@ -2277,6 +2362,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const replyText = normalized.reply || normalized.response || normalized.final || "";
     setAssistantCopy(row, replyText);
     const footer = getAssistantFooterNode(row);
+    const briefSlot = row.querySelector("[data-slot='brief']");
     if (footer) {
       footer.innerHTML = "";
       footer.appendChild(createMetaRow(normalized));
@@ -2284,8 +2370,11 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       addCopyControl(toolsWrap, replyText, row);
       footer.appendChild(toolsWrap);
     }
-    const details = row.querySelector(".details-wrap");
-    if (details) details.replaceWith(createDetailsPanel(normalized));
+    const nextBrief = createDetailsPanel(normalized);
+    const existingBrief = briefSlot?.querySelector(".details-wrap") || row.querySelector(".details-wrap");
+    if (existingBrief) existingBrief.replaceWith(nextBrief);
+    else if (briefSlot) briefSlot.appendChild(nextBrief);
+    else footer?.parentElement?.appendChild(nextBrief);
     mountOperatorDecisionPanel(row, normalized, replyText);
   }
 
@@ -2383,7 +2472,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function createDetailsPanel(data = {}) {
     const details = document.createElement("details");
-    details.className = "details-wrap";
+    details.className = "details-wrap operator-brief-details";
+    details.open = true;
 
     const decision = data.decision || {};
     const output = data.output || {};
@@ -2469,12 +2559,15 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function createStreamSteps() {
     const wrap = document.createElement("div");
-    wrap.className = "stream-steps";
+    wrap.className = "stream-steps stream-steps--premium";
     wrap.innerHTML = `
+      <div class="stream-trace-header"><span class="stream-trace-kicker">Preparing</span><span class="stream-trace-title">Decision trace</span></div>
+      <div class="stream-step-row">
       <div class="stream-step active"><div class="stream-step-dot"></div><span>Reviewing</span></div>
       <div class="stream-step"><div class="stream-step-dot"></div><span>Routing</span></div>
       <div class="stream-step"><div class="stream-step-dot"></div><span>Responding</span></div>
       <div class="stream-step"><div class="stream-step-dot"></div><span>Finalizing</span></div>
+      </div>
     `;
     return wrap;
   }
@@ -2542,8 +2635,9 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     if (els.composerStatusLine) {
       els.composerStatusLine.textContent = state.sending
-        ? "Streaming decision preparation…"
+        ? "Preparing decision · streaming trace active in the canvas…"
         : "Paste a customer issue or type a support request…";
+      els.composerStatusLine.classList.toggle("composer-status-live", state.sending);
     }
 
     if (els.sendBtn) {
@@ -2815,6 +2909,50 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         data.issue_type || data.meta?.issue_type || data.decision?.issue_type || "general_support"
       ).replace(/_/g, " ");
       els.railRunSummary.textContent = `${it} · ${displayActionLabel(data)} · conf ${formatMetric(data.confidence || 0, 2)}`;
+    }
+    syncApprovalRail(data);
+  }
+
+  function syncApprovalRail(override) {
+    const wrap = els.approvalRailWrap;
+    const sum = els.approvalRailSummary;
+    const meta = els.approvalRailMeta;
+    if (!wrap || !sum) return;
+    if (override === null) {
+      wrap.hidden = true;
+      if (meta) meta.innerHTML = "";
+      sum.textContent = "No approval gate on the latest run.";
+      return;
+    }
+    const target = override !== undefined ? override : state.latestRun;
+    if (!target || typeof target !== "object") {
+      wrap.hidden = true;
+      if (meta) meta.innerHTML = "";
+      sum.textContent = "No approval gate on the latest run.";
+      return;
+    }
+    const approval = getApprovalContext(target);
+    const pending = Boolean(approval.requiresApproval && !approval.approved);
+    if (!pending) {
+      wrap.hidden = true;
+      if (meta) meta.innerHTML = "";
+      sum.textContent = "No approval gate on the latest run.";
+      return;
+    }
+    wrap.hidden = false;
+    const action = approval.action && approval.action !== "none" ? approval.action : "prepared action";
+    const amt = approval.amount > 0 ? formatMoney(approval.amount) : "";
+    sum.textContent = `Execution is held — ${action}${amt ? ` (${amt})` : ""} requires operator approval before it ships.`;
+    if (meta) {
+      meta.innerHTML = "";
+      const chip = (text, ok) => {
+        const s = document.createElement("span");
+        s.className = `approval-rail-chip${ok ? " is-ok" : " is-muted"}`;
+        s.textContent = text;
+        meta.appendChild(s);
+      };
+      chip(approval.canApprove ? "You can approve from the canvas" : "Sign in as ticket owner to approve", approval.canApprove);
+      chip(approval.ticketId ? `Ticket #${approval.ticketId}` : "No ticket id on this run", Boolean(approval.ticketId));
     }
   }
 
@@ -3097,6 +3235,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
       stepTimers.forEach((timer) => window.clearTimeout(timer));
       removeStreamSteps(stepsEl);
+      streamHost?.classList.add("stream-trace-host--settled");
 
       if (!data) throw new Error("No response returned.");
 
@@ -3107,6 +3246,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       setAssistantCopy(row, replyText);
 
       const footer = getAssistantFooterNode(row);
+      const briefSlot = row.querySelector("[data-slot='brief']");
       if (footer) {
         footer.innerHTML = "";
         footer.appendChild(createMetaRow(data));
@@ -3116,7 +3256,12 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         footer.appendChild(toolsWrap);
 
         const details = createDetailsPanel(data);
-        footer.parentElement.appendChild(details);
+        if (briefSlot) {
+          briefSlot.innerHTML = "";
+          briefSlot.appendChild(details);
+        } else {
+          footer.parentElement.appendChild(details);
+        }
         mountOperatorDecisionPanel(row, data, replyText);
       }
 
@@ -3180,6 +3325,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     } catch (error) {
       stepTimers.forEach((timer) => window.clearTimeout(timer));
       removeStreamSteps(stepsEl);
+      streamHost?.classList.add("stream-trace-host--settled");
       const errText =
         (error && error.message) ||
         "Something went wrong while processing this support request.";
@@ -3510,6 +3656,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     addEmptyState();
     updateSystemNarrative(null);
     updateTopbarStatus();
+    syncApprovalRail(null);
     if (els.railRunSummary) els.railRunSummary.textContent = "Issue type, action, confidence — updates after each support run.";
     scrollMessagesToBottom(true);
   }
@@ -3545,6 +3692,112 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   
   function escapeAttr(value) {
     return String(value ?? "").replaceAll('"', "&quot;");
+  }
+
+  const RAIL_BRIEF_KEY = "xalvion-rail-brief-v1";
+
+  function syncSidebarCapabilityPanels() {
+    if (els.sidebarCrmNew) setText(els.sidebarCrmNew, String(state.crmSummary?.new ?? 0));
+    if (els.sidebarCrmDue) setText(els.sidebarCrmDue, String(state.crmSummary?.due_followups ?? 0));
+    if (els.sidebarCrmTodayDue) setText(els.sidebarCrmTodayDue, String(state.crmDailySummary?.due_followups ?? 0));
+    if (els.sidebarCrmTodayClosed) setText(els.sidebarCrmTodayClosed, String(state.crmDailySummary?.closed_today ?? 0));
+    const t = state.revenueMetrics?.totals || {};
+    const revenue = Number(t.revenue || 0);
+    if (els.sidebarRevenueTotal) setText(els.sidebarRevenueTotal, `$${revenue.toFixed(2)}`);
+    if (els.sidebarRevenueReply) setText(els.sidebarRevenueReply, `${Number(t.reply_rate || 0).toFixed(1)}%`);
+    if (els.sidebarRevenueWin) setText(els.sidebarRevenueWin, `${Number(t.win_rate || 0).toFixed(1)}%`);
+    if (els.sidebarRevenueSource) setText(els.sidebarRevenueSource, state.revenueMetrics?.best_source || "manual");
+  }
+
+  function initWorkspaceChromeShell() {
+    initSidebarNav();
+    initRailBriefToggles();
+  }
+
+  function initSidebarNav() {
+    const shell = els.sidebarShell;
+    const tabs = shell ? shell.querySelectorAll("[data-sidebar-tab]") : [];
+    if (!shell || !tabs.length) return;
+    if (shell.dataset.sidebarNavBound) return;
+    shell.dataset.sidebarNavBound = "1";
+
+    const applyTab = (key) => {
+      const panels = shell.querySelectorAll("[data-sidebar-panel]");
+      tabs.forEach((btn) => {
+        const on = btn.getAttribute("data-sidebar-tab") === key;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      panels.forEach((panel) => {
+        const on = panel.getAttribute("data-sidebar-panel") === key;
+        panel.classList.toggle("is-active", on);
+        if (on) {
+          panel.removeAttribute("hidden");
+          panel.setAttribute("aria-hidden", "false");
+        } else {
+          panel.setAttribute("hidden", "");
+          panel.setAttribute("aria-hidden", "true");
+        }
+      });
+      shell.dataset.sidebarActive = key;
+      const scrollArea = document.getElementById("sidebarScroll");
+      if (scrollArea) scrollArea.scrollTop = 0;
+      try {
+        sessionStorage.setItem("xalvion-sidebar-tab", key);
+      } catch {}
+    };
+
+    tabs.forEach((btn) => {
+      btn.addEventListener("click", () => applyTab(btn.getAttribute("data-sidebar-tab") || "workspace"));
+    });
+
+    let initial = "workspace";
+    try {
+      const saved = sessionStorage.getItem("xalvion-sidebar-tab");
+      if (saved && shell.querySelector(`[data-sidebar-panel="${saved}"]`)) initial = saved;
+    } catch {}
+    applyTab(initial);
+
+    els.sidebarJumpCrmBtn?.addEventListener("click", () => {
+      els.crmCard?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    els.sidebarJumpRevenueBtn?.addEventListener("click", () => {
+      els.revenueCard?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }
+
+  function initRailBriefToggles() {
+    const root = els.railInner;
+    if (!root || root.dataset.railBriefBound) return;
+    root.dataset.railBriefBound = "1";
+
+    let saved = {};
+    try {
+      saved = JSON.parse(sessionStorage.getItem(RAIL_BRIEF_KEY) || "{}") || {};
+    } catch {
+      saved = {};
+    }
+
+    root.querySelectorAll(".rail-brief").forEach((brief) => {
+      const key = brief.getAttribute("data-rail-brief") || brief.id || "rail";
+      const btn = brief.querySelector(".rail-brief-toggle");
+      if (!btn) return;
+
+      const openDefault = brief.classList.contains("is-open");
+      const wantOpen = typeof saved[key] === "boolean" ? saved[key] : openDefault;
+
+      const setOpen = (open) => {
+        brief.classList.toggle("is-open", open);
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        saved[key] = open;
+        try {
+          sessionStorage.setItem(RAIL_BRIEF_KEY, JSON.stringify(saved));
+        } catch {}
+      };
+
+      setOpen(wantOpen);
+      btn.addEventListener("click", () => setOpen(!brief.classList.contains("is-open")));
+    });
   }
 
   function renderCrmSummary(summary = {}) {
@@ -3608,6 +3861,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         </div>
       `).join("") : '<div class="refund-empty">No hot deals yet.</div>';
     }
+    syncSidebarCapabilityPanels();
   }
 
   function renderRevenueMetrics(metrics = {}) {
@@ -3650,6 +3904,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         </div>
       `).join("") : '<div class="refund-empty">No source performance data yet.</div>';
     }
+    syncSidebarCapabilityPanels();
   }
 
   function renderForecastMetrics(forecast = {}) {
@@ -4140,6 +4395,7 @@ function bindEvents() {
     buildKeyboardOverlay();
     ensureOpsCard();
     bindEvents();
+    initWorkspaceChromeShell();
 
     const draft = loadDraft();
     if (els.messageInput && draft) {
