@@ -106,6 +106,22 @@
           minutes: Number(m.time_saved_minutes ?? 0) || 0,
         };
       },
+      /** Phase 3: short strings for capacity / upgrade framing (no DOM). */
+      monetizationFraming: {
+        guestPreviewBody(freeMonthlyLimit, guestLimit) {
+          const g = Number(guestLimit) || 0;
+          const f = Number(freeMonthlyLimit) || 0;
+          return `You used all ${g} guest preview runs — the workflow is real. A free account unlocks ${f} runs/month with saved threads and approval gates.`;
+        },
+        workspaceValueLine(valueGenerated) {
+          const v = valueGenerated && typeof valueGenerated === "object" ? valueGenerated : {};
+          const money = Number(v.money_saved ?? 0) || 0;
+          const actions = Number(v.actions_taken ?? 0) || 0;
+          const mins = Number(v.time_saved_minutes ?? 0) || 0;
+          if (money <= 0 && actions <= 0 && mins <= 0) return "";
+          return `This workspace has already surfaced $${money.toFixed(0)} across ${actions} billing motions (~${mins} min of operator time).`;
+        },
+      },
     };
 
     const store = {

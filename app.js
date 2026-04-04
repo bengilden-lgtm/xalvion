@@ -81,6 +81,7 @@ if (typeof window.pulseRail !== "function") {
     refundTierAccess: document.getElementById("refundTierAccess"),
     refundHistoryCount: document.getElementById("refundHistoryCount"),
     refundCenterCopy: document.getElementById("refundCenterCopy"),
+    refundUpgradeTease: document.getElementById("refundUpgradeTease"),
     openRefundModalBtn: document.getElementById("openRefundModalBtn"),
     refreshRefundHistoryBtn: document.getElementById("refreshRefundHistoryBtn"),
     refundHistoryList: document.getElementById("refundHistoryList"),
@@ -383,30 +384,47 @@ if (typeof window.pulseRail !== "function") {
     if (!isAuthenticated()) {
       return {
         key: `guest-${getEffectiveUsage(state.usage)}`,
-        title: "You’ve hit the free preview limit",
-        detail: `Create a free account to unlock ${FREE_USAGE_LIMIT} free runs and keep the operator workflow live.`,
-        body: `You’ve used all ${GUEST_USAGE_LIMIT} guest runs.
+        title: "Preview capacity is full — you already saw the workflow",
+        detail: `You used every guest run. Create a free account for ${FREE_USAGE_LIMIT} monthly runs, saved threads, and the same approval-first path.`,
+        body: `You’ve used all ${GUEST_USAGE_LIMIT} guest preview runs — that means you already watched classification, routing, and the approval gate behave like production.
 
-You just felt the core workflow. Create a free account to unlock ${FREE_USAGE_LIMIT} free runs, keep your workspace state, and continue preparing support decisions with approval controls.`
+Create a free account to unlock ${FREE_USAGE_LIMIT} runs each month, keep workspace state, and pick up exactly where this preview left off.`
       };
     }
 
+    const tier = String(state.tier || "free").toLowerCase();
     const vs = state.valueSignals;
     const d = state.dashboardStats || {};
-    const money = Number(d.money_saved || 0);
-    const prefix =
-      vs && typeof vs.tickets_handled === "number"
-        ? `You've handled ${vs.tickets_handled} tickets this month. ${formatMoney(money)} in actions surfaced. `
-        : money > 0
-          ? `${formatMoney(money)} already moved through billing actions. `
-          : "";
+    const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
+    const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
+    const actions = Number((vg && vg.actions_taken) ?? d.actions ?? 0);
+    const valuePrefix =
+      tier === "free" && vs && typeof vs.tickets_handled === "number" && vs.tickets_handled > 0
+        ? `${vs.tickets_handled} tickets on your plan this cycle${money > 0 ? ` · ${formatMoney(money)} surfaced in billing actions` : ""}${actions > 0 ? ` · ${actions} motions logged` : ""}. `
+        : tier === "free" && money > 0
+          ? `${formatMoney(money)} already moved through workspace billing actions. `
+          : tier === "pro" && money > 0
+            ? `${formatMoney(money)} through billing actions on this workspace — you’re clearly at operating depth. `
+            : "";
+
+    if (tier === "pro") {
+      return {
+        key: `pro-${getEffectiveUsage(state.usage)}`,
+        title: "Pro capacity reached — momentum is already here",
+        detail: `${valuePrefix}Upgrade to Elite for 5,000 tickets/month, advanced dashboard depth, and room to scale without another hard stop.`,
+        body: `${valuePrefix}You’ve reached the Pro monthly ticket limit.
+
+You’re already running a serious operator surface. Elite adds headroom (5,000 tickets/month), advanced analytics, and team scale so growth doesn’t hit another wall next quarter.`
+      };
+    }
+
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
-      title: "You’ve hit the free plan limit",
-      detail: `${prefix}Upgrade to Pro to keep approval-first automation running and unlock more capacity.`,
-      body: `${prefix}You’ve used all ${FREE_USAGE_LIMIT} free runs.
+      title: "Free plan capacity reached — you proved the value",
+      detail: `${valuePrefix}Upgrade to Pro for 500 tickets/month, live refund execution, and uninterrupted operator runs.`,
+      body: `${valuePrefix}You’ve used all ${FREE_USAGE_LIMIT} free runs this month.
 
-You just saved real support effort. Upgrade to Pro to keep the approval-first operator live, unlock more capacity, and continue scanning tickets without interruption.`
+The workspace already showed you real routing and approval discipline. Pro keeps that loop running with higher limits, the refund center live, and priority routing when volume spikes.`
     };
   }
 
@@ -461,11 +479,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       return false;
     }
 
-    if (String(state.tier || "free").toLowerCase() === "free") {
-      return false;
-    }
-
-    return true;
+    return false;
   }
 
   function consumeWorkspaceRun(serverUsage = null) {
@@ -764,7 +778,18 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     if (els.refundCenterCopy) {
       els.refundCenterCopy.textContent = allowed
         ? "Open the refund UI, paste a PaymentIntent or Charge ID, and run a refund from the workspace."
-        : "Upgrade to Pro or Elite to unlock live refund execution from the workspace.";
+        : "You’re seeing decisions and approvals on Free — Pro unlocks one-click refund execution against Stripe without leaving this surface.";
+    }
+    if (els.refundUpgradeTease) {
+      const d = state.dashboardStats || {};
+      const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
+      const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
+      const actions = Number((vg && vg.actions_taken) ?? d.actions ?? 0);
+      els.refundUpgradeTease.textContent = allowed
+        ? "Execute refunds from the workspace · Available on Pro and Elite"
+        : money > 0 || actions > 0
+          ? `Your workspace already logged ${formatMoney(money)} across ${actions} billing motions — Pro turns that into live Stripe execution here.`
+          : "Close the loop on Free → Pro: run real refunds from the workspace with Stripe connected — no console, no context switch.";
     }
     syncMonetizationChrome();
   }
@@ -772,7 +797,11 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   function openRefundModal() {
     updateRefundUI();
     if (!canUseRefundCenter()) {
-      setNotice("warning", "Refunds locked", "Upgrade to Pro or Elite to unlock live refund execution.");
+      setNotice(
+        "warning",
+        "Refund center is a Pro unlock",
+        "You’re already using the operator canvas on Free — upgrade to run refunds against Stripe without leaving the workspace."
+      );
       return;
     }
     if (els.refundModal) {
@@ -838,7 +867,11 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     }
 
     if (!canUseRefundCenter()) {
-      setNotice("warning", "Refunds locked", "Upgrade to Pro or Elite to unlock live refund execution.");
+      setNotice(
+        "warning",
+        "Refund center is a Pro unlock",
+        "You’re already using the operator canvas on Free — upgrade to run refunds against Stripe without leaving the workspace."
+      );
       return;
     }
 
@@ -1313,11 +1346,23 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const el = els.upgradeValueSummary;
     if (!el) return;
     const d = state.dashboardStats || {};
+    const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
     const tickets = Number(d.total_tickets ?? d.total_interactions ?? state.totalInteractions ?? 0);
-    const money = Number(d.money_saved ?? 0);
-    const mins = estimateAgentMinutesSavedFromDashboard(d);
-    el.textContent = `${tickets} tickets handled · ${formatMoney(money)} in actions · ~${mins} min saved`;
-    el.style.display = tickets > 0 || money > 0 || mins > 0 ? "block" : "none";
+    const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
+    const actions = Number((vg && vg.actions_taken) ?? d.actions ?? state.actionsCount ?? 0);
+    const mins = Number((vg && vg.time_saved_minutes) ?? estimateAgentMinutesSavedFromDashboard(d));
+    const tier = String(state.tier || "free").toLowerCase();
+    const upgradeHint =
+      tier === "free"
+        ? " Pro adds 500 runs/month + live refunds."
+        : tier === "pro"
+          ? " Elite adds 5k runs/month + advanced analytics."
+          : "";
+    el.textContent =
+      tickets > 0 || money > 0 || actions > 0 || mins > 0
+        ? `Workspace value so far: ${tickets} tickets · ${formatMoney(money)} through billing actions (${actions} motions) · ~${mins} min saved.${upgradeHint}`
+        : "";
+    el.style.display = tickets > 0 || money > 0 || actions > 0 || mins > 0 ? "block" : "none";
   }
 
   function ensureUsageApproachNoticeEl() {
@@ -1354,13 +1399,21 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const money = formatMoney(Number(vs.money_moved ?? 0));
     const tm = Number(vs.time_saved_minutes ?? 0);
     const unlock = String(vs.upgrade_unlocks || "").trim();
+    const capLine = String(vs.capacity_message || "").trim();
+    const ctaTier = tier === "pro" ? "elite" : "pro";
+    const ctaLabel = tier === "pro" ? "Add Elite headroom before the next ceiling →" : "Upgrade for continuous coverage →";
+    const story =
+      th > 0 || Number(vs.money_moved ?? 0) > 0
+        ? `You’re using real capacity — ${th} tickets this cycle · ${money} in billing motions · ~${tm} min of operator time back.`
+        : "You’re approaching this plan’s monthly ceiling — add headroom so approvals and routing don’t stall mid-shift.";
     el.style.display = "block";
-    el.innerHTML = `<div>${th} tickets handled · ${money} in actions · ~${tm} min saved</div>
-<div>${escapeHtml(unlock)}</div>
-<button type="button" class="ghost-btn" style="margin-top:6px;padding:6px 10px;font-size:12px">Upgrade for continuous coverage →</button>`;
+    el.innerHTML = `<div>${escapeHtml(story)}</div>
+${capLine ? `<div class="muted-copy" style="margin-top:4px">${escapeHtml(capLine)}</div>` : ""}
+${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
+<button type="button" class="ghost-btn" style="margin-top:6px;padding:6px 10px;font-size:12px">${escapeHtml(ctaLabel)}</button>`;
     const btn = el.querySelector("button");
     if (btn) {
-      btn.onclick = () => upgradePlan("pro");
+      btn.onclick = () => upgradePlan(ctaTier);
     }
   }
 
@@ -1394,6 +1447,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       if (Number.isFinite(r)) state.remaining = Math.max(0, r);
     }
     const unlock = String(payload.upgrade_unlocks || "").trim();
+    const capMsg = String(payload.capacity_message || "").trim();
     const thRaw = payload.tickets_handled;
     const ticketsHandled =
       thRaw !== undefined && thRaw !== null ? Number(thRaw) : state.usage;
@@ -1401,7 +1455,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       ...(state.valueSignals && typeof state.valueSignals === "object" ? state.valueSignals : {}),
       tickets_handled: Number.isFinite(ticketsHandled) ? ticketsHandled : state.usage,
       upgrade_unlocks: unlock || (state.valueSignals && state.valueSignals.upgrade_unlocks) || "",
-      capacity_message: (state.valueSignals && state.valueSignals.capacity_message) || "",
+      capacity_message:
+        capMsg || (state.valueSignals && state.valueSignals.capacity_message) || "",
     };
     renderUsageIntelligence({
       approaching_limit: true,
@@ -1665,12 +1720,13 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function buildEmptyStateHtml() {
     const guest = !isAuthenticated();
-    const atCap = guest
-      ? getGuestUsage() >= GUEST_USAGE_LIMIT
-      : state.atLimit && String(state.tier).toLowerCase() === "free";
+    const tierLc = String(state.tier || "free").toLowerCase();
+    const atCap = guest ? getGuestUsage() >= GUEST_USAGE_LIMIT : state.atLimit;
     const previewLeft = guest ? Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()) : state.remaining;
+    const guestApproaching =
+      guest && previewLeft > 0 && previewLeft <= Math.max(1, Math.ceil(GUEST_USAGE_LIMIT * 0.34));
     const teaser =
-      guest || String(state.tier).toLowerCase() === "free"
+      guest || tierLc === "free"
         ? `<div class="empty-panel empty-panel-elevated">
             <div class="empty-panel-label">At Pro / Elite</div>
             <p class="empty-panel-copy">500+ runs · live refund execution · full dashboard · priority routing.</p>
@@ -1682,13 +1738,31 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     if (atCap) {
       const n = guest ? getGuestUsage() : state.usage;
+      const capEyebrow = guest ? "Guest preview" : tierLc === "pro" ? "Pro capacity" : "Capacity";
+      const capTitle = guest
+        ? "Preview capacity reached"
+        : tierLc === "pro"
+          ? "Pro limit reached"
+          : tierLc === "elite"
+            ? "Plan limit reached"
+            : "Free plan limit reached";
+      const capBody = guest
+        ? `You already ran the full preview — same signals you’d get on a paid desk. Create an account for ${FREE_USAGE_LIMIT} free runs/month and keep threads, history, and approval gates.`
+        : tierLc === "pro"
+          ? "You maxed Pro — the workspace already proved throughput. Elite unlocks 5,000 tickets/month and advanced analytics so the next growth step isn’t another hard stop."
+          : "You used this month’s allocation — the operator loop is working. Upgrade to Pro for 500 runs/month, live refunds, and priority routing when volume spikes.";
+      const ctaLabel = guest
+        ? "Create your free account →"
+        : tierLc === "pro"
+          ? "Scale without another wall · Upgrade to Elite"
+          : "Keep momentum · Upgrade to Pro";
       return `
       <div class="empty-card limit-moment-card empty-card-premium">
-        <div class="empty-cap-eyebrow">${guest ? "Guest preview" : "Capacity"}</div>
-        <h2>${guest ? "Preview capacity reached" : "Plan limit reached"}</h2>
+        <div class="empty-cap-eyebrow">${capEyebrow}</div>
+        <h2>${capTitle}</h2>
         <p>Processed <strong>${n}</strong> support ${guest ? "preview " : ""}scenarios · decisions prepared with full approval controls.</p>
-        <p>${guest ? `Create an account for ${FREE_USAGE_LIMIT} free runs/month · keep threads and approval gates.` : `Upgrade to Pro to keep the operator workspace running without interruption.`}</p>
-        <button type="button" class="limit-cta" id="emptySignupCta">${guest ? "Create your free account →" : "Keep operations running · Upgrade to Pro"}</button>
+        <p>${capBody}</p>
+        <button type="button" class="limit-cta" id="emptySignupCta">${ctaLabel}</button>
         ${guest ? `<button type="button" class="limit-secondary-link" id="emptyLoginLink">Already have an account? Log in</button>` : ""}
       </div>`;
     }
@@ -1714,7 +1788,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
           ${teaser}
         </div>
         <div class="empty-actions">
-          <span class="empty-chip-hint">${guest ? `Guest preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} remaining` : `${formatTier(state.tier)} · ${state.remaining} runs left this period`}</span>
+          <span class="empty-chip-hint">${guest ? (guestApproaching ? `Almost through preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} left — sign in to keep state` : `Guest preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} remaining`) : `${formatTier(state.tier)} · ${state.remaining} runs left this period`}</span>
         </div>
       </div>`;
   }
@@ -1729,7 +1803,13 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     els.messages.appendChild(empty);
 
     empty.querySelector("#emptySignupCta")?.addEventListener("click", () => {
-      els.signupBtn?.click();
+      if (!isAuthenticated()) {
+        els.signupBtn?.click();
+        return;
+      }
+      const t = String(state.tier || "free").toLowerCase();
+      if (t === "pro") upgradePlan("elite");
+      else upgradePlan("pro");
     });
     empty.querySelector("#emptyLoginLink")?.addEventListener("click", () => {
       els.usernameInput?.focus();
@@ -3640,6 +3720,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
       state.dashboardStats = data;
       refreshUpgradeValueSummary();
+      updateRefundUI();
       syncAnalyticsRail();
     } catch {
       setText(els.statInteractions, formatMetric(state.totalInteractions, 0));

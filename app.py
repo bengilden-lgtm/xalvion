@@ -2677,7 +2677,34 @@ def _me_capacity_message(tier: str, remaining: int) -> str:
     return f"Free tier: {remaining} tickets left this month"
 
 
-def _build_me_value_signals(user: User, usage_summary: dict[str, Any]) -> dict[str, Any]:
+def _user_billing_motion_rollups(db: Session, username: str) -> tuple[float, int]:
+    """Per-user refund/credit totals for /me value_signals (additive fields only)."""
+    if not username or username in {"guest", "dev_user", "extension_guest", ""}:
+        return 0.0, 0
+    try:
+        refund_sum = db.query(func.sum(ActionLog.amount)).filter(
+            ActionLog.username == username,
+            ActionLog.action == "refund",
+        ).scalar()
+        credit_sum = db.query(func.sum(ActionLog.amount)).filter(
+            ActionLog.username == username,
+            ActionLog.action == "credit",
+        ).scalar()
+        actions_done = db.query(ActionLog).filter(
+            ActionLog.username == username,
+            ActionLog.action.in_(["refund", "credit"]),
+        ).count()
+        money = float(refund_sum or 0) + float(credit_sum or 0)
+        return money, int(actions_done)
+    except Exception:
+        return 0.0, 0
+
+
+def _build_me_value_signals(
+    user: User,
+    usage_summary: dict[str, Any],
+    db: Session | None = None,
+) -> dict[str, Any]:
     tier = get_public_plan_name(user)
     tkey = str(tier or "free").strip().lower()
     rem = int(max(0, usage_summary.get("remaining", 0) or 0))
@@ -2692,15 +2719,23 @@ def _build_me_value_signals(user: User, usage_summary: dict[str, Any]) -> dict[s
         "pro":   f"Pro tier — {rem} tickets remaining",
         "elite": "Elite tier — full capacity",
     }
-    try:
-        metrics = get_metrics()
-        money_moved = float(metrics.get("money_moved", 0) or 0)
-        total_actions = int(metrics.get("total_refunds", 0) or 0) + int(metrics.get("total_credits", 0) or 0)
+    money_moved = 0.0
+    total_actions = 0
+    time_saved_mins = 0
+    uname = str(getattr(user, "username", "") or "")
+    if db is not None and uname not in {"", "guest", "dev_user"}:
+        money_moved, total_actions = _user_billing_motion_rollups(db, uname)
         time_saved_mins = total_actions * 6
-    except Exception:
-        money_moved = 0.0
-        total_actions = 0
-        time_saved_mins = 0
+    else:
+        try:
+            metrics = get_metrics()
+            money_moved = float(metrics.get("money_moved", 0) or 0)
+            total_actions = int(metrics.get("total_refunds", 0) or 0) + int(metrics.get("total_credits", 0) or 0)
+            time_saved_mins = total_actions * 6
+        except Exception:
+            money_moved = 0.0
+            total_actions = 0
+            time_saved_mins = 0
     return {
         "tickets_handled":    usage,
         "upgrade_unlocks":    unlock_map.get(tkey, _tier_upgrade_unlocks(tier)),
@@ -2733,20 +2768,25 @@ def _stream_usage_warning_payload(username: str) -> dict[str, Any] | None:
         if str(tier).strip().lower() in {"elite", "dev"}:
             return None
         at_limit = usage >= limit
+        rem = int(summary["remaining"])
         return {
             "approaching_limit": True,
             "at_limit": at_limit,
             "usage_pct": round(pct, 2),
-            "remaining": int(summary["remaining"]),
+            "remaining": rem,
             "upgrade_unlocks": _tier_upgrade_unlocks(tier),
             "tickets_handled": int(summary.get("usage", 0) or 0),
+            "capacity_message": _me_capacity_message(tier, rem),
         }
     except Exception:
         return None
 
 
 @app.get("/me")
-def me(user: User = Depends(get_current_user)):
+def me(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     usage_summary = get_usage_summary(user)
     public_username = "" if user.username in {"guest", "dev_user"} else user.username
     public_tier = get_public_plan_name(user)
@@ -2780,6 +2820,7 @@ def me(user: User = Depends(get_current_user)):
         "value_signals": _build_me_value_signals(
             user,
             {**usage_summary, "remaining": remaining},
+            db=db,
         ),
     }
 
@@ -3246,6 +3287,13 @@ def dashboard_summary(
             "your_limit": pc["monthly_limit"],
             "remaining": usage_summary["remaining"],
         })
+        ms = float(cached.get("money_saved", 0) or 0)
+        act = int(cached.get("actions", 0) or 0)
+        cached["value_generated"] = {
+            "money_saved": round(ms, 2),
+            "time_saved_minutes": int(act * 6),
+            "actions_taken": act,
+        }
         try:
             cached["operator_mode"] = get_operator_mode(db)
         except Exception:
@@ -3967,10 +4015,10 @@ async def support_stream(
             await asyncio.sleep(STREAM_CHUNK_DELAY)
 
         yield sse_event("result", result)
-        yield sse_event("done", {"ok": True})
         usage_warn = _stream_usage_warning_payload(username)
         if usage_warn:
             yield sse_event("usage_warning", usage_warn)
+        yield sse_event("done", {"ok": True})
 
     return StreamingResponse(
         generator(),
@@ -4099,6 +4147,7 @@ def analyze_extension_ticket(
         priority_routing = bool(get_plan_config(plan_tier)["priority_routing"])
         operator_mode = get_operator_mode(db)
     else:
+        # Anonymous extension traffic: same sliding-window pattern as workspace guest (12/min per key).
         username = "extension_guest"
         if not check_rate_limit("__ext_guest__"):
             raise HTTPException(
