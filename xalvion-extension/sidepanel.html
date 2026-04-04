@@ -6,21 +6,22 @@
   <title>Xalvion Assist</title>
   <style>
     :root {
-      --bg: #040816;
+      --bg: #04060f;
       --panel: #071024;
       --panel-2: #0b1630;
-      --line: rgba(255,255,255,0.08);
-      --text: #f5f7ff;
-      --muted: #a9b3cc;
-      --purple-1: #8b5cf6;
-      --purple-2: #4f46e5;
+      --line: rgba(255,255,255,0.10);
+      --text: #f5f8ff;
+      --muted: rgba(205,215,242,0.72);
+      --purple-1: #7c5cfc;
+      --purple-2: #4f8ef7;
       --blue-1: #22c1ff;
       --blue-2: #0a84ff;
       --warn: #facc15;
       --danger: #ff6b6b;
       --success: #34d399;
       --radius: 14px;
-      --shadow: 0 14px 40px rgba(0,0,0,0.35);
+      --shadow: 0 14px 40px rgba(0,0,0,0.42);
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     * { box-sizing: border-box; }
@@ -31,9 +32,9 @@
       width: 400px;
       min-height: 640px;
       background:
-        radial-gradient(circle at top left, rgba(124,92,252,0.18), transparent 32%),
-        radial-gradient(circle at top right, rgba(34,193,255,0.12), transparent 28%),
-        linear-gradient(180deg, #030712 0%, #050b1c 100%);
+        radial-gradient(ellipse 80% 55% at 50% 0%, rgba(100,60,255,0.08), transparent 70%),
+        radial-gradient(ellipse 50% 40% at 100% 100%, rgba(20,100,200,0.06), transparent 70%),
+        linear-gradient(180deg, var(--bg) 0%, #03050e 100%);
       color: var(--text);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -81,6 +82,22 @@
       font-size: 12px;
       color: var(--muted);
       line-height: 1.45;
+    }
+
+    .extension-capacity-pill {
+      margin-top: 10px;
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-family: ui-monospace, monospace;
     }
 
     .content {
@@ -530,7 +547,8 @@
         <div class="brand-mark"></div>
         <div>
           <h1 class="brand-title">Xalvion Assist</h1>
-          <p class="brand-subtitle">Analyze the current ticket and surface the right next step.</p>
+          <p class="brand-subtitle">AI prepares. You approve — same decision stack as the workspace.</p>
+          <div id="extensionCapacityPill" class="extension-capacity-pill">Extension · session</div>
         </div>
       </div>
     </div>
@@ -752,6 +770,6 @@
     </div>
   </div>
 
-  <script src="sidepanel.js"></script>
+  <script type="module" src="sidepanel.js"></script>
 </body>
 </html>

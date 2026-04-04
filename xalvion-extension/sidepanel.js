@@ -1,3 +1,7 @@
+import { createChromeContext } from "./chrome-context.js";
+
+const chromeCtx = createChromeContext(typeof chrome !== "undefined" ? chrome : null);
+
 const analyzeBtn = document.getElementById("analyze");
 const copyBtn = document.getElementById("copyBtn");
 const insertBtn = document.getElementById("insertBtn");
@@ -1011,6 +1015,13 @@ function ensureExecutionTierPill() {
 }
 
 function deriveExecutionTierPresentation(data) {
+  const decEarly = getDecisionData(data);
+  const triageEarly = getTriageData(data);
+  const riskEarly = String(decEarly.risk_level || triageEarly.risk_level || data.risk_level || "").toLowerCase();
+  if (riskEarly === "high") {
+    return { text: "⚠ High risk", cls: "escalated", title: "Elevated risk — review before send" };
+  }
+
   const raw = String(data.execution_tier || "").toLowerCase();
   if (raw === "safe_autopilot_ready") {
     return {
@@ -1068,6 +1079,11 @@ function renderExecutionTierSignal(data) {
 
 function render(data) {
   ensureEnterpriseCards();
+
+  const capPill = document.getElementById("extensionCapacityPill");
+  if (capPill && data?.meta && data.meta.plan_tier) {
+    capPill.textContent = `Extension · ${String(data.meta.plan_tier).toUpperCase()}`;
+  }
 
   const decision = getDecisionData(data);
   const triage = getTriageData(data);
@@ -1447,7 +1463,7 @@ async function analyze() {
   startThinkingPanel();
 
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await chromeCtx.getActiveTab();
 
     if (!tab?.id) {
       hideThinkingPanel();
@@ -1520,7 +1536,7 @@ async function scanInbox() {
   startThinkingPanel();
 
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await chromeCtx.getActiveTab();
 
     if (!tab?.id) {
       hideThinkingPanel();
@@ -1626,7 +1642,7 @@ if (insertBtn) {
     if (!lastReply) return;
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await chromeCtx.getActiveTab();
 
       if (!tab?.id) {
         showStatus("No active tab found.", true);

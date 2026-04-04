@@ -259,6 +259,7 @@ WORKSPACE_MODULES_JS_PATH = os.path.join(BASE_DIR, "workspace_modules.js")
 STYLES_CSS_PATH = os.path.join(BASE_DIR, "styles.css")
 LANDING_PATH = os.path.join(BASE_DIR, "landing.html")
 FLUID_DIR = os.path.join(BASE_DIR, "fluid")
+WORKSPACE_CLIENT_DIR = os.path.join(BASE_DIR, "workspace-client")
 
 # =============================================================================
 # FastAPI App + CORS
@@ -268,6 +269,9 @@ app = FastAPI(title="Xalvion Sovereign Brain")
 
 if os.path.isdir(FLUID_DIR):
     app.mount("/fluid", StaticFiles(directory=FLUID_DIR), name="fluid")
+
+if os.path.isdir(WORKSPACE_CLIENT_DIR):
+    app.mount("/workspace-client", StaticFiles(directory=WORKSPACE_CLIENT_DIR), name="workspace_client")
 
 _ALLOWED_ORIGINS = [
     "http://localhost:5500",
@@ -2728,8 +2732,10 @@ def _stream_usage_warning_payload(username: str) -> dict[str, Any] | None:
         tier = get_public_plan_name(user_row)
         if str(tier).strip().lower() in {"elite", "dev"}:
             return None
+        at_limit = usage >= limit
         return {
             "approaching_limit": True,
+            "at_limit": at_limit,
             "usage_pct": round(pct, 2),
             "remaining": int(summary["remaining"]),
             "upgrade_unlocks": _tier_upgrade_unlocks(tier),

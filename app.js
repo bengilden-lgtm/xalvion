@@ -67,7 +67,7 @@ if (typeof window.pulseRail !== "function") {
     accountCard: document.getElementById("accountCard"),
     paymentIntentInput: document.getElementById("paymentIntentInput"),
     chargeIdInput: document.getElementById("chargeIdInput"),
-    railInner: document.querySelector(".rail-inner"),
+    railInner: document.getElementById("railInner") || document.querySelector(".rail-inner"),
     messagesShell: document.getElementById("messagesShell"),
     upgradeButtons: Array.from(document.querySelectorAll("[data-upgrade]")),
     fillButtons: Array.from(document.querySelectorAll("[data-fill]")),
@@ -126,7 +126,18 @@ if (typeof window.pulseRail !== "function") {
     forecastCoverage: document.getElementById("forecastCoverage"),
     forecastStageList: document.getElementById("forecastStageList"),
     forecastDealList: document.getElementById("forecastDealList"),
-    upgradeValueSummary: document.getElementById("upgradeValueSummary")
+    upgradeValueSummary: document.getElementById("upgradeValueSummary"),
+    commandPlanCapacity: document.getElementById("commandPlanCapacity"),
+    commandModeLine: document.getElementById("commandModeLine"),
+    commandAuthChip: document.getElementById("commandAuthChip"),
+    composerStatusLine: document.getElementById("composerStatusLine"),
+    workspacePageTitle: document.getElementById("workspacePageTitle"),
+    railRunSummary: document.getElementById("railRunSummary"),
+    railValueMoney: document.getElementById("railValueMoney"),
+    railValueTime: document.getElementById("railValueTime"),
+    railValueActions: document.getElementById("railValueActions"),
+    railSessionTier: document.getElementById("railSessionTier"),
+    latestRunRailCard: document.getElementById("latestRunRailCard")
   };
 
   const state = {
@@ -1168,6 +1179,79 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     updateRefundUI();
     persistAuth();
     syncUsageApproachNotice();
+    syncCommandStripCapacity();
+  }
+
+  function syncCommandStripCapacity() {
+    const el = els.commandPlanCapacity;
+    if (!el) return;
+    el.classList.remove("is-warning", "is-limit");
+    const pct = state.limit > 0 ? state.usage / state.limit : 0;
+    if (!isAuthenticated()) {
+      el.textContent = `Preview · ${state.remaining} run${state.remaining === 1 ? "" : "s"} remaining`;
+      if (state.remaining <= 0) el.classList.add("is-limit");
+      else if (pct >= 0.75) el.classList.add("is-warning");
+      return;
+    }
+    if (state.atLimit) {
+      el.classList.add("is-limit");
+      el.textContent = `${state.usage} of ${state.limit} runs used · 0 remaining this month`;
+      return;
+    }
+    if (state.approachingLimit || pct >= 0.75) {
+      el.classList.add("is-warning");
+      el.textContent = `${state.usage} of ${state.limit} runs used · ${state.remaining} remaining this month`;
+      return;
+    }
+    el.textContent = `${formatTier(state.tier)} · ${state.usage} / ${state.limit} runs · ${state.remaining} left`;
+  }
+
+  function syncCommandAuthChip() {
+    if (!els.commandAuthChip) return;
+    if (state.username && state.token) {
+      els.commandAuthChip.textContent = state.username;
+    } else {
+      els.commandAuthChip.textContent = "Guest preview";
+    }
+  }
+
+  function syncPhase2Stores() {
+    const p2 = typeof globalThis !== "undefined" ? globalThis.__XALVION_PHASE2__ : null;
+    if (!p2 || !p2.sessionStore || !p2.agentStore) return;
+    try {
+      p2.sessionStore.set({
+        token: state.token,
+        username: state.username,
+        tier: state.tier,
+        usage: state.usage,
+        limit: state.limit,
+        remaining: state.remaining,
+        usagePct: state.usagePct,
+        approachingLimit: state.approachingLimit,
+        atLimit: state.atLimit,
+        valueSignals: state.valueSignals,
+      });
+    } catch {
+      /* no-op */
+    }
+  }
+
+  function syncAnalyticsRail() {
+    const p2 = globalThis.__XALVION_PHASE2__;
+    if (!p2?.analyticsEngine?.syncValueRail) return;
+    try {
+      p2.analyticsEngine.syncValueRail(
+        {
+          railValueMoney: els.railValueMoney,
+          railValueTime: els.railValueTime,
+          railValueActions: els.railValueActions,
+          railSessionTier: els.railSessionTier,
+        },
+        state.dashboardStats || {}
+      );
+    } catch {
+      /* no-op */
+    }
   }
 
   function estimateAgentMinutesSavedFromDashboard(d = {}) {
@@ -1252,6 +1336,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   function applyUsageWarningFromStream(payload) {
     if (!payload || typeof payload !== "object") return;
     if (payload.approaching_limit) state.approachingLimit = true;
+    if (payload.at_limit === true) state.atLimit = true;
     if (typeof payload.usage_pct === "number" && Number.isFinite(payload.usage_pct)) {
       state.usagePct = payload.usage_pct;
     }
@@ -1276,6 +1361,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       usage: state.usage,
       value_signals: state.valueSignals,
     });
+    syncCommandStripCapacity();
+    syncPhase2Stores();
   }
 
   function actionLabel(data) {
@@ -1393,10 +1480,16 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function updateTopbarStatus() {
+    syncCommandAuthChip();
+    if (els.commandModeLine) {
+      els.commandModeLine.textContent = state.latestRun ? "Live run" : "Operator";
+    }
+    syncCommandStripCapacity();
+
     if (els.workspaceHeadline) {
       els.workspaceHeadline.textContent = state.username
-        ? `Operator workspace · ${state.username}`
-        : "Operator workspace · AI prepares, you approve";
+        ? `Signed in · ${state.username}`
+        : "AI prepares. You approve.";
     }
 
     if (els.workspaceSubcopy) {
@@ -1418,6 +1511,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     }
 
     updateAuthStatus();
+    syncPhase2Stores();
   }
 
   function updateSystemNarrative(data = null) {
@@ -1488,20 +1582,81 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const when = relativeTime(new Date());
     const headLabel = role === "user" ? getUserBadge() : getAssistantBadge();
 
+    const assistantBody =
+      role === "assistant"
+        ? `<div class="msg-body assistant-canvas">
+        <div class="stream-trace-host"></div>
+        <div class="customer-message-block">
+          <div class="customer-message-label">Customer message</div>
+          <div class="reply-text js-reply-text">${bodyHtml}</div>
+        </div>
+        <div class="assistant-footer js-assistant-footer"></div>
+      </div>`
+        : `<div class="msg-body">
+        <div class="reply-text js-reply-text">${bodyHtml}</div>
+      </div>`;
+
     card.innerHTML = `
       <div class="msg-head">
         <div class="msg-who">${headLabel}</div>
         <div class="msg-time">${escapeHtml(when)}</div>
       </div>
-      <div class="msg-body">
-        <div class="reply-text js-reply-text">${bodyHtml}</div>
-        ${role === "assistant" ? `<div class="assistant-footer js-assistant-footer"></div>` : ""}
-      </div>
+      ${assistantBody}
     `;
 
     if (isPlaceholder) card.dataset.placeholder = "true";
     wrapper.appendChild(card);
     return wrapper;
+  }
+
+  function buildEmptyStateHtml() {
+    const guest = !isAuthenticated();
+    const atCap = guest
+      ? getGuestUsage() >= GUEST_USAGE_LIMIT
+      : state.atLimit && String(state.tier).toLowerCase() === "free";
+    const previewLeft = guest ? Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()) : state.remaining;
+    const teaser =
+      guest || String(state.tier).toLowerCase() === "free"
+        ? `<div class="empty-panel">
+            <div class="empty-panel-label">At Pro / Elite</div>
+            <p class="empty-panel-copy">500+ runs · live refund execution · full dashboard · priority routing.</p>
+          </div>`
+        : `<div class="empty-panel">
+            <div class="empty-panel-label">Elite</div>
+            <p class="empty-panel-copy">5,000 runs · advanced analytics · maximum operator throughput.</p>
+          </div>`;
+
+    if (atCap) {
+      const n = guest ? getGuestUsage() : state.usage;
+      return `
+      <div class="empty-card limit-moment-card">
+        <h2>${guest ? "Preview capacity reached" : "Plan limit reached"}</h2>
+        <p>Processed <strong>${n}</strong> support ${guest ? "preview " : ""}scenarios · decisions prepared with full approval controls.</p>
+        <p>${guest ? `12 free runs/month · full decision layer · operator workspace after signup.` : `Upgrade to Pro to keep the operator workspace running without interruption.`}</p>
+        <button type="button" class="limit-cta" id="emptySignupCta">${guest ? "Create your free account →" : "Keep operations running · Upgrade to Pro"}</button>
+        ${guest ? `<button type="button" class="limit-secondary-link" id="emptyLoginLink">Already have an account? Log in</button>` : ""}
+      </div>`;
+    }
+
+    return `
+      <div class="empty-card">
+        <div class="empty-eyebrow">
+          <div class="empty-eyebrow-dot" aria-hidden="true"></div>
+          Operator workspace
+        </div>
+        <h1>AI prepares. You approve.</h1>
+        <p>Paste a customer issue — Xalvion classifies risk, applies policy, drafts the customer-ready message, and holds billing moves until you approve.</p>
+        <div class="empty-grid">
+          <div class="empty-panel">
+            <div class="empty-panel-label">Recent posture</div>
+            <p class="empty-panel-copy">${state.latestRun ? `${displayActionLabel(state.latestRun)} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence` : "No runs yet — your next case appears here with consequence, controls, and brief."}</p>
+          </div>
+          ${teaser}
+        </div>
+        <div class="empty-actions">
+          <span class="empty-chip-hint">${guest ? `Preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} remaining` : `${formatTier(state.tier)} · ${state.remaining} runs left this period`}</span>
+        </div>
+      </div>`;
   }
 
   function addEmptyState() {
@@ -1510,17 +1665,15 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.innerHTML = `
-      <div class="empty-card">
-        <div class="empty-eyebrow">
-          <div class="empty-eyebrow-dot" aria-hidden="true"></div>
-          Workspace
-        </div>
-        <h1>Workspace ready</h1>
-        <p>Run a support case below and stream the response into this thread with readable action context and premium presentation.</p>
-      </div>
-    `;
+    empty.innerHTML = buildEmptyStateHtml();
     els.messages.appendChild(empty);
+
+    empty.querySelector("#emptySignupCta")?.addEventListener("click", () => {
+      els.signupBtn?.click();
+    });
+    empty.querySelector("#emptyLoginLink")?.addEventListener("click", () => {
+      els.usernameInput?.focus();
+    });
   }
 
   function clearEmptyState() {
@@ -1831,6 +1984,14 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
   function deriveConsequenceSignal(data = {}) {
     const dec = data.decision || data.sovereign_decision || {};
+    const risk = String(dec.risk_level || data.triage?.risk_level || "").toLowerCase();
+    if (risk === "high") {
+      return {
+        cls: "signal-high-risk",
+        text: "⚠ High risk",
+        title: "Elevated risk — review before customer send",
+      };
+    }
     const tier = String(data.execution_tier || "").toLowerCase();
     if (tier === "safe_autopilot_ready") {
       return {
@@ -2379,6 +2540,12 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   function setSending(value) {
     state.sending = Boolean(value);
 
+    if (els.composerStatusLine) {
+      els.composerStatusLine.textContent = state.sending
+        ? "Streaming decision preparation…"
+        : "Paste a customer issue or type a support request…";
+    }
+
     if (els.sendBtn) {
       els.sendBtn.disabled = state.sending;
       els.sendBtn.innerHTML = state.sending ? ICONS.status : ICONS.send;
@@ -2482,6 +2649,18 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
         if (item.event === "result") {
           finalData = item.data;
+          const p2 = globalThis.__XALVION_PHASE2__;
+          if (p2?.agentStore) {
+            try {
+              p2.agentStore.set({
+                currentState: "streaming",
+                currentResult: item.data,
+                currentDecision: item.data?.decision || item.data?.sovereign_decision || null,
+              });
+            } catch {
+              /* no-op */
+            }
+          }
         }
 
         if (item.event === "usage_warning" && item.data) {
@@ -2489,7 +2668,14 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
         }
 
         if (item.event === "done") {
-          /* stream may emit usage_warning after done */
+          const p2 = globalThis.__XALVION_PHASE2__;
+          if (p2?.agentStore && finalData) {
+            try {
+              p2.agentStore.set({ currentState: "done", currentResult: finalData });
+            } catch {
+              /* no-op */
+            }
+          }
         }
       }
     };
@@ -2537,7 +2723,10 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function ensureOpsCard() {
-    let card = document.getElementById("xalvionOpsCard");
+    let card = els.latestRunRailCard || document.getElementById("latestRunRailCard");
+    if (card) return card;
+
+    card = document.getElementById("xalvionOpsCard");
     if (card) return card;
 
     card = document.createElement("div");
@@ -2615,7 +2804,17 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       const value = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
       const posture = operatorPostureLabel(data);
       const risk = String(decision.risk_level || triage.risk_level || "medium");
-      latestNarrative.innerHTML = `${ICONS.spark}<span>${escapeHtml(`Operator system · ${posture} · ${risk} risk · value surfaced ${value}. ${reason}`)}</span>`;
+      const line = `Operator system · ${posture} · ${risk} risk · value surfaced ${value}. ${reason}`;
+      const sub = latestNarrative.querySelector(".ops-narrative-text");
+      if (sub) sub.textContent = line;
+      else latestNarrative.innerHTML = `${ICONS.spark}<span class="ops-narrative-text">${escapeHtml(line)}</span>`;
+    }
+
+    if (els.railRunSummary) {
+      const it = String(
+        data.issue_type || data.meta?.issue_type || data.decision?.issue_type || "general_support"
+      ).replace(/_/g, " ");
+      els.railRunSummary.textContent = `${it} · ${displayActionLabel(data)} · conf ${formatMetric(data.confidence || 0, 2)}`;
     }
   }
 
@@ -2833,10 +3032,14 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     const row = addAssistantMessage("");
     const stepsEl = createStreamSteps();
     const replyNode = getAssistantCopyNode(row);
-    if (replyNode) {
+    const streamHost = row.querySelector(".stream-trace-host");
+    if (streamHost) {
+      streamHost.appendChild(stepsEl);
+    } else if (replyNode) {
       replyNode.innerHTML = createTypingMarkup();
       replyNode.parentElement.insertBefore(stepsEl, replyNode);
     }
+    if (replyNode) replyNode.innerHTML = createTypingMarkup();
 
     setSending(true);
     setNotice("info", "Running support case", "Streaming live action states from the support pipeline.");
@@ -3207,6 +3410,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       updatePlanUI("free", getGuestUsage(), GUEST_USAGE_LIMIT, Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()));
       updateAuthStatus();
       syncUsageApproachNotice();
+      syncCommandStripCapacity();
+      syncPhase2Stores();
       return { ok: true, staleCleared: false };
     }
 
@@ -3239,6 +3444,8 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
       persistAuth();
       updateTopbarStatus();
       syncUsageApproachNotice();
+      syncCommandStripCapacity();
+      syncPhase2Stores();
       return { ok: true, staleCleared: false };
     } catch {
       updateTopbarStatus();
@@ -3287,6 +3494,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
 
       state.dashboardStats = data;
       refreshUpgradeValueSummary();
+      syncAnalyticsRail();
     } catch {
       setText(els.statInteractions, formatMetric(state.totalInteractions, 0));
       setText(els.statQuality, formatMetric(state.avgQuality, 2));
@@ -3302,6 +3510,7 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     addEmptyState();
     updateSystemNarrative(null);
     updateTopbarStatus();
+    if (els.railRunSummary) els.railRunSummary.textContent = "Issue type, action, confidence — updates after each support run.";
     scrollMessagesToBottom(true);
   }
 
@@ -3907,6 +4116,24 @@ function bindEvents() {
   }
 
   async function init() {
+    globalThis.addEventListener?.("xalvion:phase2-ready", () => {
+      syncPhase2Stores();
+      syncAnalyticsRail();
+    });
+
+    let phase2Core = null;
+    try {
+      if (typeof globalThis.createPhase2Core === "function") {
+        phase2Core = globalThis.createPhase2Core({ fetchImpl: fetch.bind(globalThis) });
+      }
+    } catch {
+      phase2Core = null;
+    }
+    if (phase2Core) {
+      globalThis.__XALVION_FORMAT__ = phase2Core.format;
+      globalThis.__XALVION_PHASE2_CORE__ = phase2Core;
+    }
+
     ensureInjectedStyles();
     ensureCrmStyles();
     hydrateStripeCallbackState();

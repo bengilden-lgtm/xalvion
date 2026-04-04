@@ -3,407 +3,473 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Xalvion</title>
+  <title>Xalvion — Operator workspace</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><text x='32' y='48' font-family='Georgia,serif' font-size='48' font-weight='700' fill='%23ffffff' text-anchor='middle'>X</text></svg>" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div class="app">
-    <!-- Sidebar omits scroll-shell so bottom/top fade pseudo-elements cannot intercept clicks on Integrations / Stripe controls. -->
-    <aside class="sidebar glass" id="sidebarShell" data-show-top="false" data-show-bottom="false">
-      <div class="sidebar-scroll scroll-area" id="sidebarScroll">
-        <div class="sidebar-inner">
+  <div class="workspace-atmosphere" aria-hidden="true"></div>
 
-          <div class="brand">
-            <svg width="200" height="36" viewBox="0 0 200 36">
-              <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="#ffffff" letter-spacing="-0.5">X</text>
-              <text x="26" y="19" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="300" fill="#ffffff" letter-spacing="4" opacity="0.9">ALVION</text>
-              <text x="27" y="29" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5" font-weight="400" fill="rgba(255,255,255,0.28)" letter-spacing="3">AI SUPPORT ENGINE</text>
-            </svg>
-            <div class="brand-sub" id="brandSubcopy">Fast, clear support responses with the right next step built in.</div>
-          </div>
-
-          <div class="section-label">Workspace notice</div>
-          <div id="notice" class="notice info">
-            <div class="notice-header">
-              <div class="notice-dot" aria-hidden="true"></div>
-              <div id="noticeTitle" class="notice-title">Booting</div>
-            </div>
-            <div class="notice-detail-wrap">
-              <span id="noticeDetail" class="notice-detail">Preparing the response workspace...</span>
-            </div>
-          </div>
-
-          <div class="section-label">Access</div>
-          <div class="auth-card">
-            <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
-            <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
-            <p id="authHints" class="muted-copy" style="margin-top:8px;font-size:12px;line-height:1.45;opacity:0.85">
-              Username: 3–64 characters, letters, numbers, and <code>.</code> <code>_</code> <code>-</code> only.
-              Password: at least 8 characters.
-            </p>
-            <div class="btn-row">
-              <button id="signupBtn" class="ghost-btn" type="button">Sign up</button>
-              <button id="loginBtn" class="btn" type="button">Log in</button>
-            </div>
-            <div class="btn-row access-links-row">
-              <button id="devBtn" class="access-link-btn" type="button">Preview access</button>
-              <button id="logoutBtn" class="access-link-btn" type="button">Logout</button>
-            </div>
-          </div>
-
-          <div class="section-label">Integrations</div>
-          <div class="tier-card stripe-card" id="stripeCard">
-            <div class="stripe-card-head">
-              <div class="stripe-card-title">
-                <span class="stripe-brand">Stripe</span>
-                <p id="stripeIntegrationCopy" class="stripe-card-desc">
-                  Connect Stripe to execute refunds instead of only preparing them.
-                </p>
-              </div>
-              <span id="stripeStatus" class="stripe-status-pill" aria-live="polite">Not connected</span>
-            </div>
-
-            <div class="stripe-meta">
-              <div class="usage-line stripe-meta-line">
-                <span>Account</span>
-                <span id="stripeAccountPill" class="stripe-meta-value">No account linked</span>
-              </div>
-              <div class="usage-line stripe-meta-line">
-                <span>Mode</span>
-                <span id="stripeModePill" class="stripe-meta-value">Awaiting connection</span>
-              </div>
-            </div>
-
-            <div class="stripe-actions-col">
-              <button id="stripeConnectBtn" class="upgrade-btn stripe-connect-btn" type="button">
-                <span class="stripe-connect-label">Connect Stripe</span><span aria-hidden="true">→</span>
-              </button>
-              <button id="stripeDisconnectBtn" class="ghost-btn stripe-disconnect-full" type="button" hidden>
-                Disconnect Stripe
-              </button>
-            </div>
-          </div>
-
-          <div class="section-label">Plans</div>
-          <div id="upgradeValueSummary" class="muted-copy" style="font-size:12px;margin-bottom:8px;line-height:1.45;display:none"></div>
-          <div class="tier-card">
-            <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Upgrade to Pro</span><span>→</span></button>
-            <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Upgrade to Elite</span><span>→</span></button>
-          </div>
-
-        </div>
+  <div class="workspace-root">
+    <header class="command-strip glass" id="commandStrip">
+      <div class="command-strip-left">
+        <a class="command-brand" href="/landing" title="Xalvion">
+          <span class="command-brand-mark" aria-hidden="true"></span>
+          <span class="command-brand-text">
+            <span class="command-brand-name">Xalvion</span>
+            <span class="command-brand-tag">AI prepares · You approve</span>
+          </span>
+        </a>
+        <span id="commandModeLine" class="command-mode-pill" translate="no">Operator</span>
       </div>
-    </aside>
+      <div class="command-strip-center">
+        <span id="commandPlanCapacity" class="command-capacity" translate="no">Preview · capacity loading</span>
+      </div>
+      <div class="command-strip-right">
+        <button id="newChatBtn" class="icon-btn command-tool-btn" type="button" title="New thread">+</button>
+        <a class="icon-btn command-tool-btn" href="/landing" title="Landing">↗</a>
+        <span id="commandAuthChip" class="command-auth-chip" translate="no">Session</span>
+      </div>
+    </header>
 
-    <main class="main">
-      <header class="topbar glass">
-        <div class="title">
-          <h1>Customer support</h1>
-          <p id="workspaceSubcopy">Preview · response ready</p>
-        </div>
-        <div class="top-actions">
-          <button id="newChatBtn" class="icon-btn" type="button" title="New chat">+</button>
-          <a class="icon-btn" href="/landing" title="Open landing page">↗</a>
-        </div>
-      </header>
+    <div class="app workspace-grid">
+      <aside class="sidebar glass rail-col rail-col-left" id="sidebarShell" data-show-top="false" data-show-bottom="false">
+        <div class="sidebar-scroll scroll-area" id="sidebarScroll">
+          <div class="sidebar-inner">
 
-      <section class="workspace glass">
-        <div class="workspace-intro">
-          <div class="workspace-intro-left">
-            <div class="section-label">Workspace</div>
-            <div class="headline" id="workspaceHeadline">Send a customer issue and get a clear reply with the next step built in.</div>
-          </div>
-        </div>
-        <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
-          <div id="messages" class="messages scroll-area"></div>
-        </div>
-      </section>
-
-      <section class="composer-wrap">
-        <div class="quick-actions">
-          <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
-          <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
-          <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
-          <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
-        </div>
-        <div class="composer glass composer-stack">
-          <div class="stripe-context-row muted-copy">
-            <span>Optional Stripe context (attached to support requests):</span>
-            <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
-            <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
-          </div>
-          <div class="composer-input-row">
-          <textarea id="messageInput" placeholder="Paste a customer issue or type a support request..."></textarea>
-          <button id="sendBtn" class="send-btn" type="button">Send</button>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <aside class="rail scroll-shell" id="railShell" data-show-top="false" data-show-bottom="false">
-      <div class="rail-scroll scroll-area" id="railScroll">
-        <div class="rail-card rail-metrics-card" id="dashboardCard">
-          <div class="rail-title">Dashboard</div>
-          <div class="stat-grid stat-grid-split">
-            <div class="stat-box">
-              <div id="statInteractions" class="stat-value">0</div>
-              <div class="stat-label">Tickets handled</div>
-              <div class="stat-context">Today</div>
+            <div class="brand">
+              <svg width="200" height="36" viewBox="0 0 200 36" aria-hidden="true">
+                <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="currentColor" letter-spacing="-0.5">X</text>
+                <text x="26" y="19" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="300" fill="currentColor" letter-spacing="4" opacity="0.9">ALVION</text>
+                <text x="27" y="29" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5" font-weight="400" fill="currentColor" opacity="0.28" letter-spacing="3">OPERATOR ENGINE</text>
+              </svg>
+              <div class="brand-sub" id="brandSubcopy">Autonomous support that prepares decisions — your team approves.</div>
             </div>
-            <div class="stat-divider" aria-hidden="true"></div>
-            <div class="stat-box">
-              <div id="statActions" class="stat-value">0</div>
-              <div class="stat-label">Actions completed</div>
-              <div class="stat-context">Session</div>
-            </div>
-          </div>
-        </div>
 
-        <div class="rail-card refund-card" id="refundCenterCard">
-          <div class="rail-title">Refund center</div>
-          <div class="refund-summary refund-summary-top">
-            <div class="refund-col refund-col-tier">
-              <div class="refund-metric-label">Tier access</div>
-              <div class="refund-upgrade-wrap">
-                <div class="refund-upgrade-card">
-                  <div class="refund-upgrade-title">Unlock live refund execution</div>
-                  <div class="refund-upgrade-sub">Available on Pro and Elite plans</div>
+            <div class="section-label">Workspace notice</div>
+            <div id="notice" class="notice info">
+              <div class="notice-header">
+                <div class="notice-dot" aria-hidden="true"></div>
+                <div id="noticeTitle" class="notice-title">Booting</div>
+              </div>
+              <div class="notice-detail-wrap">
+                <span id="noticeDetail" class="notice-detail">Preparing the operator workspace…</span>
+              </div>
+            </div>
+
+            <div class="section-label">Access</div>
+            <div class="auth-card">
+              <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
+              <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
+              <p id="authHints" class="muted-copy auth-hints">
+                Username: 3–64 characters, letters, numbers, and <code>.</code> <code>_</code> <code>-</code> only.
+                Password: at least 8 characters.
+              </p>
+              <div class="btn-row">
+                <button id="signupBtn" class="ghost-btn" type="button">Sign up</button>
+                <button id="loginBtn" class="btn" type="button">Log in</button>
+              </div>
+              <div class="btn-row access-links-row">
+                <button id="devBtn" class="access-link-btn" type="button">Preview access</button>
+                <button id="logoutBtn" class="access-link-btn" type="button">Logout</button>
+              </div>
+            </div>
+
+            <div class="section-label">Integrations</div>
+            <div class="tier-card stripe-card" id="stripeCard">
+              <div class="stripe-card-head">
+                <div class="stripe-card-title">
+                  <span class="stripe-brand">Stripe</span>
+                  <p id="stripeIntegrationCopy" class="stripe-card-desc">
+                    Connect Stripe to execute refunds instead of only preparing them.
+                  </p>
                 </div>
-                <div id="refundTierAccess" class="refund-tier-ready">Ready</div>
+                <span id="stripeStatus" class="stripe-status-pill" aria-live="polite">Not connected</span>
+              </div>
+              <div class="stripe-meta">
+                <div class="usage-line stripe-meta-line">
+                  <span>Account</span>
+                  <span id="stripeAccountPill" class="stripe-meta-value">No account linked</span>
+                </div>
+                <div class="usage-line stripe-meta-line">
+                  <span>Mode</span>
+                  <span id="stripeModePill" class="stripe-meta-value">Awaiting connection</span>
+                </div>
+              </div>
+              <div class="stripe-actions-col">
+                <button id="stripeConnectBtn" class="upgrade-btn stripe-connect-btn" type="button">
+                  <span class="stripe-connect-label">Connect Stripe</span><span aria-hidden="true">→</span>
+                </button>
+                <button id="stripeDisconnectBtn" class="ghost-btn stripe-disconnect-full" type="button" hidden>
+                  Disconnect Stripe
+                </button>
               </div>
             </div>
-            <div class="refund-summary-divider" aria-hidden="true"></div>
-            <div class="refund-col refund-col-recent">
-              <div class="refund-recent-head">
-                <span class="refund-metric-label">Recent refunds</span>
-                <span id="refundHistoryCount" class="refund-metric-count">0</span>
+
+            <div class="section-label">Plans</div>
+            <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
+            <div class="tier-card">
+              <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Handle more tickets · Upgrade to Pro</span><span>→</span></button>
+              <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Maximum capacity · Upgrade to Elite</span><span>→</span></button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main main-canvas">
+        <div class="main-canvas-inner glass">
+          <div class="workspace-heading-row">
+            <div class="title">
+              <h1 id="workspacePageTitle">Customer support</h1>
+              <p id="workspaceSubcopy" class="workspace-subline">Operator workspace loading…</p>
+            </div>
+          </div>
+
+          <section class="workspace glass workspace-decision-shell">
+            <div class="workspace-intro">
+              <div class="workspace-intro-left">
+                <div class="section-label">Decision canvas</div>
+                <div class="headline" id="workspaceHeadline">Paste a case — Xalvion prepares the decision; you approve what reaches the customer.</div>
+              </div>
+            </div>
+            <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
+              <div id="messages" class="messages scroll-area"></div>
+            </div>
+          </section>
+
+          <section class="composer-wrap">
+            <p id="composerStatusLine" class="composer-status-line">Paste a customer issue or type a support request…</p>
+            <div class="quick-actions">
+              <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
+              <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
+              <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
+              <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
+            </div>
+            <div class="composer glass composer-stack">
+              <div class="stripe-context-row muted-copy">
+                <span>Optional Stripe context (attached to support requests):</span>
+                <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
+                <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+              </div>
+              <div class="composer-input-row composer-input-wrap">
+                <textarea id="messageInput" placeholder="Paste a customer issue or type a support request…"></textarea>
+                <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <aside class="rail rail-col rail-col-right scroll-shell" id="railShell" data-show-top="false" data-show-bottom="false">
+        <div class="rail-scroll scroll-area" id="railScroll">
+          <div class="rail-inner" id="railInner">
+
+            <div class="rail-card rail-elevated" id="latestRunRailCard">
+              <div class="rail-title">Latest run</div>
+              <div class="rail-run-summary muted-copy" id="railRunSummary">Issue type, action, confidence — updates after each support run.</div>
+              <div class="ops-grid">
+                <div class="ops-metric">
+                  <div class="ops-metric-label">Action</div>
+                  <div class="ops-metric-value" id="opsLatestAction">—</div>
+                </div>
+                <div class="ops-metric">
+                  <div class="ops-metric-label">Queue</div>
+                  <div class="ops-metric-value" id="opsLatestQueue">—</div>
+                </div>
+                <div class="ops-metric">
+                  <div class="ops-metric-label">Confidence</div>
+                  <div class="ops-metric-value" id="opsLatestConfidence">0.00</div>
+                </div>
+                <div class="ops-metric">
+                  <div class="ops-metric-label">Money surfaced</div>
+                  <div class="ops-metric-value" id="opsLatestValue">$0</div>
+                </div>
+                <div class="ops-metric">
+                  <div class="ops-metric-label">Est. time saved</div>
+                  <div class="ops-metric-value" id="opsTimeSaved">—</div>
+                </div>
+                <div class="ops-metric">
+                  <div class="ops-metric-label">Posture</div>
+                  <div class="ops-metric-value" id="opsPosture">—</div>
+                </div>
+              </div>
+              <div class="ops-run-line" id="opsRunNarrative"><span class="ops-narrative-text">Waiting for the next operator run.</span></div>
+            </div>
+
+            <div class="rail-card rail-subtle">
+              <div class="rail-title">Value generated</div>
+              <p class="muted-copy rail-teaser" id="valueRailTeaser">Session and billing impact from your workspace activity.</p>
+              <div class="value-gen-grid">
+                <div class="value-gen-cell">
+                  <div class="value-gen-label">Money moved</div>
+                  <div class="value-gen-num" id="railValueMoney">$0.00</div>
+                </div>
+                <div class="value-gen-cell">
+                  <div class="value-gen-label">Time saved</div>
+                  <div class="value-gen-num" id="railValueTime">—</div>
+                </div>
+                <div class="value-gen-cell">
+                  <div class="value-gen-label">Actions</div>
+                  <div class="value-gen-num" id="railValueActions">0</div>
+                </div>
+                <div class="value-gen-cell">
+                  <div class="value-gen-label">Plan</div>
+                  <div class="value-gen-num tier-pill" id="railSessionTier">FREE</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="rail-card rail-metrics-card" id="dashboardCard">
+              <div class="rail-title">Throughput</div>
+              <div class="stat-grid stat-grid-split">
+                <div class="stat-box">
+                  <div id="statInteractions" class="stat-value">0</div>
+                  <div class="stat-label">Tickets handled</div>
+                  <div class="stat-context">Today</div>
+                </div>
+                <div class="stat-divider" aria-hidden="true"></div>
+                <div class="stat-box">
+                  <div id="statActions" class="stat-value">0</div>
+                  <div class="stat-label">Actions completed</div>
+                  <div class="stat-context">Session</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="rail-card refund-card" id="refundCenterCard">
+              <div class="rail-title">Refund center</div>
+              <div class="refund-summary refund-summary-top">
+                <div class="refund-col refund-col-tier">
+                  <div class="refund-metric-label">Tier access</div>
+                  <div class="refund-upgrade-wrap">
+                    <div class="refund-upgrade-card">
+                      <div class="refund-upgrade-title">Unlock live refund execution</div>
+                      <div class="refund-upgrade-sub">Execute refunds from the workspace · Available on Pro and Elite</div>
+                    </div>
+                    <div id="refundTierAccess" class="refund-tier-ready">Ready</div>
+                  </div>
+                </div>
+                <div class="refund-summary-divider" aria-hidden="true"></div>
+                <div class="refund-col refund-col-recent">
+                  <div class="refund-recent-head">
+                    <span class="refund-metric-label">Recent refunds</span>
+                    <span id="refundHistoryCount" class="refund-metric-count">0</span>
+                  </div>
+                </div>
+              </div>
+              <div id="refundCenterCopy" class="refund-copy">Connect Stripe, paste a payment intent or charge ID, and execute refunds from the workspace without using the browser console.</div>
+              <div class="refund-actions">
+                <button id="openRefundModalBtn" class="btn refund-cta-btn" type="button">Upgrade to unlock</button>
+                <button id="refreshRefundHistoryBtn" class="refund-link-refresh" type="button">Refresh refund history</button>
+              </div>
+              <div id="refundHistoryList" class="refund-list">
+                <div class="refund-empty">No refund activity yet. Refunds will appear here with status and timestamp.</div>
+              </div>
+            </div>
+
+            <div class="rail-card" id="usageCard">
+              <div class="rail-title">Plan usage</div>
+              <div class="usage-block">
+                <div class="plan-grid">
+                  <div class="plan-box">
+                    <div id="planTier" class="stat-value">FREE</div>
+                    <div class="stat-label">Current tier</div>
+                  </div>
+                  <div class="plan-box">
+                    <div id="planUsed" class="stat-value">0</div>
+                    <div class="stat-label">Used</div>
+                  </div>
+                </div>
+                <div class="usage-line">
+                  <span>Limit</span>
+                  <span id="planUsage">50</span>
+                </div>
+                <div class="usage-line">
+                  <span>Remaining</span>
+                  <span id="planRemaining">50</span>
+                </div>
+                <div class="usage-bar"><div id="planBar"></div></div>
+                <div id="usagePanelCopy" class="muted-copy">Your plan sets the amount of support usage available each month.</div>
+              </div>
+            </div>
+
+            <div class="rail-card" id="crmTodayCard">
+              <div class="rail-title">Today</div>
+              <div id="crmTodaySummary" class="muted-copy">Sign in to see today’s pipeline, hot deals, and reminder load.</div>
+              <div class="refund-summary" style="margin-top:10px">
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Due now</div>
+                  <div id="crmTodayDueCount" class="refund-metric-value">0</div>
+                </div>
+                <div class="refund-metric">
+                  <div class="refund-metric-label">New today</div>
+                  <div id="crmTodayNewCount" class="refund-metric-value">0</div>
+                </div>
+              </div>
+              <div class="refund-summary" style="margin-top:10px">
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Closed today</div>
+                  <div id="crmTodayClosedCount" class="refund-metric-value">0</div>
+                </div>
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Best source</div>
+                  <div id="crmTodayBestSource" class="refund-metric-value">manual</div>
+                </div>
+              </div>
+              <div class="refund-history-head" style="margin-top:14px">
+                <div class="rail-title rail-title-nested">Hottest open deals</div>
+              </div>
+              <div id="crmHotList" class="refund-list">
+                <div class="refund-empty">No hot deals yet.</div>
+              </div>
+            </div>
+
+            <div class="rail-card" id="revenueCard">
+              <div class="rail-title">Revenue Dashboard</div>
+              <div id="revenueSummary" class="muted-copy">Track source performance, reply rate, win rate, and closed revenue as pipeline moves.</div>
+              <div class="refund-summary" style="margin-top:10px">
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Leads</div>
+                  <div id="revenueLeadsCount" class="refund-metric-value">0</div>
+                </div>
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Reply rate</div>
+                  <div id="revenueReplyRate" class="refund-metric-value">0.0%</div>
+                </div>
+              </div>
+              <div class="refund-summary" style="margin-top:10px">
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Closing rate</div>
+                  <div id="revenueClosingRate" class="refund-metric-value">0.0%</div>
+                </div>
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Win rate</div>
+                  <div id="revenueWinRate" class="refund-metric-value">0.0%</div>
+                </div>
+              </div>
+              <div class="refund-summary" style="margin-top:10px">
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Revenue</div>
+                  <div id="revenueTotalValue" class="refund-metric-value">$0.00</div>
+                </div>
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Best source</div>
+                  <div id="revenueBestSource" class="refund-metric-value">manual</div>
+                </div>
+              </div>
+              <div class="refund-history-head" style="margin-top:14px">
+                <div class="rail-title rail-title-nested">Source performance</div>
+              </div>
+              <div id="sourceList" class="refund-list">
+                <div class="refund-empty">No source performance data yet.</div>
+              </div>
+            </div>
+
+            <div class="rail-card" id="forecastCard">
+              <div class="rail-title">Pipeline Forecast</div>
+              <div id="forecastSummary" class="muted-copy">Track weighted open revenue, projected revenue, and the deals most likely to close.</div>
+              <div class="refund-summary" style="margin-top:10px">
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Pipeline</div>
+                  <div id="forecastPipelineValue" class="refund-metric-value">$0.00</div>
+                </div>
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Weighted</div>
+                  <div id="forecastWeightedRevenue" class="refund-metric-value">$0.00</div>
+                </div>
+              </div>
+              <div class="refund-summary" style="margin-top:10px">
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Projected</div>
+                  <div id="forecastProjectedRevenue" class="refund-metric-value">$0.00</div>
+                </div>
+                <div class="refund-metric">
+                  <div class="refund-metric-label">Coverage</div>
+                  <div id="forecastCoverage" class="refund-metric-value">0.0%</div>
+                </div>
+              </div>
+              <div class="refund-history-head" style="margin-top:14px">
+                <div class="rail-title rail-title-nested">Forecast by stage</div>
+              </div>
+              <div id="forecastStageList" class="refund-list">
+                <div class="refund-empty">No pipeline forecast yet.</div>
+              </div>
+              <div class="refund-history-head" style="margin-top:14px">
+                <div class="rail-title rail-title-nested">Top weighted deals</div>
+              </div>
+              <div id="forecastDealList" class="refund-list">
+                <div class="refund-empty">No weighted opportunities yet.</div>
+              </div>
+            </div>
+
+            <div class="rail-card" id="crmCard">
+              <div class="rail-title">Outreach queue</div>
+              <div class="system-stack">
+                <div id="crmSummary" class="muted-copy">Sign in to load leads, follow-ups, and conversion status.</div>
+                <div class="refund-summary" style="margin-top:6px">
+                  <div class="refund-metric">
+                    <div class="refund-metric-label">New</div>
+                    <div id="crmNewCount" class="refund-metric-value">0</div>
+                  </div>
+                  <div class="refund-metric">
+                    <div class="refund-metric-label">Due</div>
+                    <div id="crmDueCount" class="refund-metric-value">0</div>
+                  </div>
+                </div>
+              </div>
+              <div class="refund-actions" style="margin-top:12px">
+                <button id="refreshLeadsBtn" class="ghost-btn" type="button">Refresh queue</button>
+              </div>
+              <div class="refund-form-grid" style="margin-top:12px">
+                <label class="refund-field">
+                  <span class="refund-label">Username</span>
+                  <input id="leadUsernameInput" class="refund-input" type="text" placeholder="@founder or store name" />
+                </label>
+                <label class="refund-field">
+                  <span class="refund-label">Source</span>
+                  <input id="leadSourceInput" class="refund-input" type="text" placeholder="reddit / x / shopify / manual" />
+                </label>
+                <label class="refund-field refund-field-full">
+                  <span class="refund-label">Lead context</span>
+                  <textarea id="leadTextInput" class="refund-input" rows="3" placeholder="Paste the post, thread, or pain point you want to work from." style="height:auto; min-height:94px; padding:12px 14px; resize:vertical;"></textarea>
+                </label>
+              </div>
+              <div class="refund-actions" style="margin-top:12px">
+                <button id="addLeadBtn" class="ghost-btn" type="button">Add lead</button>
+              </div>
+              <div class="refund-history-head" style="margin-top:14px">
+                <div class="rail-title rail-title-nested">Due follow-ups</div>
+              </div>
+              <div id="followupList" class="refund-list">
+                <div class="refund-empty">No follow-ups due yet.</div>
+              </div>
+              <div class="refund-history-head" style="margin-top:14px">
+                <div class="rail-title rail-title-nested">Lead queue</div>
+              </div>
+              <div id="leadList" class="refund-list">
+                <div class="refund-empty">No leads yet. Add one to start building your outreach queue.</div>
+              </div>
+            </div>
+
+            <div class="rail-card" id="accountCard">
+              <div class="rail-title">Account</div>
+              <div class="system-stack">
+                <div id="backendStatus" class="muted-copy">Service: checking…</div>
+                <div id="authStatus" class="muted-copy">Session: checking…</div>
+                <div id="streamStatus" class="muted-copy">Response: ready</div>
+              </div>
+              <div id="systemPanelCopy" class="muted-copy" style="margin-top:12px">
+                Clear request handling is active and ready for the next conversation.
               </div>
             </div>
           </div>
-          <div id="refundCenterCopy" class="refund-copy">Connect Stripe, paste a payment intent or charge ID, and execute refunds from the workspace without using the browser console.</div>
-          <div class="refund-actions">
-            <button id="openRefundModalBtn" class="btn refund-cta-btn" type="button">Upgrade to unlock</button>
-            <button id="refreshRefundHistoryBtn" class="refund-link-refresh" type="button">Refresh refund history</button>
-          </div>
-          <div id="refundHistoryList" class="refund-list">
-            <div class="refund-empty">No refund activity yet. Refunds will appear here with status and timestamp.</div>
-          </div>
         </div>
-
-        <div class="rail-card" id="usageCard">
-          <div class="rail-title">Plan usage</div>
-          <div class="usage-block">
-            <div class="plan-grid">
-              <div class="plan-box">
-                <div id="planTier" class="stat-value">FREE</div>
-                <div class="stat-label">Current tier</div>
-              </div>
-              <div class="plan-box">
-                <div id="planUsed" class="stat-value">0</div>
-                <div class="stat-label">Used</div>
-              </div>
-            </div>
-            <div class="usage-line">
-              <span>Limit</span>
-              <span id="planUsage">50</span>
-            </div>
-            <div class="usage-line">
-              <span>Remaining</span>
-              <span id="planRemaining">50</span>
-            </div>
-            <div class="usage-bar"><div id="planBar"></div></div>
-            <div id="usagePanelCopy" class="muted-copy">Your plan sets the amount of support usage available each month.</div>
-          </div>
-        </div>
-
-        
-        
-        <div class="rail-card" id="crmTodayCard">
-          <div class="rail-title">Today</div>
-          <div id="crmTodaySummary" class="muted-copy">Sign in to see today’s pipeline, hot deals, and reminder load.</div>
-          <div class="refund-summary" style="margin-top:10px">
-            <div class="refund-metric">
-              <div class="refund-metric-label">Due now</div>
-              <div id="crmTodayDueCount" class="refund-metric-value">0</div>
-            </div>
-            <div class="refund-metric">
-              <div class="refund-metric-label">New today</div>
-              <div id="crmTodayNewCount" class="refund-metric-value">0</div>
-            </div>
-          </div>
-          <div class="refund-summary" style="margin-top:10px">
-            <div class="refund-metric">
-              <div class="refund-metric-label">Closed today</div>
-              <div id="crmTodayClosedCount" class="refund-metric-value">0</div>
-            </div>
-            <div class="refund-metric">
-              <div class="refund-metric-label">Best source</div>
-              <div id="crmTodayBestSource" class="refund-metric-value">manual</div>
-            </div>
-          </div>
-          <div class="refund-history-head" style="margin-top:14px">
-            <div class="rail-title" style="font-size:12px">Hottest open deals</div>
-          </div>
-          <div id="crmHotList" class="refund-list">
-            <div class="refund-empty">No hot deals yet.</div>
-          </div>
-        </div>
-
-        
-        <div class="rail-card" id="revenueCard">
-          <div class="rail-title">Revenue Dashboard</div>
-          <div id="revenueSummary" class="muted-copy">Track source performance, reply rate, win rate, and closed revenue as pipeline moves.</div>
-          <div class="refund-summary" style="margin-top:10px">
-            <div class="refund-metric">
-              <div class="refund-metric-label">Leads</div>
-              <div id="revenueLeadsCount" class="refund-metric-value">0</div>
-            </div>
-            <div class="refund-metric">
-              <div class="refund-metric-label">Reply rate</div>
-              <div id="revenueReplyRate" class="refund-metric-value">0.0%</div>
-            </div>
-          </div>
-          <div class="refund-summary" style="margin-top:10px">
-            <div class="refund-metric">
-              <div class="refund-metric-label">Closing rate</div>
-              <div id="revenueClosingRate" class="refund-metric-value">0.0%</div>
-            </div>
-            <div class="refund-metric">
-              <div class="refund-metric-label">Win rate</div>
-              <div id="revenueWinRate" class="refund-metric-value">0.0%</div>
-            </div>
-          </div>
-          <div class="refund-summary" style="margin-top:10px">
-            <div class="refund-metric">
-              <div class="refund-metric-label">Revenue</div>
-              <div id="revenueTotalValue" class="refund-metric-value">$0.00</div>
-            </div>
-            <div class="refund-metric">
-              <div class="refund-metric-label">Best source</div>
-              <div id="revenueBestSource" class="refund-metric-value">manual</div>
-            </div>
-          </div>
-          <div class="refund-history-head" style="margin-top:14px">
-            <div class="rail-title">Source performance</div>
-          </div>
-          <div id="sourceList" class="refund-list">
-            <div class="refund-empty">No source performance data yet.</div>
-          </div>
-        </div>
-
-
-        <div class="rail-card" id="forecastCard">
-          <div class="rail-title">Pipeline Forecast</div>
-          <div id="forecastSummary" class="muted-copy">Track weighted open revenue, projected revenue, and the deals most likely to close.</div>
-          <div class="refund-summary" style="margin-top:10px">
-            <div class="refund-metric">
-              <div class="refund-metric-label">Pipeline</div>
-              <div id="forecastPipelineValue" class="refund-metric-value">$0.00</div>
-            </div>
-            <div class="refund-metric">
-              <div class="refund-metric-label">Weighted</div>
-              <div id="forecastWeightedRevenue" class="refund-metric-value">$0.00</div>
-            </div>
-          </div>
-          <div class="refund-summary" style="margin-top:10px">
-            <div class="refund-metric">
-              <div class="refund-metric-label">Projected</div>
-              <div id="forecastProjectedRevenue" class="refund-metric-value">$0.00</div>
-            </div>
-            <div class="refund-metric">
-              <div class="refund-metric-label">Coverage</div>
-              <div id="forecastCoverage" class="refund-metric-value">0.0%</div>
-            </div>
-          </div>
-          <div class="refund-history-head" style="margin-top:14px">
-            <div class="rail-title">Forecast by stage</div>
-          </div>
-          <div id="forecastStageList" class="refund-list">
-            <div class="refund-empty">No pipeline forecast yet.</div>
-          </div>
-          <div class="refund-history-head" style="margin-top:14px">
-            <div class="rail-title">Top weighted deals</div>
-          </div>
-          <div id="forecastDealList" class="refund-list">
-            <div class="refund-empty">No weighted opportunities yet.</div>
-          </div>
-        </div>
-
-        <div class="rail-card" id="crmCard">
-          <div class="rail-title">Outreach queue</div>
-          <div class="system-stack">
-            <div id="crmSummary" class="muted-copy">Sign in to load leads, follow-ups, and conversion status.</div>
-            <div class="refund-summary" style="margin-top:6px">
-              <div class="refund-metric">
-                <div class="refund-metric-label">New</div>
-                <div id="crmNewCount" class="refund-metric-value">0</div>
-              </div>
-              <div class="refund-metric">
-                <div class="refund-metric-label">Due</div>
-                <div id="crmDueCount" class="refund-metric-value">0</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="refund-actions" style="margin-top:12px">
-            <button id="refreshLeadsBtn" class="ghost-btn" type="button">Refresh queue</button>
-          </div>
-
-          <div class="refund-form-grid" style="margin-top:12px">
-            <label class="refund-field">
-              <span class="refund-label">Username</span>
-              <input id="leadUsernameInput" class="refund-input" type="text" placeholder="@founder or store name" />
-            </label>
-
-            <label class="refund-field">
-              <span class="refund-label">Source</span>
-              <input id="leadSourceInput" class="refund-input" type="text" placeholder="reddit / x / shopify / manual" />
-            </label>
-
-            <label class="refund-field refund-field-full">
-              <span class="refund-label">Lead context</span>
-              <textarea id="leadTextInput" class="refund-input" rows="3" placeholder="Paste the post, thread, or pain point you want to work from." style="height:auto; min-height:94px; padding:12px 14px; resize:vertical;"></textarea>
-            </label>
-          </div>
-
-          <div class="refund-actions" style="margin-top:12px">
-            <button id="addLeadBtn" class="ghost-btn" type="button">Add lead</button>
-          </div>
-
-          <div class="refund-history-head" style="margin-top:14px">
-            <div class="rail-title">Due follow-ups</div>
-          </div>
-          <div id="followupList" class="refund-list">
-            <div class="refund-empty">No follow-ups due yet.</div>
-          </div>
-
-          <div class="refund-history-head" style="margin-top:14px">
-            <div class="rail-title">Lead queue</div>
-          </div>
-          <div id="leadList" class="refund-list">
-            <div class="refund-empty">No leads yet. Add one to start building your outreach queue.</div>
-          </div>
-        </div>
-
-        <div class="rail-card" id="accountCard">
-          <div class="rail-title">Account</div>
-          <div class="system-stack">
-            <div id="backendStatus" class="muted-copy">Service: checking...</div>
-            <div id="authStatus" class="muted-copy">Session: checking...</div>
-            <div id="streamStatus" class="muted-copy">Response: ready</div>
-          </div>
-          <div id="systemPanelCopy" class="muted-copy" style="margin-top:12px">
-            Clear request handling is active and ready for the next conversation.
-          </div>
-        </div>
-      </div>
-    </aside>
+      </aside>
+    </div>
   </div>
-
 
   <div class="refund-modal" id="refundModal" aria-hidden="true">
     <div class="refund-dialog glass">
@@ -414,25 +480,20 @@
         </div>
         <button id="closeRefundModalBtn" class="refund-close" type="button" aria-label="Close refund UI">×</button>
       </div>
-
       <div id="refundModalNote" class="refund-inline-note">Refund execution is locked until your plan allows live billing actions.</div>
-
       <div class="refund-form-grid">
         <label class="refund-field">
           <span class="refund-label">PaymentIntent ID</span>
           <input id="refundPaymentIntentInput" class="refund-input" type="text" placeholder="pi_..." />
         </label>
-
         <label class="refund-field">
           <span class="refund-label">Charge ID</span>
           <input id="refundChargeInput" class="refund-input" type="text" placeholder="ch_..." />
         </label>
-
         <label class="refund-field">
           <span class="refund-label">Amount (optional)</span>
           <input id="refundAmountInput" class="refund-input" type="number" min="0" step="0.01" placeholder="Leave blank for full refund" />
         </label>
-
         <label class="refund-field">
           <span class="refund-label">Reason</span>
           <select id="refundReasonSelect" class="refund-select">
@@ -442,7 +503,6 @@
           </select>
         </label>
       </div>
-
       <div class="refund-footer">
         <button id="cancelRefundModalBtn" class="ghost-btn" type="button">Cancel</button>
         <button id="executeRefundBtn" class="btn" type="button">Run refund</button>
@@ -500,14 +560,8 @@
     })();
   </script>
 
+  <script type="module" src="/workspace-client/boot.js"></script>
+  <script src="/workspace_modules.js"></script>
   <script src="/app.js"></script>
-  <script>
-    (function () {
-      var s = document.createElement("script");
-      s.src = "/workspace_modules.js";
-      s.onerror = function () {};
-      document.body.appendChild(s);
-    })();
-  </script>
 </body>
 </html>
