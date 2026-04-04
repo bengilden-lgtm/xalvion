@@ -189,6 +189,15 @@ if (typeof window.pulseRail !== "function") {
     dashboardStats: null
   };
 
+  function getPhase2() {
+    return typeof globalThis !== "undefined" ? globalThis.__XALVION_PHASE2__ : null;
+  }
+
+  function phase2WorkspaceReady() {
+    const p2 = getPhase2();
+    return Boolean(p2 && p2.sessionStore && p2.agentStore && p2.ready !== false);
+  }
+
   const ICONS = {
     copy: `
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -711,26 +720,50 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   function renderRefundHistory(logs = []) {
     state.refundHistory = Array.isArray(logs) ? logs.slice() : [];
 
-    if (els.refundHistoryCount) {
-      setText(els.refundHistoryCount, String(state.refundHistory.length));
+    const p2 = getPhase2();
+    let delegated = false;
+    if (phase2WorkspaceReady() && p2?.stripeEngine?.renderRefundHistory) {
+      try {
+        p2.stripeEngine.renderRefundHistory(els, state.refundHistory, {
+          formatMoney,
+          escapeHtml,
+          formatRefundTimestamp,
+          refundStatusTone,
+          setText,
+        });
+        delegated = true;
+      } catch {
+        delegated = false;
+      }
     }
 
-    if (!els.refundHistoryList) return;
+    if (!delegated) {
+      if (els.refundHistoryCount) {
+        setText(els.refundHistoryCount, String(state.refundHistory.length));
+      }
 
-    if (!state.refundHistory.length) {
-      els.refundHistoryList.innerHTML = '<div class="refund-empty">No refund activity yet. Refunds will appear here with status and timestamp.</div>';
-      return;
-    }
+      if (!els.refundHistoryList) {
+        syncPhase2Stores();
+        return;
+      }
 
-    els.refundHistoryList.innerHTML = state.refundHistory.map((log) => {
-      const status = String(log.status || "pending");
-      const tone = refundStatusTone(status);
-      const amount = Number(log.amount || 0);
-      const title = amount > 0 ? `Refunded ${formatMoney(amount)}` : "Refund activity";
-      const reason = log.reason ? escapeHtml(log.reason) : "No reason provided";
-      const timestamp = formatRefundTimestamp(log.timestamp);
-      const username = log.username ? escapeHtml(log.username) : "workspace";
-      return `
+      if (!state.refundHistory.length) {
+        els.refundHistoryList.innerHTML =
+          '<div class="refund-empty">No refund activity yet. Refunds will appear here with status and timestamp.</div>';
+        syncPhase2Stores();
+        return;
+      }
+
+      els.refundHistoryList.innerHTML = state.refundHistory
+        .map((log) => {
+          const status = String(log.status || "pending");
+          const tone = refundStatusTone(status);
+          const amount = Number(log.amount || 0);
+          const title = amount > 0 ? `Refunded ${formatMoney(amount)}` : "Refund activity";
+          const reason = log.reason ? escapeHtml(log.reason) : "No reason provided";
+          const timestamp = formatRefundTimestamp(log.timestamp);
+          const username = log.username ? escapeHtml(log.username) : "workspace";
+          return `
         <div class="refund-item">
           <div class="refund-item-head">
             <div class="refund-item-title">${escapeHtml(title)}</div>
@@ -746,52 +779,75 @@ The workspace already showed you real routing and approval discipline. Pro keeps
           </div>
         </div>
       `;
-    }).join("");
+        })
+        .join("");
+    }
+
+    syncPhase2Stores();
   }
 
   function updateRefundUI() {
-    const allowed = canUseRefundCenter();
-
-    if (els.refundTierAccess) {
-      setText(els.refundTierAccess, allowed ? "Ready" : "");
+    const p2 = getPhase2();
+    let delegated = false;
+    if (phase2WorkspaceReady() && p2?.stripeEngine?.updateRefundCenterPanel) {
+      try {
+        p2.stripeEngine.updateRefundCenterPanel(
+          els,
+          { tier: state.tier, dashboardStats: state.dashboardStats },
+          { canUseRefundCenter, formatMoney, setText }
+        );
+        delegated = true;
+      } catch {
+        delegated = false;
+      }
     }
 
-    if (els.refundCenterCard) {
-      els.refundCenterCard.classList.toggle("refund-disabled", !allowed);
+    if (!delegated) {
+      const allowed = canUseRefundCenter();
+
+      if (els.refundTierAccess) {
+        setText(els.refundTierAccess, allowed ? "Ready" : "");
+      }
+
+      if (els.refundCenterCard) {
+        els.refundCenterCard.classList.toggle("refund-disabled", !allowed);
+      }
+
+      if (els.openRefundModalBtn) {
+        els.openRefundModalBtn.disabled = !allowed;
+        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Upgrade to unlock";
+      }
+
+      if (els.executeRefundBtn) {
+        els.executeRefundBtn.disabled = !allowed;
+      }
+
+      if (els.refundModalNote) {
+        els.refundModalNote.textContent = allowed
+          ? "Live refund execution is available on this plan. Use a PaymentIntent or Charge ID from Stripe."
+          : "Refund execution is locked until your plan allows live billing actions.";
+      }
+
+      if (els.refundCenterCopy) {
+        els.refundCenterCopy.textContent = allowed
+          ? "Open the refund UI, paste a PaymentIntent or Charge ID, and run a refund from the workspace."
+          : "You’re seeing decisions and approvals on Free — Pro unlocks one-click refund execution against Stripe without leaving this surface.";
+      }
+      if (els.refundUpgradeTease) {
+        const d = state.dashboardStats || {};
+        const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
+        const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
+        const actions = Number((vg && vg.actions_taken) ?? d.actions ?? 0);
+        els.refundUpgradeTease.textContent = allowed
+          ? "Execute refunds from the workspace · Available on Pro and Elite"
+          : money > 0 || actions > 0
+            ? `Your workspace already logged ${formatMoney(money)} across ${actions} billing motions — Pro turns that into live Stripe execution here.`
+            : "Close the loop on Free → Pro: run real refunds from the workspace with Stripe connected — no console, no context switch.";
+      }
     }
 
-    if (els.openRefundModalBtn) {
-      els.openRefundModalBtn.disabled = !allowed;
-      els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Upgrade to unlock";
-    }
-
-    if (els.executeRefundBtn) {
-      els.executeRefundBtn.disabled = !allowed;
-    }
-
-    if (els.refundModalNote) {
-      els.refundModalNote.textContent = allowed
-        ? "Live refund execution is available on this plan. Use a PaymentIntent or Charge ID from Stripe."
-        : "Refund execution is locked until your plan allows live billing actions.";
-    }
-
-    if (els.refundCenterCopy) {
-      els.refundCenterCopy.textContent = allowed
-        ? "Open the refund UI, paste a PaymentIntent or Charge ID, and run a refund from the workspace."
-        : "You’re seeing decisions and approvals on Free — Pro unlocks one-click refund execution against Stripe without leaving this surface.";
-    }
-    if (els.refundUpgradeTease) {
-      const d = state.dashboardStats || {};
-      const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
-      const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
-      const actions = Number((vg && vg.actions_taken) ?? d.actions ?? 0);
-      els.refundUpgradeTease.textContent = allowed
-        ? "Execute refunds from the workspace · Available on Pro and Elite"
-        : money > 0 || actions > 0
-          ? `Your workspace already logged ${formatMoney(money)} across ${actions} billing motions — Pro turns that into live Stripe execution here.`
-          : "Close the loop on Free → Pro: run real refunds from the workspace with Stripe connected — no console, no context switch.";
-    }
     syncMonetizationChrome();
+    syncPhase2Stores();
   }
 
   function openRefundModal() {
@@ -804,6 +860,11 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       );
       return;
     }
+    try {
+      getPhase2()?.uiStore?.set?.({ modalOpen: "refund" });
+    } catch {
+      /* no-op */
+    }
     if (els.refundModal) {
       els.refundModal.classList.add("open");
       els.refundModal.setAttribute("aria-hidden", "false");
@@ -811,6 +872,11 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   }
 
   function closeRefundModal() {
+    try {
+      getPhase2()?.uiStore?.set?.({ modalOpen: null });
+    } catch {
+      /* no-op */
+    }
     if (els.refundModal) {
       els.refundModal.classList.remove("open");
       els.refundModal.setAttribute("aria-hidden", "true");
@@ -923,41 +989,60 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   }
 
   function updateStripeUI() {
-    const connected = Boolean(state.stripeConnected);
-
-    if (els.stripeStatus) {
-      els.stripeStatus.textContent = connected ? "Connected" : "Not connected";
-      els.stripeStatus.classList.toggle("is-connected", connected);
-    }
-
-    if (els.stripeConnectBtn) {
-      const label = els.stripeConnectBtn.querySelector(".stripe-connect-label");
-      if (label) {
-        label.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
-      } else {
-        els.stripeConnectBtn.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
+    const p2 = getPhase2();
+    let delegated = false;
+    if (phase2WorkspaceReady() && p2?.stripeEngine?.updateStripePanel) {
+      try {
+        p2.stripeEngine.updateStripePanel(els, {
+          stripeConnected: state.stripeConnected,
+          stripeAccountId: state.stripeAccountId,
+          stripeMode: state.stripeMode,
+        });
+        delegated = true;
+      } catch {
+        delegated = false;
       }
-      els.stripeConnectBtn.disabled = false;
     }
 
-    if (els.stripeDisconnectBtn) {
-      els.stripeDisconnectBtn.hidden = !connected;
-      els.stripeDisconnectBtn.disabled = !connected;
+    if (!delegated) {
+      const connected = Boolean(state.stripeConnected);
+
+      if (els.stripeStatus) {
+        els.stripeStatus.textContent = connected ? "Connected" : "Not connected";
+        els.stripeStatus.classList.toggle("is-connected", connected);
+      }
+
+      if (els.stripeConnectBtn) {
+        const label = els.stripeConnectBtn.querySelector(".stripe-connect-label");
+        if (label) {
+          label.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
+        } else {
+          els.stripeConnectBtn.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
+        }
+        els.stripeConnectBtn.disabled = false;
+      }
+
+      if (els.stripeDisconnectBtn) {
+        els.stripeDisconnectBtn.hidden = !connected;
+        els.stripeDisconnectBtn.disabled = !connected;
+      }
+
+      if (els.stripeAccountPill) {
+        els.stripeAccountPill.textContent = connected && state.stripeAccountId ? state.stripeAccountId : "No account linked";
+      }
+
+      if (els.stripeModePill) {
+        els.stripeModePill.textContent = connected ? state.stripeMode || "Connected" : "Awaiting connection";
+      }
+
+      if (els.stripeIntegrationCopy) {
+        els.stripeIntegrationCopy.textContent = connected
+          ? "Stripe is connected. Refund execution is now live for this workspace."
+          : "Connect Stripe to execute refunds instead of only preparing them.";
+      }
     }
 
-    if (els.stripeAccountPill) {
-      els.stripeAccountPill.textContent = connected && state.stripeAccountId ? state.stripeAccountId : "No account linked";
-    }
-
-    if (els.stripeModePill) {
-      els.stripeModePill.textContent = connected ? state.stripeMode || "Connected" : "Awaiting connection";
-    }
-
-    if (els.stripeIntegrationCopy) {
-      els.stripeIntegrationCopy.textContent = connected
-        ? "Stripe is connected. Refund execution is now live for this workspace."
-        : "Connect Stripe to execute refunds instead of only preparing them.";
-    }
+    syncPhase2Stores();
   }
 
   async function loadIntegrations() {
@@ -1136,6 +1221,15 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   }
 
   function hydrateStripeCallbackState() {
+    const p2 = getPhase2();
+    if (phase2WorkspaceReady() && p2?.stripeEngine?.hydrateStripeCallbackState) {
+      try {
+        p2.stripeEngine.hydrateStripeCallbackState(window, { setNotice });
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
     try {
       const url = new URL(window.location.href);
       const stripe = url.searchParams.get("stripe");
@@ -1298,7 +1392,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   }
 
   function syncPhase2Stores() {
-    const p2 = typeof globalThis !== "undefined" ? globalThis.__XALVION_PHASE2__ : null;
+    const p2 = getPhase2();
     if (!p2 || !p2.sessionStore || !p2.agentStore) return;
     try {
       p2.sessionStore.set({
@@ -1316,11 +1410,36 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     } catch {
       /* no-op */
     }
+    try {
+      const followups = state.crmLeads.filter(
+        (lead) => (lead.status === "contacted" || lead.status === "replied") && lead.follow_up_due
+      );
+      p2.crmStore?.set?.({
+        leads: state.crmLeads,
+        followups,
+        dailySummary: state.crmDailySummary,
+        revenueMetrics: state.revenueMetrics,
+        summary: state.crmSummary,
+        loaded: Boolean(state.token && state.username),
+      });
+    } catch {
+      /* no-op */
+    }
+    try {
+      p2.refundStore?.set?.({
+        stripeConnected: state.stripeConnected,
+        stripeAccountId: state.stripeAccountId,
+        stripeMode: state.stripeMode,
+        history: state.refundHistory,
+      });
+    } catch {
+      /* no-op */
+    }
   }
 
   function syncAnalyticsRail() {
-    const p2 = globalThis.__XALVION_PHASE2__;
-    if (!p2?.analyticsEngine?.syncValueRail) return;
+    const p2 = getPhase2();
+    if (!phase2WorkspaceReady() || !p2?.analyticsEngine?.syncValueRail) return;
     try {
       p2.analyticsEngine.syncValueRail(
         {
@@ -1337,6 +1456,14 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   }
 
   function estimateAgentMinutesSavedFromDashboard(d = {}) {
+    const p2 = getPhase2();
+    if (phase2WorkspaceReady() && p2?.analyticsEngine?.estimateAgentMinutesSavedFromDashboard) {
+      try {
+        return p2.analyticsEngine.estimateAgentMinutesSavedFromDashboard(d, state.actionsCount);
+      } catch {
+        /* fall through */
+      }
+    }
     const actions = Number(d.actions || state.actionsCount || 0);
     const auto = Number(d.auto_resolved || 0);
     return Math.round(actions * 6 + auto * 2);
@@ -1345,6 +1472,24 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   function refreshUpgradeValueSummary() {
     const el = els.upgradeValueSummary;
     if (!el) return;
+    const p2 = getPhase2();
+    if (phase2WorkspaceReady() && p2?.analyticsEngine?.refreshUpgradeValueSummary) {
+      try {
+        p2.analyticsEngine.refreshUpgradeValueSummary(
+          el,
+          state.dashboardStats,
+          {
+            actionsCount: state.actionsCount,
+            totalInteractions: state.totalInteractions,
+            tier: state.tier,
+          },
+          { formatMoney }
+        );
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
     const d = state.dashboardStats || {};
     const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
     const tickets = Number(d.total_tickets ?? d.total_interactions ?? state.totalInteractions ?? 0);
@@ -1644,6 +1789,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!els.messages) return;
     const distanceFromBottom = els.messages.scrollHeight - els.messages.clientHeight - els.messages.scrollTop;
     state.stickToBottom = distanceFromBottom < 140;
+    try {
+      getPhase2()?.uiStore?.set?.({ stickToBottom: state.stickToBottom });
+    } catch {
+      /* no-op */
+    }
   }
 
   function scrollMessagesToBottom(force = false) {
@@ -2823,7 +2973,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
         if (item.event === "result") {
           finalData = item.data;
-          const p2 = globalThis.__XALVION_PHASE2__;
+          const p2 = getPhase2();
           if (p2?.agentStore) {
             try {
               p2.agentStore.set({
@@ -2842,7 +2992,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         }
 
         if (item.event === "done") {
-          const p2 = globalThis.__XALVION_PHASE2__;
+          const p2 = getPhase2();
           if (p2?.agentStore && finalData) {
             try {
               p2.agentStore.set({ currentState: "done", currentResult: finalData });
@@ -4149,6 +4299,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     renderLeadItems(queueItems, els.leadList, "queue");
     renderLeadItems(followups, els.followupList, "followup");
     if (metrics) renderRevenueMetrics(metrics);
+    syncPhase2Stores();
   }
 
   async function loadCrmLeads() {

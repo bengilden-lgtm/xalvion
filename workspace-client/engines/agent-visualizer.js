@@ -1,5 +1,5 @@
 /**
- * Optional DOM bridge for agent-store; workspace keeps primary rendering in app.js fallback.
+ * Subscribes to agent-store for future incremental canvas updates; core rendering stays in app.js fallback.
  */
 
 export function createAgentVisualizer({ agentStore } = {}) {
@@ -9,12 +9,16 @@ export function createAgentVisualizer({ agentStore } = {}) {
     attach() {
       if (!agentStore?.subscribe) return () => {};
       unsub = agentStore.subscribe(() => {
-        /* Reserved: incremental canvas updates without replacing app.js flow */
+        /* Reserved: Phase 4 keeps streaming DOM in app.js; store is synced from SSE. */
       });
       return () => {
         unsub?.();
         unsub = null;
       };
+    },
+
+    getState() {
+      return agentStore?.get?.() || null;
     },
   };
 }

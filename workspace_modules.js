@@ -188,5 +188,44 @@
     return { format, store, api };
   }
 
+  /**
+   * Phase 4: DOM-safe pure helpers + format bundle for classic scripts and future bundles.
+   * Does not replace app.js fallbacks when Phase 2 core is missing.
+   */
+  function createWorkspacePureHelpers(globalRef) {
+    const g = globalRef || global;
+    const core =
+      typeof g.createPhase2Core === "function"
+        ? g.createPhase2Core({
+            fetchImpl: typeof g.fetch === "function" ? g.fetch.bind(g) : null,
+          })
+        : null;
+    const format = core?.format;
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setText(el, value) {
+      if (el) el.textContent = String(value ?? "");
+    }
+
+    function detailFromApiBody(data) {
+      if (format?.detailFromApiBody) return format.detailFromApiBody(data);
+      const d = data && data.detail;
+      if (typeof d === "string") return d;
+      if (Array.isArray(d) && d.length && typeof d[0]?.msg === "string") return d[0].msg;
+      return "";
+    }
+
+    return { format, escapeHtml, setText, detailFromApiBody, core };
+  }
+
   global.createPhase2Core = createPhase2Core;
+  global.createWorkspacePureHelpers = createWorkspacePureHelpers;
 })(typeof globalThis !== "undefined" ? globalThis : window);

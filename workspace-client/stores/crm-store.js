@@ -1,10 +1,12 @@
-export function createCrmStore() {
+export function createCrmStore(initial = {}) {
   let state = {
     leads: [],
     followups: [],
     dailySummary: null,
     revenueMetrics: null,
+    summary: null,
     loaded: false,
+    ...initial,
   };
   const listeners = new Set();
 
