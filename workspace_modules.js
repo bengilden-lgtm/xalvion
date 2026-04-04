@@ -97,6 +97,59 @@
         }
         return { label: "○ Manual review", variant: "review", cls: "signal-review" };
       },
+      /**
+       * Mirrors main workspace `deriveConsequenceSignal` (app.js) for API-shaped payloads.
+       * Pure helper — safe for extension or other bundles that cannot import app.js.
+       */
+      deriveConsequencePresentation(data) {
+        const d = data && typeof data === "object" ? data : {};
+        const dec = d.sovereign_decision && typeof d.sovereign_decision === "object" ? d.sovereign_decision : d.decision || {};
+        const triage =
+          d.triage_metadata && typeof d.triage_metadata === "object"
+            ? d.triage_metadata
+            : d.triage || {};
+        const risk = String(dec.risk_level || triage.risk_level || d.risk_level || "").toLowerCase();
+        if (risk === "high") {
+          return {
+            cls: "signal-high-risk",
+            text: "⚠ High risk",
+            title: "Elevated risk — review before customer send",
+          };
+        }
+        const tier = String(d.execution_tier || "").toLowerCase();
+        if (tier === "safe_autopilot_ready") {
+          return {
+            cls: "signal-safe",
+            text: "✓ Safe to automate",
+            title: "Meets all automation safety criteria",
+          };
+        }
+        if (tier === "assist_only") {
+          return {
+            cls: "signal-review",
+            text: "○ Manual review",
+            title: "Risk signals require human decision",
+          };
+        }
+        if (tier === "approval_required") {
+          return {
+            cls: "signal-approval",
+            text: "⚡ Approval required",
+            title: "Awaiting operator approval",
+          };
+        }
+        const action = String(d.action || dec.action || "none").toLowerCase();
+        const actionRisk = String(dec.risk_level || triage.risk_level || "medium").toLowerCase();
+        const req = Boolean(d.requires_approval || dec.requires_approval || d.decision_state === "pending_decision");
+        const money = action === "refund" || action === "charge" || action === "credit";
+        if (req && money) {
+          return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
+        }
+        if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
+          return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
+        }
+        return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
+      },
       formatValueSummary(metrics) {
         const m = metrics && typeof metrics === "object" ? metrics : {};
         return {

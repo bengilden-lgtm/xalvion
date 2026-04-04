@@ -40,7 +40,16 @@ const riskCard = document.getElementById("riskCard");
 const reasonCard = document.getElementById("reasonCard");
 const policyCard = document.getElementById("policyCard");
 const aiSummaryCard = document.getElementById("aiSummaryCard");
-const replyCard = document.getElementById("replyCard");
+const replyStack = document.getElementById("replyStack");
+const replyTextarea = document.getElementById("replyTextarea");
+const replyToggleEditBtn = document.getElementById("replyToggleEditBtn");
+const gateEditBtn = document.getElementById("gateEditBtn");
+const gateDoneBtn = document.getElementById("gateDoneBtn");
+const approvalCompact = document.getElementById("approvalCompact");
+const approvalCompactCopy = document.getElementById("approvalCompactCopy");
+const consequenceSignal = document.getElementById("consequenceSignal");
+const operatorBriefEl = document.getElementById("operatorBrief");
+const operatorBriefBody = document.getElementById("operatorBriefBody");
 
 let executionCard = document.getElementById("executionCard");
 let executionValue = document.getElementById("executionValue");
@@ -83,6 +92,181 @@ const explainSessionValue = document.getElementById("explainSessionValue");
 let lastReply = "";
 let explainabilityOpen = false;
 let thinkingRunId = 0;
+let replyEditing = false;
+
+/** Keep aligned with `format.deriveConsequencePresentation` in workspace_modules.js */
+function deriveConsequencePresentation(data) {
+  if (!data || typeof data !== "object") data = {};
+  const dec = getDecisionData(data);
+  const triage = getTriageData(data);
+  const risk = String(dec.risk_level || triage.risk_level || data.risk_level || "").toLowerCase();
+  if (risk === "high") {
+    return {
+      cls: "signal-high-risk",
+      text: "⚠ High risk",
+      title: "Elevated risk — review before customer send",
+    };
+  }
+  const tier = String(data.execution_tier || "").toLowerCase();
+  if (tier === "safe_autopilot_ready") {
+    return {
+      cls: "signal-safe",
+      text: "✓ Safe to automate",
+      title: "Meets all automation safety criteria",
+    };
+  }
+  if (tier === "assist_only") {
+    return {
+      cls: "signal-review",
+      text: "○ Manual review",
+      title: "Risk signals require human decision",
+    };
+  }
+  if (tier === "approval_required") {
+    return {
+      cls: "signal-approval",
+      text: "⚡ Approval required",
+      title: "Awaiting operator approval",
+    };
+  }
+  const action = String(dec.action || data.action || "none").toLowerCase();
+  const actionRisk = String(dec.risk_level || triage.risk_level || "medium").toLowerCase();
+  const req = Boolean(data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision");
+  const money = action === "refund" || action === "charge" || action === "credit";
+  if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
+  if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
+    return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
+  }
+  return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
+}
+
+function renderConsequenceBar(data) {
+  if (!consequenceSignal) return;
+  const pres = deriveConsequencePresentation(data);
+  consequenceSignal.textContent = pres.text;
+  consequenceSignal.className = `consequence-signal ${pres.cls}`;
+  if (pres.title) consequenceSignal.setAttribute("title", pres.title);
+  else consequenceSignal.removeAttribute("title");
+  consequenceSignal.classList.remove("is-hidden");
+}
+
+function approvalGateActive(data) {
+  const dec = getDecisionData(data);
+  const pres = deriveConsequencePresentation(data);
+  return (
+    Boolean(dec.requires_approval || data.requires_approval) ||
+    pres.cls === "signal-approval" ||
+    pres.cls === "signal-high-risk" ||
+    pres.cls === "signal-review"
+  );
+}
+
+function renderApprovalCompact(data, reply) {
+  if (!approvalCompact || !approvalCompactCopy) return;
+  if (!reply) {
+    approvalCompact.classList.remove("is-visible");
+    return;
+  }
+  if (!approvalGateActive(data)) {
+    approvalCompact.classList.remove("is-visible");
+    return;
+  }
+  const parts = [];
+  const dec = getDecisionData(data);
+  const pres = deriveConsequencePresentation(data);
+  if (pres.cls === "signal-high-risk") {
+    parts.push("High risk — hold or edit until you are satisfied.");
+  } else if (dec.requires_approval || data.requires_approval || pres.cls === "signal-approval") {
+    parts.push("Approval-class motion — confirm the customer-ready text before copy or insert.");
+  } else {
+    parts.push("Review posture — skim brief and reply before sending.");
+  }
+  approvalCompactCopy.textContent = parts.join(" ");
+  approvalCompact.classList.add("is-visible");
+}
+
+function addBriefLine(container, label, value) {
+  const row = document.createElement("div");
+  row.className = "operator-brief-line";
+  const strong = document.createElement("strong");
+  strong.textContent = `${label} `;
+  row.appendChild(strong);
+  row.appendChild(document.createTextNode(value || "—"));
+  container.appendChild(row);
+}
+
+function renderOperatorBrief(data) {
+  if (!operatorBriefBody) return;
+  operatorBriefBody.replaceChildren();
+  const decision = getDecisionData(data);
+  const triage = getTriageData(data);
+  const issueType = normalize(data.issue_type || data.type);
+  const reply = normalize(data.reply || data.response || data.final);
+  const action = inferDisplayAction(data, reply, issueType);
+  const status = formatStatus(normalize(decision.status || data.status)) || "—";
+  const queue = normalize(String(decision.queue ?? data.queue ?? "")) || "—";
+  const risk = normalize(String(decision.risk_level ?? triage.risk_level ?? data.risk_level ?? "")) || "—";
+  const confRaw = decision.confidence ?? data.confidence;
+  let conf = "—";
+  if (confRaw !== "" && confRaw !== undefined && confRaw !== null) {
+    const n = Number(confRaw);
+    conf = Number.isFinite(n) ? n.toFixed(2) : String(confRaw);
+  }
+  addBriefLine(operatorBriefBody, "Action · type", `${safe(action)} · ${safe(issueType)}`);
+  addBriefLine(operatorBriefBody, "Status · queue", `${status} · ${queue}`);
+  addBriefLine(operatorBriefBody, "Risk · confidence", `${risk} · ${conf}`);
+  if (operatorBriefEl && !operatorBriefEl.open) {
+    /* default collapsed for compact extension chrome */
+  }
+}
+
+function resetReplyEditor() {
+  replyEditing = false;
+  if (replyTextarea) {
+    replyTextarea.classList.add("is-hidden");
+    replyTextarea.value = "";
+  }
+  if (replyValue) replyValue.classList.remove("is-hidden");
+  if (replyToggleEditBtn) replyToggleEditBtn.textContent = "Edit";
+}
+
+function setReplyEditing(on) {
+  replyEditing = Boolean(on);
+  const text = lastReply || "";
+  if (replyTextarea && replyValue && replyToggleEditBtn) {
+    if (replyEditing) {
+      replyTextarea.value = text;
+      replyTextarea.classList.remove("is-hidden");
+      replyValue.classList.add("is-hidden");
+      replyToggleEditBtn.textContent = "Preview";
+      replyTextarea.focus();
+    } else {
+      const next = replyTextarea.classList.contains("is-hidden")
+        ? lastReply
+        : normalize(replyTextarea.value);
+      lastReply = next;
+      if (replyValue) replyValue.textContent = next || "-";
+      replyTextarea.classList.add("is-hidden");
+      replyValue.classList.remove("is-hidden");
+      replyToggleEditBtn.textContent = "Edit";
+      if (copyBtn) {
+        copyBtn.disabled = !next;
+        copyBtn.style.display = next ? "block" : "none";
+      }
+      if (insertBtn) {
+        insertBtn.disabled = !next;
+        insertBtn.style.display = next ? "block" : "none";
+      }
+    }
+  }
+}
+
+function syncReplyFromTextarea() {
+  if (!replyTextarea || !replyEditing) return;
+  const next = normalize(replyTextarea.value);
+  lastReply = next;
+  if (replyValue) replyValue.textContent = next || "-";
+}
 
 // ===== MULTI-TICKET UI INJECTION =====
 function ensureScanInboxButton() {
@@ -325,7 +509,7 @@ function setConfidence(conf) {
 }
 
 function getGrid() {
-  return resultPanel?.querySelector(".grid");
+  return document.getElementById("resultMetaGrid") || resultPanel?.querySelector(".grid");
 }
 
 function createCard(id, labelText, valueId, options = {}) {
@@ -611,7 +795,7 @@ function normalizeExplainability(data) {
   return { summary, sections };
 }
 
-function renderExplainability(data) {
+function renderExplainabilitySections(data) {
   if (!explainabilityWrap) return;
 
   const explainability = normalizeExplainability(data);
@@ -834,7 +1018,7 @@ function ensureDecisionExplanationHost() {
   if (explain && explain.parentNode === panel) {
     panel.insertBefore(host, explain);
   } else {
-    const grid = panel.querySelector(".grid");
+    const grid = document.getElementById("resultMetaGrid") || panel.querySelector(".grid");
     if (grid) panel.insertBefore(host, grid);
     else panel.appendChild(host);
   }
@@ -920,14 +1104,14 @@ function ensureOperatorExplainabilityHost() {
   if (explain && explain.parentNode === panel) {
     panel.insertBefore(host, explain);
   } else {
-    const grid = panel.querySelector(".grid");
+    const grid = document.getElementById("resultMetaGrid") || panel.querySelector(".grid");
     if (grid) panel.insertBefore(host, grid);
     else panel.appendChild(host);
   }
   return host;
 }
 
-function renderExplainability(explainability) {
+function renderOperatorExplainability(explainability) {
   const host = ensureOperatorExplainabilityHost();
   const body = document.getElementById("operatorExplainabilityBody");
   const btn = document.getElementById("explainToggleBtn");
@@ -997,88 +1181,9 @@ function renderExplainability(explainability) {
   if (wrapEl) wrapEl.classList.remove("open");
 }
 
-function ensureExecutionTierPill() {
-  const top = document.querySelector("#resultPanel .panel-top");
-  if (!top) return null;
-  let el = document.getElementById("executionTierPill");
-  if (el) return el;
-  el = document.createElement("span");
-  el.id = "executionTierPill";
-  el.className = "status-badge hidden";
-  const badge = document.getElementById("statusBadge");
-  if (badge && badge.parentNode === top) {
-    top.insertBefore(el, badge);
-  } else {
-    top.appendChild(el);
-  }
-  return el;
-}
-
-function deriveExecutionTierPresentation(data) {
-  const decEarly = getDecisionData(data);
-  const triageEarly = getTriageData(data);
-  const riskEarly = String(decEarly.risk_level || triageEarly.risk_level || data.risk_level || "").toLowerCase();
-  if (riskEarly === "high") {
-    return { text: "⚠ High risk", cls: "escalated", title: "Elevated risk — review before send" };
-  }
-
-  const raw = String(data.execution_tier || "").toLowerCase();
-  if (raw === "safe_autopilot_ready") {
-    return {
-      text: "✓ Safe to automate",
-      cls: "resolved",
-      title: "Meets all automation safety criteria"
-    };
-  }
-  if (raw === "assist_only") {
-    return {
-      text: "○ Manual review",
-      cls: "pending",
-      title: "Risk signals require human decision"
-    };
-  }
-  if (raw === "approval_required") {
-    return {
-      text: "⚡ Approval required",
-      cls: "waiting",
-      title: "Awaiting operator approval"
-    };
-  }
-
-  const dec = getDecisionData(data);
-  const triage = getTriageData(data);
-  const req = Boolean(dec.requires_approval || data.requires_approval);
-  const action = String(dec.action || data.action || "none").toLowerCase();
-  const amt = Number(dec.amount ?? data.amount ?? 0);
-  const risk = String(dec.risk_level || triage.risk_level || data.risk_level || "medium").toLowerCase();
-  const money = action === "refund" || action === "charge" || action === "credit";
-
-  if (req && money) {
-    return { text: "⚡ Approval required", cls: "waiting", title: "" };
-  }
-  if (action === "review" || risk === "high" || risk === "medium") {
-    return { text: "⚠ Review recommended", cls: "pending", title: "" };
-  }
-  return { text: "✓ Safe to send", cls: "resolved", title: "" };
-}
-
-function renderExecutionTierSignal(data) {
-  const el = ensureExecutionTierPill();
-  if (!el) return;
-  const pres = deriveExecutionTierPresentation(data);
-  if (!pres.text) {
-    el.classList.add("hidden");
-    return;
-  }
-  el.textContent = pres.text;
-  el.className = `status-badge ${pres.cls}`.trim();
-  if (pres.title) el.setAttribute("title", pres.title);
-  else el.removeAttribute("title");
-  el.classList.remove("hidden");
-}
-
 function render(data) {
   ensureEnterpriseCards();
+  resetReplyEditor();
 
   const capPill = document.getElementById("extensionCapacityPill");
   if (capPill && data?.meta && data.meta.plan_tier) {
@@ -1116,8 +1221,15 @@ function render(data) {
   if (replyValue) replyValue.textContent = reply || "-";
   if (statusValue) statusValue.textContent = formatStatus(status) || "-";
 
+  lastReply = reply;
+  if (replyStack) replyStack.classList.toggle("is-visible", !!reply);
+
   updateStatusBadge(status);
   setConfidence(confidence);
+
+  renderConsequenceBar(data);
+  renderOperatorBrief(data);
+  renderApprovalCompact(data, reply);
 
   if (notePill) {
     if (note) {
@@ -1129,12 +1241,11 @@ function render(data) {
     }
   }
 
-  renderExecutionTierSignal(data);
   if (data.decision_explainability && typeof data.decision_explainability === "object") {
-    renderExplainability(data.decision_explainability);
+    renderOperatorExplainability(data.decision_explainability);
     renderDecisionExplanation(null);
   } else {
-    renderExplainability(null);
+    renderOperatorExplainability(null);
     renderDecisionExplanation(data.decision_explanation);
   }
 
@@ -1146,7 +1257,6 @@ function render(data) {
   setVisible(reasonCard, !!(reason || issueType === "shipping_issue"));
   setVisible(policyCard, !!policyRule);
   setVisible(aiSummaryCard, !!aiSummary);
-  setVisible(replyCard, !!reply);
 
   renderExecution(execution);
   renderImpact(impact);
@@ -1163,7 +1273,7 @@ function render(data) {
       value_generated: impact.money_saved || 0
     } : {})
   });
-  renderExplainability({
+  renderExplainabilitySections({
     ...data,
     impact,
     reason,
@@ -1179,8 +1289,6 @@ function render(data) {
       card.style.animationDelay = `${Math.min(index * 0.02, 0.22)}s`;
     });
   }
-
-  lastReply = reply;
 
   if (copyBtn) {
     copyBtn.style.display = reply ? "block" : "none";
@@ -1459,6 +1567,7 @@ async function analyze() {
   }
 
   lastReply = "";
+  resetReplyEditor();
   toggleExplainability(false);
   startThinkingPanel();
 
@@ -1532,6 +1641,7 @@ async function scanInbox() {
   }
 
   lastReply = "";
+  resetReplyEditor();
   toggleExplainability(false);
   startThinkingPanel();
 
@@ -1602,6 +1712,42 @@ async function scanInbox() {
     showStatus("Inbox scan failed.", true);
     if (emptyState) emptyState.style.display = "grid";
   }
+}
+
+if (replyToggleEditBtn) {
+  replyToggleEditBtn.addEventListener("click", () => {
+    if (!lastReply && !replyEditing) return;
+    setReplyEditing(!replyEditing);
+  });
+}
+
+if (gateEditBtn) {
+  gateEditBtn.addEventListener("click", () => {
+    setReplyEditing(true);
+  });
+}
+
+if (gateDoneBtn) {
+  gateDoneBtn.addEventListener("click", () => {
+    setReplyEditing(false);
+    if (approvalCompact) approvalCompact.classList.remove("is-visible");
+    showStatus("Review logged — copy or insert when ready.");
+  });
+}
+
+if (replyTextarea) {
+  replyTextarea.addEventListener("input", () => {
+    syncReplyFromTextarea();
+    const has = !!normalize(replyTextarea.value);
+    if (copyBtn) {
+      copyBtn.disabled = !has;
+      copyBtn.style.display = has ? "block" : "none";
+    }
+    if (insertBtn) {
+      insertBtn.disabled = !has;
+      insertBtn.style.display = has ? "block" : "none";
+    }
+  });
 }
 
 if (explainabilityToggle) {

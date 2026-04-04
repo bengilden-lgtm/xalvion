@@ -6,21 +6,24 @@
   <title>Xalvion Assist</title>
   <style>
     :root {
-      --bg: #04060f;
-      --panel: #071024;
-      --panel-2: #0b1630;
-      --line: rgba(255,255,255,0.10);
+      --bg-deep: #04060f;
+      --bg-panel: #071024;
+      --decision-surface: #0b1428;
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.12);
       --text: #f5f8ff;
-      --muted: rgba(205,215,242,0.72);
-      --purple-1: #7c5cfc;
-      --purple-2: #4f8ef7;
-      --blue-1: #22c1ff;
-      --blue-2: #0a84ff;
+      --muted: rgba(200, 210, 238, 0.72);
+      --muted-soft: rgba(160, 172, 200, 0.55);
+      --accent-1: #7c5cfc;
+      --accent-blue: #4f8ef7;
+      --accent-cyan: #22c1ff;
+      --success: #38d996;
       --warn: #facc15;
-      --danger: #ff6b6b;
-      --success: #34d399;
-      --radius: 14px;
-      --shadow: 0 14px 40px rgba(0,0,0,0.42);
+      --danger: #f87171;
+      --r-pill: 999px;
+      --r-md: 12px;
+      --r-lg: 16px;
+      --shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
     }
 
@@ -32,166 +35,178 @@
       width: 400px;
       min-height: 640px;
       background:
-        radial-gradient(ellipse 80% 55% at 50% 0%, rgba(100,60,255,0.08), transparent 70%),
-        radial-gradient(ellipse 50% 40% at 100% 100%, rgba(20,100,200,0.06), transparent 70%),
-        linear-gradient(180deg, var(--bg) 0%, #03050e 100%);
+        radial-gradient(ellipse 85% 50% at 50% -5%, rgba(124, 92, 252, 0.12), transparent 55%),
+        radial-gradient(ellipse 45% 38% at 100% 100%, rgba(34, 193, 255, 0.07), transparent 65%),
+        linear-gradient(180deg, var(--bg-deep) 0%, #02040c 100%);
       color: var(--text);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
 
-    body { padding: 16px; }
+    body { padding: 14px; }
 
     .shell {
       border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(8,14,32,0.92), rgba(4,8,22,0.96));
+      background: linear-gradient(180deg, rgba(10, 18, 40, 0.94), rgba(4, 10, 24, 0.98));
       border-radius: 18px;
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
       overflow: hidden;
     }
 
     .header {
-      padding: 18px 18px 14px;
+      padding: 16px 16px 14px;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
     }
 
     .brand {
       display: flex;
-      align-items: center;
-      gap: 10px;
+      align-items: flex-start;
+      gap: 12px;
     }
 
     .brand-mark {
-      width: 12px;
-      height: 12px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, var(--purple-1), var(--blue-1));
-      box-shadow: 0 0 18px rgba(124,92,252,0.55);
+      width: 11px;
+      height: 11px;
+      margin-top: 4px;
+      border-radius: var(--r-pill);
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-cyan));
+      box-shadow: 0 0 20px rgba(124, 92, 252, 0.5);
       flex: 0 0 auto;
     }
 
     .brand-title {
       margin: 0;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 750;
       letter-spacing: -0.02em;
     }
 
+    .brand-kicker {
+      margin: 0 0 4px;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(180, 160, 255, 0.88);
+    }
+
     .brand-subtitle {
-      margin: 4px 0 0;
+      margin: 0;
       font-size: 12px;
       color: var(--muted);
-      line-height: 1.45;
+      line-height: 1.5;
+      max-width: 42ch;
     }
 
     .extension-capacity-pill {
       margin-top: 10px;
       display: inline-flex;
       align-items: center;
-      padding: 6px 10px;
-      border-radius: 999px;
+      padding: 5px 10px;
+      border-radius: var(--r-pill);
       border: 1px solid var(--line);
-      background: rgba(255,255,255,0.03);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
+      background: rgba(255, 255, 255, 0.035);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--muted);
+      color: var(--muted-soft);
       font-family: ui-monospace, monospace;
     }
 
     .content {
-      padding: 16px;
+      padding: 14px 14px 16px;
       display: grid;
-      gap: 14px;
+      gap: 12px;
     }
 
     .actions {
       display: grid;
-      gap: 10px;
+      gap: 8px;
       grid-template-columns: 1fr;
     }
 
     .actions-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
     }
 
     button {
       appearance: none;
       border: 0;
-      border-radius: 12px;
-      padding: 13px 14px;
-      font-size: 14px;
+      border-radius: var(--r-md);
+      padding: 12px 14px;
+      font-size: 13px;
       font-weight: 700;
       color: white;
       cursor: pointer;
-      transition: transform 0.14s ease, opacity 0.14s ease, box-shadow 0.14s ease;
+      transition: transform 0.14s var(--ease), opacity 0.14s ease, box-shadow 0.14s var(--ease), filter 0.14s ease;
     }
 
-    button:hover { transform: translateY(-1px); }
-    button:active { transform: translateY(0); }
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button:active:not(:disabled) { transform: translateY(0); }
     button:disabled {
-      opacity: 0.55;
+      opacity: 0.5;
       cursor: not-allowed;
       transform: none;
     }
 
     #analyze {
-      background: linear-gradient(135deg, var(--purple-1), var(--purple-2));
-      box-shadow: 0 10px 24px rgba(79,70,229,0.35);
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-blue));
+      box-shadow: 0 8px 22px rgba(124, 92, 252, 0.32);
     }
 
     #scanInbox {
-      background: linear-gradient(135deg, var(--blue-1), var(--blue-2));
-      box-shadow: 0 10px 24px rgba(10,132,255,0.25);
+      background: linear-gradient(135deg, var(--accent-cyan), #0a84ff);
+      box-shadow: 0 8px 22px rgba(10, 132, 255, 0.22);
     }
 
     #insertBtn {
       display: none;
-      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
       border: 1px solid var(--line);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
 
     #copyBtn {
       display: none;
-      background: linear-gradient(135deg, #22c1ff, #0a84ff);
-      box-shadow: 0 10px 24px rgba(10,132,255,0.25);
+      background: linear-gradient(135deg, var(--accent-cyan), #0a84ff);
+      box-shadow: 0 8px 22px rgba(10, 132, 255, 0.22);
     }
 
     .status {
       display: none;
       padding: 10px 12px;
-      border-radius: 12px;
+      border-radius: var(--r-md);
       font-size: 12px;
       line-height: 1.45;
       border: 1px solid var(--line);
-      background: rgba(255,255,255,0.03);
+      background: color-mix(in srgb, var(--decision-surface) 85%, transparent);
       color: var(--muted);
     }
 
     .status.show { display: block; }
 
     .status.error {
-      color: #ffd1d1;
-      background: rgba(255, 107, 107, 0.08);
-      border-color: rgba(255, 107, 107, 0.22);
+      color: #fecaca;
+      background: rgba(248, 113, 113, 0.1);
+      border-color: rgba(248, 113, 113, 0.25);
     }
 
     .thinking {
       display: none;
       border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(11,22,48,0.68), rgba(7,16,36,0.82));
-      border-radius: var(--radius);
-      padding: 14px;
-      gap: 12px;
+      background: linear-gradient(180deg, rgba(11, 22, 48, 0.75), rgba(7, 16, 36, 0.88));
+      border-radius: var(--r-md);
+      padding: 12px;
+      gap: 10px;
     }
 
     .thinking.show {
       display: grid;
-      animation: fadeUp 0.24s ease;
+      animation: fadeUp 0.24s var(--ease);
     }
 
     .thinking-header {
@@ -201,204 +216,467 @@
     }
 
     .thinking-pulse {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, var(--purple-1), var(--blue-1));
-      box-shadow: 0 0 18px rgba(124,92,252,0.45);
+      width: 9px;
+      height: 9px;
+      border-radius: var(--r-pill);
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-cyan));
+      box-shadow: 0 0 16px rgba(124, 92, 252, 0.45);
       animation: pulse 1.2s ease-in-out infinite;
       flex: 0 0 auto;
     }
 
     .thinking-title {
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 12px;
+      font-weight: 750;
       color: var(--text);
     }
 
     .thinking-subtitle {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
       line-height: 1.45;
     }
 
     .thinking-steps {
       display: grid;
-      gap: 8px;
+      gap: 6px;
     }
 
     .thinking-step {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.05);
-      background: rgba(255,255,255,0.02);
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.02);
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1.35;
       transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
     }
 
     .thinking-step.active {
       color: var(--text);
-      border-color: rgba(34,193,255,0.18);
-      background: rgba(34,193,255,0.05);
+      border-color: rgba(34, 193, 255, 0.2);
+      background: rgba(34, 193, 255, 0.06);
     }
 
     .thinking-step.done {
-      color: #b7ffe4;
-      border-color: rgba(52, 211, 153, 0.18);
-      background: rgba(52, 211, 153, 0.06);
+      color: rgba(180, 250, 215, 0.95);
+      border-color: rgba(56, 217, 150, 0.2);
+      background: rgba(56, 217, 150, 0.07);
     }
 
     .thinking-step-status {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--muted);
+      font-size: 10px;
+      font-weight: 750;
+      color: var(--muted-soft);
       flex: 0 0 auto;
     }
 
     .thinking-step.active .thinking-step-status { color: #8fdfff; }
-    .thinking-step.done .thinking-step-status { color: #b7ffe4; }
+    .thinking-step.done .thinking-step-status { color: rgba(180, 250, 215, 0.95); }
 
     .insight {
       display: none;
-      border: 1px solid rgba(34,193,255,0.16);
-      background: linear-gradient(180deg, rgba(34,193,255,0.08), rgba(124,92,252,0.04));
-      border-radius: 12px;
-      padding: 12px 14px;
+      border: 1px solid rgba(124, 92, 252, 0.22);
+      background: linear-gradient(180deg, rgba(124, 92, 252, 0.1), rgba(34, 193, 255, 0.04));
+      border-radius: var(--r-md);
+      padding: 11px 12px;
       gap: 6px;
     }
 
-    .insight.show { display: grid; animation: fadeUp 0.24s ease; }
+    .insight.show { display: grid; animation: fadeUp 0.24s var(--ease); }
 
     .insight-label {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: #8fdfff;
+      color: rgba(200, 180, 255, 0.95);
     }
 
     .insight-value {
-      font-size: 13px;
+      font-size: 12px;
       line-height: 1.5;
-      font-weight: 650;
+      font-weight: 600;
       color: var(--text);
       white-space: pre-wrap;
     }
 
     .panel {
       border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(11,22,48,0.78), rgba(7,16,36,0.9));
-      border-radius: var(--radius);
-      padding: 14px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--decision-surface) 92%, #fff 3%), rgba(6, 12, 28, 0.94));
+      border-radius: var(--r-md);
+      padding: 12px;
       display: none;
-      gap: 12px;
+      gap: 10px;
     }
 
-    .panel.show { display: grid; animation: fadeUp 0.24s ease; }
+    .panel.show { display: grid; animation: fadeUp 0.26s var(--ease); }
 
-    .panel-top {
+    /* Consequence-first bar */
+    .consequence-bar {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      gap: 8px;
+      padding-bottom: 2px;
+    }
+
+    .consequence-bar-left {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .consequence-signal {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 11px;
+      border-radius: var(--r-pill);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      max-width: 100%;
+    }
+
+    .consequence-signal.is-hidden { display: none; }
+
+    .signal-safe {
+      background: rgba(56, 217, 150, 0.1);
+      border: 1px solid rgba(56, 217, 150, 0.28);
+      color: rgba(180, 250, 215, 0.96);
+    }
+
+    .signal-approval {
+      background: rgba(124, 92, 252, 0.12);
+      border: 1px solid rgba(124, 92, 252, 0.32);
+      color: rgba(200, 190, 255, 0.96);
+      box-shadow: 0 0 20px rgba(124, 92, 252, 0.12);
+    }
+
+    .signal-review {
+      background: rgba(250, 204, 21, 0.08);
+      border: 1px solid rgba(250, 204, 21, 0.22);
+      color: #fde68a;
+    }
+
+    .signal-high-risk {
+      background: rgba(248, 113, 113, 0.12);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      color: #fecaca;
+      box-shadow: 0 0 18px rgba(248, 113, 113, 0.12);
     }
 
     .status-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       width: fit-content;
       max-width: 100%;
-      padding: 9px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-      line-height: 1;
+      padding: 5px 10px;
+      border-radius: var(--r-pill);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      line-height: 1.2;
       border: 1px solid var(--line);
-      background: rgba(255,255,255,0.04);
-      color: var(--text);
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(210, 220, 245, 0.92);
     }
 
     .status-badge.hidden,
     .pill.hidden,
     .explainability-wrap.hidden {
-      display: none;
+      display: none !important;
     }
 
     .status-badge.resolved {
-      border-color: rgba(52, 211, 153, 0.28);
-      background: rgba(52, 211, 153, 0.12);
-      color: #b7ffe4;
+      border-color: rgba(56, 217, 150, 0.3);
+      background: rgba(56, 217, 150, 0.1);
+      color: rgba(180, 250, 215, 0.95);
     }
 
     .status-badge.pending,
     .status-badge.waiting {
-      border-color: rgba(250, 204, 21, 0.24);
-      background: rgba(250, 204, 21, 0.10);
-      color: #ffe58a;
+      border-color: rgba(250, 204, 21, 0.26);
+      background: rgba(250, 204, 21, 0.09);
+      color: #fde68a;
     }
 
     .status-badge.escalated,
     .status-badge.ignored {
-      border-color: rgba(255, 107, 107, 0.24);
-      background: rgba(255, 107, 107, 0.10);
-      color: #ffd1d1;
+      border-color: rgba(248, 113, 113, 0.3);
+      background: rgba(248, 113, 113, 0.1);
+      color: #fecaca;
     }
 
     .pill {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       width: fit-content;
       max-width: 100%;
-      padding: 9px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-      line-height: 1;
-      border: 1px solid rgba(250, 204, 21, 0.2);
+      padding: 5px 10px;
+      border-radius: var(--r-pill);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      line-height: 1.2;
+      border: 1px solid rgba(250, 204, 21, 0.22);
       background: rgba(250, 204, 21, 0.08);
-      color: #ffe58a;
+      color: #fde68a;
+    }
+
+    /* Operator gate strip */
+    .approval-compact {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 11px;
+      border-radius: var(--r-md);
+      border: 1px solid rgba(124, 92, 252, 0.22);
+      background: rgba(124, 92, 252, 0.06);
+    }
+
+    .approval-compact.is-visible {
+      display: flex;
+    }
+
+    .approval-compact-copy {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.5;
+      color: rgba(200, 210, 240, 0.88);
+    }
+
+    .approval-compact-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .btn-compact {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 650;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(200, 210, 240, 0.92);
+      box-shadow: none;
+    }
+
+    .btn-compact:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn-compact-primary {
+      border: none;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-blue));
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(124, 92, 252, 0.28);
+    }
+
+    .btn-compact-primary:hover:not(:disabled) {
+      filter: brightness(1.06);
+    }
+
+    /* Operator brief */
+    .operator-brief {
+      border-radius: var(--r-md);
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+      overflow: hidden;
+    }
+
+    .operator-brief-summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-weight: 650;
+    }
+
+    .operator-brief-summary::-webkit-details-marker { display: none; }
+
+    .operator-brief-summary-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      text-align: left;
+    }
+
+    .operator-brief-eyebrow {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(180, 160, 255, 0.9);
+    }
+
+    .operator-brief-heading {
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .operator-brief-chevron {
+      color: var(--muted-soft);
+      font-size: 12px;
+      flex-shrink: 0;
+      transition: transform 0.2s var(--ease);
+    }
+
+    .operator-brief[open] .operator-brief-chevron {
+      transform: rotate(180deg);
+    }
+
+    .operator-brief-body {
+      padding: 0 12px 12px;
+      display: grid;
+      gap: 6px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .operator-brief-line {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .operator-brief-line strong {
+      color: rgba(220, 228, 250, 0.92);
+      font-weight: 650;
+    }
+
+    /* Customer-ready reply */
+    .reply-stack {
+      border-radius: var(--r-md);
+      border: 1px solid rgba(124, 92, 252, 0.18);
+      background: linear-gradient(180deg, rgba(124, 92, 252, 0.06), rgba(8, 14, 32, 0.5));
+      padding: 10px 11px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .reply-stack.is-visible {
+      display: flex;
+    }
+
+    .reply-stack-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .reply-stack-label {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(200, 190, 255, 0.9);
+    }
+
+    .btn-texty {
+      appearance: none;
+      border: none;
+      background: none;
+      padding: 4px 6px;
+      margin: 0;
+      font-size: 11px;
+      font-weight: 650;
+      color: rgba(147, 197, 253, 0.95);
+      cursor: pointer;
+      border-radius: 6px;
+      box-shadow: none;
+    }
+
+    .btn-texty:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .btn-texty:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .reply-textarea {
+      width: 100%;
+      min-height: 120px;
+      resize: vertical;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(0, 0, 0, 0.25);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 10px;
+    }
+
+    .reply-textarea:focus {
+      outline: none;
+      border-color: rgba(124, 92, 252, 0.45);
+      box-shadow: 0 0 0 1px rgba(124, 92, 252, 0.2);
+    }
+
+    .reply-textarea.is-hidden {
+      display: none !important;
     }
 
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
     }
 
     .card {
       border: 1px solid var(--line);
-      background: rgba(255,255,255,0.02);
-      border-radius: 12px;
-      padding: 11px 12px;
+      background: rgba(255, 255, 255, 0.025);
+      border-radius: 10px;
+      padding: 9px 10px;
       min-width: 0;
       opacity: 0;
-      transform: translateY(6px);
-      animation: cardIn 0.28s ease forwards;
+      transform: translateY(5px);
+      animation: cardIn 0.28s var(--ease) forwards;
     }
 
     .card.full { grid-column: 1 / -1; }
 
     .label {
       display: block;
-      font-size: 11px;
-      font-weight: 700;
+      font-size: 9px;
+      font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      margin-bottom: 6px;
+      letter-spacing: 0.1em;
+      color: var(--muted-soft);
+      margin-bottom: 5px;
     }
 
     .value {
-      font-size: 14px;
-      font-weight: 650;
+      font-size: 12px;
+      font-weight: 600;
       line-height: 1.45;
       color: var(--text);
       word-break: break-word;
@@ -411,24 +689,24 @@
 
     .reply-box {
       white-space: pre-wrap;
-      line-height: 1.55;
+      line-height: 1.5;
     }
 
     .meter {
-      margin-top: 10px;
-      height: 8px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.06);
+      margin-top: 8px;
+      height: 6px;
+      border-radius: var(--r-pill);
+      background: rgba(255, 255, 255, 0.06);
       overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.04);
+      border: 1px solid rgba(255, 255, 255, 0.04);
     }
 
     .meter-fill {
       height: 100%;
       width: 0%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--purple-1), var(--blue-1));
-      transition: width 0.22s ease;
+      border-radius: var(--r-pill);
+      background: linear-gradient(90deg, var(--accent-1), var(--accent-cyan));
+      transition: width 0.22s var(--ease);
     }
 
     .explainability-toggle {
@@ -436,40 +714,41 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 12px 14px;
-      border-radius: 12px;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--r-md);
       border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
       text-align: left;
+      cursor: pointer;
     }
 
     .explainability-toggle-title {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
       min-width: 0;
     }
 
     .explainability-title {
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 12px;
+      font-weight: 750;
       color: var(--text);
     }
 
     .explainability-summary {
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1.45;
       color: var(--muted);
       word-break: break-word;
     }
 
     .chevron {
-      color: var(--muted);
-      font-size: 14px;
+      color: var(--muted-soft);
+      font-size: 12px;
       font-weight: 700;
-      transition: transform 0.18s ease;
+      transition: transform 0.18s var(--ease);
       flex: 0 0 auto;
     }
 
@@ -477,66 +756,73 @@
 
     .explainability-panel {
       display: none;
-      gap: 10px;
+      gap: 8px;
+      margin-top: 2px;
     }
 
     .explainability-wrap.open .explainability-panel {
       display: grid;
-      animation: fadeUp 0.18s ease;
+      animation: fadeUp 0.18s var(--ease);
     }
 
     .empty-state {
       display: grid;
-      gap: 10px;
+      gap: 8px;
       border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(11,22,48,0.42), rgba(7,16,36,0.56));
-      border-radius: var(--radius);
-      padding: 16px;
+      background: linear-gradient(180deg, rgba(11, 22, 48, 0.4), rgba(7, 16, 36, 0.55));
+      border-radius: var(--r-md);
+      padding: 14px;
     }
 
     .empty-title {
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 12px;
+      font-weight: 750;
       color: var(--text);
     }
 
     .empty-copy {
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1.5;
       color: var(--muted);
     }
 
     .empty-list {
       margin: 0;
-      padding-left: 18px;
+      padding-left: 16px;
       display: grid;
-      gap: 6px;
+      gap: 5px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1.45;
     }
 
     .footer-note {
-      font-size: 11px;
-      color: var(--muted);
+      font-size: 10px;
+      color: var(--muted-soft);
       line-height: 1.45;
       text-align: center;
       padding-top: 2px;
     }
 
+    .stack-gap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
     @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(6px); }
+      from { opacity: 0; transform: translateY(5px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes cardIn {
-      from { opacity: 0; transform: translateY(6px); }
+      from { opacity: 0; transform: translateY(5px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes pulse {
       0%, 100% { transform: scale(1); opacity: 0.9; }
-      50% { transform: scale(1.18); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 1; }
     }
   </style>
 </head>
@@ -544,10 +830,11 @@
   <div class="shell">
     <div class="header">
       <div class="brand">
-        <div class="brand-mark"></div>
+        <div class="brand-mark" aria-hidden="true"></div>
         <div>
+          <p class="brand-kicker">Operator console</p>
           <h1 class="brand-title">Xalvion Assist</h1>
-          <p class="brand-subtitle">AI prepares. You approve — same decision stack as the workspace.</p>
+          <p class="brand-subtitle">AI prepares. You approve — consequence, brief, then customer-ready text, same stack as the workspace.</p>
           <div id="extensionCapacityPill" class="extension-capacity-pill">Extension · session</div>
         </div>
       </div>
@@ -555,11 +842,11 @@
 
     <div class="content">
       <div class="actions">
-        <button id="analyze">Analyze Ticket</button>
-        <button id="scanInbox">Scan Inbox ⚡</button>
+        <button type="button" id="analyze">Analyze Ticket</button>
+        <button type="button" id="scanInbox">Scan Inbox ⚡</button>
         <div class="actions-row">
-          <button id="insertBtn">Insert Reply</button>
-          <button id="copyBtn">Copy Reply</button>
+          <button type="button" id="insertBtn">Insert Reply</button>
+          <button type="button" id="copyBtn">Copy Reply</button>
         </div>
       </div>
 
@@ -567,7 +854,7 @@
 
       <div id="thinkingPanel" class="thinking">
         <div class="thinking-header">
-          <div class="thinking-pulse"></div>
+          <div class="thinking-pulse" aria-hidden="true"></div>
           <div>
             <div class="thinking-title">Working through the decision</div>
             <div id="thinkingSubtitle" class="thinking-subtitle">Xalvion is reading the ticket, checking policy, and preparing the next step.</div>
@@ -599,30 +886,61 @@
       </div>
 
       <div id="headerInsight" class="insight">
-        <div class="insight-label">Operator Insight</div>
+        <div class="insight-label">Operator insight</div>
         <div id="headerInsightValue" class="insight-value">No decision yet.</div>
       </div>
 
       <div id="inboxSummary" class="insight">
-        <div class="insight-label">Inbox Summary</div>
+        <div class="insight-label">Inbox summary</div>
         <div id="inboxSummaryValue" class="insight-value">No inbox scan yet.</div>
       </div>
 
       <div id="emptyState" class="empty-state">
         <div class="empty-title">No ticket analyzed yet</div>
-        <div class="empty-copy">Xalvion will evaluate the message, apply policy, recommend the best action, and explain why it made that decision.</div>
+        <div class="empty-copy">Run analyze to open the same consequence-first stack: signal, operator brief, customer-ready reply, then supporting fields.</div>
         <ul class="empty-list">
-          <li>Understand intent</li>
-          <li>Apply policy</li>
-          <li>Take action</li>
-          <li>Learn from outcomes</li>
+          <li>Consequence signal first</li>
+          <li>Operator brief</li>
+          <li>Customer-ready reply</li>
+          <li>Policy-backed detail on demand</li>
         </ul>
       </div>
 
       <div id="resultPanel" class="panel">
-        <div class="panel-top">
-          <div id="notePill" class="pill hidden"></div>
+        <div class="consequence-bar">
+          <div class="consequence-bar-left">
+            <span id="consequenceSignal" class="consequence-signal signal-safe is-hidden" data-role="consequence"></span>
+            <div id="notePill" class="pill hidden"></div>
+          </div>
           <div id="statusBadge" class="status-badge hidden"></div>
+        </div>
+
+        <div id="approvalCompact" class="approval-compact">
+          <p id="approvalCompactCopy" class="approval-compact-copy"></p>
+          <div class="approval-compact-actions">
+            <button type="button" id="gateEditBtn" class="btn-compact btn-compact-primary">Edit reply</button>
+            <button type="button" id="gateDoneBtn" class="btn-compact">Done reviewing</button>
+          </div>
+        </div>
+
+        <details id="operatorBrief" class="operator-brief">
+          <summary class="operator-brief-summary">
+            <span class="operator-brief-summary-text">
+              <span class="operator-brief-eyebrow">Brief</span>
+              <span class="operator-brief-heading">Case posture</span>
+            </span>
+            <span class="operator-brief-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div id="operatorBriefBody" class="operator-brief-body"></div>
+        </details>
+
+        <div id="replyStack" class="reply-stack">
+          <div class="reply-stack-head">
+            <span class="reply-stack-label">Customer-ready reply</span>
+            <button type="button" id="replyToggleEditBtn" class="btn-texty">Edit</button>
+          </div>
+          <div id="replyValue" class="value reply-box">-</div>
+          <textarea id="replyTextarea" class="reply-textarea is-hidden" aria-label="Edit customer reply" rows="7"></textarea>
         </div>
 
         <div id="explainabilityWrap" class="explainability-wrap hidden">
@@ -636,136 +954,133 @@
 
           <div id="explainabilityPanel" class="explainability-panel">
             <div class="card full" id="explainDecisionCard">
-              <span class="label">Decision Logic</span>
+              <span class="label">Decision logic</span>
               <div id="explainDecisionValue" class="value muted reply-box">-</div>
             </div>
 
             <div class="card" id="explainConfidenceCard">
-              <span class="label">Confidence Context</span>
+              <span class="label">Confidence context</span>
               <div id="explainConfidenceValue" class="value muted reply-box">-</div>
             </div>
 
             <div class="card" id="explainLearningCard">
-              <span class="label">Learning Context</span>
+              <span class="label">Learning context</span>
               <div id="explainLearningValue" class="value muted reply-box">-</div>
             </div>
 
             <div class="card full" id="explainExecutionCard">
-              <span class="label">Execution Rationale</span>
+              <span class="label">Execution rationale</span>
               <div id="explainExecutionValue" class="value muted reply-box">-</div>
             </div>
 
             <div class="card full" id="explainImpactCard">
-              <span class="label">Impact Narrative</span>
+              <span class="label">Impact narrative</span>
               <div id="explainImpactValue" class="value muted reply-box">-</div>
             </div>
 
             <div class="card full" id="explainSessionCard">
-              <span class="label">Session Context</span>
+              <span class="label">Session context</span>
               <div id="explainSessionValue" class="value muted reply-box">-</div>
             </div>
           </div>
         </div>
 
-        <div class="grid">
-          <div class="card" id="statusCard">
-            <span class="label">Status</span>
-            <div id="statusValue" class="value">-</div>
-          </div>
-
-          <div class="card">
-            <span class="label">Type</span>
-            <div id="typeValue" class="value">-</div>
-          </div>
-
-          <div class="card">
-            <span class="label">Action</span>
-            <div id="actionValue" class="value">-</div>
-          </div>
-
-          <div class="card" id="confidenceCard">
-            <span class="label">Confidence</span>
-            <div id="confidenceValue" class="value">-</div>
-            <div class="meter">
-              <div id="confidenceMeter" class="meter-fill"></div>
+        <div class="stack-gap" id="secondaryStack">
+          <div id="resultMetaGrid" class="grid">
+            <div class="card" id="statusCard">
+              <span class="label">Status</span>
+              <div id="statusValue" class="value">-</div>
             </div>
-          </div>
 
-          <div class="card" id="priorityCard">
-            <span class="label">Priority</span>
-            <div id="priorityValue" class="value">-</div>
-          </div>
+            <div class="card">
+              <span class="label">Type</span>
+              <div id="typeValue" class="value">-</div>
+            </div>
 
-          <div class="card" id="queueCard">
-            <span class="label">Queue</span>
-            <div id="queueValue" class="value">-</div>
-          </div>
+            <div class="card">
+              <span class="label">Action</span>
+              <div id="actionValue" class="value">-</div>
+            </div>
 
-          <div class="card" id="riskCard">
-            <span class="label">Risk</span>
-            <div id="riskValue" class="value">-</div>
-          </div>
+            <div class="card" id="confidenceCard">
+              <span class="label">Confidence</span>
+              <div id="confidenceValue" class="value">-</div>
+              <div class="meter">
+                <div id="confidenceMeter" class="meter-fill"></div>
+              </div>
+            </div>
 
-          <div class="card full" id="reasonCard">
-            <span class="label">Reason</span>
-            <div id="reasonValue" class="value muted">-</div>
-          </div>
+            <div class="card" id="priorityCard">
+              <span class="label">Priority</span>
+              <div id="priorityValue" class="value">-</div>
+            </div>
 
-          <div class="card full" id="policyCard">
-            <span class="label">Policy Rule</span>
-            <div id="policyValue" class="value muted">-</div>
-          </div>
+            <div class="card" id="queueCard">
+              <span class="label">Queue</span>
+              <div id="queueValue" class="value">-</div>
+            </div>
 
-          <div class="card full" id="aiSummaryCard">
-            <span class="label">AI Summary</span>
-            <div id="aiSummaryValue" class="value muted">-</div>
-          </div>
+            <div class="card" id="riskCard">
+              <span class="label">Risk</span>
+              <div id="riskValue" class="value">-</div>
+            </div>
 
-          <div class="card full" id="replyCard">
-            <span class="label">Reply</span>
-            <div id="replyValue" class="value reply-box">-</div>
-          </div>
+            <div class="card full" id="reasonCard">
+              <span class="label">Reason</span>
+              <div id="reasonValue" class="value muted">-</div>
+            </div>
 
-          <div class="card full" id="executionCard">
-            <span class="label">Execution</span>
-            <div id="executionValue" class="value">-</div>
-            <div id="executionDetailValue" class="value muted">-</div>
-          </div>
+            <div class="card full" id="policyCard">
+              <span class="label">Policy rule</span>
+              <div id="policyValue" class="value muted">-</div>
+            </div>
 
-          <div class="card" id="modeCard">
-            <span class="label">Mode</span>
-            <div id="modeValue" class="value">-</div>
-          </div>
+            <div class="card full" id="aiSummaryCard">
+              <span class="label">AI summary</span>
+              <div id="aiSummaryValue" class="value muted">-</div>
+            </div>
 
-          <div class="card full" id="impactCard">
-            <span class="label">Impact</span>
-            <div id="impactValue" class="value reply-box">-</div>
-          </div>
+            <div class="card full" id="executionCard">
+              <span class="label">Execution</span>
+              <div id="executionValue" class="value">-</div>
+              <div id="executionDetailValue" class="value muted">-</div>
+            </div>
 
-          <div class="card full" id="signalsCard">
-            <span class="label">Signals</span>
-            <div id="signalsValue" class="value muted reply-box">-</div>
-          </div>
+            <div class="card" id="modeCard">
+              <span class="label">Mode</span>
+              <div id="modeValue" class="value">-</div>
+            </div>
 
-          <div class="card full" id="decisionTraceCard">
-            <span class="label">Decision Trace</span>
-            <div id="decisionTraceValue" class="value muted reply-box">-</div>
-          </div>
+            <div class="card full" id="impactCard">
+              <span class="label">Impact</span>
+              <div id="impactValue" class="value reply-box">-</div>
+            </div>
 
-          <div class="card full" id="memorySummaryCard">
-            <span class="label">Memory Summary</span>
-            <div id="memorySummaryValue" class="value muted reply-box">-</div>
-          </div>
+            <div class="card full" id="signalsCard">
+              <span class="label">Signals</span>
+              <div id="signalsValue" class="value muted reply-box">-</div>
+            </div>
 
-          <div class="card full" id="sessionImpactCard">
-            <span class="label">Session Impact</span>
-            <div id="sessionImpactValue" class="value muted reply-box">-</div>
+            <div class="card full" id="decisionTraceCard">
+              <span class="label">Decision trace</span>
+              <div id="decisionTraceValue" class="value muted reply-box">-</div>
+            </div>
+
+            <div class="card full" id="memorySummaryCard">
+              <span class="label">Memory summary</span>
+              <div id="memorySummaryValue" class="value muted reply-box">-</div>
+            </div>
+
+            <div class="card full" id="sessionImpactCard">
+              <span class="label">Session impact</span>
+              <div id="sessionImpactValue" class="value muted reply-box">-</div>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="footer-note">
-        Works on the current page only. Copy Reply appears only when a reply is generated.
+        Current tab only. Copy and insert use the customer-ready reply after your review.
       </div>
     </div>
   </div>
