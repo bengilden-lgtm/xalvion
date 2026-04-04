@@ -35,100 +35,116 @@
       </div>
     </header>
 
-    <div class="app workspace-grid">
-      <aside class="sidebar glass rail-col rail-col-left" id="sidebarShell" data-show-top="false" data-show-bottom="false">
+    <div class="app workspace-grid workspace-body">
+      <aside class="sidebar glass rail-col rail-col-left" id="sidebarShell">
+        <div class="sidebar-chrome">
+          <div class="sidebar-tab-dock" aria-hidden="true">
+            <span class="sidebar-tab-pill is-active">Overview</span>
+            <span class="sidebar-tab-pill">Account</span>
+            <span class="sidebar-tab-pill">Growth</span>
+          </div>
+        </div>
+        <div class="sidebar-scroll-host scroll-shell" id="sidebarScrollShell" data-show-top="false" data-show-bottom="false">
         <div class="sidebar-scroll scroll-area" id="sidebarScroll">
           <div class="sidebar-inner">
 
-            <div class="brand">
-              <svg width="200" height="36" viewBox="0 0 200 36" aria-hidden="true">
-                <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="currentColor" letter-spacing="-0.5">X</text>
-                <text x="26" y="19" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="300" fill="currentColor" letter-spacing="4" opacity="0.9">ALVION</text>
-                <text x="27" y="29" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5" font-weight="400" fill="currentColor" opacity="0.28" letter-spacing="3">OPERATOR ENGINE</text>
-              </svg>
-              <div class="brand-sub" id="brandSubcopy">Autonomous support that prepares decisions — your team approves.</div>
-            </div>
+            <section class="sidebar-panel" id="sidebarPanelOverview" data-sidebar-panel="overview" aria-label="Overview">
+              <div class="brand">
+                <svg width="200" height="36" viewBox="0 0 200 36" aria-hidden="true">
+                  <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="currentColor" letter-spacing="-0.5">X</text>
+                  <text x="26" y="19" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="300" fill="currentColor" letter-spacing="4" opacity="0.9">ALVION</text>
+                  <text x="27" y="29" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5" font-weight="400" fill="currentColor" opacity="0.28" letter-spacing="3">OPERATOR ENGINE</text>
+                </svg>
+                <div class="brand-sub" id="brandSubcopy">Autonomous support that prepares decisions — your team approves.</div>
+              </div>
 
-            <div class="section-label">Workspace notice</div>
-            <div id="notice" class="notice info">
-              <div class="notice-header">
-                <div class="notice-dot" aria-hidden="true"></div>
-                <div id="noticeTitle" class="notice-title">Booting</div>
-              </div>
-              <div class="notice-detail-wrap">
-                <span id="noticeDetail" class="notice-detail">Preparing the operator workspace…</span>
-              </div>
-            </div>
-
-            <div class="section-label">Access</div>
-            <div class="auth-card">
-              <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
-              <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
-              <p id="authHints" class="muted-copy auth-hints">
-                Username: 3–64 characters, letters, numbers, and <code>.</code> <code>_</code> <code>-</code> only.
-                Password: at least 8 characters.
-              </p>
-              <div class="btn-row">
-                <button id="signupBtn" class="ghost-btn" type="button">Sign up</button>
-                <button id="loginBtn" class="btn" type="button">Log in</button>
-              </div>
-              <div class="btn-row access-links-row">
-                <button id="devBtn" class="access-link-btn" type="button">Preview access</button>
-                <button id="logoutBtn" class="access-link-btn" type="button">Logout</button>
-              </div>
-            </div>
-
-            <div class="section-label">Integrations</div>
-            <div class="tier-card stripe-card" id="stripeCard">
-              <div class="stripe-card-head">
-                <div class="stripe-card-title">
-                  <span class="stripe-brand">Stripe</span>
-                  <p id="stripeIntegrationCopy" class="stripe-card-desc">
-                    Connect Stripe to execute refunds instead of only preparing them.
-                  </p>
+              <div class="section-label">Workspace notice</div>
+              <div id="notice" class="notice info">
+                <div class="notice-header">
+                  <div class="notice-dot" aria-hidden="true"></div>
+                  <div id="noticeTitle" class="notice-title">Booting</div>
                 </div>
-                <span id="stripeStatus" class="stripe-status-pill" aria-live="polite">Not connected</span>
-              </div>
-              <div class="stripe-meta">
-                <div class="usage-line stripe-meta-line">
-                  <span>Account</span>
-                  <span id="stripeAccountPill" class="stripe-meta-value">No account linked</span>
-                </div>
-                <div class="usage-line stripe-meta-line">
-                  <span>Mode</span>
-                  <span id="stripeModePill" class="stripe-meta-value">Awaiting connection</span>
+                <div class="notice-detail-wrap">
+                  <span id="noticeDetail" class="notice-detail">Preparing the operator workspace…</span>
                 </div>
               </div>
-              <div class="stripe-actions-col">
-                <button id="stripeConnectBtn" class="upgrade-btn stripe-connect-btn" type="button">
-                  <span class="stripe-connect-label">Connect Stripe</span><span aria-hidden="true">→</span>
-                </button>
-                <button id="stripeDisconnectBtn" class="ghost-btn stripe-disconnect-full" type="button" hidden>
-                  Disconnect Stripe
-                </button>
-              </div>
-            </div>
+            </section>
 
-            <div class="section-label">Plans</div>
-            <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
-            <div class="tier-card">
-              <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Handle more tickets · Upgrade to Pro</span><span>→</span></button>
-              <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Maximum capacity · Upgrade to Elite</span><span>→</span></button>
-            </div>
+            <section class="sidebar-panel" id="sidebarPanelAccount" data-sidebar-panel="account" aria-label="Account access">
+              <div class="section-label">Access</div>
+              <div class="auth-card">
+                <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
+                <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
+                <p id="authHints" class="muted-copy auth-hints">
+                  Username: 3–64 characters, letters, numbers, and <code>.</code> <code>_</code> <code>-</code> only.
+                  Password: at least 8 characters.
+                </p>
+                <div class="btn-row">
+                  <button id="signupBtn" class="ghost-btn" type="button">Sign up</button>
+                  <button id="loginBtn" class="btn" type="button">Log in</button>
+                </div>
+                <div class="btn-row access-links-row">
+                  <button id="devBtn" class="access-link-btn" type="button">Preview access</button>
+                  <button id="logoutBtn" class="access-link-btn" type="button">Logout</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="sidebar-panel" id="sidebarPanelGrowth" data-sidebar-panel="growth" aria-label="Integrations and plans">
+              <div class="section-label">Integrations</div>
+              <div class="tier-card stripe-card" id="stripeCard">
+                <div class="stripe-card-head">
+                  <div class="stripe-card-title">
+                    <span class="stripe-brand">Stripe</span>
+                    <p id="stripeIntegrationCopy" class="stripe-card-desc">
+                      Connect Stripe to execute refunds instead of only preparing them.
+                    </p>
+                  </div>
+                  <span id="stripeStatus" class="stripe-status-pill" aria-live="polite">Not connected</span>
+                </div>
+                <div class="stripe-meta">
+                  <div class="usage-line stripe-meta-line">
+                    <span>Account</span>
+                    <span id="stripeAccountPill" class="stripe-meta-value">No account linked</span>
+                  </div>
+                  <div class="usage-line stripe-meta-line">
+                    <span>Mode</span>
+                    <span id="stripeModePill" class="stripe-meta-value">Awaiting connection</span>
+                  </div>
+                </div>
+                <div class="stripe-actions-col">
+                  <button id="stripeConnectBtn" class="upgrade-btn stripe-connect-btn" type="button">
+                    <span class="stripe-connect-label">Connect Stripe</span><span aria-hidden="true">→</span>
+                  </button>
+                  <button id="stripeDisconnectBtn" class="ghost-btn stripe-disconnect-full" type="button" hidden>
+                    Disconnect Stripe
+                  </button>
+                </div>
+              </div>
+
+              <div class="section-label">Plans</div>
+              <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
+              <div class="tier-card tier-card-plans">
+                <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Handle more tickets · Upgrade to Pro</span><span>→</span></button>
+                <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Maximum capacity · Upgrade to Elite</span><span>→</span></button>
+              </div>
+            </section>
+
           </div>
+        </div>
         </div>
       </aside>
 
-      <main class="main main-canvas">
-        <div class="main-canvas-inner glass">
-          <div class="workspace-heading-row">
+      <main class="main main-canvas center-canvas">
+        <div class="main-canvas-inner glass canvas-shell">
+          <header class="workspace-heading-row canvas-header">
             <div class="title">
               <h1 id="workspacePageTitle">Customer support</h1>
               <p id="workspaceSubcopy" class="workspace-subline">Operator workspace loading…</p>
             </div>
-          </div>
+          </header>
 
-          <section class="workspace glass workspace-decision-shell">
+          <section class="workspace glass workspace-decision-shell decision-canvas">
             <div class="workspace-intro">
               <div class="workspace-intro-left">
                 <div class="section-label">Decision canvas</div>
@@ -140,7 +156,7 @@
             </div>
           </section>
 
-          <section class="composer-wrap">
+          <section class="composer-wrap composer-dock">
             <p id="composerStatusLine" class="composer-status-line">Paste a customer issue or type a support request…</p>
             <div class="quick-actions">
               <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
@@ -163,11 +179,17 @@
         </div>
       </main>
 
-      <aside class="rail rail-col rail-col-right scroll-shell" id="railShell" data-show-top="false" data-show-bottom="false">
+      <aside class="rail rail-col rail-col-right operator-rail" id="railShell">
+        <div class="operator-rail-head">
+          <div class="operator-rail-kicker">Live operations</div>
+          <div class="operator-rail-title">Operator rail</div>
+          <p class="operator-rail-sub">Throughput, billing, and pipeline signals stay visible while you decide.</p>
+        </div>
+        <div class="rail-scroll-host scroll-shell" id="railScrollShell" data-show-top="false" data-show-bottom="false">
         <div class="rail-scroll scroll-area" id="railScroll">
-          <div class="rail-inner" id="railInner">
+          <div class="rail-inner rail-stack" id="railInner">
 
-            <div class="rail-card rail-elevated" id="latestRunRailCard">
+            <div class="rail-card rail-surface rail-elevated" id="latestRunRailCard">
               <div class="rail-title">Latest run</div>
               <div class="rail-run-summary muted-copy" id="railRunSummary">Issue type, action, confidence — updates after each support run.</div>
               <div class="ops-grid">
@@ -199,7 +221,7 @@
               <div class="ops-run-line" id="opsRunNarrative"><span class="ops-narrative-text">Waiting for the next operator run.</span></div>
             </div>
 
-            <div class="rail-card rail-subtle">
+            <div class="rail-card rail-surface rail-subtle">
               <div class="rail-title">Value generated</div>
               <p class="muted-copy rail-teaser" id="valueRailTeaser">Session and billing impact from your workspace activity.</p>
               <div class="value-gen-grid">
@@ -222,7 +244,7 @@
               </div>
             </div>
 
-            <div class="rail-card rail-metrics-card" id="dashboardCard">
+            <div class="rail-card rail-surface rail-metrics-card" id="dashboardCard">
               <div class="rail-title">Throughput</div>
               <div class="stat-grid stat-grid-split">
                 <div class="stat-box">
@@ -239,7 +261,7 @@
               </div>
             </div>
 
-            <div class="rail-card refund-card" id="refundCenterCard">
+            <div class="rail-card rail-surface refund-card" id="refundCenterCard">
               <div class="rail-title">Refund center</div>
               <div class="refund-summary refund-summary-top">
                 <div class="refund-col refund-col-tier">
@@ -270,7 +292,7 @@
               </div>
             </div>
 
-            <div class="rail-card" id="usageCard">
+            <div class="rail-card rail-surface" id="usageCard">
               <div class="rail-title">Plan usage</div>
               <div class="usage-block">
                 <div class="plan-grid">
@@ -296,7 +318,7 @@
               </div>
             </div>
 
-            <div class="rail-card" id="crmTodayCard">
+            <div class="rail-card rail-surface" id="crmTodayCard">
               <div class="rail-title">Today</div>
               <div id="crmTodaySummary" class="muted-copy">Sign in to see today’s pipeline, hot deals, and reminder load.</div>
               <div class="refund-summary" style="margin-top:10px">
@@ -327,7 +349,7 @@
               </div>
             </div>
 
-            <div class="rail-card" id="revenueCard">
+            <div class="rail-card rail-surface" id="revenueCard">
               <div class="rail-title">Revenue Dashboard</div>
               <div id="revenueSummary" class="muted-copy">Track source performance, reply rate, win rate, and closed revenue as pipeline moves.</div>
               <div class="refund-summary" style="margin-top:10px">
@@ -368,7 +390,7 @@
               </div>
             </div>
 
-            <div class="rail-card" id="forecastCard">
+            <div class="rail-card rail-surface" id="forecastCard">
               <div class="rail-title">Pipeline Forecast</div>
               <div id="forecastSummary" class="muted-copy">Track weighted open revenue, projected revenue, and the deals most likely to close.</div>
               <div class="refund-summary" style="margin-top:10px">
@@ -405,7 +427,7 @@
               </div>
             </div>
 
-            <div class="rail-card" id="crmCard">
+            <div class="rail-card rail-surface" id="crmCard">
               <div class="rail-title">Outreach queue</div>
               <div class="system-stack">
                 <div id="crmSummary" class="muted-copy">Sign in to load leads, follow-ups, and conversion status.</div>
@@ -454,7 +476,7 @@
               </div>
             </div>
 
-            <div class="rail-card" id="accountCard">
+            <div class="rail-card rail-surface" id="accountCard">
               <div class="rail-title">Account</div>
               <div class="system-stack">
                 <div id="backendStatus" class="muted-copy">Service: checking…</div>
@@ -466,6 +488,7 @@
               </div>
             </div>
           </div>
+        </div>
         </div>
       </aside>
     </div>
@@ -513,9 +536,9 @@
   <script>
     (() => {
       const scrollConfigs = [
-        { areaId: "sidebarScroll", shellId: "sidebarShell", key: "xalvion-scroll-sidebar" },
+        { areaId: "sidebarScroll", shellId: "sidebarScrollShell", key: "xalvion-scroll-sidebar" },
         { areaId: "messages", shellId: "messagesShell", key: "xalvion-scroll-messages" },
-        { areaId: "railScroll", shellId: "railShell", key: "xalvion-scroll-rail" }
+        { areaId: "railScroll", shellId: "railScrollShell", key: "xalvion-scroll-rail" }
       ];
 
       function updateFade(area, shell) {
