@@ -1957,7 +1957,7 @@ def health():
     return {
         "status": "ok",
         "service": "xalvion",
-        "timestamp": datetime.utcnow().isoformat(),
+        "env": os.getenv("ENVIRONMENT", "unknown"),
     }
 
 
@@ -1968,7 +1968,10 @@ def health_deep():
             db.execute(text("SELECT 1"))
         return {"status": "ok", "db": "connected"}
     except Exception as e:
-        return {"status": "degraded", "error": str(e)[:200]}
+        return {
+            "status": "degraded",
+            "error": str(e)[:200],
+        }
 
 
 # =============================================================================
