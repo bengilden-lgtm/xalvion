@@ -380,6 +380,112 @@ def calculate_impact(ticket: Dict[str, Any], executed_action: Dict[str, Any]) ->
         saved = 40
     return {"type": "saved", "amount": saved, "money_saved": saved, "auto_resolved": True}
 
+
+def _to_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def project_business_impact(
+    ticket: Dict[str, Any],
+    executed_action: Dict[str, Any],
+    *,
+    confidence: float | None = None,
+) -> Dict[str, Any]:
+    """
+    Companion to calculate_impact — additive business projection for outcome intelligence.
+    All values are heuristic projections for UI / analytics, not accounting truth.
+
+    Fields:
+      revenue_at_risk, revenue_saved, churn_risk_delta, refund_cost,
+      time_saved (minutes), confidence_band (low/high/point estimates).
+    """
+    ticket = ticket or {}
+    executed_action = executed_action or {}
+    triage = ticket.get("triage") or {}
+    action = str(executed_action.get("action", "none") or "none").lower()
+    amount = _to_float(_to_int(executed_action.get("amount", 0), 0), 0.0)
+    ltv = max(0, _to_int(ticket.get("ltv", 0), 0))
+    churn_risk = float(_clamp(triage.get("churn_risk", 35), 0, 99, 35))
+    sentiment = _clamp(ticket.get("sentiment", 5), 1, 10, 5)
+    risk_level = str(triage.get("risk_level", "medium") or "medium").lower()
+
+    # Exposure if the account churns (capped by observed LTV).
+    revenue_at_risk = round(min(float(ltv), float(ltv) * (churn_risk / 100.0) * 1.15), 2)
+
+    # Churn-risk delta in percentage points (negative => projected improvement).
+    if action == "refund" and amount > 0:
+        churn_risk_delta = round(-min(28.0, 10.0 + amount * 0.2), 2)
+    elif action == "credit" and amount > 0:
+        churn_risk_delta = round(-min(22.0, 8.0 + amount * 0.25), 2)
+    elif action == "review":
+        churn_risk_delta = round(-min(14.0, 6.0 + max(0, 7 - sentiment)), 2)
+    elif action == "charge" and amount > 0:
+        churn_risk_delta = round(-min(6.0, 3.0 + amount * 0.02), 2)
+    else:
+        churn_risk_delta = round(-min(10.0, 4.0 + max(0, 8 - sentiment) * 0.6), 2)
+
+    # Retention / recovery value surfaced (orthogonal to refund_cost).
+    if action == "credit" and amount > 0:
+        revenue_saved = round(min(float(ltv) * 0.12, amount * 2.2 + 18.0), 2)
+    elif action == "refund" and amount > 0:
+        revenue_saved = round(min(float(ltv) * 0.06, 12.0 + amount * 0.1), 2)
+    else:
+        revenue_saved = round(max(0.0, revenue_at_risk * 0.12 + max(0, 9 - sentiment) * 1.8), 2)
+
+    refund_cost = round(amount, 2) if action == "refund" else 0.0
+
+    if action == "review":
+        time_saved = 5.0
+    elif action in {"refund", "credit", "charge"}:
+        time_saved = 14.0
+    else:
+        time_saved = 9.0
+    if int(triage.get("complexity", 0) or 0) >= 65:
+        time_saved += 5.0
+    time_saved = round(time_saved, 2)
+
+    conf = confidence
+    if conf is None:
+        conf = 0.88
+    conf = _to_float(conf, 0.88)
+    conf = max(0.55, min(0.99, conf))
+    margin = 0.04 if risk_level == "low" else 0.06 if risk_level == "medium" else 0.09
+    confidence_band = {
+        "low": round(max(0.5, conf - margin), 3),
+        "high": round(min(0.99, conf + margin * 0.65), 3),
+        "point": round(conf, 3),
+    }
+
+    return {
+        "revenue_at_risk": revenue_at_risk,
+        "revenue_saved": revenue_saved,
+        "churn_risk_delta": churn_risk_delta,
+        "refund_cost": refund_cost,
+        "time_saved": time_saved,
+        "confidence_band": confidence_band,
+    }
+
+
+def merge_impact_with_business_projection(
+    ticket: Dict[str, Any],
+    executed_action: Dict[str, Any],
+    *,
+    confidence: float | None = None,
+) -> Dict[str, Any]:
+    """
+    Non-breaking merge: preserves calculate_impact keys and adds business projection fields.
+    Also sets agent_minutes_saved when absent (aligned with time_saved).
+    """
+    base = calculate_impact(ticket, executed_action)
+    biz = project_business_impact(ticket, executed_action, confidence=confidence)
+    out: Dict[str, Any] = {**base, **biz}
+    if "agent_minutes_saved" not in out or int(out.get("agent_minutes_saved") or 0) == 0:
+        out["agent_minutes_saved"] = int(round(float(biz.get("time_saved", 0.0) or 0.0)))
+    return out
+
 # ===== ACTION EXECUTION LAYER (NO DOWNGRADE) =====
 
 def execute_action(action_type: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:

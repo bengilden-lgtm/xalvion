@@ -131,6 +131,42 @@ class TestCalculateImpact:
         assert impact["money_saved"] > 0
 
 
+class TestBusinessImpactProjection:
+    def test_project_business_impact_keys(self):
+        from actions import project_business_impact
+
+        ticket = {
+            "ltv": 400,
+            "sentiment": 3,
+            "triage": {"churn_risk": 55, "risk_level": "medium", "complexity": 40},
+        }
+        action = {"action": "refund", "amount": 20}
+        biz = project_business_impact(ticket, action, confidence=0.9)
+        for key in (
+            "revenue_at_risk",
+            "revenue_saved",
+            "churn_risk_delta",
+            "refund_cost",
+            "time_saved",
+            "confidence_band",
+        ):
+            assert key in biz
+        assert biz["refund_cost"] == 20.0
+        assert "low" in biz["confidence_band"] and "high" in biz["confidence_band"]
+
+    def test_merge_preserves_calculate_impact(self):
+        from actions import calculate_impact, merge_impact_with_business_projection
+
+        ticket = {"triage": {"churn_risk": 40, "risk_level": "low"}}
+        action = {"action": "none", "amount": 0}
+        base = calculate_impact(ticket, action)
+        merged = merge_impact_with_business_projection(ticket, action, confidence=0.91)
+        assert merged["type"] == base["type"]
+        assert merged["money_saved"] == base["money_saved"]
+        assert "revenue_at_risk" in merged
+        assert merged.get("agent_minutes_saved", 0) >= 0
+
+
 # =============================================================================
 # security.py
 # =============================================================================
@@ -330,6 +366,42 @@ class TestOutcomeImpactScoring:
         result = compute_outcome_impact(None)
         assert result["impact_score"] == 0.5
         assert result["impact_label"] == "neutral"
+
+    def test_outcome_summary_compact_shape(self):
+        from outcome_store import build_outcome_summary_for_ui
+
+        row = {
+            "outcome_key": "u:ship:abc",
+            "action": "credit",
+            "amount": 15.0,
+            "success": True,
+            "auto_resolved": True,
+            "approved_by_human": False,
+            "refund_reversed": False,
+            "dispute_filed": False,
+            "ticket_reopened": False,
+            "crm_closed": False,
+        }
+        summary = build_outcome_summary_for_ui(row)
+        assert "headline" in summary and "tier" in summary
+        assert "flags" in summary and "money" in summary
+        assert summary["money"]["credit"] == 15.0
+
+    def test_normalize_business_outcome_flags(self):
+        from outcome_store import normalize_business_outcome
+
+        norm = normalize_business_outcome(
+            {
+                "success": True,
+                "auto_resolved": True,
+                "ticket_reopened": True,
+                "refund_reversed": False,
+                "action": "none",
+                "amount": 0,
+            }
+        )
+        assert norm["stability"] == "unstable"
+        assert "ticket_reopened" in norm["risk_flags"]
 
 
 # =============================================================================
@@ -568,3 +640,52 @@ class TestLearningLoopIntegration:
         score = _score_outcome(outcome)
         assert isinstance(score, (int, float))
         assert score >= 0.0
+
+    def test_refund_outcome_score_is_capped_on_fallback_path(self):
+        from learning import _score_outcome
+
+        refund_score = _score_outcome(
+            {"auto_resolved": True, "money_saved": 200, "revenue_saved": 500},
+            decision={"action": "refund", "risk_level": "low"},
+        )
+        assert refund_score <= 3.85
+
+    def test_low_risk_credit_bonus_on_fallback_path(self):
+        from learning import _score_outcome
+
+        s = _score_outcome(
+            {"auto_resolved": True, "money_saved": 20},
+            decision={"action": "credit", "risk_level": "low"},
+        )
+        assert s >= 1.5
+
+
+# =============================================================================
+# analytics.py — compact intelligence metrics
+# =============================================================================
+
+
+class TestAnalyticsCompactMetrics:
+    def test_get_metrics_includes_new_keys(self):
+        from analytics import get_metrics, _DEFAULT_METRICS
+
+        for key in (
+            "approval_rate",
+            "auto_safe_rate",
+            "review_rate",
+            "revenue_saved",
+            "refund_cost",
+            "good_excellent_outcome_rate",
+        ):
+            assert key in _DEFAULT_METRICS
+        m = get_metrics()
+        for key in (
+            "approval_rate",
+            "auto_safe_rate",
+            "review_rate",
+            "revenue_saved",
+            "refund_cost",
+            "good_excellent_outcome_rate",
+        ):
+            assert key in m
+            assert isinstance(m[key], (int, float))

@@ -71,10 +71,17 @@ def _is_closed_outcome(outcome: Dict[str, Any]) -> bool:
     return value == "closed"
 
 
-def _score_outcome(outcome: Dict[str, Any], outcome_key: str | None = None) -> float:
+def _score_outcome(
+    outcome: Dict[str, Any],
+    outcome_key: str | None = None,
+    *,
+    decision: Dict[str, Any] | None = None,
+) -> float:
     """
-    Score an outcome.  If a real outcome exists in outcome_store, use it.
+    Score an outcome. If a real outcome exists in outcome_store, use it (outcome-aware).
     Falls back to the self-reported outcome dict for backwards compatibility.
+
+    Refund outcomes are capped so learning does not self-reinforce aggressive refunding.
     """
     real: Dict[str, Any] | None = None
     if outcome_key:
@@ -83,6 +90,10 @@ def _score_outcome(outcome: Dict[str, Any], outcome_key: str | None = None) -> f
         except Exception:
             real = None
 
+    dec = decision or {}
+    decision_action = str(dec.get("action", outcome.get("action", "none")) or "none").lower()
+    decision_risk = str(dec.get("risk_level", "medium") or "medium").lower()
+
     score = 0.0
 
     if real is not None:
@@ -90,7 +101,26 @@ def _score_outcome(outcome: Dict[str, Any], outcome_key: str | None = None) -> f
             from outcome_store import compute_outcome_impact
 
             impact = compute_outcome_impact(real)
-            return round(float(impact["impact_score"]) * 5.0, 4)
+            base = float(impact["impact_score"]) * 5.0
+            if real.get("ticket_reopened"):
+                base -= 1.35
+            if real.get("refund_reversed"):
+                base -= 2.25
+            if real.get("dispute_filed"):
+                base -= 1.65
+            if (
+                real.get("success")
+                and real.get("auto_resolved")
+                and not real.get("refund_reversed")
+                and not real.get("dispute_filed")
+                and not real.get("ticket_reopened")
+                and decision_risk == "low"
+                and decision_action in {"none", "credit"}
+            ):
+                base += 0.55
+            if decision_action == "refund":
+                base = min(base, 3.85)
+            return round(max(0.0, base), 4)
         except Exception:
             pass
         if real.get("success"):
@@ -107,16 +137,24 @@ def _score_outcome(outcome: Dict[str, Any], outcome_key: str | None = None) -> f
             score -= 1.5
         if real.get("crm_closed"):
             score += 0.8
+        if decision_action == "refund":
+            score = min(score, 3.5)
     else:
-        # Self-reported fallback — original logic preserved
+        # Self-reported fallback — original logic preserved, plus light use of new impact fields
         if _is_closed_outcome(outcome):
             score += 2.0
         if bool(outcome.get("auto_resolved", False)):
             score += 1.0
         score += min(2.0, float(outcome.get("money_saved", 0.0) or 0.0) / 50.0)
         score += min(1.0, float(outcome.get("agent_minutes_saved", 0) or 0) / 10.0)
+        score += min(0.85, float(outcome.get("time_saved", 0.0) or 0.0) / 18.0)
+        score += min(1.1, float(outcome.get("revenue_saved", 0.0) or 0.0) / 120.0)
+        if decision_risk == "low" and decision_action in {"none", "credit"} and bool(outcome.get("auto_resolved")):
+            score += 0.35
+        if decision_action == "refund":
+            score = min(score, 3.4)
 
-    return round(score, 4)
+    return round(max(0.0, score), 4)
 
 
 def _pattern_key(ticket: Dict[str, Any], decision: Dict[str, Any]) -> str:
@@ -203,7 +241,8 @@ def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome:
         return
     if not validate_rule(candidate) or not simulate_rule(candidate):
         return
-    conversion_weight = 1.0 + _score_outcome(outcome, outcome_key=outcome_key)
+    conversion_weight = 1.0 + _score_outcome(outcome, outcome_key=outcome_key, decision=decision)
+    conversion_weight = round(min(3.2, max(0.35, conversion_weight)), 4)
     for rule in rules:
         if rule["trigger"] == candidate["trigger"]:
             rule["weight"] = round(float(rule.get("weight", 1.0)) + (0.5 * conversion_weight), 4)
@@ -280,7 +319,7 @@ def apply_learned_rules(ticket: Dict[str, Any], top_rules: List[Dict[str, Any]] 
 def update_rule_feedback(ticket: Dict[str, Any], decision: Dict[str, Any], outcome: Dict[str, Any]) -> None:
     rules = load_rules()
     decision_action = str(decision.get("action", "none") or "none")
-    success = _score_outcome(outcome) > 0.9
+    success = _score_outcome(outcome, decision=decision) > 0.9
     for rule in rules:
         trigger = rule.get("trigger", "")
         matches_low_sentiment = trigger == "low_sentiment_no_action" and int(ticket.get("sentiment", 10) or 10) <= 3

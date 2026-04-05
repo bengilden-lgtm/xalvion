@@ -54,7 +54,7 @@ from sqlalchemy.orm import Session
 from agent import run_agent, local_fallback_reply
 from actions import (
     build_ticket as build_support_ticket,
-    calculate_impact,
+    merge_impact_with_business_projection,
     system_decision,
     triage_ticket,
     HANDLED_ISSUE_TYPES,
@@ -78,6 +78,12 @@ _METRICS_FALLBACK: dict[str, Any] = {
     "total_refunds": 0,
     "total_credits": 0,
     "money_moved": 0.0,
+    "approval_rate": 0.0,
+    "auto_safe_rate": 0.0,
+    "review_rate": 0.0,
+    "revenue_saved": 0.0,
+    "refund_cost": 0.0,
+    "good_excellent_outcome_rate": 0.0,
 }
 
 _dashboard_cache: dict[str, Any] = {}
@@ -113,6 +119,7 @@ except Exception:
             "avg_impact_score": 0.5,
             "excellent_rate": 0.0,
             "bad_rate": 0.0,
+            "good_excellent_outcome_rate": 0.0,
         }
 
     def mark_ticket_reopened(_k: str) -> bool:
@@ -1899,10 +1906,15 @@ def apply_learning_feedback(runtime_ticket: dict[str, Any], result: dict[str, An
         "action": str(result.get("action", "none") or "none"),
         "amount": float(result.get("amount", 0) or 0),
         "reason": str(result.get("reason", "") or ""),
+        "risk_level": str((result.get("decision") or {}).get("risk_level", "medium") or "medium"),
     }
     outcome = dict(result.get("impact") or {})
     if not outcome:
-        outcome = calculate_impact(runtime_ticket, decision)
+        outcome = merge_impact_with_business_projection(
+            runtime_ticket,
+            decision,
+            confidence=float(result.get("confidence", 0.9) or 0.9),
+        )
     safe_execute(learn_from_ticket, runtime_ticket, decision, outcome)
 
 
@@ -2334,10 +2346,16 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
         else:
             result = apply_real_actions(result, req, user)
 
-        impact = calculate_impact(runtime_ticket, {
-            "action": str(result.get("action", "none") or "none"),
-            "amount": float(result.get("amount", 0) or 0),
-        })
+        merged_impact = merge_impact_with_business_projection(
+            runtime_ticket,
+            {
+                "action": str(result.get("action", "none") or "none"),
+                "amount": float(result.get("amount", 0) or 0),
+            },
+            confidence=float(result.get("confidence", 0.9) or 0.9),
+        )
+        agent_impact = result.get("impact") if isinstance(result.get("impact"), dict) else {}
+        impact = {**agent_impact, **merged_impact}
         result = hydrate_result_with_engine_context(
             result,
             runtime_ticket=runtime_ticket,

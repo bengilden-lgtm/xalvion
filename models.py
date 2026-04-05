@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -82,6 +83,27 @@ class ImpactProjections(BaseModel):
     auto_resolved: bool = False
     agent_minutes_saved: int = 0
     signals: list[str] = Field(default_factory=list)
+    revenue_at_risk: float = 0
+    revenue_saved: float = 0
+    churn_risk_delta: float = 0
+    refund_cost: float = 0
+    time_saved: float = 0
+    confidence_band: dict[str, float] = Field(default_factory=dict)
+
+    @field_validator("confidence_band", mode="before")
+    @classmethod
+    def _coerce_confidence_band(cls, v: Any) -> dict[str, float]:
+        if v is None or v == {}:
+            return {}
+        if isinstance(v, dict):
+            out: dict[str, float] = {}
+            for k, x in v.items():
+                try:
+                    out[str(k)] = float(x)
+                except Exception:
+                    continue
+            return out
+        return {}
 
 
 class MemoryDelta(BaseModel):

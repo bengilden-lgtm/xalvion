@@ -25,6 +25,12 @@ _DEFAULT_METRICS: dict[str, Any] = {
     "total_refunds": 0,
     "total_credits": 0,
     "money_moved": 0.0,
+    "approval_rate": 0.0,
+    "auto_safe_rate": 0.0,
+    "review_rate": 0.0,
+    "revenue_saved": 0.0,
+    "refund_cost": 0.0,
+    "good_excellent_outcome_rate": 0.0,
 }
 
 _metrics_failure_logged = False
@@ -108,12 +114,45 @@ def get_metrics() -> dict[str, Any]:
         avg_qual = db.query(func.avg(AnalyticsEvent.quality)).scalar() or 0.0
         total_refunds = db.query(AnalyticsEvent).filter(AnalyticsEvent.action == "refund").count()
         total_credits = db.query(AnalyticsEvent).filter(AnalyticsEvent.action == "credit").count()
+        review_n = db.query(AnalyticsEvent).filter(AnalyticsEvent.action == "review").count()
         money_moved = (
             db.query(func.sum(AnalyticsEvent.amount))
             .filter(AnalyticsEvent.action.in_(["refund", "credit"]))
             .scalar()
             or 0.0
         )
+        refund_cost = (
+            db.query(func.sum(AnalyticsEvent.amount))
+            .filter(AnalyticsEvent.action == "refund")
+            .scalar()
+            or 0.0
+        )
+        credit_volume = (
+            db.query(func.sum(AnalyticsEvent.amount))
+            .filter(AnalyticsEvent.action == "credit")
+            .scalar()
+            or 0.0
+        )
+        auto_safe_n = db.query(AnalyticsEvent).filter(
+            AnalyticsEvent.action.in_(["none", "credit"]),
+            AnalyticsEvent.quality >= 0.85,
+            AnalyticsEvent.confidence >= 0.82,
+        ).count()
+        review_rate = round(review_n / max(1, total) * 100, 2)
+        auto_safe_rate = round(auto_safe_n / max(1, total) * 100, 2)
+        revenue_saved = round(float(credit_volume) * 2.05 + max(0, total - review_n) * 0.35, 2)
+
+        approval_rate = 0.0
+        good_excellent_outcome_rate = 0.0
+        try:
+            from outcome_store import get_outcome_stats as _outcome_stats
+
+            ost = _outcome_stats()
+            ot = max(1, int(ost.get("total", 0) or 0))
+            approval_rate = round(float(ost.get("human_approved", 0) or 0) / ot * 100, 2)
+            good_excellent_outcome_rate = float(ost.get("good_excellent_outcome_rate", 0.0) or 0.0)
+        except Exception:
+            pass
 
         return {
             "avg_confidence": round(float(avg_conf), 2),
@@ -122,6 +161,12 @@ def get_metrics() -> dict[str, Any]:
             "total_refunds": total_refunds,
             "total_credits": total_credits,
             "money_moved": round(float(money_moved), 2),
+            "approval_rate": approval_rate,
+            "auto_safe_rate": auto_safe_rate,
+            "review_rate": review_rate,
+            "revenue_saved": revenue_saved,
+            "refund_cost": round(float(refund_cost), 2),
+            "good_excellent_outcome_rate": round(good_excellent_outcome_rate, 2),
         }
     except SQLTimeoutError as exc:
         _log_metrics_pool_timeout_once(exc)

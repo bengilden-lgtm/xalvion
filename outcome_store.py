@@ -168,6 +168,103 @@ def _outcome_orm_to_dict(row: ActionOutcomeLog) -> dict[str, Any]:
     }
 
 
+def normalize_business_outcome(row_dict: dict[str, Any] | None) -> dict[str, Any]:
+    """
+    Normalized business semantics for an outcome row (dict from get_outcome or ORM-shaped dict).
+    Additive helper — does not replace compute_outcome_impact.
+    """
+    if not row_dict:
+        return {
+            "resolution_class": "unknown",
+            "financial_motion": False,
+            "stability": "unknown",
+            "risk_flags": [],
+        }
+
+    success = bool(row_dict.get("success"))
+    auto_r = bool(row_dict.get("auto_resolved"))
+    reopened = bool(row_dict.get("ticket_reopened"))
+    reversed_f = bool(row_dict.get("refund_reversed"))
+    dispute = bool(row_dict.get("dispute_filed"))
+    action = str(row_dict.get("action", "none") or "none")
+    amt = float(row_dict.get("amount", 0) or 0)
+
+    risk_flags: list[str] = []
+    if reversed_f:
+        risk_flags.append("refund_reversed")
+    if dispute:
+        risk_flags.append("dispute_filed")
+    if reopened:
+        risk_flags.append("ticket_reopened")
+
+    if reversed_f or dispute:
+        stability = "fragile"
+    elif reopened:
+        stability = "unstable"
+    elif success and auto_r:
+        stability = "stable_auto"
+    elif success:
+        stability = "stable"
+    else:
+        stability = "failed"
+
+    if success and auto_r and not reopened and not reversed_f and not dispute:
+        resolution_class = "auto_success"
+    elif success:
+        resolution_class = "assisted_success"
+    else:
+        resolution_class = "failed"
+
+    return {
+        "resolution_class": resolution_class,
+        "financial_motion": action in {"refund", "credit", "charge"} and amt > 0,
+        "stability": stability,
+        "risk_flags": risk_flags,
+        "action_family": action,
+    }
+
+
+def build_outcome_summary_for_ui(row_dict: dict[str, Any] | None) -> dict[str, Any]:
+    """
+    Compact card-shaped summary for frontends. Backward compatible: only adds structure;
+    existing callers of get_outcome / log_outcome unchanged.
+    """
+    if not row_dict:
+        return {
+            "headline": "No outcome recorded",
+            "tier": "neutral",
+            "score": 0.5,
+            "badges": [],
+            "money": {"refund": 0.0, "credit": 0.0},
+            "flags": normalize_business_outcome(None),
+        }
+
+    imp = compute_outcome_impact(row_dict)
+    norm = normalize_business_outcome(row_dict)
+    action = str(row_dict.get("action", "none") or "none")
+    amt = round(float(row_dict.get("amount", 0) or 0), 2)
+
+    headline = f"{action.replace('_', ' ').title()} · {imp['impact_label']} outcome"
+    if action == "refund" and amt > 0:
+        headline = f"Refund ${amt:.0f} · {imp['impact_label']}"
+    elif action == "credit" and amt > 0:
+        headline = f"Credit ${amt:.0f} · {imp['impact_label']}"
+
+    badges = [imp["impact_label"], norm["stability"], norm["resolution_class"]]
+    money = {"refund": amt if action == "refund" else 0.0, "credit": amt if action == "credit" else 0.0}
+
+    return {
+        "outcome_key": row_dict.get("outcome_key"),
+        "headline": headline,
+        "tier": imp["impact_label"],
+        "score": imp["impact_score"],
+        "badges": [b for b in badges if b and b != "unknown"],
+        "money": money,
+        "flags": norm,
+        "components": imp.get("component_scores") or {},
+    }
+
+
 def compute_outcome_impact(row_dict: dict[str, Any] | None) -> dict[str, Any]:
     """
     Authoritative normalized impact for an outcome record (dict from get_outcome()
@@ -396,6 +493,7 @@ def get_outcome_stats() -> dict[str, Any]:
         avg_impact_score = 0.5
         excellent_rate = 0.0
         bad_rate = 0.0
+        good_excellent_outcome_rate = 0.0
         try:
             sample_rows = (
                 db.query(ActionOutcomeLog)
@@ -415,8 +513,15 @@ def get_outcome_stats() -> dict[str, Any]:
                 bad_rate = round(
                     sum(1 for i in impacts if i["impact_label"] == "bad") / max(1, n) * 100, 2
                 )
+                good_excellent_outcome_rate = round(
+                    sum(1 for i in impacts if i["impact_label"] in {"good", "excellent"}) / max(1, n) * 100,
+                    2,
+                )
+            else:
+                good_excellent_outcome_rate = 0.0
         except Exception:
             avg_impact_score, excellent_rate, bad_rate = 0.5, 0.0, 0.0
+            good_excellent_outcome_rate = 0.0
 
         total = db.query(ActionOutcomeLog).count()
         if not total:
@@ -433,6 +538,7 @@ def get_outcome_stats() -> dict[str, Any]:
                 "avg_impact_score":    0.5,
                 "excellent_rate":      0.0,
                 "bad_rate":            0.0,
+                "good_excellent_outcome_rate": 0.0,
             }
             _outcome_stats_cache.clear()
             _outcome_stats_cache.update(result)
@@ -469,6 +575,7 @@ def get_outcome_stats() -> dict[str, Any]:
             "avg_impact_score":    avg_impact_score,
             "excellent_rate":      excellent_rate,
             "bad_rate":            bad_rate,
+            "good_excellent_outcome_rate": good_excellent_outcome_rate,
         }
         _outcome_stats_cache.clear()
         _outcome_stats_cache.update(result)

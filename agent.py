@@ -15,9 +15,9 @@ from actions import (
     HANDLED_ISSUE_TYPES,
     apply_learned_rules,
     build_ticket,
-    calculate_impact,
     compute_execution_tier,
     execute_action as dispatch_integrated_action,
+    merge_impact_with_business_projection,
     system_decision,
     triage_ticket,
 )
@@ -269,13 +269,12 @@ def build_structured_response(
     customer_note: str,
 ) -> Dict[str, Any]:
     safe_action = normalize_action_payload(action_payload)
-    impact = calculate_impact(ticket, safe_action)
-
     queue = str(action_payload.get("queue", "new") or "new")
     priority = str(action_payload.get("priority", "medium") or "medium")
     risk_level = str(action_payload.get("risk_level", triage.get("risk_level", "medium")) or "medium")
 
     conf_val = float(clamp_confidence(confidence, 0.9))
+    impact = merge_impact_with_business_projection(ticket, safe_action, confidence=conf_val)
     final_like = {
         "action": safe_action["action"],
         "amount": safe_action["amount"],
@@ -298,6 +297,12 @@ def build_structured_response(
         "money_saved": float(impact.get("money_saved", 0) or 0),
         "agent_minutes_saved": int(impact.get("agent_minutes_saved", 0) or 0),
         "auto_resolved": bool(impact.get("auto_resolved", False)),
+        "revenue_at_risk": float(impact.get("revenue_at_risk", 0) or 0),
+        "revenue_saved": float(impact.get("revenue_saved", 0) or 0),
+        "churn_risk_delta": float(impact.get("churn_risk_delta", 0) or 0),
+        "refund_cost": float(impact.get("refund_cost", 0) or 0),
+        "time_saved": float(impact.get("time_saved", 0) or 0),
+        "confidence_band": dict(impact.get("confidence_band") or {}),
     }
     decision_explanation = build_decision_explanation(
         ticket=ticket,
@@ -1426,6 +1431,12 @@ def build_decision_explanation(
             "money_saved": float(impact_projection.get("money_saved", 0) or 0),
             "agent_minutes_saved": int(impact_projection.get("agent_minutes_saved", 0) or 0),
             "auto_resolved": bool(impact_projection.get("auto_resolved", False)),
+            "revenue_at_risk": float(impact_projection.get("revenue_at_risk", 0) or 0),
+            "revenue_saved": float(impact_projection.get("revenue_saved", 0) or 0),
+            "churn_risk_delta": float(impact_projection.get("churn_risk_delta", 0) or 0),
+            "refund_cost": float(impact_projection.get("refund_cost", 0) or 0),
+            "time_saved": float(impact_projection.get("time_saved", 0) or 0),
+            "confidence_band": dict(impact_projection.get("confidence_band") or {}),
         },
         "execution_tier": execution_tier,
         "summary": summary,
@@ -1451,7 +1462,8 @@ def _canonicalize_result(
     hard_decision: Dict[str, Any] | None = None,
     pattern_expectation: dict | None = None,
 ) -> Dict[str, Any]:
-    impact = calculate_impact(ticket, final_action)
+    conf_for_impact = float(clamp_confidence(final_action.get("confidence", 0.9), 0.9))
+    impact = merge_impact_with_business_projection(ticket, final_action, confidence=conf_for_impact)
     tool_status = str(executed.get("tool_status", executed.get("status", "no_action")) or "no_action")
     queue = str(final_action.get("queue", "new") or "new")
     if tool_status in {"pending_approval", "manual_review"}:
@@ -1500,6 +1512,12 @@ def _canonicalize_result(
         "auto_resolved": bool(impact.get("auto_resolved", decision["action"] in {"refund", "credit", "none"})),
         "agent_minutes_saved": int(impact.get("agent_minutes_saved", 6 if decision["action"] != "review" else 0) or 0),
         "signals": list(impact.get("signals", [])) if isinstance(impact.get("signals", []), list) else [],
+        "revenue_at_risk": float(impact.get("revenue_at_risk", 0) or 0),
+        "revenue_saved": float(impact.get("revenue_saved", 0) or 0),
+        "churn_risk_delta": float(impact.get("churn_risk_delta", 0) or 0),
+        "refund_cost": float(impact.get("refund_cost", 0) or 0),
+        "time_saved": float(impact.get("time_saved", 0) or 0),
+        "confidence_band": dict(impact.get("confidence_band") or {}),
     }
 
     hd = hard_decision if hard_decision is not None else final_action
