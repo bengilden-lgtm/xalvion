@@ -3859,6 +3859,11 @@ body{
   color:rgba(250,204,21,0.85);
   margin-bottom:8px;
 }
+.limit-moment-card .empty-cap-eyebrow{
+  color:rgba(167,139,250,0.78);
+  font-weight:700;
+  letter-spacing:0.12em;
+}
 
 .composer-status-line.composer-status-live{
   color:rgba(124,92,252,0.92);
@@ -3868,6 +3873,11 @@ body{
 
 #workspaceRoot.mono-guest-preview{
   --mono-tint: rgba(34,193,255,0.04);
+}
+#workspaceRoot.mono-guest-preview .command-status-chip .command-capacity{
+  font-family:Outfit,var(--font-sans);
+  font-weight:500;
+  letter-spacing:0.01em;
 }
 #workspaceRoot.mono-approaching-limit{
   --mono-tint: rgba(250,204,21,0.05);
@@ -3947,7 +3957,7 @@ body{
 
 .sidebar-top{
   flex-shrink:0;
-  padding:14px 16px 10px;
+  padding:16px 16px 12px;
   border-bottom:1px solid rgba(255,255,255,0.04);
 }
 .sidebar-brand-compact{
@@ -5617,12 +5627,12 @@ body{
 }
 
 .assistant-context-line{
-  font-size:12.5px;
-  line-height:1.5;
+  font-size:12px;
+  line-height:1.55;
   font-weight:500;
-  color:rgba(158,172,204,0.82);
-  margin:0 0 14px;
-  max-width:62ch;
+  color:rgba(148,162,196,0.78);
+  margin:0 0 12px;
+  max-width:min(68ch,100%);
 }
 .assistant-context-line[hidden]{
   display:none !important;
@@ -6716,6 +6726,15 @@ body{
   letter-spacing:-0.02em;
   color:var(--text-secondary);
   margin-bottom:var(--xv-launch-2);
+}
+.brand-compact--value-only .brand-sub{
+  margin-top:0;
+  font-size:12.5px;
+  line-height:1.55;
+  color:rgba(170,184,214,0.88);
+}
+.brand-compact--value-only{
+  padding-top:2px !important;
 }
 .sidebar-fold--quiet{
   border-color:rgba(255,255,255,0.035) !important;

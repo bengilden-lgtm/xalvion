@@ -33,7 +33,7 @@
       <div class="command-strip-center command-strip-center--align">
         <div class="command-status-chip" role="status" aria-live="polite">
           <span class="command-status-dot" aria-hidden="true"></span>
-          <span id="commandPlanCapacity" class="command-capacity" translate="no">Preview · capacity loading</span>
+          <span id="commandPlanCapacity" class="command-capacity" translate="no">Capacity · loading</span>
         </div>
       </div>
       <div class="command-strip-right">
@@ -46,7 +46,7 @@
     <div class="app workspace-grid workspace-body workspace-split">
       <aside class="sidebar glass rail-col rail-col-left sidebar-app-rail" id="sidebarShell" data-sidebar-active="workspace">
         <div class="sidebar-top">
-          <a class="sidebar-brand-compact" href="/landing" title="Xalvion home">
+          <a class="sidebar-brand-compact" href="/landing" title="Xalvion — operator workspace">
             <span class="sidebar-brand-dot" aria-hidden="true"></span>
             <span class="sidebar-brand-word">Xalvion</span>
           </a>
@@ -79,10 +79,9 @@
 
               <section class="sidebar-panel is-active" id="sidebarPanelWorkspace" data-sidebar-panel="workspace" role="tabpanel" aria-labelledby="sidebarTabWorkspace" aria-label="Workspace" aria-hidden="false">
                 <details class="sidebar-fold sidebar-fold--quiet">
-                  <summary class="sidebar-fold-summary">About</summary>
-                  <div class="brand brand-compact brand-compact--textual">
-                    <div class="brand-wordmark" aria-hidden="true">Xalvion</div>
-                    <div class="brand-sub" id="brandSubcopy">Support prep with approval gates — nothing customer-facing ships without you.</div>
+                  <summary class="sidebar-fold-summary">How it works</summary>
+                  <div class="brand brand-compact brand-compact--textual brand-compact--value-only">
+                    <div class="brand-sub" id="brandSubcopy">Paste a ticket, get a customer-ready reply, and keep risky moves gated until you approve.</div>
                   </div>
                 </details>
 
@@ -115,7 +114,7 @@
                     <button id="loginBtn" class="btn" type="button">Log in</button>
                   </div>
                   <div class="btn-row access-links-row">
-                    <button id="devBtn" class="access-link-btn" type="button">Preview access</button>
+                    <button id="devBtn" class="access-link-btn" type="button">Refresh guided tries</button>
                     <button id="logoutBtn" class="access-link-btn" type="button">Logout</button>
                   </div>
                 </div>
@@ -589,8 +588,8 @@
             <header class="main-stage-header main-stage-hero main-stage-hero--bar">
               <div class="main-stage-identity">
                 <div class="main-stage-title-block">
-                  <h1 id="workspacePageTitle">Customer support</h1>
-                  <p id="workspaceSubcopy" class="workspace-subline">Connecting the operator workspace…</p>
+                  <h1 id="workspacePageTitle">Support ticket prep</h1>
+                  <p id="workspaceSubcopy" class="workspace-subline">Paste a ticket — Xalvion drafts the reply; sensitive actions stay gated for you.</p>
                 </div>
               </div>
             </header>
@@ -611,7 +610,7 @@
                         <span class="composer-thinking-anchor" aria-hidden="true">
                           <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm xv-spark-mark" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span>
                         </span>
-                        <p id="composerStatusLine" class="composer-status-line composer-inline-hint">Idle · ready for the next case</p>
+                        <p id="composerStatusLine" class="composer-status-line composer-inline-hint">Paste a ticket below to start.</p>
                       </div>
                     </div>
                     <div class="quick-actions">
@@ -629,7 +628,7 @@
                       </div>
                     </details>
                     <div class="composer-input-row composer-input-wrap">
-                      <textarea id="messageInput" placeholder="Paste the customer message or describe the issue…" autocomplete="off"></textarea>
+                      <textarea id="messageInput" placeholder="Paste a real support message (or pick an example chip)…" autocomplete="off"></textarea>
                       <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                     </div>
                   </div>
