@@ -11,7 +11,12 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div class="workspace-atmosphere" aria-hidden="true"></div>
+  <div class="workspace-atmosphere" aria-hidden="true">
+    <div class="workspace-atmosphere-glow"></div>
+    <div class="workspace-atmosphere-falloff"></div>
+    <div class="workspace-atmosphere-vignette"></div>
+    <div class="workspace-atmosphere-grain"></div>
+  </div>
 
   <div class="workspace-root" id="workspaceRoot">
     <header class="command-strip glass" id="commandStrip">
@@ -166,7 +171,7 @@
       </aside>
 
       <main class="main main-canvas center-canvas">
-        <div class="main-canvas-inner glass canvas-shell">
+        <div class="main-canvas-inner glass canvas-shell canvas-command-hero">
           <header class="workspace-heading-row canvas-header">
             <div class="title">
               <h1 id="workspacePageTitle">Customer support</h1>
@@ -174,7 +179,7 @@
             </div>
           </header>
 
-          <section class="workspace glass workspace-decision-shell decision-canvas">
+          <section class="workspace glass workspace-decision-shell decision-canvas decision-command-surface">
             <div class="workspace-intro">
               <div class="workspace-intro-left">
                 <div class="section-label">Decision canvas</div>
