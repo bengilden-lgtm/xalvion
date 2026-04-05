@@ -90,6 +90,7 @@ const explainSessionCard = document.getElementById("explainSessionCard");
 const explainSessionValue = document.getElementById("explainSessionValue");
 
 let lastReply = "";
+let replySnapshotBeforeEdit = "";
 let explainabilityOpen = false;
 let thinkingRunId = 0;
 let replyEditing = false;
@@ -222,6 +223,7 @@ function renderOperatorBrief(data) {
 
 function resetReplyEditor() {
   replyEditing = false;
+  replySnapshotBeforeEdit = "";
   if (replyTextarea) {
     replyTextarea.classList.add("is-hidden");
     replyTextarea.value = "";
@@ -235,15 +237,20 @@ function setReplyEditing(on) {
   const text = lastReply || "";
   if (replyTextarea && replyValue && replyToggleEditBtn) {
     if (replyEditing) {
+      replySnapshotBeforeEdit = lastReply;
       replyTextarea.value = text;
       replyTextarea.classList.remove("is-hidden");
       replyValue.classList.add("is-hidden");
       replyToggleEditBtn.textContent = "Preview";
       replyTextarea.focus();
     } else {
-      const next = replyTextarea.classList.contains("is-hidden")
+      let next = replyTextarea.classList.contains("is-hidden")
         ? lastReply
         : normalize(replyTextarea.value);
+      if (!next && replySnapshotBeforeEdit) {
+        next = replySnapshotBeforeEdit;
+      }
+      replySnapshotBeforeEdit = "";
       lastReply = next;
       if (replyValue) replyValue.textContent = next || "-";
       replyTextarea.classList.add("is-hidden");
@@ -268,73 +275,9 @@ function syncReplyFromTextarea() {
   if (replyValue) replyValue.textContent = next || "-";
 }
 
-// ===== MULTI-TICKET UI INJECTION =====
-function ensureScanInboxButton() {
-  let scanBtn = document.getElementById("scanInbox");
-  if (scanBtn) return scanBtn;
-
-  const actions = document.querySelector(".actions");
-  if (!actions) return null;
-
-  scanBtn = document.createElement("button");
-  scanBtn.id = "scanInbox";
-  scanBtn.textContent = "Scan Inbox ⚡";
-  scanBtn.style.background = "linear-gradient(135deg, #22c1ff, #0a84ff)";
-  scanBtn.style.boxShadow = "0 10px 24px rgba(10,132,255,0.25)";
-
-  const actionsRow = actions.querySelector(".actions-row");
-  if (actionsRow) {
-    actions.insertBefore(scanBtn, actionsRow);
-  } else {
-    actions.appendChild(scanBtn);
-  }
-
-  return scanBtn;
-}
-
-function ensureInboxSummaryPanel() {
-  let panel = document.getElementById("inboxSummary");
-  let value = document.getElementById("inboxSummaryValue");
-
-  if (panel && value) return { panel, value };
-
-  const content = document.querySelector(".content");
-  if (!content) return { panel: null, value: null };
-
-  panel = document.createElement("div");
-  panel.id = "inboxSummary";
-  panel.className = "insight";
-  panel.style.display = "none";
-
-  const label = document.createElement("div");
-  label.className = "insight-label";
-  label.textContent = "Inbox Summary";
-
-  value = document.createElement("div");
-  value.id = "inboxSummaryValue";
-  value.className = "insight-value";
-  value.textContent = "No inbox scan yet.";
-
-  panel.appendChild(label);
-  panel.appendChild(value);
-
-  if (headerInsight && headerInsight.parentNode === content) {
-    if (headerInsight.nextSibling) {
-      content.insertBefore(panel, headerInsight.nextSibling);
-    } else {
-      content.appendChild(panel);
-    }
-  } else {
-    content.appendChild(panel);
-  }
-
-  return { panel, value };
-}
-
-const scanInboxBtn = ensureScanInboxButton();
-const inboxSummaryRefs = ensureInboxSummaryPanel();
-const inboxSummary = inboxSummaryRefs.panel;
-const inboxSummaryValue = inboxSummaryRefs.value;
+const scanInboxBtn = document.getElementById("scanInbox");
+const inboxSummary = document.getElementById("inboxSummary");
+const inboxSummaryValue = document.getElementById("inboxSummaryValue");
 
 function showStatus(message, isError = false) {
   if (!statusBox) return;
@@ -795,6 +738,46 @@ function normalizeExplainability(data) {
   return { summary, sections };
 }
 
+/**
+ * Fold API shapes `decision_explainability` and `decision_explanation` into
+ * `data.explainability` so a single panel (`renderExplainabilitySections`) renders them.
+ */
+function applyStructuredExplainabilityToData(data) {
+  if (!data || typeof data !== "object") return data;
+  const out = { ...data };
+  const lines = [];
+
+  const op = out.decision_explainability;
+  if (op && typeof op === "object") {
+    if (op.classification?.signal) lines.push(String(op.classification.signal));
+    if (op.risk_reasoning?.signal) lines.push(String(op.risk_reasoning.signal));
+    if (op.policy_trigger?.signal) lines.push(String(op.policy_trigger.signal));
+    if (op.memory_influence?.signal) lines.push(String(op.memory_influence.signal));
+    if (op.outcome_expectation?.signal) lines.push(String(op.outcome_expectation.signal));
+    if (op.why_not_other_actions) lines.push(String(op.why_not_other_actions));
+    if (op.summary) lines.push(String(op.summary));
+  }
+
+  const leg = out.decision_explanation;
+  if (leg && typeof leg === "object") {
+    if (leg.issue_classification?.signal) lines.push(String(leg.issue_classification.signal));
+    if (leg.risk_assessment?.signal) lines.push(String(leg.risk_assessment.signal));
+    if (leg.policy_influence?.signal) lines.push(String(leg.policy_influence.signal));
+    if (leg.memory_influence?.signal) lines.push(String(leg.memory_influence.signal));
+    if (leg.approval_rationale?.reason) lines.push(String(leg.approval_rationale.reason));
+    if (leg.summary) lines.push(String(leg.summary));
+  }
+
+  const block = lines.join("\n");
+  if (!block) return out;
+
+  const ex = out.explainability && typeof out.explainability === "object" ? { ...out.explainability } : {};
+  const baseDecision = ex.decision || ex.policy || "";
+  ex.decision = [baseDecision, block].filter(Boolean).join("\n\n");
+  out.explainability = ex;
+  return out;
+}
+
 function renderExplainabilitySections(data) {
   if (!explainabilityWrap) return;
 
@@ -978,209 +961,6 @@ function hideInboxSummary() {
   inboxSummary.style.display = "none";
 }
 
-function ensureDecisionExplanationHost() {
-  const panel = document.getElementById("resultPanel");
-  const explain = document.getElementById("explainabilityWrap");
-  if (!panel) return null;
-  let host = document.getElementById("decisionExplanationHost");
-  if (host) return host;
-  host = document.createElement("div");
-  host.id = "decisionExplanationHost";
-  const det = document.createElement("details");
-  det.className = "explainability-wrap";
-  const sum = document.createElement("summary");
-  sum.className = "explainability-toggle";
-  sum.type = "button";
-  const titleCol = document.createElement("div");
-  titleCol.className = "explainability-toggle-title";
-  const title = document.createElement("div");
-  title.className = "explainability-title";
-  title.textContent = "Why?";
-  titleCol.appendChild(title);
-  const preview = document.createElement("div");
-  preview.id = "decisionExplanationPreview";
-  preview.className = "explainability-summary";
-  titleCol.appendChild(preview);
-  const chev = document.createElement("div");
-  chev.className = "chevron";
-  chev.textContent = "⌄";
-  sum.appendChild(titleCol);
-  sum.appendChild(chev);
-  const inner = document.createElement("div");
-  inner.className = "explainability-panel";
-  inner.id = "decisionExplanationBody";
-  det.appendChild(sum);
-  det.appendChild(inner);
-  host.appendChild(det);
-  det.addEventListener("toggle", () => {
-    det.classList.toggle("open", det.open);
-  });
-  if (explain && explain.parentNode === panel) {
-    panel.insertBefore(host, explain);
-  } else {
-    const grid = document.getElementById("resultMetaGrid") || panel.querySelector(".grid");
-    if (grid) panel.insertBefore(host, grid);
-    else panel.appendChild(host);
-  }
-  return host;
-}
-
-function renderDecisionExplanation(explanation) {
-  const host = ensureDecisionExplanationHost();
-  const preview = document.getElementById("decisionExplanationPreview");
-  const body = document.getElementById("decisionExplanationBody");
-  const det = host?.querySelector("details");
-  if (!host || !preview || !body || !det) return;
-
-  if (!explanation || typeof explanation !== "object") {
-    host.style.display = "none";
-    det.open = false;
-    preview.textContent = "";
-    body.replaceChildren();
-    return;
-  }
-
-  const lines = [];
-  const ic = explanation.issue_classification;
-  if (ic && ic.signal) lines.push(String(ic.signal));
-  const ra = explanation.risk_assessment;
-  if (ra && ra.signal) lines.push(String(ra.signal));
-  const pi = explanation.policy_influence;
-  if (pi && pi.signal) lines.push(String(pi.signal));
-  const mi = explanation.memory_influence;
-  if (mi && mi.signal) lines.push(String(mi.signal));
-  const appr = explanation.approval_rationale;
-  if (appr && appr.reason) lines.push(String(appr.reason));
-  if (explanation.summary) lines.push(String(explanation.summary));
-
-  if (!lines.length) {
-    host.style.display = "none";
-    det.open = false;
-    preview.textContent = "";
-    body.replaceChildren();
-    return;
-  }
-
-  host.style.display = "";
-  const sumText = explanation.summary ? String(explanation.summary) : lines[0];
-  preview.textContent = sumText.length > 140 ? `${sumText.slice(0, 140)}…` : sumText;
-
-  body.replaceChildren();
-  lines.forEach((text) => {
-    const row = document.createElement("div");
-    row.className = "value muted reply-box";
-    row.style.marginBottom = "8px";
-    row.textContent = text;
-    body.appendChild(row);
-  });
-  det.open = false;
-  det.classList.remove("open");
-}
-
-function ensureOperatorExplainabilityHost() {
-  const panel = document.getElementById("resultPanel");
-  const explain = document.getElementById("explainabilityWrap");
-  if (!panel) return null;
-  let host = document.getElementById("operatorExplainabilityHost");
-  if (host) return host;
-  host = document.createElement("div");
-  host.id = "operatorExplainabilityHost";
-  host.style.marginBottom = "10px";
-  const wrap = document.createElement("div");
-  wrap.className = "explainability-wrap";
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.id = "explainToggleBtn";
-  btn.className = "explainability-toggle";
-  btn.style.width = "100%";
-  btn.textContent = "Why this decision ↓";
-  const panelBody = document.createElement("div");
-  panelBody.id = "operatorExplainabilityBody";
-  panelBody.className = "explainability-panel";
-  panelBody.style.display = "none";
-  wrap.appendChild(btn);
-  wrap.appendChild(panelBody);
-  host.appendChild(wrap);
-  if (explain && explain.parentNode === panel) {
-    panel.insertBefore(host, explain);
-  } else {
-    const grid = document.getElementById("resultMetaGrid") || panel.querySelector(".grid");
-    if (grid) panel.insertBefore(host, grid);
-    else panel.appendChild(host);
-  }
-  return host;
-}
-
-function renderOperatorExplainability(explainability) {
-  const host = ensureOperatorExplainabilityHost();
-  const body = document.getElementById("operatorExplainabilityBody");
-  const btn = document.getElementById("explainToggleBtn");
-  if (!host || !body || !btn) return;
-
-  if (!explainability || typeof explainability !== "object") {
-    host.style.display = "none";
-    body.replaceChildren();
-    body.style.display = "none";
-    btn.textContent = "Why this decision ↓";
-    return;
-  }
-
-  const lines = [];
-  const cl = explainability.classification;
-  if (cl && cl.signal) lines.push(String(cl.signal));
-  const rr = explainability.risk_reasoning;
-  if (rr && rr.signal) lines.push(String(rr.signal));
-  const pt = explainability.policy_trigger;
-  if (pt && pt.signal) lines.push(String(pt.signal));
-  const mi = explainability.memory_influence;
-  if (mi && mi.signal) lines.push(String(mi.signal));
-  const oe = explainability.outcome_expectation;
-  if (oe && oe.signal) lines.push(String(oe.signal));
-
-  host.style.display = "";
-  body.replaceChildren();
-  lines.forEach((text) => {
-    const row = document.createElement("div");
-    row.className = "value muted reply-box";
-    row.style.marginBottom = "8px";
-    row.textContent = text;
-    body.appendChild(row);
-  });
-  if (explainability.why_not_other_actions) {
-    const wrow = document.createElement("div");
-    wrow.className = "value muted reply-box";
-    wrow.style.marginBottom = "8px";
-    wrow.style.opacity = "0.85";
-    wrow.style.fontSize = "12px";
-    wrow.textContent = String(explainability.why_not_other_actions);
-    body.appendChild(wrow);
-  }
-  if (explainability.summary) {
-    const sep = document.createElement("div");
-    sep.style.borderTop = "1px solid var(--line)";
-    sep.style.margin = "12px 0 10px";
-    body.appendChild(sep);
-    const sum = document.createElement("div");
-    sum.className = "value reply-box";
-    sum.style.fontSize = "13px";
-    sum.style.lineHeight = "1.5";
-    sum.textContent = String(explainability.summary);
-    body.appendChild(sum);
-  }
-
-  const wrapEl = host.querySelector(".explainability-wrap");
-  let open = false;
-  btn.onclick = () => {
-    open = !open;
-    body.style.display = open ? "grid" : "none";
-    btn.textContent = open ? "Close ↑" : "Why this decision ↓";
-    if (wrapEl) wrapEl.classList.toggle("open", open);
-  };
-  body.style.display = "none";
-  btn.textContent = "Why this decision ↓";
-  if (wrapEl) wrapEl.classList.remove("open");
-}
-
 function render(data) {
   ensureEnterpriseCards();
   resetReplyEditor();
@@ -1241,14 +1021,6 @@ function render(data) {
     }
   }
 
-  if (data.decision_explainability && typeof data.decision_explainability === "object") {
-    renderOperatorExplainability(data.decision_explainability);
-    renderDecisionExplanation(null);
-  } else {
-    renderOperatorExplainability(null);
-    renderDecisionExplanation(data.decision_explanation);
-  }
-
   setVisible(statusCard, !!status);
   setVisible(confidenceCard, confidence !== "" && confidence !== null && confidence !== undefined);
   setVisible(priorityCard, !!priority);
@@ -1273,15 +1045,17 @@ function render(data) {
       value_generated: impact.money_saved || 0
     } : {})
   });
-  renderExplainabilitySections({
-    ...data,
-    impact,
-    reason,
-    confidence,
-    priority,
-    risk_level: risk,
-    execution
-  });
+  renderExplainabilitySections(
+    applyStructuredExplainabilityToData({
+      ...data,
+      impact,
+      reason,
+      confidence,
+      priority,
+      risk_level: risk,
+      execution
+    })
+  );
 
   if (resultPanel) {
     const cards = Array.from(resultPanel.querySelectorAll(".card"));

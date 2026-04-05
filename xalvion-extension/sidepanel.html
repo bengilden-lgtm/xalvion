@@ -313,6 +313,8 @@
       padding: 12px;
       display: none;
       gap: 10px;
+      min-width: 0;
+      overflow-x: hidden;
     }
 
     .panel.show { display: grid; animation: fadeUp 0.26s var(--ease); }
@@ -577,6 +579,7 @@
       display: none;
       flex-direction: column;
       gap: 8px;
+      min-width: 0;
     }
 
     .reply-stack.is-visible {
@@ -649,6 +652,7 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
+      min-width: 0;
     }
 
     .card {
