@@ -471,8 +471,8 @@ def ensure_user_columns() -> None:
             with engine.begin() as conn:
                 for statement in additions:
                     conn.execute(text(statement))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("startup_failure: %s", str(e), exc_info=True)
 
 
 @app.on_event("startup")
@@ -494,12 +494,12 @@ def _startup_database() -> None:
     ensure_user_columns()
     try:
         ensure_outcome_log_columns()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("startup_failure: %s", str(e), exc_info=True)
     try:
         ensure_outcome_columns()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("startup_failure: %s", str(e), exc_info=True)
     try:
         from learning import sync_rules_to_brain
 
