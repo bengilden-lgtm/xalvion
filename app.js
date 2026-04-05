@@ -2957,8 +2957,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
     if (els.messageInput) {
       els.messageInput.disabled = state.sending;
-      const wrap = els.messageInput.closest(".composer-input-wrap") || els.messageInput.closest(".composer");
-      wrap?.classList.toggle("composer-live", state.sending);
+      const composerSurface = els.messageInput.closest(".composer.composer-chat");
+      composerSurface?.classList.toggle("composer-live", state.sending);
     }
 
     syncComposerDraftClass();
