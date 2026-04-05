@@ -1806,7 +1806,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function createTypingMarkup() {
     return `
       <span class="xalvion-typing-sovereign" aria-hidden="true">
-        <span class="xalvion-sovereign-mark xalvion-sovereign-mark--xs"><span class="xv-signal-rays" aria-hidden="true"></span></span>
+        <span class="xalvion-sovereign-mark xalvion-sovereign-mark--xs xv-spark-mark" aria-hidden="true"><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span>
       </span>
     `;
   }
@@ -2804,7 +2804,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     wrap.className = "stream-steps stream-steps--premium";
     wrap.innerHTML = `
       <div class="stream-trace-header">
-        <span class="stream-trace-mark" aria-hidden="true"><span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm"><span class="xv-signal-rays" aria-hidden="true"></span></span></span>
+        <span class="stream-trace-mark" aria-hidden="true"><span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm xv-spark-mark"><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span></span>
         <span class="stream-trace-header-copy">
           <span class="stream-trace-kicker">Preparing</span>
           <span class="stream-trace-title">Decision trace</span>
@@ -2878,6 +2878,14 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     els.messageInput.style.height = `${Math.min(240, Math.max(50, els.messageInput.scrollHeight))}px`;
   }
 
+  function syncComposerDraftClass() {
+    const input = els.messageInput;
+    const composer = input?.closest(".composer.composer-chat");
+    if (!composer || !input) return;
+    const hasDraft = Boolean(String(input.value || "").trim());
+    composer.classList.toggle("composer-has-draft", hasDraft);
+  }
+
   function setSending(value) {
     state.sending = Boolean(value);
 
@@ -2897,7 +2905,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       els.sendBtn.disabled = state.sending;
       els.sendBtn.classList.toggle("send-btn--thinking", state.sending);
       els.sendBtn.innerHTML = state.sending
-        ? '<span class="xalvion-sovereign-mark" aria-hidden="true"><span class="xv-signal-rays" aria-hidden="true"></span></span>'
+        ? '<span class="xalvion-sovereign-mark xv-spark-mark" aria-hidden="true"><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span>'
         : ICONS.send;
       els.sendBtn.setAttribute("aria-label", state.sending ? "Sending" : "Send message");
     }
@@ -2907,6 +2915,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const wrap = els.messageInput.closest(".composer-input-wrap") || els.messageInput.closest(".composer");
       wrap?.classList.toggle("composer-live", state.sending);
     }
+
+    syncComposerDraftClass();
 
     updateStreamStatus(state.sending ? "Response: streaming" : "Response: ready");
   }
@@ -3421,6 +3431,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       els.messageInput.value = "";
       autoResizeTextarea();
       saveDraft("");
+      syncComposerDraftClass();
     }
 
     const row = addAssistantMessage("");
@@ -3737,6 +3748,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       els.messageInput.value = demoText;
       autoResizeTextarea();
       saveDraft(demoText);
+      syncComposerDraftClass();
       els.messageInput.focus();
     }
     setNotice("info", "Quick demo loaded", "A high-intent billing case is ready to run through the workspace.");
@@ -4442,6 +4454,7 @@ function bindEvents() {
     els.messageInput?.addEventListener("input", () => {
       autoResizeTextarea();
       saveDraft(els.messageInput.value || "");
+      syncComposerDraftClass();
     });
 
 
@@ -4565,6 +4578,7 @@ function bindEvents() {
         els.messageInput.value = fill;
         saveDraft(fill);
         autoResizeTextarea();
+        syncComposerDraftClass();
         els.messageInput.focus();
       });
     });
@@ -4661,6 +4675,7 @@ function bindEvents() {
     }
 
     autoResizeTextarea();
+    syncComposerDraftClass();
     syncMobileViewport();
     window.addEventListener("resize", syncMobileViewport, { passive: true });
     window.visualViewport?.addEventListener("resize", syncMobileViewport, { passive: true });

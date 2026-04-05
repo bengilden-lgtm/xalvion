@@ -3975,14 +3975,16 @@ body{
 }
 
 .sidebar-fold{
-  border-radius:10px;
+  border-radius:12px;
   border:1px solid transparent;
-  background:rgba(255,255,255,0.02);
-  overflow:hidden;
-  margin-bottom:2px;
+  background:rgba(255,255,255,0.018);
+  overflow:visible;
+  margin-bottom:10px;
 }
 .sidebar-fold[open]{
-  background:rgba(255,255,255,0.025);
+  background:rgba(255,255,255,0.028);
+  border-color:rgba(255,255,255,0.045);
+  padding-bottom:4px;
 }
 .sidebar-fold-summary{
   list-style:none;
@@ -5020,11 +5022,23 @@ body{
   margin-right:0;
 }
 
-.composer-prelude{
+.composer-unified{
   width:100%;
   max-width:var(--main-max,920px);
   margin-left:auto;
   margin-right:auto;
+}
+.composer-hint-band{
+  margin:0 0 2px;
+  padding:2px 4px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.045);
+  transition:
+    opacity var(--id-duration-state) var(--sys-curve),
+    border-color var(--id-duration-state) var(--sys-curve),
+    padding var(--id-duration-state) var(--sys-curve);
+}
+.composer-inline-hint{
+  margin:0;
 }
 .composer-status-cluster{
   display:flex;
@@ -5058,8 +5072,10 @@ body{
   margin:0;
 }
 
-.workspace-idle .composer-prelude{
+.workspace-idle .composer-hint-band{
   text-align:center;
+  padding-left:10px;
+  padding-right:10px;
 }
 .workspace-idle .composer-status-cluster{
   justify-content:center;
@@ -5070,7 +5086,7 @@ body{
 .workspace-idle .composer-thinking-anchor{
   min-height:0;
 }
-.workspace-active .composer-prelude{
+.workspace-active .composer-hint-band{
   text-align:left;
 }
 .workspace-active .composer-status-cluster{
@@ -5080,20 +5096,37 @@ body{
 
 .workspace-idle .composer-status-line{
   font-size:13px;
-  line-height:1.5;
-  color:rgba(158,172,204,0.78);
-  max-width:52ch;
+  line-height:1.52;
+  color:rgba(158,172,204,0.76);
+  max-width:54ch;
 }
 .workspace-active .composer-status-line{
   font-size:12px;
-  color:rgba(148,162,196,0.82);
+  line-height:1.48;
+  color:rgba(148,162,196,0.78);
   max-width:none;
 }
 .workspace-idle .composer-status-line.composer-status-live,
 .workspace-active .composer-status-line.composer-status-live{
-  color:rgba(196,181,254,0.92);
+  color:rgba(206,190,255,0.94);
   font-weight:500;
   letter-spacing:0.01em;
+}
+
+.composer-has-draft:not(.composer-live) .composer-hint-band{
+  opacity:0.38;
+  border-bottom-color:transparent;
+  padding-bottom:8px;
+}
+.workspace-thinking .composer-has-draft .composer-hint-band,
+.composer-live .composer-hint-band{
+  opacity:1;
+  border-bottom-color:rgba(255,255,255,0.06);
+  padding-bottom:12px;
+}
+.composer.composer-chat .quick-actions{
+  margin:0 0 10px;
+  padding:0 2px;
 }
 
 .workspace-idle .command-strip-center{
@@ -5288,7 +5321,7 @@ body{
     align-items:flex-start;
     text-align:left;
   }
-  .workspace-idle .composer-prelude{
+  .workspace-idle .composer-hint-band{
     text-align:left;
   }
   .composer-thinking-anchor{
@@ -5341,10 +5374,30 @@ body{
 }
 
 .workspace-active .msg-card.assistant .customer-message-block{
-  margin-top:2px;
-  padding-left:18px;
-  border-left:2px solid color-mix(in srgb, var(--accent-1) 42%, transparent);
-  box-shadow:inset 1px 0 0 rgba(34,211,238,0.12);
+  margin-top:6px;
+  padding-left:0;
+  border-left:none;
+  box-shadow:none;
+}
+.workspace-active .assistant-result-stack{
+  display:flex;
+  flex-direction:column;
+  gap:18px !important;
+}
+.workspace-active .assistant-result-stack .customer-message-block{
+  order:1;
+}
+.workspace-active .assistant-result-stack .stream-trace-host{
+  order:2;
+}
+.workspace-active .assistant-result-stack .assistant-decision-slot{
+  order:3;
+}
+.workspace-active .assistant-result-stack .assistant-brief-slot{
+  order:4;
+}
+.workspace-active .assistant-result-stack .assistant-footer{
+  order:5;
 }
 
 .workspace-active .messages-shell{
@@ -5355,5 +5408,144 @@ body{
   opacity:0.88;
 }
 .workspace-active .sidebar-top{
+  opacity:1;
+}
+
+/* —— Xalvion sovereign spark · orbit layer (brand motion, not a generic spinner) —— */
+@keyframes xv-spark-orbit-rotate{
+  to{ transform:rotate(360deg); }
+}
+@keyframes xv-spark-pulse-glow{
+  0%,100%{ opacity:0.2; filter:blur(0); }
+  50%{ opacity:0.55; filter:blur(0.4px); }
+}
+.xalvion-sovereign-mark.xv-spark-mark .xv-spark-orbit{
+  position:absolute;
+  inset:-5px;
+  border-radius:50%;
+  pointer-events:none;
+  background:conic-gradient(
+    from 200deg,
+    transparent 0deg 70deg,
+    rgba(167,139,250,0.5) 72deg 78deg,
+    transparent 80deg 168deg,
+    rgba(34,211,238,0.42) 170deg 176deg,
+    transparent 178deg 300deg,
+    rgba(99,102,241,0.45) 302deg 312deg,
+    transparent 314deg 360deg
+  );
+  mask:radial-gradient(circle, transparent 58%, #000 60%, #000 76%, transparent 78%);
+  -webkit-mask:radial-gradient(circle, transparent 58%, #000 60%, #000 76%, transparent 78%);
+  opacity:0.24;
+  animation:xv-spark-orbit-rotate 2.6s linear infinite;
+  mix-blend-mode:screen;
+}
+.xalvion-sovereign-mark--xs.xv-spark-mark .xv-spark-orbit{
+  inset:-3px;
+  animation-duration:2.1s;
+}
+.workspace-thinking .composer-hint-band .xv-spark-mark .xv-spark-orbit,
+.send-btn.send-btn--thinking .xv-spark-mark .xv-spark-orbit,
+.stream-trace-mark .xv-spark-mark .xv-spark-orbit{
+  opacity:0.5;
+  animation-duration:1.35s;
+  animation-timing-function:cubic-bezier(0.45,0,0.2,1);
+}
+
+/* Reply centerpiece: lighter decision / trace frames */
+.workspace-active .assistant-decision-slot .decision-panel{
+  border-radius:16px !important;
+  border:1px solid rgba(255,255,255,0.042) !important;
+  border-top:1px solid rgba(139,92,246,0.28) !important;
+  padding:16px 18px !important;
+  background:linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--decision-surface) 78%, transparent),
+    color-mix(in srgb, var(--l2-base) 88%, rgba(124,92,252,0.04))
+  ) !important;
+  box-shadow:none !important;
+}
+.workspace-active .stream-steps--premium{
+  border-radius:16px !important;
+  border:1px solid rgba(255,255,255,0.038) !important;
+  background:color-mix(in srgb, var(--l2-base) 92%, rgba(124,92,252,0.035)) !important;
+  padding:12px 14px 14px !important;
+}
+.workspace-active .msg-card.assistant .reply-text{
+  font-size:clamp(15.5px,1.08vw,17px) !important;
+  line-height:1.82 !important;
+  max-width:min(62ch,100%) !important;
+}
+
+/* Sidebar: calmer hierarchy, readable expands */
+.sidebar-inner{
+  gap:16px !important;
+}
+.sidebar-chrome{
+  padding-bottom:6px;
+}
+.sidebar-nav-group-label{
+  font-size:9px !important;
+  letter-spacing:0.16em !important;
+  color:rgba(120,134,168,0.42) !important;
+  padding:2px 4px 10px 10px !important;
+}
+.sidebar-nav-items{
+  gap:3px !important;
+}
+.sidebar-nav-item{
+  padding:8px 11px !important;
+  font-size:12.5px !important;
+  border-radius:11px !important;
+}
+.workspace-idle .sidebar-nav-item:not(.is-active){
+  color:rgba(154,168,198,0.68) !important;
+}
+.rail-brief-panel{
+  padding-top:2px;
+}
+.rail-in-sidebar .rail-brief.is-open .rail-brief-panel{
+  padding-bottom:12px !important;
+}
+
+/* Composer: one lifted surface, less inner boxing */
+.workspace-idle .composer.composer-chat{
+  padding:14px 16px 16px !important;
+  border:1px solid rgba(255,255,255,0.055) !important;
+  background:linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--l2-base) 82%, rgba(124,92,252,0.09)) 0%,
+    color-mix(in srgb, var(--l3-base) 86%, rgba(34,211,238,0.05)) 100%
+  ) !important;
+  box-shadow:
+    0 0 0 1px rgba(124,92,252,0.06),
+    0 20px 56px rgba(0,0,0,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.07) !important;
+}
+.workspace-active .composer.composer-chat{
+  border:1px solid rgba(255,255,255,0.055) !important;
+  background:linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--l2-base) 84%, rgba(255,255,255,0.04)),
+    color-mix(in srgb, var(--l3-base) 90%, rgba(124,92,252,0.03))
+  ) !important;
+  box-shadow:0 14px 40px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+.composer-chat textarea{
+  border:1px solid rgba(255,255,255,0.05) !important;
+  background:color-mix(in srgb, var(--l3-base) 78%, rgba(255,255,255,0.12)) !important;
+}
+.composer-stripe-fold[open]{
+  padding-bottom:4px;
+}
+.composer-stripe-fold-summary:hover{
+  color:rgba(186,198,232,0.88) !important;
+}
+
+/* Idle: slightly quieter hero so the composer leads */
+.workspace-idle .main-stage-kicker{
+  opacity:0.88;
+}
+.workspace-active .main-stage-kicker{
   opacity:1;
 }

@@ -607,32 +607,34 @@
               <div class="xv-idle-lift" aria-hidden="true"></div>
 
               <footer class="composer-wrap composer-dock xv-composer-foot">
-                <div class="composer-prelude">
-                  <div class="composer-status-cluster" role="status" aria-live="polite">
-                    <span class="composer-thinking-anchor" aria-hidden="true">
-                      <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span></span>
-                    </span>
-                    <p id="composerStatusLine" class="composer-status-line">Describe the case in your own words — Xalvion prepares a clear reply and the recommended next step for your review.</p>
-                  </div>
-                </div>
-                <div class="quick-actions">
-                  <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
-                  <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
-                  <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
-                  <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
-                </div>
-                <div class="composer composer-chat">
-                  <details class="composer-stripe-fold">
-                    <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
-                    <div class="stripe-context-row muted-copy composer-stripe-fields">
-                      <span class="stripe-context-hint">Attached to support requests when present.</span>
-                      <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
-                      <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+                <div class="composer-unified">
+                  <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
+                    <div class="composer-hint-band">
+                      <div class="composer-status-cluster" role="status" aria-live="polite">
+                        <span class="composer-thinking-anchor" aria-hidden="true">
+                          <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm xv-spark-mark" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span>
+                        </span>
+                        <p id="composerStatusLine" class="composer-status-line composer-inline-hint">Describe the case in your own words — Xalvion prepares a clear reply and the recommended next step for your review.</p>
+                      </div>
                     </div>
-                  </details>
-                  <div class="composer-input-row composer-input-wrap">
-                    <textarea id="messageInput" placeholder="Paste the customer message or describe the issue…"></textarea>
-                    <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
+                    <div class="quick-actions">
+                      <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
+                      <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
+                      <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
+                      <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
+                    </div>
+                    <details class="composer-stripe-fold">
+                      <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
+                      <div class="stripe-context-row muted-copy composer-stripe-fields">
+                        <span class="stripe-context-hint">Attached to support requests when present.</span>
+                        <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
+                        <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+                      </div>
+                    </details>
+                    <div class="composer-input-row composer-input-wrap">
+                      <textarea id="messageInput" placeholder="Paste the ticket, email, or a short description of the issue…" autocomplete="off"></textarea>
+                      <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
+                    </div>
                   </div>
                 </div>
               </footer>
