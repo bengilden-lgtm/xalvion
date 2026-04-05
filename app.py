@@ -1954,7 +1954,37 @@ def serve_landing():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "xalvion-sovereign-brain"}
+    """Liveness/readiness-style check: verifies DB connectivity and production secrets."""
+    mode = (os.getenv("ENVIRONMENT", "development") or "development").strip()
+    env_lower = mode.lower()
+
+    db_state = "disconnected"
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_state = "connected"
+    except Exception:
+        pass
+
+    stripe_state = "configured" if STRIPE_KEY else "missing"
+    openai_state = "configured" if os.getenv("OPENAI_API_KEY", "").strip() else "missing"
+
+    jwt_ok = True
+    if env_lower == "production":
+        raw_jwt = os.getenv("JWT_SECRET")
+        jwt_ok = bool(raw_jwt and raw_jwt.strip())
+
+    ok = db_state == "connected" and jwt_ok
+    payload: dict[str, Any] = {
+        "status": "ok" if ok else "error",
+        "db": db_state,
+        "stripe": stripe_state,
+        "openai": openai_state,
+        "mode": mode,
+    }
+    if not ok:
+        return JSONResponse(status_code=503, content=payload)
+    return payload
 
 
 @app.get("/health/deep")
