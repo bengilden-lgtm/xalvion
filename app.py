@@ -1954,37 +1954,8 @@ def serve_landing():
 
 @app.get("/health")
 def health():
-    """Liveness/readiness-style check: verifies DB connectivity and production secrets."""
-    mode = (os.getenv("ENVIRONMENT", "development") or "development").strip()
-    env_lower = mode.lower()
-
-    db_state = "disconnected"
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        db_state = "connected"
-    except Exception:
-        pass
-
-    stripe_state = "configured" if STRIPE_KEY else "missing"
-    openai_state = "configured" if os.getenv("OPENAI_API_KEY", "").strip() else "missing"
-
-    jwt_ok = True
-    if env_lower == "production":
-        raw_jwt = os.getenv("JWT_SECRET")
-        jwt_ok = bool(raw_jwt and raw_jwt.strip())
-
-    ok = db_state == "connected" and jwt_ok
-    payload: dict[str, Any] = {
-        "status": "ok" if ok else "error",
-        "db": db_state,
-        "stripe": stripe_state,
-        "openai": openai_state,
-        "mode": mode,
-    }
-    if not ok:
-        return JSONResponse(status_code=503, content=payload)
-    return payload
+    """Shallow liveness: process is up (use /health/deep for readiness)."""
+    return {"status": "ok", "service": "xalvion-sovereign-brain"}
 
 
 @app.get("/health/deep")
@@ -1992,6 +1963,8 @@ def health_deep(db: Session = Depends(get_db)):
     from sqlalchemy import text as _text
 
     checks: dict[str, Any] = {}
+    mode = (os.getenv("ENVIRONMENT", "development") or "development").strip()
+    checks["mode"] = mode
 
     try:
         db.execute(_text("SELECT 1"))
@@ -2011,7 +1984,20 @@ def health_deep(db: Session = Depends(get_db)):
     except Exception as exc:
         checks["operator_mode"] = f"error: {exc}"
 
+    env_lower = mode.lower()
+    if env_lower == "production":
+        raw_jwt = os.getenv("JWT_SECRET")
+        checks["jwt_secret"] = "configured" if (raw_jwt and raw_jwt.strip()) else "missing"
+    else:
+        checks["jwt_secret"] = "n/a"
+
+    checks["stripe"] = "configured" if STRIPE_KEY else "missing"
+    checks["openai"] = "configured" if os.getenv("OPENAI_API_KEY", "").strip() else "missing"
+
     degraded = any(isinstance(v, str) and v.startswith("error") for v in checks.values())
+    if checks.get("jwt_secret") == "missing":
+        degraded = True
+
     checks["status"] = "degraded" if degraded else "ok"
     checks["service"] = "xalvion-sovereign-brain"
     return checks
