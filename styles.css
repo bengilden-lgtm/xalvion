@@ -3899,6 +3899,65 @@ body{
   color:rgba(252,165,165,0.95) !important;
   font-weight:700;
 }
+#workspaceRoot.mono-guest-preview.mono-at-limit .command-capacity.is-limit{
+  color:rgba(196,181,253,0.92) !important;
+  font-weight:600;
+}
+.notice-sidebar.notice.info.notice-continuation{
+  border-color:rgba(124,92,252,0.2);
+  background:linear-gradient(180deg, rgba(124,92,252,0.09), rgba(34,211,238,0.04));
+}
+.notice-sidebar.notice.info.notice-continuation .notice-title{
+  color:rgba(228,232,255,0.94);
+}
+.reply-value-reinforcement{
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:0.02em;
+  color:rgba(167,180,210,0.72);
+  margin:0 0 10px;
+  line-height:1.4;
+}
+.workspace-subline--quiet{
+  margin-top:6px;
+  font-size:13px;
+  font-weight:400;
+  color:rgba(148,162,196,0.78);
+  line-height:1.45;
+}
+.empty-launch-directive{
+  font-family:Outfit,var(--font-sans);
+  font-size:clamp(17px,2.2vw,20px);
+  font-weight:600;
+  letter-spacing:-0.02em;
+  margin:0;
+  color:var(--text-primary);
+}
+.empty-launch-outcome{
+  margin:12px 0 0;
+  font-size:14px;
+  line-height:1.5;
+  color:rgba(186,198,228,0.88);
+  max-width:44ch;
+}
+.empty-launch-review{
+  margin:8px 0 0;
+  font-size:12px;
+  line-height:1.5;
+  color:rgba(140,154,188,0.62);
+  max-width:48ch;
+}
+.limit-moment-lead{
+  font-size:14px;
+  line-height:1.55;
+  color:rgba(186,198,228,0.85);
+  margin:0 0 8px;
+}
+#workspaceRoot .composer.composer-chat.composer-preview-continue .composer-hint-band--integrated{
+  background:linear-gradient(90deg, rgba(124,92,252,0.08), rgba(34,211,238,0.05));
+  border-radius:10px;
+  border:1px solid rgba(124,92,252,0.14);
+}
 #usageCard.mono-at-limit .usage-block{
   border-radius:var(--r-md);
   box-shadow:0 0 0 1px rgba(248,113,113,0.2);
@@ -3983,7 +4042,7 @@ body{
 
 .sidebar-chrome{
   flex-shrink:0;
-  padding:10px 12px 12px;
+  padding:14px 12px 12px;
   border-bottom:1px solid rgba(255,255,255,0.035);
   background:transparent;
 }
@@ -6004,7 +6063,7 @@ body{
   padding:14px 14px max(18px,env(safe-area-inset-bottom,0px)) !important;
 }
 .sidebar-chrome{
-  padding:10px 12px 10px !important;
+  padding:14px 12px 10px !important;
 }
 .sidebar-top{
   padding:14px 14px 10px !important;
@@ -7216,10 +7275,13 @@ body{
 #workspaceRoot.workspace-idle .empty-launch-mark{
   justify-content:flex-start !important;
 }
-.empty-launch-title{
+.empty-launch-title,
+.empty-launch-directive{
   text-align:left !important;
 }
-.empty-launch-lead{
+.empty-launch-lead,
+.empty-launch-outcome,
+.empty-launch-review{
   margin-left:0 !important;
   margin-right:0 !important;
   text-align:left !important;

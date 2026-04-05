@@ -59,8 +59,8 @@ if (typeof window.pulseRail !== "function") {
     planBar: document.getElementById("planBar"),
     usagePanelCopy: document.getElementById("usagePanelCopy"),
     systemPanelCopy: document.getElementById("systemPanelCopy"),
-    brandSubcopy: document.getElementById("brandSubcopy"),
     workspaceSubcopy: document.getElementById("workspaceSubcopy"),
+    workspaceSubcopyTier: document.getElementById("workspaceSubcopyTier"),
     dashboardCard: document.getElementById("dashboardCard"),
     usageCard: document.getElementById("usageCard"),
     accountCard: document.getElementById("accountCard"),
@@ -392,11 +392,9 @@ if (typeof window.pulseRail !== "function") {
     if (!isAuthenticated()) {
       return {
         key: `guest-${getEffectiveUsage(state.usage)}`,
-        title: "You’ve seen the workflow — continue with a free account",
-        detail: `Your guided tries are complete. Sign up for ${FREE_USAGE_LIMIT} runs per month, saved threads, history, and the same approval-first path.`,
-        body: `You used every guided try in this session — you already saw how Xalvion classifies, drafts the reply, and keeps risky steps gated.
-
-Create a free account for ${FREE_USAGE_LIMIT} runs each month, continuity across visits, and the same operator workflow.`
+        title: "Continue where you left off — unlock full access",
+        detail: `You’ve seen how Xalvion prepares replies. Create a free account for ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same workflow.`,
+        body: `Continue without limits — free accounts get ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same draft-and-review flow. Sign up under Access when you’re ready.`
       };
     }
 
@@ -441,12 +439,14 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     if (!force && state.lastLimitNoticeKey === key) return;
     state.lastLimitNoticeKey = key;
 
-    setNotice("warning", title, detail);
+    if (!isAuthenticated()) setNotice("info", title, detail, { continuation: true });
+    else setNotice("warning", title, detail);
 
     if (!els.messages) return;
 
     clearEmptyState();
     const row = addAssistantMessage(body);
+    row.classList.add("msg-group--limit-cta");
     const footer = getAssistantFooterNode(row);
     if (footer) {
       footer.innerHTML = "";
@@ -455,7 +455,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       meta.appendChild(
         createMetaChip({
           icon: ICONS.warn,
-          text: isAuthenticated() ? "Upgrade required" : "Account to continue",
+          text: isAuthenticated() ? "Upgrade required" : "Sign up — full access",
           tone: "review"
         })
       );
@@ -467,6 +467,9 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       );
       footer.appendChild(meta);
     }
+
+    row.querySelector(".msg-card")?.removeAttribute("data-placeholder");
+    syncReplyReinforcement(row);
 
     scrollMessagesToBottom(true);
     refreshMessageShellGlow();
@@ -1270,10 +1273,11 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     }, 1700);
   }
 
-  function setNotice(kind, title, detail) {
+  function setNotice(kind, title, detail, opts) {
     if (!els.notice) return;
-    els.notice.classList.remove("success", "warning", "error", "info");
+    els.notice.classList.remove("success", "warning", "error", "info", "notice-continuation");
     els.notice.classList.add(kind || "info");
+    if (opts && opts.continuation) els.notice.classList.add("notice-continuation");
     setText(els.noticeTitle, title);
     setText(els.noticeDetail, detail);
   }
@@ -1367,12 +1371,12 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       el.classList.remove("is-warning", "is-limit");
       const pct = state.limit > 0 ? state.usage / state.limit : 0;
       if (!isAuthenticated()) {
-        const cap = state.limit || GUEST_USAGE_LIMIT;
         const rem = state.remaining;
+        const runWord = rem === 1 ? "run" : "runs";
         el.textContent =
           rem <= 0
-            ? "Guided evaluation · complete — sign up to continue"
-            : `Guided evaluation · ${rem} of ${cap} ${rem === 1 ? "try" : "tries"} left`;
+            ? "Preview complete • unlock full access"
+            : `Preview mode • ${rem} ${runWord} remaining`;
         if (state.remaining <= 0) el.classList.add("is-limit");
         else if (pct >= 0.75) el.classList.add("is-warning");
       } else if (state.atLimit) {
@@ -1386,6 +1390,14 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       }
     }
     syncMonetizationChrome();
+    syncComposerPreviewChrome();
+  }
+
+  function syncComposerPreviewChrome() {
+    const composer = els.messageInput?.closest?.(".composer.composer-chat");
+    if (!composer) return;
+    const guest = !isAuthenticated();
+    composer.classList.toggle("composer-preview-continue", guest && state.remaining <= 0);
   }
 
   function syncCommandAuthChip() {
@@ -1394,8 +1406,8 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       els.commandAuthChip.textContent = state.username;
       els.commandAuthChip.title = "";
     } else {
-      els.commandAuthChip.textContent = "Guided evaluation";
-      els.commandAuthChip.title = "Try the workflow without signing in — limited tries per session.";
+      els.commandAuthChip.textContent = "Preview";
+      els.commandAuthChip.title = "Try a few full runs without signing in.";
     }
   }
 
@@ -1748,18 +1760,20 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         const decision = state.latestRun.decision || {};
         const posture = operatorPostureLabel(state.latestRun);
         els.workspaceSubcopy.textContent = `${formatTier(state.tier)} · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${posture} · ${formatMetric(state.latestRun.confidence || 0, 2)} conf`;
+        if (els.workspaceSubcopyTier) els.workspaceSubcopyTier.hidden = true;
       } else if (state.username) {
-        els.workspaceSubcopy.textContent = `${state.username} · ${formatTier(state.tier)} · Paste a ticket; the draft reply appears here for your review.`;
+        els.workspaceSubcopy.textContent = "Get a customer-ready reply instantly";
+        if (els.workspaceSubcopyTier) {
+          els.workspaceSubcopyTier.hidden = false;
+          els.workspaceSubcopyTier.textContent = `${state.username} · ${formatTier(state.tier)} · Sensitive actions stay gated for approval`;
+        }
       } else {
-        els.workspaceSubcopy.textContent =
-          "Guided evaluation — paste a real ticket below. You’ll get a customer-ready draft; sensitive steps stay gated.";
+        els.workspaceSubcopy.textContent = "Get a customer-ready reply instantly";
+        if (els.workspaceSubcopyTier) {
+          els.workspaceSubcopyTier.hidden = false;
+          els.workspaceSubcopyTier.textContent = "Sensitive actions stay gated for approval";
+        }
       }
-    }
-
-    if (els.brandSubcopy) {
-      els.brandSubcopy.textContent = state.username
-        ? `Signed in as ${state.username}. History, threads, and plan capacity persist across visits.`
-        : "You’re evaluating without an account — sign up anytime for saved threads, history, and higher monthly runs.";
     }
 
     updateAuthStatus();
@@ -1772,7 +1786,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!els.systemPanelCopy) return;
 
     if (!data) {
-      els.systemPanelCopy.textContent = "Use an example chip or paste a ticket — the workspace shows routing, draft reply, and approval context.";
+      els.systemPanelCopy.textContent = "Paste a ticket or pick an example chip — your draft shows up here.";
       return;
     }
 
@@ -1869,6 +1883,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="customer-message-block">
             <div class="assistant-context-line js-assistant-context" hidden></div>
             <div class="customer-message-label reply-hero-label">Customer-ready reply</div>
+            <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared by Xalvion — ready to review</div>
             <div class="reply-text js-reply-text">${bodyHtml}</div>
           </div>
           <div class="assistant-footer js-assistant-footer"></div>
@@ -1898,28 +1913,24 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const previewLeft = guest ? Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()) : state.remaining;
     const guestApproaching =
       guest && previewLeft > 0 && previewLeft <= Math.max(1, Math.ceil(GUEST_USAGE_LIMIT * 0.34));
-    const planHint =
-      guest || tierLc === "free"
-        ? "Pro / Elite unlock higher monthly runs and live refund execution."
-        : "Elite adds maximum throughput and deeper analytics.";
 
     if (atCap) {
       const n = guest ? getGuestUsage() : state.usage;
-      const capEyebrow = guest ? "Guided evaluation" : tierLc === "pro" ? "Pro capacity" : "Capacity";
+      const capEyebrow = guest ? "Preview" : tierLc === "pro" ? "Pro capacity" : "Capacity";
       const capTitle = guest
-        ? "You’ve already seen the value"
+        ? "Continue with full access"
         : tierLc === "pro"
           ? "Pro limit reached"
           : tierLc === "elite"
             ? "Plan limit reached"
             : "Free plan limit reached";
       const capBody = guest
-        ? `You used every guided try — same routing, reply prep, and approval gates you’d use in production. Create a free account for ${FREE_USAGE_LIMIT} runs/month, saved threads, and continuity.`
+        ? `You’ve seen how Xalvion prepares replies — unlock ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same workflow.`
         : tierLc === "pro"
           ? "You maxed Pro — the workspace already proved throughput. Elite unlocks 5,000 tickets/month and advanced analytics so the next growth step isn’t another hard stop."
           : "You used this month’s allocation — the operator loop is working. Upgrade to Pro for 500 runs/month, live refunds, and priority routing when volume spikes.";
       const ctaLabel = guest
-        ? "Continue with a free account →"
+        ? "Sign up — full access"
         : tierLc === "pro"
           ? "Scale without another wall · Upgrade to Elite"
           : "Keep momentum · Upgrade to Pro";
@@ -1927,34 +1938,28 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       <div class="empty-card limit-moment-card empty-card-premium">
         <div class="empty-cap-eyebrow">${capEyebrow}</div>
         <h2>${capTitle}</h2>
-        <p>You ran <strong>${n}</strong> full ${guest ? "evaluation " : ""}scenario${n === 1 ? "" : "s"} · customer-ready drafts with approval discipline.</p>
+        <p class="limit-moment-lead">${guest ? "You’ve used your preview runs — continue with the same flow under a free account." : `You ran <strong>${n}</strong> full scenario${n === 1 ? "" : "s"} this cycle.`}</p>
         <p>${capBody}</p>
         <button type="button" class="limit-cta" id="emptySignupCta">${ctaLabel}</button>
         ${guest ? `<button type="button" class="limit-secondary-link" id="emptyLoginLink">Already have an account? Log in</button>` : ""}
       </div>`;
     }
 
-    const postureLine = state.latestRun
-      ? `${displayActionLabel(state.latestRun)} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence`
-      : "Next: paste below and send — your draft and decision context appear in this column.";
+    const previewRunsWord = previewLeft === 1 ? "run" : "runs";
+    const chipHintGuest = guestApproaching
+      ? `Preview · ${previewLeft} ${previewRunsWord} left — sign up to save threads`
+      : `Preview · ${previewLeft} ${previewRunsWord} remaining`;
 
     return `
       <div class="empty-card empty-card-premium empty-card-launch">
-        <div class="empty-launch-mark" aria-hidden="true">
-          <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm xv-spark-mark xv-spark-mark--idle" data-xv-thinking-glyph>
-            <span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span>
-          </span>
-        </div>
-        <p class="empty-launch-eyebrow">${guest ? "Guided evaluation" : "Start here"}</p>
-        <h2 class="empty-launch-title">Paste a support ticket — get a customer-ready reply.</h2>
-        <p class="empty-launch-lead">Xalvion drafts the message your customer should see; refunds and other risky moves stay gated until you approve.</p>
+        <p class="empty-launch-directive">Paste a real customer message</p>
+        <p class="empty-launch-outcome">Xalvion prepares a ready-to-send reply</p>
+        <p class="empty-launch-review">Review, edit, or approve before sending</p>
         <div class="empty-actions empty-actions-intent" role="group" aria-label="Example ticket">
           <button type="button" class="chip empty-intent-chip" data-fill="A customer says: I was charged twice.">Example: duplicate charge</button>
         </div>
-        <p class="empty-launch-posture">${postureLine}</p>
-        <p class="empty-launch-plan-hint empty-launch-plan-hint--quiet">${planHint}</p>
         <div class="empty-actions empty-actions-launch">
-          <span class="empty-chip-hint">${guest ? (guestApproaching ? `Evaluation · ${previewLeft} full ${previewLeft === 1 ? "try" : "tries"} left — sign up to save threads` : `Evaluation · ${previewLeft} full ${previewLeft === 1 ? "try" : "tries"} left on this device`) : `${formatTier(state.tier)} · ${state.remaining} runs this period`}</span>
+          <span class="empty-chip-hint">${guest ? chipHintGuest : `${formatTier(state.tier)} · ${state.remaining} runs this period`}</span>
         </div>
       </div>`;
   }
@@ -2036,6 +2041,21 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     return row?.querySelector(".js-reply-text") || null;
   }
 
+  function syncReplyReinforcement(row) {
+    const rein = row?.querySelector(".js-reply-reinforcement");
+    if (!rein) return;
+    if (row?.classList.contains("msg-group--limit-cta")) {
+      rein.hidden = true;
+      return;
+    }
+    const card = row?.querySelector(".msg-card");
+    const node = getAssistantCopyNode(row);
+    const txt = (node?.textContent || "").trim();
+    const typing = node?.querySelector?.(".xalvion-typing-sovereign");
+    const looksLikeError = /something went wrong|request failed|no response returned|plan limit reached/i.test(txt);
+    rein.hidden = !txt || Boolean(typing) || card?.dataset.placeholder === "true" || looksLikeError;
+  }
+
   function getAssistantFooterNode(row) {
     return row?.querySelector(".js-assistant-footer") || null;
   }
@@ -2044,6 +2064,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const node = getAssistantCopyNode(row);
     if (!node) return;
     node.innerHTML = escapeHtml(text || "").replace(/\n/g, "<br>");
+    const card = row?.querySelector(".msg-card");
+    if (card?.dataset.placeholder !== "true") syncReplyReinforcement(row);
   }
 
   function appendAssistantChunk(row, chunk) {
@@ -2054,6 +2076,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
     const current = node.textContent || "";
     node.innerHTML = escapeHtml(current + chunk).replace(/\n/g, "<br>");
+    syncReplyReinforcement(row);
     scrollMessagesToBottom();
   }
 
@@ -2125,15 +2148,14 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       el.textContent = "";
       return;
     }
-    el.hidden = false;
-    const posture = operatorPostureLabel(data);
-    const action = displayActionLabel(data);
     const approval = getApprovalContext(data);
-    const gate =
-      approval.requiresApproval && !approval.approved
-        ? "Sensitive actions await your approval."
-        : "Review and send when you’re satisfied.";
-    el.textContent = `Xalvion prepared this draft · ${posture} · ${action} · ${gate}`;
+    if (approval.requiresApproval && !approval.approved) {
+      el.hidden = false;
+      el.textContent = "Sensitive actions await your approval before they run.";
+    } else {
+      el.hidden = true;
+      el.textContent = "";
+    }
   }
 
   function getApprovalContext(data = {}) {
@@ -2972,15 +2994,16 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!hasThread) {
       els.composerStatusLine.textContent = isAuthenticated()
         ? "Paste a ticket below to start."
-        : "Paste a real ticket below — this guided session has a few full tries.";
+        : "Paste below — preview mode includes a few full runs.";
       return;
     }
     if (!isAuthenticated()) {
       const left = Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage());
+      const rw = left === 1 ? "run" : "runs";
       els.composerStatusLine.textContent =
         left > 0
-          ? `Review the draft above, then run another case · ${left} guided ${left === 1 ? "try" : "tries"} left`
-          : "Sign up under Access to keep threads, history, and monthly runs.";
+          ? `Review the draft above, then try another case · ${left} preview ${rw} left`
+          : "Continue with full access — sign up under Access to keep threads and monthly runs.";
       return;
     }
     els.composerStatusLine.textContent = "Paste the next ticket, or refine this thread.";
@@ -3515,7 +3538,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         const reset = maybeResetGuestUsage(true);
         if (reset) {
           updatePlanUI("free", getGuestUsage(), GUEST_USAGE_LIMIT, Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()));
-          setNotice("info", "Evaluation refreshed", "Guided tries were reset for this session.");
+          setNotice("info", "Preview refreshed", "Your preview runs were reset for this session.");
         }
       }
       if (!enforceWorkspaceLimit()) return;
@@ -3635,6 +3658,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         mountOperatorDecisionPanel(row, data, replyText);
       }
       row.querySelector(".msg-card")?.removeAttribute("data-placeholder");
+      syncReplyReinforcement(row);
       pulsePreparedReplyReveal(row);
       syncAssistantContextLine(row, data);
 
@@ -4809,7 +4833,7 @@ function bindEvents() {
         "Your saved login no longer matches an account on this server. Log in again to use billing and Stripe."
       );
     } else if (!state.username) {
-      setNotice("info", "Guided evaluation", "Paste a ticket below — a few full tries, then sign up for saved threads and monthly runs.");
+      setNotice("info", "Ready when you are", "Paste a ticket below to see your first draft.");
     } else {
       setNotice("success", "Workspace synced", `Signed in as ${state.username}. The operator workspace is ready.`);
     }
