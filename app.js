@@ -1796,6 +1796,26 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     }
   }
 
+  function applyFillFromButton(button) {
+    const fill = button?.dataset?.fill || "";
+    if (!fill || !els.messageInput) return;
+    els.messageInput.value = fill;
+    saveDraft(fill);
+    autoResizeTextarea();
+    syncComposerDraftClass();
+    els.messageInput.focus();
+  }
+
+  /** Subtle branded reveal on prepared reply (CSS: .xv-prepared-reveal) */
+  function pulsePreparedReplyReveal(row) {
+    const block = row?.querySelector(".customer-message-block");
+    if (!block) return;
+    block.classList.remove("xv-prepared-reveal");
+    void block.offsetWidth;
+    block.classList.add("xv-prepared-reveal");
+    window.setTimeout(() => block.classList.remove("xv-prepared-reveal"), 1400);
+  }
+
   function createTypingMarkup() {
     return `
       <span class="xalvion-typing-sovereign" aria-hidden="true">
@@ -1915,14 +1935,13 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           </span>
         </div>
         <p class="empty-launch-eyebrow">Ready</p>
-        <h2 class="empty-launch-title">Paste a ticket to prepare the reply.</h2>
-        <p class="empty-launch-lead">Xalvion reads the case, drafts customer-ready language, and holds risky moves until you approve.</p>
-        <ul class="empty-launch-examples" aria-label="Example scenarios">
-          <li><span class="empty-launch-ex-label">Shipping</span><span class="empty-launch-ex-copy">Late or damaged shipment — policy-aligned response in one pass.</span></li>
-          <li><span class="empty-launch-ex-label">Billing</span><span class="empty-launch-ex-copy">Duplicate charge or refund ask — clear next step, gated execution.</span></li>
-        </ul>
+        <h2 class="empty-launch-title">Paste a ticket to prepare the response.</h2>
+        <p class="empty-launch-lead">Drafts customer-ready language here; risky moves wait on your approval.</p>
+        <div class="empty-actions empty-actions-intent" role="group" aria-label="Example case">
+          <button type="button" class="chip empty-intent-chip" data-fill="A customer says: I was charged twice.">Example · duplicate charge</button>
+        </div>
         <p class="empty-launch-posture">${postureLine}</p>
-        <p class="empty-launch-plan-hint">${planHint}</p>
+        <p class="empty-launch-plan-hint empty-launch-plan-hint--quiet">${planHint}</p>
         <div class="empty-actions empty-actions-launch">
           <span class="empty-chip-hint">${guest ? (guestApproaching ? `Preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} left — sign in to keep threads` : `Guest preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} left`) : `${formatTier(state.tier)} · ${state.remaining} runs this period`}</span>
         </div>
@@ -3567,6 +3586,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         mountOperatorDecisionPanel(row, data, replyText);
       }
       row.querySelector(".msg-card")?.removeAttribute("data-placeholder");
+      pulsePreparedReplyReveal(row);
       syncAssistantContextLine(row, data);
 
       updateStatsFromResult(data);
@@ -3634,6 +3654,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         (error && error.message) ||
         "Something went wrong while processing this support request.";
       setAssistantCopy(row, errText);
+      pulsePreparedReplyReveal(row);
       syncAssistantContextLine(row, null);
       setNotice("error", "Request failed", errText);
       authDebugLog("support_failed", error);
@@ -4609,25 +4630,19 @@ function bindEvents() {
       if (event.target === els.refundModal) closeRefundModal();
     });
 
-    els.fillButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        const fill = button.dataset.fill || "";
-        if (!fill || !els.messageInput) return;
-        els.messageInput.value = fill;
-        saveDraft(fill);
-        autoResizeTextarea();
-        syncComposerDraftClass();
-        els.messageInput.focus();
-      });
+    els.workspaceRoot?.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-fill]");
+      if (!btn || !els.workspaceRoot.contains(btn)) return;
+      applyFillFromButton(btn);
     });
 
-    els.fillButtons.forEach((btn) => {
-      btn.addEventListener("dblclick", async () => {
-        const label = String(btn.textContent || "").trim().toLowerCase();
-        if (label === "duplicate charge") {
-          await runWorkspaceRefundFromInput();
-        }
-      });
+    els.workspaceRoot?.addEventListener("dblclick", async (e) => {
+      const btn = e.target.closest("[data-fill]");
+      if (!btn || !els.workspaceRoot.contains(btn)) return;
+      const label = String(btn.textContent || "").trim().toLowerCase();
+      if (label.includes("duplicate charge")) {
+        await runWorkspaceRefundFromInput();
+      }
     });
 
     els.messages?.addEventListener("scroll", updateStickiness, { passive: true });
