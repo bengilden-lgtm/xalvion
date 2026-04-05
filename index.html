@@ -31,7 +31,10 @@
         <span id="commandModeLine" class="command-mode-pill" translate="no">Operator</span>
       </div>
       <div class="command-strip-center">
-        <span id="commandPlanCapacity" class="command-capacity" translate="no">Preview · capacity loading</span>
+        <div class="command-status-chip" role="status" aria-live="polite">
+          <span class="command-status-dot" aria-hidden="true"></span>
+          <span id="commandPlanCapacity" class="command-capacity" translate="no">Preview · capacity loading</span>
+        </div>
       </div>
       <div class="command-strip-right">
         <button id="newChatBtn" class="icon-btn command-tool-btn" type="button" title="New thread">+</button>
@@ -44,12 +47,12 @@
       <aside class="sidebar glass rail-col rail-col-left" id="sidebarShell" data-sidebar-active="workspace">
         <div class="sidebar-chrome">
           <nav class="sidebar-nav" role="tablist" aria-label="Workspace areas">
-            <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace">Workspace</button>
-            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount">Access</button>
-            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans">Plans</button>
-            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations">Integrations</button>
-            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm">CRM</button>
-            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue">Revenue</button>
+            <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace">Workspace</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount">Access</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans">Plans</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations">Integrations</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm">CRM</button>
+            <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue">Revenue</button>
           </nav>
         </div>
         <div class="sidebar-scroll-host scroll-shell" id="sidebarScrollShell" data-show-top="false" data-show-bottom="false">
@@ -57,17 +60,17 @@
           <div class="sidebar-inner sidebar-panels-host">
 
             <section class="sidebar-panel is-active" id="sidebarPanelWorkspace" data-sidebar-panel="workspace" role="tabpanel" aria-labelledby="sidebarTabWorkspace" aria-label="Workspace" aria-hidden="false">
-              <div class="brand">
-                <svg width="200" height="36" viewBox="0 0 200 36" aria-hidden="true">
+              <div class="brand brand-compact">
+                <svg width="168" height="30" viewBox="0 0 200 36" aria-hidden="true">
                   <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="currentColor" letter-spacing="-0.5">X</text>
                   <text x="26" y="19" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="300" fill="currentColor" letter-spacing="4" opacity="0.9">ALVION</text>
                   <text x="27" y="29" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5" font-weight="400" fill="currentColor" opacity="0.28" letter-spacing="3">OPERATOR ENGINE</text>
                 </svg>
-                <div class="brand-sub" id="brandSubcopy">Autonomous support that prepares decisions — your team approves.</div>
+                <div class="brand-sub" id="brandSubcopy">Autonomous support prepares decisions — your team approves.</div>
               </div>
 
-              <div class="section-label">Workspace notice</div>
-              <div id="notice" class="notice info">
+              <div class="section-label section-label-tight">Workspace notice</div>
+              <div id="notice" class="notice info notice-dense">
                 <div class="notice-header">
                   <div class="notice-dot" aria-hidden="true"></div>
                   <div id="noticeTitle" class="notice-title">Booting</div>
@@ -79,7 +82,7 @@
             </section>
 
             <section class="sidebar-panel" id="sidebarPanelAccount" data-sidebar-panel="account" role="tabpanel" aria-labelledby="sidebarTabAccount" aria-label="Account access" hidden aria-hidden="true">
-              <div class="section-label">Account / access</div>
+              <div class="section-label section-label-tight">Account / access</div>
               <div class="auth-card">
                 <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
                 <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
@@ -99,7 +102,7 @@
             </section>
 
             <section class="sidebar-panel" id="sidebarPanelPlans" data-sidebar-panel="plans" role="tabpanel" aria-labelledby="sidebarTabPlans" aria-label="Plans" hidden aria-hidden="true">
-              <div class="section-label">Plans &amp; capacity</div>
+              <div class="section-label section-label-tight">Plans &amp; capacity</div>
               <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
               <div class="tier-card tier-card-plans">
                 <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Handle more tickets · Upgrade to Pro</span><span>→</span></button>
@@ -109,7 +112,7 @@
             </section>
 
             <section class="sidebar-panel" id="sidebarPanelIntegrations" data-sidebar-panel="integrations" role="tabpanel" aria-labelledby="sidebarTabIntegrations" aria-label="Integrations" hidden aria-hidden="true">
-              <div class="section-label">Integrations</div>
+              <div class="section-label section-label-tight">Integrations</div>
               <div class="tier-card stripe-card" id="stripeCard">
                 <div class="stripe-card-head">
                   <div class="stripe-card-title">
@@ -142,7 +145,7 @@
             </section>
 
             <section class="sidebar-panel" id="sidebarPanelCrm" data-sidebar-panel="crm" role="tabpanel" aria-labelledby="sidebarTabCrm" aria-label="CRM snapshot" hidden aria-hidden="true">
-              <div class="section-label">CRM snapshot</div>
+              <div class="section-label section-label-tight">CRM snapshot</div>
               <div class="sidebar-capability-card">
                 <div class="sidebar-cap-row"><span class="sidebar-cap-label">New leads</span><span id="sidebarCrmNew" class="sidebar-cap-value">0</span></div>
                 <div class="sidebar-cap-row"><span class="sidebar-cap-label">Due follow-ups</span><span id="sidebarCrmDue" class="sidebar-cap-value">0</span></div>
@@ -154,7 +157,7 @@
             </section>
 
             <section class="sidebar-panel" id="sidebarPanelRevenue" data-sidebar-panel="revenue" role="tabpanel" aria-labelledby="sidebarTabRevenue" aria-label="Revenue snapshot" hidden aria-hidden="true">
-              <div class="section-label">Revenue snapshot</div>
+              <div class="section-label section-label-tight">Revenue snapshot</div>
               <div class="sidebar-capability-card">
                 <div class="sidebar-cap-row"><span class="sidebar-cap-label">Tracked revenue</span><span id="sidebarRevenueTotal" class="sidebar-cap-value">$0.00</span></div>
                 <div class="sidebar-cap-row"><span class="sidebar-cap-label">Reply rate</span><span id="sidebarRevenueReply" class="sidebar-cap-value">0.0%</span></div>
@@ -172,7 +175,7 @@
 
       <main class="main main-canvas center-canvas">
         <div class="main-canvas-inner glass canvas-shell canvas-command-hero">
-          <header class="workspace-heading-row canvas-header">
+          <header class="workspace-heading-row canvas-header canvas-stage-header">
             <div class="title">
               <h1 id="workspacePageTitle">Customer support</h1>
               <p id="workspaceSubcopy" class="workspace-subline">Operator workspace loading…</p>
@@ -180,10 +183,12 @@
           </header>
 
           <section class="workspace glass workspace-decision-shell decision-canvas decision-command-surface">
-            <div class="workspace-intro">
-              <div class="workspace-intro-left">
-                <div class="section-label">Decision canvas</div>
-                <div class="headline" id="workspaceHeadline">Paste a case — Xalvion prepares the decision; you approve what reaches the customer.</div>
+            <div class="workspace-intro workspace-intro-compact">
+              <div class="workspace-intro-strip">
+                <span class="surface-live-dot" aria-hidden="true"></span>
+                <span class="workspace-intro-kicker">Live surface</span>
+                <span class="workspace-intro-divider" aria-hidden="true"></span>
+                <p class="headline workspace-headline-inline" id="workspaceHeadline">Paste a case — Xalvion prepares the decision; you approve what reaches the customer.</p>
               </div>
             </div>
             <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
@@ -191,7 +196,7 @@
             </div>
           </section>
 
-          <section class="composer-wrap composer-dock">
+          <section class="composer-wrap composer-dock composer-stage">
             <p id="composerStatusLine" class="composer-status-line">Paste a customer issue or type a support request…</p>
             <div class="quick-actions">
               <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
@@ -215,8 +220,11 @@
       </main>
 
       <aside class="rail rail-col rail-col-right operator-rail" id="railShell">
-        <div class="operator-rail-head">
-          <div class="operator-rail-kicker">Live operations</div>
+        <div class="operator-rail-head operator-rail-intel">
+          <div class="operator-rail-intel-top">
+            <span class="operator-rail-live-badge"><span class="operator-rail-live-pulse" aria-hidden="true"></span> Live intelligence</span>
+            <p class="operator-rail-intel-line">Run outcome, value, and capacity — updated as you operate.</p>
+          </div>
           <div class="operator-rail-title">Operator rail</div>
           <p class="operator-rail-sub">Throughput, billing, and pipeline signals stay visible while you decide.</p>
         </div>
@@ -224,10 +232,10 @@
         <div class="rail-scroll scroll-area" id="railScroll">
           <div class="rail-inner rail-stack" id="railInner">
 
-            <div class="rail-brief is-open" data-rail-brief="latest">
+            <div class="rail-brief is-open rail-brief-tier-now" data-rail-brief="latest">
               <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleLatest">
                 <span class="rail-brief-toggle-text">
-                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-tier rail-brief-tier-now">Now</span>
                   <span class="rail-brief-heading">Latest run</span>
                 </span>
                 <span class="rail-brief-chevron" aria-hidden="true"></span>
@@ -266,10 +274,10 @@
               </div>
             </div>
 
-            <div class="rail-brief is-open" data-rail-brief="value">
+            <div class="rail-brief is-open rail-brief-tier-session" data-rail-brief="value">
               <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleValue">
                 <span class="rail-brief-toggle-text">
-                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-tier rail-brief-tier-session">Session</span>
                   <span class="rail-brief-heading">Value generated</span>
                 </span>
                 <span class="rail-brief-chevron" aria-hidden="true"></span>
@@ -299,10 +307,10 @@
               </div>
             </div>
 
-            <div class="rail-brief" data-rail-brief="throughput">
+            <div class="rail-brief rail-brief-tier-volume" data-rail-brief="throughput">
               <button type="button" class="rail-brief-toggle" aria-expanded="false" id="railBriefToggleThroughput">
                 <span class="rail-brief-toggle-text">
-                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-tier rail-brief-tier-volume">Volume</span>
                   <span class="rail-brief-heading">Throughput</span>
                 </span>
                 <span class="rail-brief-chevron" aria-hidden="true"></span>
@@ -326,10 +334,10 @@
               </div>
             </div>
 
-            <div class="rail-brief is-open" data-rail-brief="refund">
+            <div class="rail-brief is-open rail-brief-tier-billing" data-rail-brief="refund">
               <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleRefund">
                 <span class="rail-brief-toggle-text">
-                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-tier rail-brief-tier-billing">Billing</span>
                   <span class="rail-brief-heading">Refund center · lock state</span>
                 </span>
                 <span class="rail-brief-chevron" aria-hidden="true"></span>
@@ -367,10 +375,10 @@
               </div>
             </div>
 
-            <div class="rail-brief is-open" data-rail-brief="usage">
+            <div class="rail-brief is-open rail-brief-tier-quota" data-rail-brief="usage">
               <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleUsage">
                 <span class="rail-brief-toggle-text">
-                  <span class="rail-brief-eyebrow">Brief</span>
+                  <span class="rail-brief-tier rail-brief-tier-quota">Quota</span>
                   <span class="rail-brief-heading">Plan usage</span>
                 </span>
                 <span class="rail-brief-chevron" aria-hidden="true"></span>
@@ -403,10 +411,10 @@
               </div>
             </div>
 
-            <div class="rail-brief is-open" data-rail-brief="approval" id="approvalRailWrap" hidden>
+            <div class="rail-brief is-open rail-brief-tier-gate" data-rail-brief="approval" id="approvalRailWrap" hidden>
               <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleApproval">
                 <span class="rail-brief-toggle-text">
-                  <span class="rail-brief-eyebrow">Gate</span>
+                  <span class="rail-brief-tier rail-brief-tier-gate">Gate</span>
                   <span class="rail-brief-heading">Approval state</span>
                 </span>
                 <span class="rail-brief-chevron" aria-hidden="true"></span>
