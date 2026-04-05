@@ -84,18 +84,18 @@
         const t = String(tier || "").toLowerCase();
         const risk = String(riskLevel || "").toLowerCase();
         if (risk === "high") {
-          return { label: "High risk", variant: "high_risk", cls: "signal-high-risk" };
+          return { label: "⚠ High risk", variant: "high_risk", cls: "signal-high-risk" };
         }
         if (t === "safe_autopilot_ready" && !requiresApproval) {
-          return { label: "Safe to automate", variant: "safe", cls: "signal-safe" };
+          return { label: "✓ Safe to automate", variant: "safe", cls: "signal-safe" };
         }
         if (t === "approval_required" || requiresApproval) {
-          return { label: "Approval required", variant: "approval", cls: "signal-approval" };
+          return { label: "⚡ Approval required", variant: "approval", cls: "signal-approval" };
         }
         if (t === "assist_only") {
-          return { label: "Manual review", variant: "review", cls: "signal-review" };
+          return { label: "○ Manual review", variant: "review", cls: "signal-review" };
         }
-        return { label: "Manual review", variant: "review", cls: "signal-review" };
+        return { label: "○ Manual review", variant: "review", cls: "signal-review" };
       },
       /**
        * Mirrors main workspace `deriveConsequenceSignal` (app.js) for API-shaped payloads.
@@ -112,7 +112,7 @@
         if (risk === "high") {
           return {
             cls: "signal-high-risk",
-            text: "High risk",
+            text: "⚠ High risk",
             title: "Elevated risk — review before customer send",
           };
         }
@@ -120,21 +120,21 @@
         if (tier === "safe_autopilot_ready") {
           return {
             cls: "signal-safe",
-            text: "Safe to automate",
+            text: "✓ Safe to automate",
             title: "Meets all automation safety criteria",
           };
         }
         if (tier === "assist_only") {
           return {
             cls: "signal-review",
-            text: "Manual review",
+            text: "○ Manual review",
             title: "Risk signals require human decision",
           };
         }
         if (tier === "approval_required") {
           return {
             cls: "signal-approval",
-            text: "Approval required",
+            text: "⚡ Approval required",
             title: "Awaiting operator approval",
           };
         }
@@ -143,12 +143,12 @@
         const req = Boolean(d.requires_approval || dec.requires_approval || d.decision_state === "pending_decision");
         const money = action === "refund" || action === "charge" || action === "credit";
         if (req && money) {
-          return { cls: "signal-approval", text: "Approval required", title: "" };
+          return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
         }
         if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
-          return { cls: "signal-review", text: "Review recommended", title: "" };
+          return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
         }
-        return { cls: "signal-safe", text: "Safe to send", title: "" };
+        return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
       },
       formatValueSummary(metrics) {
         const m = metrics && typeof metrics === "object" ? metrics : {};

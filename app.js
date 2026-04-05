@@ -392,9 +392,9 @@ if (typeof window.pulseRail !== "function") {
     if (!isAuthenticated()) {
       return {
         key: `guest-${getEffectiveUsage(state.usage)}`,
-        title: "Continue where you left off — unlock full access",
-        detail: `You’ve seen how Xalvion prepares replies. Create a free account for ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same workflow.`,
-        body: `Continue without limits — free accounts get ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same draft-and-review flow. Sign up under Access when you’re ready.`
+        title: "You hit the preview wall — unlock full operator capacity",
+        detail: `You’ve already seen the workflow work. Create a free account for ${FREE_USAGE_LIMIT} runs/month, saved threads, and uninterrupted decisioning.`,
+        body: `You’ve hit your preview limit — and Xalvion is already generating value. Create a free account to unlock ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same approval-safe workflow. Every blocked action is lost momentum.`
       };
     }
 
@@ -416,8 +416,8 @@ if (typeof window.pulseRail !== "function") {
     if (tier === "pro") {
       return {
         key: `pro-${getEffectiveUsage(state.usage)}`,
-        title: "Pro capacity reached — momentum is already here",
-        detail: `${valuePrefix}Upgrade to Elite for 5,000 tickets/month, advanced dashboard depth, and room to scale without another hard stop.`,
+        title: "Pro capacity reached — don’t let throughput stall",
+        detail: `${valuePrefix}Unlock Elite for 5,000 tickets/month, deeper analytics, and more execution headroom before volume turns into drag.`,
         body: `${valuePrefix}You’ve reached the Pro monthly ticket limit.
 
 You’re already running a serious operator surface. Elite adds headroom (5,000 tickets/month), advanced analytics, and team scale so growth doesn’t hit another wall next quarter.`
@@ -426,8 +426,8 @@ You’re already running a serious operator surface. Elite adds headroom (5,000 
 
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
-      title: "Free plan capacity reached — you proved the value",
-      detail: `${valuePrefix}Upgrade to Pro for 500 tickets/month, live refund execution, and uninterrupted operator runs.`,
+      title: "Free plan capacity reached — the value is already visible",
+      detail: `${valuePrefix}Unlock Pro for 500 tickets/month, live refund execution, and uninterrupted operator runs before the next valuable action gets blocked.`,
       body: `${valuePrefix}You’ve used all ${FREE_USAGE_LIMIT} free runs this month.
 
 The workspace already showed you real routing and approval discipline. Pro keeps that loop running with higher limits, the refund center live, and priority routing when volume spikes.`
@@ -455,7 +455,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       meta.appendChild(
         createMetaChip({
           icon: ICONS.warn,
-          text: isAuthenticated() ? "Upgrade required" : "Sign up — full access",
+          text: isAuthenticated() ? "Unlock more capacity" : "Unlock full operator capacity",
           tone: "review"
         })
       );
@@ -1375,8 +1375,8 @@ The workspace already showed you real routing and approval discipline. Pro keeps
         const runWord = rem === 1 ? "run" : "runs";
         el.textContent =
           rem <= 0
-            ? "Preview complete • unlock full access"
-            : `Preview mode • ${rem} ${runWord} remaining`;
+            ? "Preview complete • unlock full operator capacity"
+            : `Preview mode • ${rem} operator ${runWord} remaining`;
         if (state.remaining <= 0) el.classList.add("is-limit");
         else if (pct >= 0.75) el.classList.add("is-warning");
       } else if (state.atLimit) {
@@ -1386,14 +1386,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
         el.classList.add("is-warning");
         el.textContent = `${state.usage} of ${state.limit} runs this month · ${state.remaining} left`;
       } else {
-        const tier = String(state.tier || "free").toLowerCase();
-        const suffix =
-          tier === "elite" || tier === "dev"
-            ? " · operator-scale capacity"
-            : tier === "pro"
-              ? " · Pro throughput envelope"
-              : " · upgrade when the queue earns it";
-        el.textContent = `${formatTier(state.tier)} · ${state.remaining} of ${state.limit} runs left this month${suffix}`;
+        el.textContent = `${formatTier(state.tier)} · ${state.remaining} of ${state.limit} runs left this month`;
       }
     }
     syncMonetizationChrome();
@@ -1526,13 +1519,13 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     const tier = String(state.tier || "free").toLowerCase();
     const upgradeHint =
       tier === "free"
-        ? " Pro unlocks 500 runs/month and live refund execution in-place."
+        ? " Pro adds 500 runs/month + live refunds."
         : tier === "pro"
-          ? " Elite lifts the ceiling to 5k runs/month with deeper analytics."
+          ? " Elite adds 5k runs/month + advanced analytics."
           : "";
     el.textContent =
       tickets > 0 || money > 0 || actions > 0 || mins > 0
-        ? `This workspace has already surfaced ${formatMoney(money)} across ${tickets} tickets (${actions} billing motions, ~${mins} min operator time).${upgradeHint}`
+        ? `Workspace value so far: ${tickets} tickets · ${formatMoney(money)} through billing actions (${actions} motions) · ~${mins} min saved.${upgradeHint}`
         : "";
     el.style.display = tickets > 0 || money > 0 || actions > 0 || mins > 0 ? "block" : "none";
   }
@@ -1765,12 +1758,9 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (els.workspaceSubcopy) {
       if (state.latestRun) {
         const decision = state.latestRun.decision || {};
-        const sig = deriveConsequenceSignal(state.latestRun);
-        els.workspaceSubcopy.textContent = `${displayActionLabel(state.latestRun)} · ${sig.text}`;
-        if (els.workspaceSubcopyTier) {
-          els.workspaceSubcopyTier.hidden = false;
-          els.workspaceSubcopyTier.textContent = `${formatTier(state.tier)} · ${displayQueueLabel({ decision })} · ${operatorPostureLabel(state.latestRun)} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence`;
-        }
+        const posture = operatorPostureLabel(state.latestRun);
+        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${posture} · ${formatMetric(state.latestRun.confidence || 0, 2)} conf`;
+        if (els.workspaceSubcopyTier) els.workspaceSubcopyTier.hidden = true;
       } else if (state.username) {
         els.workspaceSubcopy.textContent = "Get a customer-ready reply instantly";
         if (els.workspaceSubcopyTier) {
@@ -1887,15 +1877,15 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       role === "assistant"
         ? `<div class="msg-body assistant-canvas">
         <div class="stream-trace-host"></div>
-        <div class="assistant-result-stack assistant-result-stack--decision-first">
+        <div class="assistant-result-stack">
           <div class="assistant-decision-slot" data-slot="decision"></div>
+          <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="customer-message-block">
             <div class="assistant-context-line js-assistant-context" hidden></div>
             <div class="customer-message-label reply-hero-label">Customer-ready reply</div>
             <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared by Xalvion — ready to review</div>
             <div class="reply-text js-reply-text">${bodyHtml}</div>
           </div>
-          <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="assistant-footer js-assistant-footer"></div>
         </div>
       </div>`
@@ -1928,19 +1918,19 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const n = guest ? getGuestUsage() : state.usage;
       const capEyebrow = guest ? "Preview" : tierLc === "pro" ? "Pro capacity" : "Capacity";
       const capTitle = guest
-        ? "Continue with full access"
+        ? "Unlock full operator capacity"
         : tierLc === "pro"
           ? "Pro limit reached"
           : tierLc === "elite"
             ? "Plan limit reached"
             : "Free plan limit reached";
       const capBody = guest
-        ? `You’ve seen how Xalvion prepares replies — unlock ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same workflow.`
+        ? `You just saw Xalvion complete the workflow — unlock ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same operator flow.`
         : tierLc === "pro"
           ? "You maxed Pro — the workspace already proved throughput. Elite unlocks 5,000 tickets/month and advanced analytics so the next growth step isn’t another hard stop."
           : "You used this month’s allocation — the operator loop is working. Upgrade to Pro for 500 runs/month, live refunds, and priority routing when volume spikes.";
       const ctaLabel = guest
-        ? "Sign up — full access"
+        ? "Unlock full operator capacity"
         : tierLc === "pro"
           ? "Scale without another wall · Upgrade to Elite"
           : "Keep momentum · Upgrade to Pro";
@@ -2099,11 +2089,39 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function createMetaRow(data = {}) {
     const meta = document.createElement("div");
-    meta.className = "assistant-meta assistant-meta--inline";
+    meta.className = "assistant-meta";
+
     const confidence = Number(data.confidence || 0);
-    const q = Number(data.quality || 0);
-    const qBit = q > 0 ? `Outcome ${formatMetric(q, 1)} · ` : "";
-    meta.innerHTML = `<span class="assistant-meta-inline">${qBit}${formatMetric(confidence, 2)} confidence · ${escapeHtml(displayQueueLabel(data))} · ${escapeHtml(displayRiskLabel(data))}</span>`;
+
+    meta.appendChild(
+      createMetaChip({
+        icon: ICONS.pulse,
+        text: `${formatMetric(confidence, 2)} conf`,
+        tone: confidenceTone(confidence)
+      })
+    );
+
+    meta.appendChild(
+      createMetaChip({
+        icon: ICONS.spark,
+        text: displayActionLabel(data)
+      })
+    );
+
+    meta.appendChild(
+      createMetaChip({
+        icon: ICONS.ticket,
+        text: displayQueueLabel(data)
+      })
+    );
+
+    meta.appendChild(
+      createMetaChip({
+        icon: ICONS.shield,
+        text: displayRiskLabel(data)
+      })
+    );
+
     return meta;
   }
 
@@ -2112,7 +2130,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     fold.className = "assistant-meta-fold";
     const sum = document.createElement("summary");
     sum.className = "assistant-meta-fold-summary";
-    sum.textContent = "Run telemetry";
+    sum.textContent = "Details";
     const body = document.createElement("div");
     body.className = "assistant-meta-fold-body";
     body.appendChild(metaRow);
@@ -2174,29 +2192,6 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     return "Clear to send";
   }
 
-  function outcomeQualityLabel(data = {}) {
-    const q = Number(data.quality || 0);
-    if (!Number.isFinite(q) || q <= 0) return "—";
-    const fmt = globalThis.__XALVION_FORMAT__;
-    if (fmt && typeof fmt.formatOutcomeQuality === "function") {
-      return `${fmt.formatOutcomeQuality(q)} · ${formatMetric(q, 1)}`;
-    }
-    if (q < 2) return `Low · ${formatMetric(q, 1)}`;
-    if (q < 3.5) return `Moderate · ${formatMetric(q, 1)}`;
-    if (q < 4.5) return `Strong · ${formatMetric(q, 1)}`;
-    return `Excellent · ${formatMetric(q, 1)}`;
-  }
-
-  function costExposureSummary(impact = {}) {
-    const refund = Number(impact.refund_cost || 0);
-    const atRisk = Number(impact.revenue_at_risk || 0);
-    const parts = [];
-    if (refund > 0) parts.push(`Refund ${formatMoney(refund)}`);
-    if (atRisk > 0) parts.push(`At-risk ${formatMoney(atRisk)}`);
-    if (!parts.length) return "—";
-    return parts.join(" · ");
-  }
-
   function normalizeWorkspaceResult(data) {
     if (!data || typeof data !== "object") return data;
     const out = { ...data };
@@ -2211,16 +2206,6 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const tri = out.triage_metadata;
     if (tri && typeof tri === "object") {
       out.triage = { ...(out.triage || {}), ...tri };
-    }
-    const dex = out.decision_explanation;
-    if (dex && typeof dex === "object") {
-      if (!out.execution_tier && dex.execution_tier) {
-        out.execution_tier = dex.execution_tier;
-      }
-      const proj = dex.projected_impact;
-      if (proj && typeof proj === "object") {
-        out.impact = { ...(out.impact || {}), ...proj };
-      }
     }
     return out;
   }
@@ -2391,35 +2376,31 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const risk = String(dec.risk_level || data.triage?.risk_level || "").toLowerCase();
     if (risk === "high") {
       return {
-        variant: "high_risk",
         cls: "signal-high-risk",
-        text: "High risk",
+        text: "⚠ High risk",
         title: "Elevated risk — review before customer send",
       };
     }
     const tier = String(data.execution_tier || "").toLowerCase();
     if (tier === "safe_autopilot_ready") {
       return {
-        variant: "safe",
         cls: "signal-safe",
-        text: "Safe to automate",
-        title: "Meets all automation safety criteria",
+        text: "✓ Safe to automate",
+        title: "Meets all automation safety criteria"
       };
     }
     if (tier === "assist_only") {
       return {
-        variant: "review",
         cls: "signal-review",
-        text: "Manual review",
-        title: "Risk signals require human decision",
+        text: "○ Manual review",
+        title: "Risk signals require human decision"
       };
     }
     if (tier === "approval_required") {
       return {
-        variant: "approval",
         cls: "signal-approval",
-        text: "Approval required",
-        title: "Awaiting operator approval",
+        text: "⚡ Approval required",
+        title: "Awaiting operator approval"
       };
     }
 
@@ -2429,13 +2410,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision"
     );
     const money = action === "refund" || action === "charge" || action === "credit";
-    if (req && money) {
-      return { variant: "approval", cls: "signal-approval", text: "Approval required", title: "" };
-    }
+    if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
     if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
-      return { variant: "review", cls: "signal-review", text: "Review recommended", title: "" };
+      return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
     }
-    return { variant: "safe", cls: "signal-safe", text: "Safe to send", title: "" };
+    return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
   }
 
   function mountOperatorDecisionPanel(row, data, initialReply) {
@@ -2455,11 +2434,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     ).trim();
 
     const panel = document.createElement("div");
-    panel.className = `decision-panel decision-panel--consequence-${sig.variant || "safe"}`;
-    panel.dataset.consequenceVariant = sig.variant || "safe";
+    panel.className = "decision-panel";
     panel.innerHTML = `
       <div class="decision-panel-top">
-        <span class="consequence-signal ${sig.cls}" data-role="consequence" data-consequence="${escapeHtml(sig.variant || "safe")}">${escapeHtml(sig.text)}</span>
+        <span class="consequence-signal ${sig.cls}" data-role="consequence">${escapeHtml(sig.text)}</span>
         <div class="decision-controls" data-role="controls"></div>
       </div>
       <div class="decision-panel-note" data-role="note" style="display:none"></div>
@@ -2513,7 +2491,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       return;
     }
     if (approval.approved) {
-      setTerminal("Approved", "✓  Sent to customer");
+      setTerminal("Action executed", "✓  Customer updated · outcome logged");
       return;
     }
 
@@ -2530,7 +2508,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const ap = document.createElement("button");
       ap.type = "button";
       ap.className = "btn-approve";
-      ap.textContent = "Approve";
+      ap.textContent = "Approve & Execute";
       controls.append(rej, ed, ap);
 
       ed.addEventListener("click", () => {
@@ -2604,7 +2582,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
               [rej, ed, ap].forEach((b) => {
                 b.disabled = false;
               });
-              ap.textContent = "Approve";
+              ap.textContent = "Approve & Execute";
               sendEdited.disabled = false;
               sendEdited.textContent = "Send edited reply";
             }
@@ -2696,12 +2674,12 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
             [rej, ed, ap].forEach((b) => {
               b.disabled = false;
             });
-            ap.textContent = "Approve";
+            ap.textContent = "Approve & Execute";
           }
           return;
         }
-        setTerminal("Approved", "✓  Sent to customer");
-        setNotice("success", "Cleared", "Operator cleared this response — copy when ready.");
+        setTerminal("Action executed", "✓  Customer updated · outcome logged");
+        setNotice("success", "Action executed", "Decision approved, customer updated, and outcome tracked.");
       });
     };
 
@@ -2781,23 +2759,6 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     `;
   }
 
-  function buildTrustTracePanelHtml(audit) {
-    if (!audit || typeof audit !== "object") return "";
-    const lines = Array.isArray(audit.trace) ? audit.trace.filter(Boolean) : [];
-    if (!lines.length) return "";
-    const oc = audit.outcome || {};
-    const ocLine =
-      oc.known && oc.summary
-        ? `<div class="trust-outcome-pill">Recorded outcome: ${escapeHtml(String(oc.summary))}</div>`
-        : "";
-    const items = lines.map((ln) => `<li class="trust-trace-li">${escapeHtml(String(ln))}</li>`).join("");
-    return `<div class="trust-trace-block" role="region" aria-label="Decision accountability">
-      <div class="trust-trace-kicker">Decision trace</div>
-      <ol class="trust-trace-list">${items}</ol>
-      ${ocLine}
-    </div>`;
-  }
-
   function buildExplainabilityBriefHtml(ex) {
     if (!ex || typeof ex !== "object") return "";
     const sum = ex.summary ? `<p class="details-note" style="margin-bottom:10px">${escapeHtml(String(ex.summary))}</p>` : "";
@@ -2874,8 +2835,6 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       ? ""
       : buildDecisionExplanationInsightsHtml(data.decision_explanation);
 
-    const trustTraceHtml = buildTrustTracePanelHtml(data.audit_summary);
-
     const insightBlock = `
       <div class="details-insight-stack">
         ${explainabilityBrief}
@@ -2925,7 +2884,6 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         <span class="chev">${ICONS.chevron}</span>
       </summary>
       <div class="details-panel">
-        ${trustTraceHtml}
         ${insightBlock}
         <div class="details-grid">
           ${createDetailBox("Surface action", displayActionLabel(data))}
@@ -2933,9 +2891,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           ${createDetailBox("Risk", riskLabel(data))}
           ${createDetailBox("Priority", String(decision.priority || "medium"))}
           ${createDetailBox("Tool status", toolStatus)}
-          ${createDetailBox("Money saved", formatMoney(impact.money_saved || impact.revenue_saved || impact.amount || data.amount || 0))}
-          ${createDetailBox("Cost exposure", costExposureSummary(impact))}
-          ${createDetailBox("Outcome quality", outcomeQualityLabel(data))}
+          ${createDetailBox("Value surfaced", formatMoney(impact.money_saved || impact.amount || data.amount || 0))}
         </div>
         ${policyNote && policyNote !== internalNote ? `<div class="details-note">${escapeHtml(policyNote)}</div>` : ""}
         ${internalNote ? `<div class="details-note">${escapeHtml(internalNote)}</div>` : ""}
@@ -3037,7 +2993,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const hasThread = Boolean(els.messages?.querySelector(".msg-group"));
     if (!hasThread) {
       els.composerStatusLine.textContent = isAuthenticated()
-        ? "Paste a ticket below to start."
+        ? "Paste a ticket below to generate the decision and action."
         : "Paste below — preview mode includes a few full runs.";
       return;
     }
@@ -3046,8 +3002,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const rw = left === 1 ? "run" : "runs";
       els.composerStatusLine.textContent =
         left > 0
-          ? `Review the draft above, then try another case · ${left} preview ${rw} left`
-          : "Continue with full access — sign up under Access to keep threads and monthly runs.";
+          ? `Review the decision above, then run another case · ${left} preview ${rw} left`
+          : "Upgrade to continue executing outcomes — full access keeps threads, usage, and approval-safe actions live.";
       return;
     }
     els.composerStatusLine.textContent = "Paste the next ticket, or refine this thread.";
@@ -3262,28 +3218,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       <div class="panel-head">
         <div>
           <div class="panel-title">Latest operator run</div>
-          <div class="panel-copy">Impact, exposure, and approval posture from the latest structured response.</div>
+          <div class="panel-copy">Posture, value surfaced, and time saved — same signals your sidepanel traces, condensed for the rail.</div>
         </div>
       </div>
-      <div class="ops-impact-primary" role="group" aria-label="Impact">
-        <div class="ops-metric ops-metric--impact">
-          <div class="ops-metric-label">Money saved</div>
-          <div class="ops-metric-value" id="opsLatestValue">$0</div>
-        </div>
-        <div class="ops-metric ops-metric--impact">
-          <div class="ops-metric-label">Cost exposure</div>
-          <div class="ops-metric-value" id="opsCostExposure">—</div>
-        </div>
-        <div class="ops-metric ops-metric--impact">
-          <div class="ops-metric-label">Time saved</div>
-          <div class="ops-metric-value" id="opsTimeSaved">—</div>
-        </div>
-        <div class="ops-metric ops-metric--impact">
-          <div class="ops-metric-label">Outcome quality</div>
-          <div class="ops-metric-value" id="opsOutcomeQuality">—</div>
-        </div>
-      </div>
-      <div class="ops-impact-lane ops-grid ops-grid--lane" role="group" aria-label="Routing and posture">
+      <div class="ops-grid">
         <div class="ops-metric">
           <div class="ops-metric-label">Action</div>
           <div class="ops-metric-value" id="opsLatestAction">—</div>
@@ -3293,19 +3231,23 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="ops-metric-value" id="opsLatestQueue">—</div>
         </div>
         <div class="ops-metric">
-          <div class="ops-metric-label">Approval posture</div>
-          <div class="ops-metric-value" id="opsPosture">—</div>
-        </div>
-        <div class="ops-metric ops-metric--tertiary">
-          <div class="ops-metric-label">Model confidence</div>
+          <div class="ops-metric-label">Confidence</div>
           <div class="ops-metric-value" id="opsLatestConfidence">0.00</div>
         </div>
+        <div class="ops-metric">
+          <div class="ops-metric-label">Protected</div>
+          <div class="ops-metric-value" id="opsLatestValue">$0</div>
+        </div>
+        <div class="ops-metric">
+          <div class="ops-metric-label">Est. time saved</div>
+          <div class="ops-metric-value" id="opsTimeSaved">—</div>
+        </div>
+        <div class="ops-metric">
+          <div class="ops-metric-label">Posture</div>
+          <div class="ops-metric-value" id="opsPosture">—</div>
+        </div>
       </div>
-      <div class="ops-trust-trace" id="opsTrustTraceHostDyn" hidden>
-        <div class="ops-trust-kicker">Accountability</div>
-        <p class="ops-trust-copy" id="opsTrustTraceDyn"></p>
-      </div>
-      <div class="ops-run-line" id="opsRunNarrative">${ICONS.spark}<span class="ops-narrative-text">Waiting for the next operator run.</span></div>
+      <div class="ops-run-line" id="opsRunNarrative">${ICONS.spark}<span>Waiting for the next operator run.</span></div>
     `;
 
     if (els.railInner) els.railInner.appendChild(card);
@@ -3324,67 +3266,38 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const latestTime = document.getElementById("opsTimeSaved");
     const latestPosture = document.getElementById("opsPosture");
     const latestNarrative = document.getElementById("opsRunNarrative");
-    const latestExposure = document.getElementById("opsCostExposure");
-    const latestQuality = document.getElementById("opsOutcomeQuality");
 
     const decision = data.decision || {};
     const triage = data.triage || {};
     const impact = data.impact || {};
-    const minsRaw = Number(impact.agent_minutes_saved || impact.time_saved_est_min || impact.time_saved || 0);
-    const mins = Number.isFinite(minsRaw) ? minsRaw : 0;
-    const sig = deriveConsequenceSignal(data);
+    const mins = Number(impact.agent_minutes_saved || impact.time_saved_est_min || 0);
 
     if (latestAction) latestAction.textContent = displayActionLabel(data);
     if (latestQueue) latestQueue.textContent = displayQueueLabel({ decision });
     if (latestConfidence) latestConfidence.textContent = formatMetric(data.confidence || 0, 2);
-    if (latestValue) {
-      latestValue.textContent = formatMoney(
-        impact.money_saved || impact.revenue_saved || impact.amount || data.amount || 0
-      );
-    }
-    if (latestExposure) latestExposure.textContent = costExposureSummary(impact);
+    if (latestValue) latestValue.textContent = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
     if (latestTime) {
       latestTime.textContent = mins > 0 ? `${Math.round(mins)} min` : "—";
     }
-    if (latestQuality) latestQuality.textContent = outcomeQualityLabel(data);
-    if (latestPosture) latestPosture.textContent = sig.text;
+    if (latestPosture) latestPosture.textContent = operatorPostureLabel(data);
 
     if (latestNarrative) {
       const reason = explainWhyAction(data);
-      const value = formatMoney(impact.money_saved || impact.revenue_saved || impact.amount || data.amount || 0);
+      const value = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
+      const posture = operatorPostureLabel(data);
       const risk = String(decision.risk_level || triage.risk_level || "medium");
-      const line = `${sig.text} · ${risk} risk · value ${value}. ${reason}`;
+      const line = `Operator system · ${posture} · ${risk} risk · value surfaced ${value}. ${reason}`;
       const sub = latestNarrative.querySelector(".ops-narrative-text");
       if (sub) sub.textContent = line;
       else latestNarrative.innerHTML = `${ICONS.spark}<span class="ops-narrative-text">${escapeHtml(line)}</span>`;
     }
 
     if (els.railRunSummary) {
-      els.railRunSummary.textContent = `${displayActionLabel(data)} · ${sig.text}`;
+      const it = String(
+        data.issue_type || data.meta?.issue_type || data.decision?.issue_type || "general_support"
+      ).replace(/_/g, " ");
+      els.railRunSummary.textContent = `${it} · ${displayActionLabel(data)} · conf ${formatMetric(data.confidence || 0, 2)}`;
     }
-
-    const trustHost = document.getElementById("opsTrustTraceHost");
-    const trustP = document.getElementById("opsTrustTrace");
-    const trustHostDyn = document.getElementById("opsTrustTraceHostDyn");
-    const trustPDyn = document.getElementById("opsTrustTraceDyn");
-    const aud = data.audit_summary;
-    const applyTrust = (hostEl, textEl) => {
-      if (!hostEl || !textEl) return;
-      if (aud && Array.isArray(aud.trace) && aud.trace.length) {
-        let line = aud.trace.join(" ");
-        const oc = aud.outcome;
-        if (oc && oc.known && oc.summary) {
-          line += ` — Outcome: ${oc.summary}`;
-        }
-        textEl.textContent = line.length > 280 ? `${line.slice(0, 277)}…` : line;
-        hostEl.hidden = false;
-      } else {
-        hostEl.hidden = true;
-      }
-    };
-    applyTrust(trustHost, trustP);
-    applyTrust(trustHostDyn, trustPDyn);
-
     syncApprovalRail(data);
   }
 
@@ -4145,11 +4058,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     updateSystemNarrative(null);
     updateTopbarStatus();
     syncApprovalRail(null);
-    if (els.railRunSummary) els.railRunSummary.textContent = "Latest decision and impact surface here after each run.";
-    ["opsTrustTraceHost", "opsTrustTraceHostDyn"].forEach((id) => {
-      const h = document.getElementById(id);
-      if (h) h.hidden = true;
-    });
+    if (els.railRunSummary) els.railRunSummary.textContent = "Issue type, action, confidence — updates after each support run.";
     scrollMessagesToBottom(true);
   }
 

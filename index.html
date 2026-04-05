@@ -28,12 +28,12 @@
             <span class="command-brand-tag command-brand-tag--strip" aria-hidden="true">Operator workspace</span>
           </span>
         </a>
-        <span id="commandModeLine" class="command-mode-pill" translate="no">Operator</span>
+        <span id="commandModeLine" class="command-mode-pill" translate="no">AI prepares · you approve</span>
       </div>
       <div class="command-strip-center command-strip-center--align">
         <div class="command-status-chip" role="status" aria-live="polite">
           <span class="command-status-dot" aria-hidden="true"></span>
-          <span id="commandPlanCapacity" class="command-capacity" translate="no">Capacity · loading</span>
+          <span id="commandPlanCapacity" class="command-capacity" translate="no">Value generated · loading</span>
         </div>
       </div>
       <div class="command-strip-right">
@@ -109,11 +109,10 @@
 
               <section class="sidebar-panel" id="sidebarPanelPlans" data-sidebar-panel="plans" role="tabpanel" aria-labelledby="sidebarTabPlans" aria-label="Plans" hidden aria-hidden="true">
                 <div class="section-label section-label-tight">Plans &amp; capacity</div>
-                <p class="muted-copy sidebar-panel-hint plans-capacity-framing">Higher tiers add monthly headroom, live Stripe refunds, and analytics depth—upgrade when throughput pressure shows up in the rail.</p>
                 <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
                 <div class="tier-card tier-card-plans">
-                  <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Handle more tickets · Upgrade to Pro</span><span>→</span></button>
-                  <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Maximum capacity · Upgrade to Elite</span><span>→</span></button>
+                  <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Unlock full operator capacity · Upgrade to Pro</span><span>→</span></button>
+                  <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Scale without limits · Upgrade to Elite</span><span>→</span></button>
                 </div>
                 <details class="sidebar-more">
                   <summary class="sidebar-more-summary">Where to see usage</summary>
@@ -175,10 +174,10 @@
               <section class="sidebar-panel" id="sidebarPanelRevenue" data-sidebar-panel="revenue" role="tabpanel" aria-labelledby="sidebarTabRevenue" aria-label="Revenue snapshot" hidden aria-hidden="true">
                 <div class="section-label section-label-tight">Revenue snapshot</div>
                 <div class="sidebar-capability-card">
-                  <div class="sidebar-cap-row"><span class="sidebar-cap-label">Tracked revenue</span><span id="sidebarRevenueTotal" class="sidebar-cap-value">$0.00</span></div>
-                  <div class="sidebar-cap-row"><span class="sidebar-cap-label">Reply rate</span><span id="sidebarRevenueReply" class="sidebar-cap-value">0.0%</span></div>
-                  <div class="sidebar-cap-row"><span class="sidebar-cap-label">Win rate</span><span id="sidebarRevenueWin" class="sidebar-cap-value">0.0%</span></div>
-                  <div class="sidebar-cap-row"><span class="sidebar-cap-label">Best source</span><span id="sidebarRevenueSource" class="sidebar-cap-value">manual</span></div>
+                  <div class="sidebar-cap-row"><span class="sidebar-cap-label">Potential saved</span><span id="sidebarRevenueTotal" class="sidebar-cap-value">$0.00</span></div>
+                  <div class="sidebar-cap-row"><span class="sidebar-cap-label">Decision rate</span><span id="sidebarRevenueReply" class="sidebar-cap-value">0.0%</span></div>
+                  <div class="sidebar-cap-row"><span class="sidebar-cap-label">Execution rate</span><span id="sidebarRevenueWin" class="sidebar-cap-value">0.0%</span></div>
+                  <div class="sidebar-cap-row"><span class="sidebar-cap-label">Best lever</span><span id="sidebarRevenueSource" class="sidebar-cap-value">manual</span></div>
                 </div>
                 <details class="sidebar-more">
                   <summary class="sidebar-more-summary">More</summary>
@@ -206,26 +205,8 @@
                           </button>
                           <div class="rail-brief-panel" id="railBriefPanelLatest">
                             <div class="rail-card rail-surface rail-elevated rail-card-nested" id="latestRunRailCard">
-                              <div class="rail-run-summary muted-copy" id="railRunSummary">Latest decision and impact surface here after each run.</div>
-                              <div class="ops-impact-primary" role="group" aria-label="Impact">
-                                <div class="ops-metric ops-metric--impact">
-                                  <div class="ops-metric-label">Money saved</div>
-                                  <div class="ops-metric-value" id="opsLatestValue">$0</div>
-                                </div>
-                                <div class="ops-metric ops-metric--impact">
-                                  <div class="ops-metric-label">Cost exposure</div>
-                                  <div class="ops-metric-value" id="opsCostExposure">—</div>
-                                </div>
-                                <div class="ops-metric ops-metric--impact">
-                                  <div class="ops-metric-label">Time saved</div>
-                                  <div class="ops-metric-value" id="opsTimeSaved">—</div>
-                                </div>
-                                <div class="ops-metric ops-metric--impact">
-                                  <div class="ops-metric-label">Outcome quality</div>
-                                  <div class="ops-metric-value" id="opsOutcomeQuality">—</div>
-                                </div>
-                              </div>
-                              <div class="ops-impact-lane ops-grid ops-grid--lane" role="group" aria-label="Routing and posture">
+                              <div class="rail-run-summary muted-copy" id="railRunSummary">Issue type, action, confidence — updates after each support run.</div>
+                              <div class="ops-grid">
                                 <div class="ops-metric">
                                   <div class="ops-metric-label">Action</div>
                                   <div class="ops-metric-value" id="opsLatestAction">—</div>
@@ -235,17 +216,21 @@
                                   <div class="ops-metric-value" id="opsLatestQueue">—</div>
                                 </div>
                                 <div class="ops-metric">
-                                  <div class="ops-metric-label">Approval posture</div>
-                                  <div class="ops-metric-value" id="opsPosture">—</div>
-                                </div>
-                                <div class="ops-metric ops-metric--tertiary">
-                                  <div class="ops-metric-label">Model confidence</div>
+                                  <div class="ops-metric-label">Confidence</div>
                                   <div class="ops-metric-value" id="opsLatestConfidence">0.00</div>
                                 </div>
-                              </div>
-                              <div class="ops-trust-trace" id="opsTrustTraceHost" hidden>
-                                <div class="ops-trust-kicker">Accountability</div>
-                                <p class="ops-trust-copy" id="opsTrustTrace">Each run shows what was proposed, whether approval applied, and what executed — with recorded outcomes when available.</p>
+                                <div class="ops-metric">
+                                  <div class="ops-metric-label">Money surfaced</div>
+                                  <div class="ops-metric-value" id="opsLatestValue">$0</div>
+                                </div>
+                                <div class="ops-metric">
+                                  <div class="ops-metric-label">Est. time saved</div>
+                                  <div class="ops-metric-value" id="opsTimeSaved">—</div>
+                                </div>
+                                <div class="ops-metric">
+                                  <div class="ops-metric-label">Posture</div>
+                                  <div class="ops-metric-value" id="opsPosture">—</div>
+                                </div>
                               </div>
                               <div class="ops-run-line" id="opsRunNarrative"><span class="ops-narrative-text">Waiting for the next operator run.</span></div>
                             </div>
@@ -266,15 +251,15 @@
                                 <p class="muted-copy rail-teaser" id="valueRailTeaser">Session and billing impact from your workspace activity.</p>
                                 <div class="value-gen-grid">
                                   <div class="value-gen-cell">
-                                    <div class="value-gen-label">Money moved</div>
+                                    <div class="value-gen-label">Potential saved</div>
                                     <div class="value-gen-num" id="railValueMoney">$0.00</div>
                                   </div>
                                   <div class="value-gen-cell">
-                                    <div class="value-gen-label">Time saved</div>
+                                    <div class="value-gen-label">Time returned</div>
                                     <div class="value-gen-num" id="railValueTime">—</div>
                                   </div>
                                   <div class="value-gen-cell">
-                                    <div class="value-gen-label">Actions</div>
+                                    <div class="value-gen-label">Outcomes</div>
                                     <div class="value-gen-num" id="railValueActions">0</div>
                                   </div>
                                   <div class="value-gen-cell">
@@ -348,7 +333,7 @@
                                   <div id="crmTodayClosedCount" class="refund-metric-value">0</div>
                                 </div>
                                 <div class="refund-metric">
-                                  <div class="refund-metric-label">Best source</div>
+                                  <div class="refund-metric-label">Best lever</div>
                                   <div id="crmTodayBestSource" class="refund-metric-value">manual</div>
                                 </div>
                               </div>
@@ -369,7 +354,7 @@
                                   <div id="revenueLeadsCount" class="refund-metric-value">0</div>
                                 </div>
                                 <div class="refund-metric">
-                                  <div class="refund-metric-label">Reply rate</div>
+                                  <div class="refund-metric-label">Decision rate</div>
                                   <div id="revenueReplyRate" class="refund-metric-value">0.0%</div>
                                 </div>
                               </div>
@@ -379,7 +364,7 @@
                                   <div id="revenueClosingRate" class="refund-metric-value">0.0%</div>
                                 </div>
                                 <div class="refund-metric">
-                                  <div class="refund-metric-label">Win rate</div>
+                                  <div class="refund-metric-label">Execution rate</div>
                                   <div id="revenueWinRate" class="refund-metric-value">0.0%</div>
                                 </div>
                               </div>
@@ -389,7 +374,7 @@
                                   <div id="revenueTotalValue" class="refund-metric-value">$0.00</div>
                                 </div>
                                 <div class="refund-metric">
-                                  <div class="refund-metric-label">Best source</div>
+                                  <div class="refund-metric-label">Best lever</div>
                                   <div id="revenueBestSource" class="refund-metric-value">manual</div>
                                 </div>
                               </div>
@@ -587,12 +572,12 @@
           </div>
 
           <div class="xv-stage-scaffold">
-            <header class="main-stage-header main-stage-hero main-stage-hero--bar xv-operator-hero">
+            <header class="main-stage-header main-stage-hero main-stage-hero--bar">
               <div class="main-stage-identity">
                 <div class="main-stage-title-block">
-                  <h1 id="workspacePageTitle">Paste a support ticket</h1>
-                  <p id="workspaceSubcopy" class="workspace-subline">Get a customer-ready reply instantly</p>
-                  <p id="workspaceSubcopyTier" class="workspace-subline workspace-subline--quiet">Sensitive actions stay gated for approval</p>
+                  <h1 id="workspacePageTitle">Make a support decision</h1>
+                  <p id="workspaceSubcopy" class="workspace-subline">Generate the response and the next action instantly</p>
+                  <p id="workspaceSubcopyTier" class="workspace-subline workspace-subline--quiet">AI prepares. You approve. Actions execute.</p>
                 </div>
               </div>
             </header>
