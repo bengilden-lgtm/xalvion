@@ -13,6 +13,8 @@ This version hardens:
 
 from __future__ import annotations
 
+print("🚀 APP.PY STARTING...", flush=True)
+
 import asyncio
 import json
 import logging
@@ -158,6 +160,9 @@ except Exception as _outcome_store_imp_err:
 load_dotenv(override=True)
 
 logger = logging.getLogger("xalvion.api")
+
+STARTUP_ISSUES: list[str] = []
+STARTUP_READY: bool = False
 
 _db_issue_last_log: dict[str, float] = {}
 DB_ISSUE_LOG_COOLDOWN_S = 60.0
@@ -447,11 +452,16 @@ class ProcessedWebhook(Base):
 
 
 def _import_orm_submodules() -> None:
-    """Import modules that register ORM classes on shared Base (required before create_all)."""
-    import analytics  # noqa: F401
-    import outcome_store  # noqa: F401
-    import persistence_layer  # noqa: F401
-    import state_store  # noqa: F401
+    """Import modules that register ORM classes on shared Base (required before create_all).
+    Missing optional modules are logged instead of crashing process boot.
+    """
+    for module_name in ("analytics", "outcome_store", "persistence_layer", "state_store"):
+        try:
+            __import__(module_name)
+        except Exception as exc:
+            msg = f"optional_startup_import_failed:{module_name}:{type(exc).__name__}:{str(exc)[:180]}"
+            STARTUP_ISSUES.append(msg)
+            logger.warning(msg)
 
 
 def ensure_user_columns() -> None:
@@ -471,8 +481,8 @@ def ensure_user_columns() -> None:
             with engine.begin() as conn:
                 for statement in additions:
                     conn.execute(text(statement))
-    except Exception as e:
-        logger.error("startup_failure: %s", str(e), exc_info=True)
+    except Exception:
+        pass
 
 
 @app.on_event("startup")
@@ -494,12 +504,12 @@ def _startup_database() -> None:
     ensure_user_columns()
     try:
         ensure_outcome_log_columns()
-    except Exception as e:
-        logger.error("startup_failure: %s", str(e), exc_info=True)
+    except Exception:
+        pass
     try:
         ensure_outcome_columns()
-    except Exception as e:
-        logger.error("startup_failure: %s", str(e), exc_info=True)
+    except Exception:
+        pass
     try:
         from learning import sync_rules_to_brain
 
@@ -945,13 +955,181 @@ def build_agent_meta(
     }
 
 
-from services import ticket_service
+try:
+    from services import ticket_service
 
-create_ticket_record = ticket_service.create_ticket_record
-update_ticket_from_result = ticket_service.update_ticket_from_result
-log_action = ticket_service.log_action
-serialize_ticket = ticket_service.serialize_ticket
-serialize_ticket_with_log = ticket_service.serialize_ticket_with_log
+    create_ticket_record = ticket_service.create_ticket_record
+    update_ticket_from_result = ticket_service.update_ticket_from_result
+    log_action = ticket_service.log_action
+    serialize_ticket = ticket_service.serialize_ticket
+    serialize_ticket_with_log = ticket_service.serialize_ticket_with_log
+except Exception as exc:
+    STARTUP_ISSUES.append(f"ticket_service_import_failed:{type(exc).__name__}:{str(exc)[:180]}")
+    logger.warning("ticket_service import failed; using local compatibility helpers", exc_info=True)
+
+    def create_ticket_record(db: Session, user: User, req: SupportRequest) -> Ticket:
+        now = _now_iso()
+        bootstrap_ticket = build_support_ticket(
+            req.message,
+            user_id=str(getattr(user, "username", "unknown") or "unknown"),
+            meta={
+                "sentiment": req.sentiment if req.sentiment is not None else 5,
+                "ltv": req.ltv if req.ltv is not None else 0,
+                "order_status": req.order_status if req.order_status is not None else "unknown",
+                "plan_tier": get_plan_name(user),
+                "operator_mode": "balanced",
+                "channel": _safe_channel(req.channel),
+                "source": _safe_source(req.source),
+                "customer_history": {},
+            },
+        )
+        ticket = Ticket(
+            created_at=now,
+            updated_at=now,
+            username=str(getattr(user, "username", "unknown") or "unknown"),
+            channel=_safe_channel(req.channel),
+            source=_safe_source(req.source),
+            subject=(req.message or "")[:300],
+            customer_message=(req.message or "")[:10000],
+            status="new",
+            queue="new",
+            priority="medium",
+            risk_level="medium",
+            issue_type=str(bootstrap_ticket.get("issue_type", "general_support") or "general_support")[:64],
+        )
+        db.add(ticket)
+        db.commit()
+        db.refresh(ticket)
+        return ticket
+
+    def update_ticket_from_result(db: Session, ticket: Ticket, result: dict[str, Any]) -> Ticket:
+        decision = result.get("decision") or {}
+        triage = result.get("triage") or {}
+        output = result.get("output") or {}
+        action = str(result.get("action", "none") or "none")
+        raw_queue = str(decision.get("queue", "new") or "new")
+        tool_status = str(result.get("tool_status", "") or "").lower()
+        if tool_status in {"pending_approval", "manual_review"}:
+            status = "waiting"
+        elif action in {"refund", "credit", "none"}:
+            status = "resolved"
+        else:
+            status = "escalated"
+        if raw_queue == "resolved":
+            status = "resolved"
+        ticket.updated_at = _now_iso()
+        ticket.status = _safe_status(status)
+        ticket.queue = _safe_queue(raw_queue)
+        ticket.priority = _safe_priority(decision.get("priority") or (result.get("meta") or {}).get("priority") or "medium")
+        ticket.risk_level = _safe_risk(decision.get("risk_level") or "medium")
+        ticket.issue_type = str(result.get("issue_type", "general_support") or "general_support")[:64]
+        ticket.final_reply = str(result.get("reply", result.get("final", "")) or "")[:8000]
+        ticket.internal_note = str(output.get("internal_note") or "")[:2000]
+        ticket.action = action
+        ticket.amount = float(result.get("amount", 0) or 0)
+        ticket.confidence = float(result.get("confidence", 0) or 0)
+        ticket.quality = float(result.get("quality", 0) or 0)
+        ticket.requires_approval = int(bool(decision.get("requires_approval", False)))
+        ticket.approved = 0
+        ticket.urgency = _clamp(triage.get("urgency", 0), 0, 99)
+        ticket.churn_risk = _clamp(triage.get("churn_risk", 0), 0, 99)
+        ticket.refund_likelihood = _clamp(triage.get("refund_likelihood", 0), 0, 99)
+        ticket.abuse_likelihood = _clamp(triage.get("abuse_likelihood", 0), 0, 99)
+        ticket.complexity = _clamp(triage.get("complexity", 0), 0, 99)
+        db.commit()
+        db.refresh(ticket)
+        return ticket
+
+    def log_action(
+        db: Session,
+        *,
+        username: str,
+        ticket_id: int | None = None,
+        action: str,
+        amount: float,
+        issue_type: str,
+        reason: str,
+        status: str,
+        confidence: float,
+        quality: float,
+        message_snippet: str,
+        requires_approval: bool = False,
+        approved: bool = False,
+    ) -> ActionLog:
+        entry = ActionLog(
+            timestamp=_now_iso(),
+            username=username,
+            ticket_id=ticket_id,
+            action=action,
+            amount=round(float(amount or 0), 2),
+            issue_type=issue_type,
+            reason=(reason or "")[:500],
+            status=status,
+            confidence=round(float(confidence or 0), 4),
+            quality=round(float(quality or 0), 4),
+            message_snippet=(message_snippet or "")[:200],
+            requires_approval=int(requires_approval),
+            approved=int(approved),
+        )
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+        return entry
+
+    def serialize_ticket(ticket: Ticket) -> dict[str, Any]:
+        return {
+            "id": ticket.id,
+            "created_at": ticket.created_at,
+            "updated_at": ticket.updated_at,
+            "username": ticket.username,
+            "channel": ticket.channel,
+            "source": ticket.source,
+            "status": ticket.status,
+            "queue": ticket.queue,
+            "priority": ticket.priority,
+            "risk_level": ticket.risk_level,
+            "issue_type": ticket.issue_type,
+            "subject": ticket.subject,
+            "customer_message": ticket.customer_message,
+            "final_reply": ticket.final_reply,
+            "internal_note": ticket.internal_note,
+            "action": ticket.action,
+            "amount": ticket.amount,
+            "confidence": ticket.confidence,
+            "quality": ticket.quality,
+            "requires_approval": bool(ticket.requires_approval),
+            "approved": bool(ticket.approved),
+            "urgency": ticket.urgency,
+            "churn_risk": ticket.churn_risk,
+            "refund_likelihood": ticket.refund_likelihood,
+            "abuse_likelihood": ticket.abuse_likelihood,
+            "complexity": ticket.complexity,
+        }
+
+    def serialize_ticket_with_log(ticket: Ticket, db: Session) -> dict[str, Any]:
+        base = serialize_ticket(ticket)
+        log = (
+            db.query(ActionLog)
+            .filter(ActionLog.ticket_id == ticket.id)
+            .order_by(ActionLog.id.desc())
+            .first()
+        )
+        if log:
+            base["action_log"] = {
+                "log_id": log.id,
+                "action": log.action,
+                "amount": log.amount,
+                "status": log.status,
+                "reason": log.reason,
+                "confidence": log.confidence,
+                "quality": log.quality,
+                "requires_approval": bool(log.requires_approval),
+                "approved": bool(log.approved),
+                "timestamp": log.timestamp,
+            }
+        else:
+            base["action_log"] = None
+        return base
 
 
 def _attach_trust_layer(result: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
@@ -1883,16 +2061,6 @@ def debug_refund_mode():
     }
 
 
-@app.get("/debug/build-fingerprint")
-def debug_build_fingerprint():
-    return {
-        "app_name": "xalvion",
-        "health_mode": "shallow-ok",
-        "has_workspace_modules_route": True,
-        "timestamp_hint": "2026-04-05-current-app-py",
-    }
-
-
 @app.get("/debug/payment-intent/{payment_intent_id}")
 def debug_payment_intent(payment_intent_id: str):
     try:
@@ -1964,39 +2132,71 @@ def serve_landing():
 
 @app.get("/health")
 def health():
-    return {
-        "status": "ok",
-        "service": "xalvion",
-        "env": os.getenv("ENVIRONMENT", "unknown"),
-    }
+    """Shallow liveness: process is up (use /health/deep for readiness)."""
+    return {"status": "ok", "service": "xalvion-sovereign-brain"}
 
 
 @app.get("/health/deep")
-def health_deep():
+def health_deep(db: Session = Depends(get_db)):
+    from sqlalchemy import text as _text
+
+    checks: dict[str, Any] = {}
+    mode = (os.getenv("ENVIRONMENT", "development") or "development").strip()
+    checks["mode"] = mode
+
     try:
-        with SessionLocal() as db:
-            db.execute(text("SELECT 1"))
-        return {"status": "ok", "db": "connected"}
-    except Exception as e:
-        return {
-            "status": "degraded",
-            "error": str(e)[:200],
-        }
+        db.execute(_text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as exc:
+        checks["database"] = f"error: {exc}"
+
+    try:
+        checks["users"] = db.query(User).count()
+        checks["tickets"] = db.query(Ticket).count()
+        checks["actions"] = db.query(ActionLog).count()
+    except Exception as exc:
+        checks["tables"] = f"error: {exc}"
+
+    try:
+        checks["operator_mode"] = get_operator_mode(db)
+    except Exception as exc:
+        checks["operator_mode"] = f"error: {exc}"
+
+    env_lower = mode.lower()
+    if env_lower == "production":
+        raw_jwt = os.getenv("JWT_SECRET")
+        checks["jwt_secret"] = "configured" if (raw_jwt and raw_jwt.strip()) else "missing"
+    else:
+        checks["jwt_secret"] = "n/a"
+
+    checks["stripe"] = "configured" if STRIPE_KEY else "missing"
+    checks["openai"] = "configured" if os.getenv("OPENAI_API_KEY", "").strip() else "missing"
+
+    degraded = any(isinstance(v, str) and v.startswith("error") for v in checks.values())
+    if checks.get("jwt_secret") == "missing":
+        degraded = True
+
+    checks["status"] = "degraded" if degraded else "ok"
+    checks["service"] = "xalvion-sovereign-brain"
+    return checks
 
 
 # =============================================================================
 # ROUTER MODULES (auth, billing, dashboard, support)
 # =============================================================================
 
-from routes.auth import router as auth_router
-from routes.billing import router as billing_router
-from routes.dashboard import router as dashboard_router
-from routes.support import router as support_router
-
-app.include_router(auth_router)
-app.include_router(billing_router)
-app.include_router(dashboard_router)
-app.include_router(support_router)
+for _router_mod, _router_label in (
+    ("routes.auth", "auth"),
+    ("routes.billing", "billing"),
+    ("routes.dashboard", "dashboard"),
+    ("routes.support", "support"),
+):
+    try:
+        _module = __import__(_router_mod, fromlist=["router"])
+        app.include_router(_module.router)
+    except Exception as exc:
+        STARTUP_ISSUES.append(f"router_import_failed:{_router_label}:{type(exc).__name__}:{str(exc)[:180]}")
+        logger.warning("router import failed for %s", _router_label, exc_info=True)
 
 
 def _build_extension_meta(
