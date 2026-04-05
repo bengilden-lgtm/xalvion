@@ -91,8 +91,9 @@ def ensure_outcome_log_columns() -> None:
             with engine.begin() as conn:
                 for stmt in additions:
                     conn.execute(text(stmt))
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.error("outcome_store_migration_failed: %s", str(e), exc_info=True)
 
 
 def ensure_outcome_columns() -> None:
