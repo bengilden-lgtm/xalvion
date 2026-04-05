@@ -7700,3 +7700,198 @@ body{
     max-width:100% !important;
   }
 }
+
+
+/* === Hotfix: idle starter card full-width, aligned, Claude-like composition === */
+.workspace-idle .main-canvas-inner.main-stage{
+  padding-top:clamp(6px,2.2vh,20px) !important;
+  padding-bottom:clamp(10px,2.6vh,24px) !important;
+}
+
+.workspace-idle .main-stage-header{
+  max-width:min(940px,100%) !important;
+  margin:0 auto 10px !important;
+}
+
+.workspace-idle .main-stage-body{
+  max-width:min(940px,100%) !important;
+  margin-left:auto !important;
+  margin-right:auto !important;
+}
+
+.workspace-idle .messages-zone{
+  flex:0 1 auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  opacity:1 !important;
+  pointer-events:auto !important;
+}
+
+.workspace-idle .messages-shell{
+  min-height:auto !important;
+  overflow:visible !important;
+  border:none !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+.workspace-idle .messages{
+  padding:0 !important;
+  overflow:visible !important;
+  max-width:none !important;
+}
+
+.workspace-idle .empty-state{
+  display:flex !important;
+  padding:0 !important;
+  align-items:flex-start !important;
+  justify-content:stretch !important;
+}
+
+.workspace-idle .empty-state .empty-card,
+.workspace-idle .empty-card-launch{
+  width:100% !important;
+  max-width:none !important;
+}
+
+.workspace-idle .empty-card-launch{
+  border-radius:22px !important;
+  padding:26px 28px 22px !important;
+  background:linear-gradient(180deg, rgba(23,28,52,0.82), rgba(17,21,39,0.86)) !important;
+  border:1px solid rgba(124,92,252,0.10) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 18px 48px rgba(0,0,0,0.18),
+    0 0 0 1px rgba(124,92,252,0.04) !important;
+  backdrop-filter:blur(14px) saturate(1.06) !important;
+  -webkit-backdrop-filter:blur(14px) saturate(1.06) !important;
+  position:relative !important;
+  overflow:hidden !important;
+}
+
+.workspace-idle .empty-card-launch::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(120% 85% at 15% 0%, rgba(124,92,252,0.10), transparent 44%),
+    radial-gradient(95% 70% at 100% 10%, rgba(34,211,238,0.05), transparent 38%);
+}
+
+.workspace-idle .empty-launch-directive,
+.workspace-idle .empty-launch-outcome,
+.workspace-idle .empty-launch-review,
+.workspace-idle .empty-actions,
+.workspace-idle .empty-flow-strip{
+  position:relative;
+  z-index:1;
+}
+
+.workspace-idle .empty-launch-directive{
+  font-size:12px !important;
+  letter-spacing:0.14em !important;
+  text-transform:uppercase !important;
+  color:rgba(148,164,198,0.58) !important;
+  font-weight:700 !important;
+}
+
+.workspace-idle .empty-launch-outcome{
+  margin-top:10px !important;
+  font-size:clamp(34px,4vw,48px) !important;
+  line-height:0.98 !important;
+  letter-spacing:-0.05em !important;
+  font-weight:700 !important;
+  color:rgba(244,247,255,0.98) !important;
+  max-width:12ch !important;
+}
+
+.workspace-idle .empty-launch-review{
+  margin-top:14px !important;
+  font-size:16px !important;
+  line-height:1.52 !important;
+  color:rgba(200,210,232,0.88) !important;
+  max-width:42ch !important;
+}
+
+.workspace-idle .empty-flow-strip{
+  margin-top:16px !important;
+  gap:8px !important;
+}
+
+.workspace-idle .empty-flow-strip span{
+  min-height:30px !important;
+  padding:0 12px !important;
+  border-radius:999px !important;
+  background:rgba(255,255,255,0.025) !important;
+  border:1px solid rgba(255,255,255,0.06) !important;
+  color:rgba(212,220,242,0.82) !important;
+  font-size:12px !important;
+}
+
+.workspace-idle .empty-actions-intent{
+  margin-top:14px !important;
+  gap:8px !important;
+}
+
+.workspace-idle .empty-intent-chip{
+  border-radius:999px !important;
+  padding:6px 12px !important;
+  background:rgba(255,255,255,0.028) !important;
+  border:1px solid rgba(255,255,255,0.06) !important;
+}
+
+.workspace-idle .empty-actions-launch{
+  margin-top:16px !important;
+  gap:10px !important;
+}
+
+.workspace-idle .empty-chip-hint{
+  min-height:32px !important;
+  padding:0 12px !important;
+  border-radius:999px !important;
+  background:rgba(124,92,252,0.10) !important;
+  border:1px solid rgba(124,92,252,0.15) !important;
+  color:rgba(213,222,245,0.88) !important;
+}
+
+.workspace-idle .empty-chip-hint-secondary{
+  background:rgba(255,255,255,0.02) !important;
+  border-color:rgba(255,255,255,0.05) !important;
+  color:rgba(160,174,206,0.78) !important;
+}
+
+.workspace-idle .composer-wrap.composer-dock,
+.workspace-idle .composer-wrap{
+  margin-top:14px !important;
+}
+
+.workspace-idle .composer-chat{
+  border-radius:18px !important;
+  background:linear-gradient(180deg, rgba(18,22,40,0.82), rgba(14,18,33,0.86)) !important;
+  border:1px solid rgba(255,255,255,0.06) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.04), 0 14px 36px rgba(0,0,0,0.16) !important;
+}
+
+.workspace-idle .composer textarea{
+  background:rgba(10,14,30,0.72) !important;
+}
+
+.workspace-idle .main-stage-ambient-glow{
+  opacity:0.58 !important;
+  bottom:12% !important;
+}
+
+@media (max-width: 900px){
+  .workspace-idle .empty-card-launch{
+    padding:22px 18px 18px !important;
+    border-radius:18px !important;
+  }
+  .workspace-idle .empty-launch-outcome{
+    font-size:clamp(28px,8vw,40px) !important;
+    max-width:100% !important;
+  }
+  .workspace-idle .empty-launch-review{
+    font-size:15px !important;
+  }
+}
