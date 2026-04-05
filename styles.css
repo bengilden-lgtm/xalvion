@@ -3348,6 +3348,58 @@ body{
   line-height:1.55;
   color:var(--text-secondary);
 }
+
+.ops-trust-trace{
+  margin-top:var(--sp-2);
+  padding:10px 12px;
+  border-radius:12px;
+  background:rgba(124,58,237,.06);
+  border:1px solid rgba(124,58,237,.18);
+}
+.ops-trust-kicker{
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--text-tertiary);
+  margin-bottom:4px;
+}
+.ops-trust-copy{
+  margin:0;
+  font-size:12px;
+  line-height:1.5;
+  color:var(--text-secondary);
+}
+.trust-trace-block{
+  margin-bottom:14px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:rgba(124,58,237,.05);
+  border:1px solid rgba(124,58,237,.14);
+}
+.trust-trace-kicker{
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--text-tertiary);
+  margin-bottom:8px;
+}
+.trust-trace-list{
+  margin:0;
+  padding-left:18px;
+  font-size:12px;
+  line-height:1.5;
+  color:var(--text-secondary);
+}
+.trust-trace-li{ margin:4px 0; }
+.trust-outcome-pill{
+  margin-top:10px;
+  font-size:12px;
+  color:var(--text-primary);
+  font-weight:500;
+}
+
 .ops-impact-primary{
   display:grid;
   grid-template-columns:1fr 1fr;

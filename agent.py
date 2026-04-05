@@ -411,6 +411,14 @@ def build_structured_response(
         "decision_explanation": decision_explanation,
         "decision_explainability": decision_explainability,
         "execution_tier": execution_tier,
+        "outcome_key": None,
+        "audit_summary": build_audit_summary_payload(
+            proposed_action=final_like,
+            executed=executed_like,
+            outcome_key=None,
+            human_approved=False,
+            issue_type=str(ticket.get("issue_type", "general_support") or "general_support"),
+        ),
     }
 
 
@@ -1039,6 +1047,127 @@ def _human_issue_label(issue_type: str) -> str:
     return raw[:1].upper() + raw[1:] if raw else "General support"
 
 
+def _sanitize_audit_rationale(text: str, max_len: int = 220) -> str:
+    t = (text or "").strip().replace("\n", " ")
+    if len(t) > max_len:
+        t = t[: max_len - 1] + "…"
+    return t
+
+
+def _audit_action_label(action: str, amount: float) -> str:
+    a = str(action or "none").strip().lower()
+    try:
+        amt = float(amount or 0)
+    except Exception:
+        amt = 0.0
+    if a == "none":
+        return "No billing motion"
+    if a in {"refund", "credit", "charge"} and amt > 0:
+        return f"{a.replace('_', ' ').title()} ${amt:.0f}"
+    if a == "review":
+        return "Escalated for review"
+    return a.replace("_", " ").title()
+
+
+def _friendly_execution_status(tool_status: str) -> str:
+    s = str(tool_status or "unknown").strip().lower().replace("_", " ")
+    mapping = {
+        "pending approval": "held for approval",
+        "approved pending execution": "approved — execution pending",
+        "credit issued": "credit issued",
+        "local tracking": "shipping update path",
+        "local damage flow": "damage recovery path",
+        "local billing flow": "billing review path",
+        "local refund request": "refund request path",
+        "local fast path": "fast-path response",
+        "no action": "no system action",
+    }
+    return mapping.get(s, s or "completed")
+
+
+def build_audit_summary_payload(
+    *,
+    proposed_action: Dict[str, Any],
+    executed: Dict[str, Any],
+    outcome_key: str | None,
+    human_approved: bool,
+    issue_type: str,
+) -> Dict[str, Any]:
+    """
+    Compact audit / trust trace for one decision. Safe for UI and external stakeholders:
+    no API secrets, raw tool payloads, or customer message bodies.
+    """
+    prop = proposed_action or {}
+    ex = executed or {}
+    prop_act = str(prop.get("action", "none") or "none")
+    prop_amt = float(prop.get("amount", 0) or 0)
+    req_appr = bool(prop.get("requires_approval", False))
+
+    rationale = _sanitize_audit_rationale(str(prop.get("reason", "") or ""))
+    if not rationale:
+        rationale = f"Classified as {_human_issue_label(issue_type)} with policy-aligned routing."
+
+    exec_act = str(ex.get("action", prop_act) or prop_act)
+    exec_amt = float(ex.get("amount", prop_amt) or prop_amt)
+    tool_status = str(ex.get("tool_status", ex.get("status", "no_action")) or "no_action")
+
+    approval_required = req_appr or tool_status in {"pending_approval", "manual_review"}
+    human_ok = bool(human_approved)
+
+    if approval_required:
+        appr_line = (
+            "Approval: Required · Operator confirmed in workspace"
+            if human_ok
+            else "Approval: Required · Awaiting operator confirmation"
+        )
+    else:
+        appr_line = "Approval: Not required for this path"
+
+    prop_label = _audit_action_label(prop_act, prop_amt)
+    exec_label = _audit_action_label(exec_act, exec_amt)
+    exec_human = _friendly_execution_status(tool_status)
+
+    if tool_status == "pending_approval":
+        exec_line = f"Execution: Not run yet — {prop_label} is held until an operator approves."
+    else:
+        exec_line = f"What ran: {exec_label} — {exec_human}"
+
+    trace = [
+        f"Proposed: {prop_label}",
+        f"Why: {rationale}",
+        appr_line,
+        exec_line,
+    ]
+
+    return {
+        "version": 1,
+        "outcome_key": outcome_key,
+        "proposed": {
+            "action": prop_act,
+            "amount": round(prop_amt, 2),
+            "label": prop_label,
+        },
+        "rationale": rationale,
+        "approval": {
+            "required": approval_required,
+            "human_confirmed": human_ok,
+        },
+        "execution": {
+            "action": exec_act,
+            "amount": round(exec_amt, 2),
+            "status": tool_status,
+            "label": exec_label,
+        },
+        "outcome": {
+            "known": False,
+            "summary": None,
+            "tier": None,
+            "success": None,
+        },
+        "trace": trace,
+    }
+
+
 def build_decision_explainability(
     *,
     ticket: Dict[str, Any],
@@ -1461,6 +1590,8 @@ def _canonicalize_result(
     brain_rules: list[Dict[str, Any]] | None = None,
     hard_decision: Dict[str, Any] | None = None,
     pattern_expectation: dict | None = None,
+    outcome_key: str | None = None,
+    human_approved: bool = False,
 ) -> Dict[str, Any]:
     conf_for_impact = float(clamp_confidence(final_action.get("confidence", 0.9), 0.9))
     impact = merge_impact_with_business_projection(ticket, final_action, confidence=conf_for_impact)
@@ -1600,6 +1731,14 @@ def _canonicalize_result(
         "decision_explanation": decision_explanation,
         "decision_explainability": decision_explainability,
         "execution_tier": execution_tier,
+        "outcome_key": outcome_key,
+        "audit_summary": build_audit_summary_payload(
+            proposed_action=final_action,
+            executed=executed,
+            outcome_key=outcome_key,
+            human_approved=human_approved,
+            issue_type=str(ticket.get("issue_type", "general_support") or "general_support"),
+        ),
     }
     validated = CanonicalAgentResponse.model_validate(canonical).model_dump()
     validated.update({k: v for k, v in canonical.items() if k not in validated})
@@ -1618,6 +1757,29 @@ def run_agent(
 
     if blocked_reason:
         thinking_trace.append(_trace("sanitize_input", "error", "blocked_input"))
+        _blocked_audit = build_audit_summary_payload(
+            proposed_action={
+                "action": "none",
+                "amount": 0,
+                "reason": "blocked_input",
+                "requires_approval": False,
+            },
+            executed={
+                "action": "none",
+                "amount": 0,
+                "tool_status": "blocked",
+                "tool_result": {"status": "blocked"},
+            },
+            outcome_key=None,
+            human_approved=False,
+            issue_type="blocked",
+        )
+        _blocked_audit["trace"] = [
+            "Request did not pass safety screening.",
+            "Why: Input blocked by the security layer.",
+            "Approval: Not applicable — nothing was executed.",
+            "What ran: No action — blocked",
+        ]
         payload = CanonicalAgentResponse(
             reply=blocked_reason,
             final=blocked_reason,
@@ -1635,6 +1797,8 @@ def run_agent(
             decision_explanation=None,
             decision_explainability=None,
             execution_tier="assist_only",
+            outcome_key=None,
+            audit_summary=_blocked_audit,
         ).model_dump()
         payload.update({
             "action": "none",
@@ -1839,4 +2003,6 @@ def run_agent(
         brain_rules=top_rules,
         hard_decision=hard_decision,
         pattern_expectation=_pattern_exp,
+        outcome_key=_outcome_key,
+        human_approved=False,
     )

@@ -51,7 +51,7 @@ from sqlalchemy import (
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from agent import run_agent, local_fallback_reply
+from agent import run_agent, local_fallback_reply, build_audit_summary_payload
 from actions import (
     build_ticket as build_support_ticket,
     merge_impact_with_business_projection,
@@ -104,11 +104,17 @@ try:
         mark_crm_closed,
         ensure_outcome_log_columns,
         ensure_outcome_columns,
+        merge_audit_outcome_digest,
     )
 except Exception:
 
     def _log_real_outcome(*_a: Any, **_k: Any) -> None:
         return None
+
+    def merge_audit_outcome_digest(
+        audit: dict[str, Any] | None, outcome_key: str | None
+    ) -> dict[str, Any] | None:
+        return audit
 
     def get_outcome_stats() -> dict[str, Any]:
         return {
@@ -1105,6 +1111,37 @@ def serialize_ticket_with_log(ticket: Ticket, db: Session) -> dict[str, Any]:
     return base
 
 
+def _attach_trust_layer(result: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    """Build or enrich audit_summary and merge verified outcome digest (additive)."""
+    key = (str(result.get("outcome_key") or "")).strip() or None
+    audit = result.get("audit_summary")
+    if not isinstance(audit, dict) or not audit:
+        try:
+            dec = dict(result.get("decision") or {})
+            audit = build_audit_summary_payload(
+                proposed_action={
+                    **dec,
+                    "action": str(result.get("action", dec.get("action", "none")) or "none"),
+                    "amount": float(result.get("amount", dec.get("amount", 0)) or 0),
+                    "reason": str(result.get("reason", dec.get("reason", "")) or ""),
+                    "requires_approval": bool(dec.get("requires_approval", False)),
+                },
+                executed={
+                    "action": str(result.get("action", "none") or "none"),
+                    "amount": float(result.get("amount", 0) or 0),
+                    "tool_status": str(result.get("tool_status", "no_action") or "no_action"),
+                    "tool_result": result.get("tool_result") if isinstance(result.get("tool_result"), dict) else {},
+                },
+                outcome_key=key,
+                human_approved=False,
+                issue_type=str(result.get("issue_type", "general_support") or "general_support"),
+            )
+        except Exception:
+            audit = None
+    merged = merge_audit_outcome_digest(audit, key)
+    return merged, key
+
+
 def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, Any]:
     usage_summary = get_usage_summary(user)
     tool_result = result.get("tool_result") or {}
@@ -1117,6 +1154,7 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "auto_resolved": bool(impact.get("auto_resolved", False)),
         "requires_approval": bool((result.get("decision") or {}).get("requires_approval", False)),
     }
+    trust_audit, outcome_correlation_key = _attach_trust_layer(result)
 
     return {
         "reply": reply,
@@ -1153,6 +1191,8 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "decision_explanation": result.get("decision_explanation"),
         "decision_explainability": result.get("decision_explainability"),
         "execution_tier": str(result.get("execution_tier") or "approval_required"),
+        "outcome_key": outcome_correlation_key,
+        "audit_summary": trust_audit,
     }
 
 # =============================================================================
@@ -1987,6 +2027,27 @@ def serialize_pending_approval_result(result: dict[str, Any], *, action: str, am
         "proposed_amount": round(float(amount or 0), 2),
     })
     pending["execution"] = execution
+    ok = (str(pending.get("outcome_key") or result.get("outcome_key") or "")).strip() or None
+    pending["outcome_key"] = ok
+    issue = str(pending.get("issue_type", "general_support") or "general_support")
+    try:
+        pending["audit_summary"] = merge_audit_outcome_digest(
+            build_audit_summary_payload(
+                proposed_action=dict(pending.get("decision") or {}),
+                executed={
+                    "action": str(pending.get("action", "none") or "none"),
+                    "amount": float(pending.get("amount", 0) or 0),
+                    "tool_status": str(pending.get("tool_status", "pending_approval") or "pending_approval"),
+                    "tool_result": pending.get("tool_result") if isinstance(pending.get("tool_result"), dict) else {},
+                },
+                outcome_key=ok,
+                human_approved=False,
+                issue_type=issue,
+            ),
+            ok,
+        )
+    except Exception:
+        pass
     return pending
 
 
@@ -2476,6 +2537,16 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
             "mode": "error",
             "confidence": 0.0,
             "quality": 0.0,
+            "outcome_key": None,
+            "audit_summary": {
+                "version": 1,
+                "trace": [
+                    "System: Request could not be completed automatically.",
+                    "Execution: Escalated for manual review — no billing motion applied.",
+                ],
+                "approval": {"required": False, "human_confirmed": False},
+                "outcome": {"known": False, "summary": None, "tier": None, "success": None},
+            },
             "tier": plan,
             "plan_limit": get_plan_config(plan)["monthly_limit"],
             "usage": int(getattr(user, "usage", 0) or 0),
@@ -3804,6 +3875,32 @@ def approve_ticket(
 
     response = build_ticket_response_payload(ticket, log, db=db)
     response["message"] = f"Ticket {ticket.id} approved"
+    try:
+        pa = str(log.action or ticket.action or "none")
+        pam = round(float(log.amount or ticket.amount or 0), 2)
+        response["audit_summary"] = build_audit_summary_payload(
+            proposed_action={
+                "action": pa,
+                "amount": pam,
+                "reason": str(log.reason or "") or "Policy-sensitive motion",
+                "requires_approval": True,
+            },
+            executed={
+                "action": str(payload.get("action", pa) or pa),
+                "amount": float(payload.get("amount", pam) or pam),
+                "tool_status": str(payload.get("tool_status", log_status)),
+                "tool_result": payload.get("tool_result") if isinstance(payload.get("tool_result"), dict) else {},
+            },
+            outcome_key=None,
+            human_approved=True,
+            issue_type=str(ticket.issue_type or "general_support"),
+        )
+        tr = list((response.get("audit_summary") or {}).get("trace") or [])
+        response["audit_summary"]["trace"] = tr + [
+            "Accountability: Operator sign-off recorded in workspace before release.",
+        ]
+    except Exception:
+        pass
     return response
 
 
@@ -3855,6 +3952,39 @@ def reject_ticket(
 
     response = build_ticket_response_payload(ticket, log, db=db)
     response["message"] = f"Ticket {ticket.id} rejected"
+    try:
+        pa = str(log.action or ticket.action or "none")
+        pam = round(float(log.amount or ticket.amount or 0), 2)
+        audit = build_audit_summary_payload(
+            proposed_action={
+                "action": pa,
+                "amount": pam,
+                "reason": str(log.reason or "") or "Policy-sensitive motion",
+                "requires_approval": True,
+            },
+            executed={
+                "action": "review",
+                "amount": 0.0,
+                "tool_status": "rejected",
+                "tool_result": {"status": "rejected"},
+            },
+            outcome_key=None,
+            human_approved=False,
+            issue_type=str(ticket.issue_type or "general_support"),
+        )
+        audit["approval"] = {"required": True, "human_confirmed": False}
+        prop_l = str((audit.get("proposed") or {}).get("label") or "")
+        rat = str(audit.get("rationale") or "")
+        audit["trace"] = [
+            f"Proposed: {prop_l}" if prop_l else f"Proposed: {pa}",
+            f"Why: {rat}",
+            "Approval: Operator declined — prepared motion not executed.",
+            "Execution: Stopped — case left for manual follow-up.",
+            "Accountability: Rejection recorded in workspace audit trail.",
+        ]
+        response["audit_summary"] = audit
+    except Exception:
+        pass
     return response
 
 

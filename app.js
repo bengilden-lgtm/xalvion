@@ -2781,6 +2781,23 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     `;
   }
 
+  function buildTrustTracePanelHtml(audit) {
+    if (!audit || typeof audit !== "object") return "";
+    const lines = Array.isArray(audit.trace) ? audit.trace.filter(Boolean) : [];
+    if (!lines.length) return "";
+    const oc = audit.outcome || {};
+    const ocLine =
+      oc.known && oc.summary
+        ? `<div class="trust-outcome-pill">Recorded outcome: ${escapeHtml(String(oc.summary))}</div>`
+        : "";
+    const items = lines.map((ln) => `<li class="trust-trace-li">${escapeHtml(String(ln))}</li>`).join("");
+    return `<div class="trust-trace-block" role="region" aria-label="Decision accountability">
+      <div class="trust-trace-kicker">Decision trace</div>
+      <ol class="trust-trace-list">${items}</ol>
+      ${ocLine}
+    </div>`;
+  }
+
   function buildExplainabilityBriefHtml(ex) {
     if (!ex || typeof ex !== "object") return "";
     const sum = ex.summary ? `<p class="details-note" style="margin-bottom:10px">${escapeHtml(String(ex.summary))}</p>` : "";
@@ -2857,6 +2874,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       ? ""
       : buildDecisionExplanationInsightsHtml(data.decision_explanation);
 
+    const trustTraceHtml = buildTrustTracePanelHtml(data.audit_summary);
+
     const insightBlock = `
       <div class="details-insight-stack">
         ${explainabilityBrief}
@@ -2906,6 +2925,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         <span class="chev">${ICONS.chevron}</span>
       </summary>
       <div class="details-panel">
+        ${trustTraceHtml}
         ${insightBlock}
         <div class="details-grid">
           ${createDetailBox("Surface action", displayActionLabel(data))}
@@ -3281,6 +3301,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="ops-metric-value" id="opsLatestConfidence">0.00</div>
         </div>
       </div>
+      <div class="ops-trust-trace" id="opsTrustTraceHostDyn" hidden>
+        <div class="ops-trust-kicker">Accountability</div>
+        <p class="ops-trust-copy" id="opsTrustTraceDyn"></p>
+      </div>
       <div class="ops-run-line" id="opsRunNarrative">${ICONS.spark}<span class="ops-narrative-text">Waiting for the next operator run.</span></div>
     `;
 
@@ -3338,6 +3362,29 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (els.railRunSummary) {
       els.railRunSummary.textContent = `${displayActionLabel(data)} · ${sig.text}`;
     }
+
+    const trustHost = document.getElementById("opsTrustTraceHost");
+    const trustP = document.getElementById("opsTrustTrace");
+    const trustHostDyn = document.getElementById("opsTrustTraceHostDyn");
+    const trustPDyn = document.getElementById("opsTrustTraceDyn");
+    const aud = data.audit_summary;
+    const applyTrust = (hostEl, textEl) => {
+      if (!hostEl || !textEl) return;
+      if (aud && Array.isArray(aud.trace) && aud.trace.length) {
+        let line = aud.trace.join(" ");
+        const oc = aud.outcome;
+        if (oc && oc.known && oc.summary) {
+          line += ` — Outcome: ${oc.summary}`;
+        }
+        textEl.textContent = line.length > 280 ? `${line.slice(0, 277)}…` : line;
+        hostEl.hidden = false;
+      } else {
+        hostEl.hidden = true;
+      }
+    };
+    applyTrust(trustHost, trustP);
+    applyTrust(trustHostDyn, trustPDyn);
+
     syncApprovalRail(data);
   }
 
@@ -4099,6 +4146,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     updateTopbarStatus();
     syncApprovalRail(null);
     if (els.railRunSummary) els.railRunSummary.textContent = "Latest decision and impact surface here after each run.";
+    ["opsTrustTraceHost", "opsTrustTraceHostDyn"].forEach((id) => {
+      const h = document.getElementById(id);
+      if (h) h.hidden = true;
+    });
     scrollMessagesToBottom(true);
   }
 

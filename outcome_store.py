@@ -224,6 +224,59 @@ def normalize_business_outcome(row_dict: dict[str, Any] | None) -> dict[str, Any
     }
 
 
+def public_outcome_digest_for_audit(row_dict: dict[str, Any] | None) -> dict[str, Any]:
+    """
+    Compact, operator-safe outcome view for trust traces.
+    Excludes raw tool JSON and internal identifiers beyond correlation key.
+    """
+    if not row_dict:
+        return {"known": False, "summary": None, "tier": None, "success": None}
+
+    summary_ui = build_outcome_summary_for_ui(row_dict)
+    headline = str(summary_ui.get("headline") or "").strip() or "Outcome on file"
+    tier = str(summary_ui.get("tier") or "neutral")
+
+    return {
+        "known": True,
+        "summary": headline[:280],
+        "tier": tier,
+        "success": bool(row_dict.get("success")),
+    }
+
+
+def merge_audit_outcome_digest(audit: dict[str, Any] | None, outcome_key: str | None) -> dict[str, Any] | None:
+    """
+    Attach verified outcome headline to an audit_summary dict (copy — does not mutate input).
+    """
+    if audit is None and not (outcome_key or "").strip():
+        return None
+
+    base: dict[str, Any] = dict(audit) if audit is not None else {"version": 1, "trace": []}
+    key = str(outcome_key or "").strip() or None
+    if not key:
+        base.setdefault(
+            "outcome",
+            {"known": False, "summary": None, "tier": None, "success": None},
+        )
+        return base
+
+    try:
+        row = get_outcome(key)
+    except Exception:
+        row = None
+    digest = public_outcome_digest_for_audit(row)
+    base["outcome"] = digest
+    base["outcome_key"] = key
+    if digest.get("known") and digest.get("summary"):
+        trace = list(base.get("trace") or [])
+        if trace:
+            trace = trace + [f"Recorded outcome: {digest['summary']}"]
+        else:
+            trace = [f"Recorded outcome: {digest['summary']}"]
+        base["trace"] = trace
+    return base
+
+
 def build_outcome_summary_for_ui(row_dict: dict[str, Any] | None) -> dict[str, Any]:
     """
     Compact card-shaped summary for frontends. Backward compatible: only adds structure;

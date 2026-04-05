@@ -141,3 +141,6 @@ class CanonicalAgentResponse(BaseModel):
     decision_explanation: dict[str, Any] | None = None
     decision_explainability: dict[str, Any] | None = None
     execution_tier: str = "approval_required"
+    # Enterprise trust / audit (additive; safe for clients — no secrets or raw tool payloads)
+    outcome_key: str | None = None
+    audit_summary: dict[str, Any] | None = None
