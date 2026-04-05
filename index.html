@@ -61,7 +61,7 @@
 
             <section class="sidebar-panel is-active" id="sidebarPanelWorkspace" data-sidebar-panel="workspace" role="tabpanel" aria-labelledby="sidebarTabWorkspace" aria-label="Workspace" aria-hidden="false">
               <details class="sidebar-fold sidebar-fold--brand">
-                <summary class="sidebar-fold-summary">Workspace identity</summary>
+                <summary class="sidebar-fold-summary">About Xalvion</summary>
                 <div class="brand brand-compact">
                   <svg width="168" height="30" viewBox="0 0 200 36" aria-hidden="true">
                     <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="currentColor" letter-spacing="-0.5">X</text>
@@ -72,8 +72,8 @@
                 </div>
               </details>
 
-              <div class="section-label section-label-tight">Workspace notice</div>
-              <div id="notice" class="notice info notice-dense">
+              <h2 class="sr-only" id="noticeRegionLabel">Workspace status</h2>
+              <div id="notice" class="notice info notice-dense" role="status" aria-labelledby="noticeRegionLabel noticeTitle">
                 <div class="notice-header">
                   <div class="notice-dot" aria-hidden="true"></div>
                   <div id="noticeTitle" class="notice-title">Booting</div>
@@ -111,7 +111,10 @@
                 <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Handle more tickets · Upgrade to Pro</span><span>→</span></button>
                 <button class="upgrade-btn" data-upgrade="elite" type="button"><span>Maximum capacity · Upgrade to Elite</span><span>→</span></button>
               </div>
-              <p class="muted-copy sidebar-panel-hint">Usage meters and limits also appear in the operator rail while you work.</p>
+              <details class="sidebar-more">
+                <summary class="sidebar-more-summary">Where to see usage</summary>
+                <p class="muted-copy sidebar-panel-hint">Usage meters and limits also appear in the operator rail while you work.</p>
+              </details>
             </section>
 
             <section class="sidebar-panel" id="sidebarPanelIntegrations" data-sidebar-panel="integrations" role="tabpanel" aria-labelledby="sidebarTabIntegrations" aria-label="Integrations" hidden aria-hidden="true">
@@ -126,16 +129,19 @@
                   </div>
                   <span id="stripeStatus" class="stripe-status-pill" aria-live="polite">Not connected</span>
                 </div>
-                <div class="stripe-meta">
-                  <div class="usage-line stripe-meta-line">
-                    <span>Account</span>
-                    <span id="stripeAccountPill" class="stripe-meta-value">No account linked</span>
+                <details class="stripe-more">
+                  <summary class="stripe-more-summary">Connection details</summary>
+                  <div class="stripe-meta">
+                    <div class="usage-line stripe-meta-line">
+                      <span>Account</span>
+                      <span id="stripeAccountPill" class="stripe-meta-value">No account linked</span>
+                    </div>
+                    <div class="usage-line stripe-meta-line">
+                      <span>Mode</span>
+                      <span id="stripeModePill" class="stripe-meta-value">Awaiting connection</span>
+                    </div>
                   </div>
-                  <div class="usage-line stripe-meta-line">
-                    <span>Mode</span>
-                    <span id="stripeModePill" class="stripe-meta-value">Awaiting connection</span>
-                  </div>
-                </div>
+                </details>
                 <div class="stripe-actions-col">
                   <button id="stripeConnectBtn" class="upgrade-btn stripe-connect-btn" type="button">
                     <span class="stripe-connect-label">Connect Stripe</span><span aria-hidden="true">→</span>
@@ -155,8 +161,11 @@
                 <div class="sidebar-cap-row"><span class="sidebar-cap-label">Due today</span><span id="sidebarCrmTodayDue" class="sidebar-cap-value">0</span></div>
                 <div class="sidebar-cap-row"><span class="sidebar-cap-label">Closed today</span><span id="sidebarCrmTodayClosed" class="sidebar-cap-value">0</span></div>
               </div>
-              <p class="muted-copy sidebar-panel-hint">Full queue, hottest deals, and lead entry live in the operator rail — scroll the right column.</p>
-              <button type="button" class="ghost-btn sidebar-jump-btn" id="sidebarJumpCrmBtn">Focus CRM in rail</button>
+              <details class="sidebar-more">
+                <summary class="sidebar-more-summary">More</summary>
+                <p class="muted-copy sidebar-panel-hint">Full queue, hottest deals, and lead entry live in the operator rail — scroll the right column.</p>
+                <button type="button" class="ghost-btn sidebar-jump-btn" id="sidebarJumpCrmBtn">Focus CRM in rail</button>
+              </details>
             </section>
 
             <section class="sidebar-panel" id="sidebarPanelRevenue" data-sidebar-panel="revenue" role="tabpanel" aria-labelledby="sidebarTabRevenue" aria-label="Revenue snapshot" hidden aria-hidden="true">
@@ -167,8 +176,11 @@
                 <div class="sidebar-cap-row"><span class="sidebar-cap-label">Win rate</span><span id="sidebarRevenueWin" class="sidebar-cap-value">0.0%</span></div>
                 <div class="sidebar-cap-row"><span class="sidebar-cap-label">Best source</span><span id="sidebarRevenueSource" class="sidebar-cap-value">manual</span></div>
               </div>
-              <p class="muted-copy sidebar-panel-hint">Source performance and forecast detail stay in the operator rail.</p>
-              <button type="button" class="ghost-btn sidebar-jump-btn" id="sidebarJumpRevenueBtn">Focus revenue in rail</button>
+              <details class="sidebar-more">
+                <summary class="sidebar-more-summary">More</summary>
+                <p class="muted-copy sidebar-panel-hint">Source performance and forecast detail stay in the operator rail.</p>
+                <button type="button" class="ghost-btn sidebar-jump-btn" id="sidebarJumpRevenueBtn">Focus revenue in rail</button>
+              </details>
             </section>
 
           </div>
@@ -187,11 +199,11 @@
 
           <section class="workspace glass workspace-decision-shell decision-canvas decision-command-surface">
             <div class="workspace-intro workspace-intro-compact">
-              <div class="workspace-intro-strip">
+              <p class="workspace-headline-row">
                 <span class="surface-live-dot" aria-hidden="true"></span>
                 <span class="workspace-intro-kicker">Live</span>
-                <p class="headline workspace-headline-inline" id="workspaceHeadline">Paste a case — Xalvion prepares the decision; you approve what reaches the customer.</p>
-              </div>
+                <span class="headline workspace-headline-inline" id="workspaceHeadline">Paste a case — Xalvion prepares the decision; you approve what reaches the customer.</span>
+              </p>
             </div>
             <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
               <div id="messages" class="messages scroll-area"></div>
@@ -207,11 +219,14 @@
               <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
             </div>
             <div class="composer glass composer-stack">
-              <div class="stripe-context-row muted-copy">
-                <span>Optional Stripe context (attached to support requests):</span>
-                <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
-                <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
-              </div>
+              <details class="composer-stripe-fold">
+                <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
+                <div class="stripe-context-row muted-copy composer-stripe-fields">
+                  <span class="stripe-context-hint">Attached to support requests when present.</span>
+                  <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
+                  <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+                </div>
+              </details>
               <div class="composer-input-row composer-input-wrap">
                 <textarea id="messageInput" placeholder="Paste a customer issue or type a support request…"></textarea>
                 <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
@@ -225,8 +240,8 @@
         <div class="operator-rail-head operator-rail-intel">
           <div class="operator-rail-intel-compact">
             <span class="operator-rail-live-badge"><span class="operator-rail-live-pulse" aria-hidden="true"></span> Live</span>
-            <div class="operator-rail-title">Operator rail</div>
-            <p class="operator-rail-sub">Latest run first — expand sections for pipeline, billing, and queue depth.</p>
+            <div class="operator-rail-title">Context</div>
+            <p class="operator-rail-sub">Latest run and session stats. Expand for pipeline, billing, and queue.</p>
           </div>
         </div>
         <div class="rail-scroll-host scroll-shell" id="railScrollShell" data-show-top="false" data-show-bottom="false">
@@ -345,7 +360,7 @@
               <summary class="rail-details-summary rail-details-summary-pipeline">
                 <span class="rail-details-summary-inner">
                   <span class="rail-details-title">Pipeline &amp; revenue</span>
-                  <span class="rail-details-hint">Today’s CRM snapshot · revenue dashboard</span>
+                  <span class="rail-details-hint">CRM snapshot and revenue detail</span>
                 </span>
                 <span class="rail-details-chevron" aria-hidden="true"></span>
               </summary>
@@ -428,7 +443,7 @@
               <summary class="rail-details-summary">
                 <span class="rail-details-summary-inner">
                   <span class="rail-details-title">More</span>
-                  <span class="rail-details-hint">Billing · quota · forecast · queue · system</span>
+                  <span class="rail-details-hint">Billing, usage, queues, system</span>
                 </span>
                 <span class="rail-details-chevron" aria-hidden="true"></span>
               </summary>
