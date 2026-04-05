@@ -1,9 +1,43 @@
 import { createChromeContext } from "./chrome-context.js";
+import { insertIntoGmail } from "./adapters/chrome-compose.js";
+import {
+  applyStructuredExplainabilityToData,
+  buildHeaderInsight,
+  buildThinkingSequence,
+  normalizeExplainability,
+  resetThinkingSteps,
+  setThinkingStep,
+  toBullets,
+} from "./engines/agent-visualizer.js";
+import {
+  approvalGateActive,
+  buildOperatorBriefLines,
+  confidenceMeterPercent,
+  deriveConsequencePresentation,
+  formatDecisionTrace,
+  formatImpact,
+  formatMemorySummary,
+  formatMode,
+  formatSessionImpact,
+  formatSignals,
+  formatStatus,
+  getApprovalCompactCopyText,
+  getDecisionData,
+  getHistoryData,
+  getImpactData,
+  getThinkingTrace,
+  getTriageData,
+  inferDisplayAction,
+  inferExecutionPayload,
+  normalize,
+  safe,
+} from "./utils/decision-formatters.js";
 import { agentStore } from "./stores/agent-store.js";
 import { uiStore } from "./stores/ui-store.js";
 import { sessionStore } from "./stores/session-store.js";
 
 const chromeCtx = createChromeContext(typeof chrome !== "undefined" ? chrome : null);
+const chromeApi = typeof chrome !== "undefined" ? chrome : null;
 
 const analyzeBtn = document.getElementById("analyze");
 const copyBtn = document.getElementById("copyBtn");
@@ -112,52 +146,6 @@ uiStore.subscribe(syncCompatFromStores);
 agentStore.subscribe(syncCompatFromStores);
 syncCompatFromStores();
 
-/** Keep aligned with `format.deriveConsequencePresentation` in workspace_modules.js */
-function deriveConsequencePresentation(data) {
-  if (!data || typeof data !== "object") data = {};
-  const dec = getDecisionData(data);
-  const triage = getTriageData(data);
-  const risk = String(dec.risk_level || triage.risk_level || data.risk_level || "").toLowerCase();
-  if (risk === "high") {
-    return {
-      cls: "signal-high-risk",
-      text: "⚠ High risk",
-      title: "Elevated risk — review before customer send",
-    };
-  }
-  const tier = String(data.execution_tier || "").toLowerCase();
-  if (tier === "safe_autopilot_ready") {
-    return {
-      cls: "signal-safe",
-      text: "✓ Safe to automate",
-      title: "Meets all automation safety criteria",
-    };
-  }
-  if (tier === "assist_only") {
-    return {
-      cls: "signal-review",
-      text: "○ Manual review",
-      title: "Risk signals require human decision",
-    };
-  }
-  if (tier === "approval_required") {
-    return {
-      cls: "signal-approval",
-      text: "⚡ Approval required",
-      title: "Awaiting operator approval",
-    };
-  }
-  const action = String(dec.action || data.action || "none").toLowerCase();
-  const actionRisk = String(dec.risk_level || triage.risk_level || "medium").toLowerCase();
-  const req = Boolean(data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision");
-  const money = action === "refund" || action === "charge" || action === "credit";
-  if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
-  if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
-    return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
-  }
-  return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
-}
-
 function renderConsequenceBar(data) {
   if (!consequenceSignal) return;
   const pres = deriveConsequencePresentation(data);
@@ -166,17 +154,6 @@ function renderConsequenceBar(data) {
   if (pres.title) consequenceSignal.setAttribute("title", pres.title);
   else consequenceSignal.removeAttribute("title");
   consequenceSignal.classList.remove("is-hidden");
-}
-
-function approvalGateActive(data) {
-  const dec = getDecisionData(data);
-  const pres = deriveConsequencePresentation(data);
-  return (
-    Boolean(dec.requires_approval || data.requires_approval) ||
-    pres.cls === "signal-approval" ||
-    pres.cls === "signal-high-risk" ||
-    pres.cls === "signal-review"
-  );
 }
 
 function renderApprovalCompact(data, reply) {
@@ -189,17 +166,7 @@ function renderApprovalCompact(data, reply) {
     approvalCompact.classList.remove("is-visible");
     return;
   }
-  const parts = [];
-  const dec = getDecisionData(data);
-  const pres = deriveConsequencePresentation(data);
-  if (pres.cls === "signal-high-risk") {
-    parts.push("High risk — hold or edit until you are satisfied.");
-  } else if (dec.requires_approval || data.requires_approval || pres.cls === "signal-approval") {
-    parts.push("Approval-class motion — confirm the customer-ready text before copy or insert.");
-  } else {
-    parts.push("Review posture — skim brief and reply before sending.");
-  }
-  approvalCompactCopy.textContent = parts.join(" ");
+  approvalCompactCopy.textContent = getApprovalCompactCopyText(data);
   approvalCompact.classList.add("is-visible");
 }
 
@@ -216,23 +183,10 @@ function addBriefLine(container, label, value) {
 function renderOperatorBrief(data) {
   if (!operatorBriefBody) return;
   operatorBriefBody.replaceChildren();
-  const decision = getDecisionData(data);
-  const triage = getTriageData(data);
-  const issueType = normalize(data.issue_type || data.type);
-  const reply = normalize(data.reply || data.response || data.final);
-  const action = inferDisplayAction(data, reply, issueType);
-  const status = formatStatus(normalize(decision.status || data.status)) || "—";
-  const queue = normalize(String(decision.queue ?? data.queue ?? "")) || "—";
-  const risk = normalize(String(decision.risk_level ?? triage.risk_level ?? data.risk_level ?? "")) || "—";
-  const confRaw = decision.confidence ?? data.confidence;
-  let conf = "—";
-  if (confRaw !== "" && confRaw !== undefined && confRaw !== null) {
-    const n = Number(confRaw);
-    conf = Number.isFinite(n) ? n.toFixed(2) : String(confRaw);
+  const lines = buildOperatorBriefLines(data);
+  for (const line of lines) {
+    addBriefLine(operatorBriefBody, line.label, line.value);
   }
-  addBriefLine(operatorBriefBody, "Action · type", `${safe(action)} · ${safe(issueType)}`);
-  addBriefLine(operatorBriefBody, "Status · queue", `${status} · ${queue}`);
-  addBriefLine(operatorBriefBody, "Risk · confidence", `${risk} · ${conf}`);
   if (operatorBriefEl && !operatorBriefEl.open) {
     /* default collapsed for compact extension chrome */
   }
@@ -331,126 +285,9 @@ function hidePanel() {
   if (resultPanel) resultPanel.classList.remove("show");
 }
 
-
-function getDecisionData(data) {
-  if (!data || typeof data !== "object") return {};
-  return (data.sovereign_decision && typeof data.sovereign_decision === "object")
-    ? data.sovereign_decision
-    : ((data.decision && typeof data.decision === "object") ? data.decision : {});
-}
-
-function getTriageData(data) {
-  if (!data || typeof data !== "object") return {};
-  return (data.triage_metadata && typeof data.triage_metadata === "object")
-    ? data.triage_metadata
-    : ((data.triage && typeof data.triage === "object") ? data.triage : {});
-}
-
-function getImpactData(data) {
-  if (!data || typeof data !== "object") return {};
-  return (data.impact_projections && typeof data.impact_projections === "object")
-    ? data.impact_projections
-    : ((data.impact && typeof data.impact === "object") ? data.impact : {});
-}
-
-function getHistoryData(data) {
-  if (!data || typeof data !== "object") return {};
-  return (data.memory_delta && typeof data.memory_delta === "object")
-    ? data.memory_delta
-    : ((data.history && typeof data.history === "object") ? data.history : {});
-}
-
-function getThinkingTrace(data) {
-  return Array.isArray(data?.thinking_trace) ? data.thinking_trace : [];
-}
-
-function inferDisplayAction(data, reply, issueType) {
-  const decision = getDecisionData(data);
-  const raw = normalize(decision.action || data.action);
-  if (raw) return raw;
-  if (issueType === "shipping_issue" && reply) return "Inform";
-  if (reply) return "Reply";
-  return "";
-}
-
-function inferExecutionPayload(data, reply, issueType) {
-  if (data?.execution && typeof data.execution === "object") {
-    return data.execution;
-  }
-
-  const decision = getDecisionData(data);
-  const impact = getImpactData(data);
-  const displayAction = inferDisplayAction(data, reply, issueType);
-  const toolStatus = normalize(decision.tool_status || data.tool_status);
-
-  let label = "-";
-  if (toolStatus === "success" && displayAction && displayAction !== "Reply" && displayAction !== "Inform") {
-    label = `${displayAction.charAt(0).toUpperCase()}${displayAction.slice(1)} executed`;
-  } else if (issueType === "shipping_issue" && reply) {
-    label = "Tracking response prepared";
-  } else if (reply) {
-    label = "Reply prepared";
-  }
-
-  const detailParts = [];
-  if (toolStatus) detailParts.push(`Tool: ${toolStatus}`);
-  if (impact?.agent_minutes_saved) detailParts.push(`Saved ${impact.agent_minutes_saved} min`);
-
-  return {
-    label,
-    detail: detailParts.join(" • "),
-    mode: normalize(data.mode),
-    auto_resolved: Boolean(impact?.auto_resolved),
-    requires_approval: Boolean(decision?.requires_approval)
-  };
-}
-
-function normalize(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function safe(value, fallback = "-") {
-  const v = normalize(String(value ?? ""));
-  return v || fallback;
-}
-
 function setVisible(el, visible) {
   if (!el) return;
   el.style.display = visible ? "" : "none";
-}
-
-function formatStatus(status) {
-  const s = normalize(status).toLowerCase();
-
-  if (!s) return "";
-  if (s === "resolved") return "Resolved";
-  if (s === "pending") return "Pending";
-  if (s === "escalated") return "Escalated";
-  if (s === "ignored") return "Ignored";
-  if (s === "waiting") return "Waiting";
-
-  return s
-    .split("_")
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatMode(mode) {
-  const m = normalize(mode).toLowerCase();
-
-  if (!m) return "-";
-  if (m === "auto" || m === "policy_auto") return "Auto Execution";
-  if (m === "manual_review") return "Review Required";
-  if (m === "escalation") return "Escalated";
-  if (m === "skip") return "Skipped";
-  if (m === "assist") return "Assist";
-  if (m === "ai_policy") return "AI + Policy";
-  if (m === "fallback") return "Fallback";
-
-  return m
-    .split("_")
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function updateStatusBadge(status) {
@@ -474,12 +311,7 @@ function updateStatusBadge(status) {
 
 function setConfidence(conf) {
   if (!confidenceMeter) return;
-
-  let val = Number(conf);
-  if (!Number.isFinite(val)) val = 0;
-
-  const pct = Math.max(0, Math.min(100, Math.round(val * 100)));
-  confidenceMeter.style.width = pct + "%";
+  confidenceMeter.style.width = confidenceMeterPercent(conf) + "%";
 }
 
 function getGrid() {
@@ -523,7 +355,7 @@ function ensureEnterpriseCards() {
   if (!executionCard) {
     executionCard = createCard("executionCard", "Execution", "executionValue", {
       full: true,
-      detailId: "executionDetailValue"
+      detailId: "executionDetailValue",
     });
     executionValue = document.getElementById("executionValue");
     executionDetailValue = document.getElementById("executionDetailValue");
@@ -536,7 +368,7 @@ function ensureEnterpriseCards() {
 
   if (!impactCard) {
     impactCard = createCard("impactCard", "Impact", "impactValue", {
-      full: true
+      full: true,
     });
     impactValue = document.getElementById("impactValue");
     if (impactValue) impactValue.classList.add("reply-box");
@@ -545,7 +377,7 @@ function ensureEnterpriseCards() {
   if (!signalsCard) {
     signalsCard = createCard("signalsCard", "Signals", "signalsValue", {
       full: true,
-      muted: true
+      muted: true,
     });
     signalsValue = document.getElementById("signalsValue");
     if (signalsValue) signalsValue.classList.add("reply-box");
@@ -554,7 +386,7 @@ function ensureEnterpriseCards() {
   if (!decisionTraceCard) {
     decisionTraceCard = createCard("decisionTraceCard", "Decision Trace", "decisionTraceValue", {
       full: true,
-      muted: true
+      muted: true,
     });
     decisionTraceValue = document.getElementById("decisionTraceValue");
     if (decisionTraceValue) decisionTraceValue.classList.add("reply-box");
@@ -563,7 +395,7 @@ function ensureEnterpriseCards() {
   if (!memorySummaryCard) {
     memorySummaryCard = createCard("memorySummaryCard", "Memory Summary", "memorySummaryValue", {
       full: true,
-      muted: true
+      muted: true,
     });
     memorySummaryValue = document.getElementById("memorySummaryValue");
     if (memorySummaryValue) memorySummaryValue.classList.add("reply-box");
@@ -572,90 +404,11 @@ function ensureEnterpriseCards() {
   if (!sessionImpactCard) {
     sessionImpactCard = createCard("sessionImpactCard", "Session Impact", "sessionImpactValue", {
       full: true,
-      muted: true
+      muted: true,
     });
     sessionImpactValue = document.getElementById("sessionImpactValue");
     if (sessionImpactValue) sessionImpactValue.classList.add("reply-box");
   }
-}
-
-function toBullets(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (Array.isArray(value)) {
-    return value.map(item => `• ${String(item ?? "").trim()}`).filter(Boolean).join("\n");
-  }
-  if (typeof value === "object") {
-    return Object.entries(value)
-      .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
-      .map(([k, v]) => `• ${k.replace(/_/g, " ")}: ${v}`)
-      .join("\n");
-  }
-  return String(value);
-}
-
-function formatImpact(impact) {
-  if (!impact || typeof impact !== "object") return "";
-
-  const lines = [];
-
-  if (impact.resolution_speed) {
-    const speed =
-      String(impact.resolution_speed).charAt(0).toUpperCase() +
-      String(impact.resolution_speed).slice(1);
-    lines.push(`• Resolution: ${speed}`);
-  }
-
-  if (impact.agent_minutes_saved !== undefined && impact.agent_minutes_saved !== null) {
-    lines.push(`• Agent time saved: ${impact.agent_minutes_saved} min`);
-  }
-
-  if (impact.cost_avoided !== undefined && impact.cost_avoided !== null) {
-    lines.push(`• Cost avoided: $${Number(impact.cost_avoided).toFixed(2)}`);
-  }
-
-  if (impact.money_saved !== undefined && impact.money_saved !== null && Number(impact.money_saved) > 0) {
-    lines.push(`• Value captured: $${Number(impact.money_saved).toFixed(2)}`);
-  }
-
-  return lines.join("\n");
-}
-
-function formatSignals(impact) {
-  if (!impact || typeof impact !== "object" || !Array.isArray(impact.signals)) return "";
-  return impact.signals.map(s => `• ${s}`).join("\n");
-}
-
-function formatDecisionTrace(decisionTrace) {
-  if (!Array.isArray(decisionTrace) || decisionTrace.length === 0) return "";
-  return decisionTrace.map(s => `• ${s}`).join("\n");
-}
-
-function formatMemorySummary(memorySummary) {
-  if (!memorySummary) return "";
-  if (typeof memorySummary === "string") return memorySummary;
-
-  const lines = [];
-  if (memorySummary.summary) lines.push(`• ${memorySummary.summary}`);
-  if (memorySummary.pattern) lines.push(`• Pattern: ${memorySummary.pattern}`);
-  if (memorySummary.samples !== undefined) lines.push(`• Samples: ${memorySummary.samples}`);
-  if (memorySummary.avg_confidence !== undefined) lines.push(`• Avg confidence: ${memorySummary.avg_confidence}`);
-  if (memorySummary.same_action_rate !== undefined) lines.push(`• Same action rate: ${memorySummary.same_action_rate}`);
-  if (memorySummary.issue_count !== undefined) lines.push(`• Similar issues: ${memorySummary.issue_count}`);
-  if (memorySummary.same_action_count !== undefined) lines.push(`• Same action path: ${memorySummary.same_action_count}`);
-  return lines.join("\n");
-}
-
-function formatSessionImpact(sessionImpact) {
-  if (!sessionImpact || typeof sessionImpact !== "object") return "";
-
-  const lines = [];
-  if (sessionImpact.tickets_seen !== undefined) lines.push(`• Tickets seen: ${sessionImpact.tickets_seen}`);
-  if (sessionImpact.tickets_resolved !== undefined) lines.push(`• Tickets resolved: ${sessionImpact.tickets_resolved}`);
-  if (sessionImpact.agent_minutes_saved !== undefined) lines.push(`• Agent minutes saved: ${sessionImpact.agent_minutes_saved}`);
-  if (sessionImpact.value_generated !== undefined) lines.push(`• Value generated: $${Number(sessionImpact.value_generated).toFixed(2)}`);
-  if (sessionImpact.avg_confidence !== undefined) lines.push(`• Avg confidence: ${sessionImpact.avg_confidence}`);
-  return lines.join("\n");
 }
 
 function renderExecution(execution) {
@@ -702,113 +455,6 @@ function renderMetaCards(data) {
   setVisible(sessionImpactCard, !!sessionImpactText);
 }
 
-function buildExplainabilityFallback(data) {
-  const sections = {};
-
-  if (data.reason || data.policy_rule || data.ai_summary) {
-    sections.decision = [
-      data.reason ? `Reason: ${data.reason}` : "",
-      data.policy_rule ? `Policy rule: ${data.policy_rule}` : "",
-      data.ai_summary ? `AI summary: ${data.ai_summary}` : ""
-    ].filter(Boolean).join("\n");
-  }
-
-  if (data.confidence !== undefined || data.risk_level || data.priority) {
-    sections.confidence = [
-      data.confidence !== undefined && data.confidence !== null && data.confidence !== "" ? `Model confidence: ${data.confidence}` : "",
-      data.priority ? `Priority: ${data.priority}` : "",
-      data.risk_level ? `Risk level: ${data.risk_level}` : ""
-    ].filter(Boolean).join("\n");
-  }
-
-  if (data.memory_summary) {
-    sections.learning = formatMemorySummary(data.memory_summary);
-  }
-
-  if (data.execution) {
-    sections.execution = [
-      data.execution.label ? data.execution.label : "",
-      data.execution.detail ? data.execution.detail : "",
-      data.execution.mode ? `Mode: ${formatMode(data.execution.mode)}` : ""
-    ].filter(Boolean).join("\n");
-  }
-
-  if (data.impact || data.signals) {
-    sections.impact = [
-      formatImpact(data.impact),
-      formatSignals(data.impact)
-    ].filter(Boolean).join("\n");
-  }
-
-  if (data.session_impact) {
-    sections.session = formatSessionImpact(data.session_impact);
-  }
-
-  return sections;
-}
-
-function normalizeExplainability(data) {
-  const explainability = data && typeof data.explainability === "object" && data.explainability ? data.explainability : {};
-  const fallback = buildExplainabilityFallback(data);
-
-  const sections = {
-    decision: explainability.decision || explainability.policy || fallback.decision || "",
-    confidence: explainability.confidence || explainability.confidence_context || fallback.confidence || "",
-    learning: explainability.learning || explainability.memory || fallback.learning || "",
-    execution: explainability.execution || explainability.execution_rationale || fallback.execution || "",
-    impact: explainability.impact || explainability.impact_narrative || fallback.impact || "",
-    session: explainability.session || explainability.session_context || fallback.session || ""
-  };
-
-  const summary =
-    normalize(data.explainability_summary) ||
-    normalize(explainability.summary) ||
-    normalize(data.reason) ||
-    "Decision confidence, policy fit, learned behavior, and execution rationale.";
-
-  return { summary, sections };
-}
-
-/**
- * Fold API shapes `decision_explainability` and `decision_explanation` into
- * `data.explainability` so a single panel (`renderExplainabilitySections`) renders them.
- */
-function applyStructuredExplainabilityToData(data) {
-  if (!data || typeof data !== "object") return data;
-  const out = { ...data };
-  const lines = [];
-
-  const op = out.decision_explainability;
-  if (op && typeof op === "object") {
-    if (op.classification?.signal) lines.push(String(op.classification.signal));
-    if (op.risk_reasoning?.signal) lines.push(String(op.risk_reasoning.signal));
-    if (op.policy_trigger?.signal) lines.push(String(op.policy_trigger.signal));
-    if (op.memory_influence?.signal) lines.push(String(op.memory_influence.signal));
-    if (op.outcome_expectation?.signal) lines.push(String(op.outcome_expectation.signal));
-    if (op.why_not_other_actions) lines.push(String(op.why_not_other_actions));
-    if (op.summary) lines.push(String(op.summary));
-  }
-
-  const leg = out.decision_explanation;
-  if (leg && typeof leg === "object") {
-    if (leg.issue_classification?.signal) lines.push(String(leg.issue_classification.signal));
-    if (leg.risk_assessment?.signal) lines.push(String(leg.risk_assessment.signal));
-    if (leg.policy_influence?.signal) lines.push(String(leg.policy_influence.signal));
-    if (leg.memory_influence?.signal) lines.push(String(leg.memory_influence.signal));
-    if (leg.approval_rationale?.reason) lines.push(String(leg.approval_rationale.reason));
-    if (leg.summary) lines.push(String(leg.summary));
-  }
-
-  const block = lines.join("\n");
-  if (!block) return out;
-
-  const ex = out.explainability && typeof out.explainability === "object" ? { ...out.explainability } : {};
-  const baseDecision = ex.decision || ex.policy || "";
-  ex.decision = [baseDecision, block].filter(Boolean).join("\n\n");
-  out.explainability = ex;
-  return out;
-}
-
 function renderExplainabilitySections(data) {
   if (!explainabilityWrap) return;
 
@@ -816,7 +462,8 @@ function renderExplainabilitySections(data) {
   const sections = explainability.sections;
 
   if (explainabilitySummary) {
-    explainabilitySummary.textContent = explainability.summary || "Decision confidence, policy fit, learned behavior, and execution rationale.";
+    explainabilitySummary.textContent =
+      explainability.summary || "Decision confidence, policy fit, learned behavior, and execution rationale.";
   }
 
   const decisionText = toBullets(sections.decision);
@@ -861,45 +508,9 @@ function hideThinkingPanel() {
   if (thinkingPanel) thinkingPanel.classList.remove("show");
 }
 
-function resetThinkingSteps() {
-  if (!thinkingSteps.length) return;
-  thinkingSteps.forEach((step) => {
-    step.classList.remove("active", "done");
-    const status = step.querySelector(".thinking-step-status");
-    if (status) status.textContent = "Queued";
-  });
-  if (thinkingSubtitle) {
-    thinkingSubtitle.textContent = "Xalvion is reading the ticket, checking policy, and preparing the next step.";
-  }
-}
-
 function startThinkingPanel() {
-  resetThinkingSteps();
+  resetThinkingSteps(thinkingSteps, thinkingSubtitle);
   if (thinkingPanel) thinkingPanel.classList.add("show");
-}
-
-function setThinkingStep(index, state, subtitle = "") {
-  const step = thinkingSteps[index];
-  if (!step) return;
-
-  step.classList.remove("active", "done");
-  if (state === "active") {
-    step.classList.add("active");
-  }
-  if (state === "done") {
-    step.classList.add("done");
-  }
-
-  const status = step.querySelector(".thinking-step-status");
-  if (status) {
-    if (state === "active") status.textContent = "Running";
-    else if (state === "done") status.textContent = "Done";
-    else status.textContent = "Queued";
-  }
-
-  if (subtitle && thinkingSubtitle) {
-    thinkingSubtitle.textContent = subtitle;
-  }
 }
 
 function delay(ms) {
@@ -907,66 +518,16 @@ function delay(ms) {
 }
 
 async function playThinkingSequence(runId, mode = "single") {
-  const sequence = mode === "inbox"
-    ? [
-        { index: 0, status: "Reading inbox...", subtitle: "Capturing visible threads from the page." },
-        { index: 1, status: "Classifying visible tickets...", subtitle: "Understanding likely intent across multiple conversations." },
-        { index: 2, status: "Matching policy...", subtitle: "Checking best-fit policy paths across the inbox." },
-        { index: 3, status: "Checking memory patterns...", subtitle: "Comparing multiple decisions against prior learned outcomes." },
-        { index: 4, status: "Building inbox summary...", subtitle: "Preparing workload totals, risk flags, and automation opportunities." }
-      ]
-    : [
-        { index: 0, status: "Reading ticket...", subtitle: "Capturing the current message and context from the page." },
-        { index: 1, status: "Classifying intent...", subtitle: "Understanding what the customer needs and how urgent it is." },
-        { index: 2, status: "Matching policy...", subtitle: "Checking the best-fit policy path for this request." },
-        { index: 3, status: "Checking memory patterns...", subtitle: "Comparing against prior decisions and learned outcomes." },
-        { index: 4, status: "Finalizing decision...", subtitle: "Preparing the reply, action, and confidence summary." }
-      ];
+  const sequence = buildThinkingSequence(mode);
 
   for (const item of sequence) {
     if (runId !== agentStore.getState().thinkingRunId) return;
     showStatus(item.status);
-    setThinkingStep(item.index, "active", item.subtitle);
+    setThinkingStep(thinkingSteps, item.index, "active", item.subtitle, thinkingSubtitle);
     await delay(180);
     if (runId !== agentStore.getState().thinkingRunId) return;
-    setThinkingStep(item.index, "done", item.subtitle);
+    setThinkingStep(thinkingSteps, item.index, "done", item.subtitle, thinkingSubtitle);
   }
-}
-
-function buildHeaderInsight(data) {
-  const decision = getDecisionData(data);
-  const history = getHistoryData(data);
-  const issueType = normalize(data.issue_type || data.type).toLowerCase();
-  const status = normalize(decision.status || data.status).toLowerCase();
-  const action = inferDisplayAction(data, normalize(data.reply), issueType);
-  const confidence = Number(decision.confidence ?? data.confidence);
-  const samples =
-    Number(history.samples) ||
-    Number(history.same_action_count) ||
-    Number(history.issue_count) ||
-    0;
-
-  if (issueType === "shipping_issue" && normalize(data.reply)) {
-    return "Shipping context verified and a customer-safe tracking reply is ready.";
-  }
-
-  if (status === "resolved" && action && samples > 0 && Number.isFinite(confidence) && confidence > 0) {
-    return `Resolved using ${samples} similar past tickets at ${confidence.toFixed(2)} confidence.`;
-  }
-
-  if (status === "resolved" && action) {
-    return `High-confidence path selected: ${action}.`;
-  }
-
-  if ((status === "waiting" || status === "pending") && action) {
-    return `Decision prepared: ${action}. Human review is still required.`;
-  }
-
-  if (status === "escalated") {
-    return "Escalated for review because this case falls outside the low-risk automation path.";
-  }
-
-  return "Decision prepared using ticket context, policy fit, and learned behavior.";
 }
 
 function showHeaderInsight(text) {
@@ -1075,14 +636,18 @@ function render(data) {
     ...data,
     impact,
     history,
-    decision_trace: getThinkingTrace(data).map(step => `${step.step}: ${step.status}${step.detail ? ` (${step.detail})` : ""}`),
+    decision_trace: getThinkingTrace(data).map((step) => `${step.step}: ${step.status}${step.detail ? ` (${step.detail})` : ""}`),
     memory_summary: history,
-    session_impact: data.session_impact || (impact.agent_minutes_saved ? {
-      tickets_seen: 1,
-      tickets_resolved: statusLower === "resolved" ? 1 : 0,
-      agent_minutes_saved: impact.agent_minutes_saved,
-      value_generated: impact.money_saved || 0
-    } : {})
+    session_impact:
+      data.session_impact ||
+      (impact.agent_minutes_saved
+        ? {
+            tickets_seen: 1,
+            tickets_resolved: statusLower === "resolved" ? 1 : 0,
+            agent_minutes_saved: impact.agent_minutes_saved,
+            value_generated: impact.money_saved || 0,
+          }
+        : {}),
   });
   renderExplainabilitySections(
     applyStructuredExplainabilityToData({
@@ -1092,7 +657,7 @@ function render(data) {
       confidence,
       priority,
       risk_level: risk,
-      execution
+      execution,
     })
   );
 
@@ -1134,8 +699,7 @@ async function extractText(tabId) {
     target: { tabId },
     func: () => {
       const gmailMessage =
-        document.querySelector(".a3s")?.innerText ||
-        document.querySelector("div.a3s.aiL")?.innerText;
+        document.querySelector(".a3s")?.innerText || document.querySelector("div.a3s.aiL")?.innerText;
 
       if (gmailMessage && gmailMessage.trim()) {
         return gmailMessage.trim();
@@ -1147,7 +711,7 @@ async function extractText(tabId) {
       }
 
       return document.body?.innerText?.trim() || "";
-    }
+    },
   });
 
   return results?.[0]?.result || "";
@@ -1168,7 +732,7 @@ async function extractThreads(tabId) {
       });
 
       return threads.slice(0, 15);
-    }
+    },
   });
 
   return results?.[0]?.result || [];
@@ -1197,167 +761,8 @@ function buildInboxSummary(results) {
     auto,
     review,
     risk,
-    minutesSaved
+    minutesSaved,
   };
-}
-
-async function insertIntoGmail(tabId, text) {
-  const [res] = await chrome.scripting.executeScript({
-    target: { tabId },
-    args: [text],
-    func: async (reply) => {
-      const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-      function getComposer() {
-        return (
-          document.querySelector('div[aria-label="Message Body"]') ||
-          document.querySelector('div[aria-label^="Message Body"]') ||
-          document.querySelector('div[role="textbox"][g_editable="true"]') ||
-          document.querySelector('div[contenteditable="true"][role="textbox"]') ||
-          document.querySelector('div[contenteditable="true"][aria-label*="Message Body"]') ||
-          document.querySelector('div[contenteditable="true"]')
-        );
-      }
-
-      function findReplyButton() {
-        const selectors = [
-          'div[role="button"][aria-label="Reply"]',
-          'div[role="button"][aria-label^="Reply"]',
-          'span[role="button"][aria-label="Reply"]',
-          'span[role="button"][aria-label^="Reply"]',
-          '[data-tooltip="Reply"]',
-          '[aria-label*="Reply"]'
-        ];
-
-        for (const selector of selectors) {
-          const found = document.querySelector(selector);
-          if (found) return found;
-        }
-
-        const roleButtons = Array.from(document.querySelectorAll('[role="button"], [role="link"], button, span'));
-        return roleButtons.find(el => {
-          const aria = (el.getAttribute("aria-label") || "").trim().toLowerCase();
-          const text = (el.textContent || "").trim().toLowerCase();
-          const tooltip = (el.getAttribute("data-tooltip") || "").trim().toLowerCase();
-
-          return (
-            aria === "reply" ||
-            aria.startsWith("reply") ||
-            tooltip === "reply" ||
-            text === "reply"
-          );
-        }) || null;
-      }
-
-      function findComposeButton() {
-        return (
-          document.querySelector('div[role="button"][gh="cm"]') ||
-          document.querySelector('div[role="button"][aria-label="Compose"]') ||
-          document.querySelector('div[role="button"][aria-label^="Compose"]') ||
-          document.querySelector('[aria-label="Compose"]')
-        );
-      }
-
-      function insertTextIntoComposer(composer, value) {
-        composer.focus();
-
-        try {
-          composer.click();
-        } catch (_) {}
-
-        try {
-          if (document.getSelection) {
-            const selection = document.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(composer);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-          }
-        } catch (_) {}
-
-        let inserted = false;
-
-        try {
-          inserted = document.execCommand("insertText", false, value);
-        } catch (_) {}
-
-        if (!inserted) {
-          try {
-            composer.innerHTML = "";
-          } catch (_) {}
-
-          try {
-            composer.textContent = value;
-          } catch (_) {}
-        }
-
-        composer.dispatchEvent(new InputEvent("input", {
-          bubbles: true,
-          cancelable: true,
-          inputType: "insertText",
-          data: value
-        }));
-
-        composer.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-
-      let composer = getComposer();
-
-      if (!composer) {
-        const replyButton = findReplyButton();
-
-        if (replyButton) {
-          try {
-            replyButton.click();
-          } catch (_) {
-            try {
-              replyButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-            } catch (_) {}
-          }
-
-          for (let i = 0; i < 8; i += 1) {
-            await wait(250);
-            composer = getComposer();
-            if (composer) break;
-          }
-        }
-      }
-
-      if (!composer) {
-        const composeButton = findComposeButton();
-
-        if (composeButton) {
-          try {
-            composeButton.click();
-          } catch (_) {
-            try {
-              composeButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-            } catch (_) {}
-          }
-
-          for (let i = 0; i < 10; i += 1) {
-            await wait(300);
-            composer = getComposer();
-            if (composer) break;
-          }
-        }
-      }
-
-      if (!composer) {
-        return {
-          ok: false,
-          detail: "No Gmail reply composer found."
-        };
-      }
-
-      insertTextIntoComposer(composer, reply);
-
-      return { ok: true };
-    }
-  });
-
-  return res?.result || { ok: false, detail: "Insert failed." };
 }
 
 async function analyze() {
@@ -1413,9 +818,9 @@ async function analyze() {
     const res = await fetch("http://127.0.0.1:8000/analyze", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text }),
     });
 
     await thinkingPromise;
@@ -1499,7 +904,7 @@ async function scanInbox() {
         const res = await fetch("http://127.0.0.1:8000/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: threads[i] })
+          body: JSON.stringify({ text: threads[i] }),
         });
 
         if (res.ok) {
@@ -1622,7 +1027,7 @@ if (insertBtn) {
         return;
       }
 
-      const res = await insertIntoGmail(tab.id, lastReply);
+      const res = await insertIntoGmail(tab.id, lastReply, chromeApi);
 
       if (!res.ok) {
         showStatus(res.detail || "Insert failed", true);
