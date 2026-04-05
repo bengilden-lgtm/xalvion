@@ -4,6 +4,20 @@ AI-powered support operations system with a Chrome extension, FastAPI backend, a
 
 ---
 
+## Quickstart (Windows)
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app:app --reload
+pytest -v
+```
+
+Copy `.env.example` to `.env` and fill in secrets before relying on auth, OpenAI, or Stripe in local runs.
+
+---
+
 ## Architecture
 
 ```
@@ -23,7 +37,7 @@ dashboard.py        Simulation run dashboard (used by ticket_engine.py)
 ticket_engine.py    Batch simulation harness
 ```
 
-**Chrome Extension** (`sidepanel.html`, `sidepanel.js`, `manifest.json`)  
+**Chrome Extension** (`xalvion-extension/` — `sidepanel.html`, `sidepanel.js`, `manifest.json`)  
 Connects to `http://127.0.0.1:8000/analyze` — reads the active tab, sends ticket text, renders the decision panel.
 
 ---
@@ -46,8 +60,6 @@ cp .env.example .env
 ### 3. Run the backend
 
 ```bash
-python run.py
-# or
 uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
@@ -55,7 +67,7 @@ uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
-3. Click **Load unpacked** → select the project folder
+3. Click **Load unpacked** → select the `xalvion-extension` folder in this repository
 4. Open Gmail or Zendesk — click the Xalvion icon
 
 ---
@@ -104,6 +116,14 @@ See `.env.example` for the full list. Critical ones:
 ---
 
 ## Running Tests
+
+From the repository root (with the virtual environment activated):
+
+```bash
+pytest -v
+```
+
+To run only this project’s suite file:
 
 ```bash
 pytest tests/test_suite.py -v
