@@ -19,8 +19,8 @@ const refundStore = createRefundStore();
 const analyticsEngine = createAnalyticsEngine({ sessionStore });
 const agentVisualizer = createAgentVisualizer({ agentStore });
 const stripeEngine = createStripeEngine({ refundStore, apiClient: null });
-const inboxScanEngine = createInboxScanEngine({ chromeContext: createChromeContext() });
 const chromeContext = createChromeContext();
+const inboxScanEngine = createInboxScanEngine({ chromeContext });
 
 function createBoundApi(getToken, onUnauthorized) {
   return createApiClient({
