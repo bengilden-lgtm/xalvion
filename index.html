@@ -18,7 +18,7 @@
     <div class="workspace-atmosphere-grain"></div>
   </div>
 
-  <div class="workspace-root workspace-idle" id="workspaceRoot">
+  <div class="workspace-root workspace-idle" id="workspaceRoot" aria-busy="false">
     <header class="command-strip glass" id="commandStrip">
       <div class="command-strip-left">
         <a class="command-brand" href="/landing" title="Xalvion">
@@ -54,14 +54,20 @@
         <div class="sidebar-chrome">
           <nav class="sidebar-nav" role="tablist" aria-label="Workspace areas">
             <div class="sidebar-nav-group" role="presentation">
-              <span class="sidebar-nav-group-label sr-only">Workspace areas</span>
+              <span class="sidebar-nav-group-label" aria-hidden="true">Navigate</span>
               <div class="sidebar-nav-items" role="presentation">
                 <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace">Workspace</button>
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount">Access</button>
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans">Plans</button>
+              </div>
+              <div class="sidebar-nav-divider" aria-hidden="true"></div>
+              <div class="sidebar-nav-items" role="presentation">
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations">Integrations</button>
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm">CRM</button>
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue">Revenue</button>
+              </div>
+              <div class="sidebar-nav-divider" aria-hidden="true"></div>
+              <div class="sidebar-nav-items" role="presentation">
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="more" data-nav-cluster="tools" aria-selected="false" aria-controls="sidebarPanelMore" id="sidebarTabMore">More</button>
               </div>
             </div>
@@ -580,53 +586,57 @@
             <div class="main-stage-ambient-ripple"></div>
           </div>
 
-          <header class="main-stage-header main-stage-hero">
-            <div class="main-stage-identity">
-              <div class="main-stage-title-block">
-                <h1 id="workspacePageTitle">Customer support</h1>
-                <p id="workspaceSubcopy" class="workspace-subline">Connecting the operator workspace…</p>
+          <div class="xv-stage-scaffold">
+            <header class="main-stage-header main-stage-hero">
+              <div class="main-stage-identity">
+                <div class="main-stage-title-block">
+                  <h1 id="workspacePageTitle">Customer support</h1>
+                  <p id="workspaceSubcopy" class="workspace-subline">Connecting the operator workspace…</p>
+                </div>
+                <p class="main-stage-kicker" id="workspaceHeadline">Paste a ticket below. Xalvion drafts the reply and recommended action — you review and approve before anything goes to the customer.</p>
               </div>
-              <p class="main-stage-kicker" id="workspaceHeadline">Paste a ticket below. Xalvion drafts the reply and recommended action — you review and approve before anything goes to the customer.</p>
-            </div>
-          </header>
+            </header>
 
-          <div class="main-stage-body">
-            <div class="messages-zone" id="messagesZone">
-              <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
-                <div id="messages" class="messages scroll-area"></div>
-              </div>
-            </div>
-
-            <footer class="composer-wrap composer-dock">
-              <div class="composer-prelude">
-                <div class="composer-status-cluster" role="status" aria-live="polite">
-                  <span class="composer-thinking-anchor" aria-hidden="true">
-                    <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span></span>
-                  </span>
-                  <p id="composerStatusLine" class="composer-status-line">Describe the case in your own words — Xalvion prepares a clear reply and the recommended next step for your review.</p>
+            <div class="main-stage-body xv-stage-body">
+              <div class="messages-zone" id="messagesZone">
+                <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
+                  <div id="messages" class="messages scroll-area"></div>
                 </div>
               </div>
-              <div class="quick-actions">
-                <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
-                <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
-                <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
-                <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
-              </div>
-              <div class="composer composer-chat">
-                <details class="composer-stripe-fold">
-                  <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
-                  <div class="stripe-context-row muted-copy composer-stripe-fields">
-                    <span class="stripe-context-hint">Attached to support requests when present.</span>
-                    <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
-                    <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+
+              <div class="xv-idle-lift" aria-hidden="true"></div>
+
+              <footer class="composer-wrap composer-dock xv-composer-foot">
+                <div class="composer-prelude">
+                  <div class="composer-status-cluster" role="status" aria-live="polite">
+                    <span class="composer-thinking-anchor" aria-hidden="true">
+                      <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span></span>
+                    </span>
+                    <p id="composerStatusLine" class="composer-status-line">Describe the case in your own words — Xalvion prepares a clear reply and the recommended next step for your review.</p>
                   </div>
-                </details>
-                <div class="composer-input-row composer-input-wrap">
-                  <textarea id="messageInput" placeholder="Paste the customer message or describe the issue…"></textarea>
-                  <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                 </div>
-              </div>
-            </footer>
+                <div class="quick-actions">
+                  <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
+                  <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
+                  <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
+                  <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
+                </div>
+                <div class="composer composer-chat">
+                  <details class="composer-stripe-fold">
+                    <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
+                    <div class="stripe-context-row muted-copy composer-stripe-fields">
+                      <span class="stripe-context-hint">Attached to support requests when present.</span>
+                      <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
+                      <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+                    </div>
+                  </details>
+                  <div class="composer-input-row composer-input-wrap">
+                    <textarea id="messageInput" placeholder="Paste the customer message or describe the issue…"></textarea>
+                    <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
+                  </div>
+                </div>
+              </footer>
+            </div>
           </div>
         </div>
       </main>

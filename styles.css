@@ -1,7 +1,7 @@
 /* Xalvion — depth + hierarchy (design tokens + legacy aliases) */
 :root{
   /* Lifted premium dark — violet/cyan energy, readable mid-tones */
-  --l1-bg:hsl(230, 24%, 11%);
+  --l1-bg:hsl(230, 22%, 12%);
   --l2-base:hsl(228, 26%, 15%);
   --l2-grad-peak:hsl(228, 27%, 18%);
   --l2-header:hsl(228, 25%, 14%);
@@ -3499,20 +3499,48 @@ body{
 /* —— Phase 2: operator navigation & rails —— */
 .sidebar-nav{
   display:flex;
-  flex-wrap:wrap;
-  gap:6px;
+  flex-direction:column;
+  flex-wrap:nowrap;
+  gap:0;
+}
+.sidebar-nav-group{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.sidebar-nav-group-label{
+  display:block;
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:rgba(120,134,168,0.48);
+  padding:2px 4px 8px 10px;
+}
+.sidebar-nav-items{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.sidebar-nav-divider{
+  height:1px;
+  margin:10px 8px 10px 10px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.07) 12%, rgba(255,255,255,0.07) 88%, transparent);
+  flex-shrink:0;
 }
 .sidebar-nav-item{
   appearance:none;
-  border:1px solid rgba(255,255,255,0.08);
-  background:rgba(255,255,255,0.03);
-  color:rgba(180,192,220,0.72);
-  font-size:10px;
-  font-weight:700;
-  letter-spacing:0.06em;
-  text-transform:uppercase;
-  padding:6px 10px;
-  border-radius:var(--r-pill);
+  width:100%;
+  text-align:left;
+  border:1px solid transparent;
+  background:transparent;
+  color:rgba(176,190,220,0.82);
+  font-size:13px;
+  font-weight:500;
+  letter-spacing:0.01em;
+  text-transform:none;
+  padding:9px 12px;
+  border-radius:10px;
   cursor:pointer;
   transition:
     background var(--id-duration-state) var(--sys-curve),
@@ -3522,15 +3550,15 @@ body{
     transform 100ms var(--sys-curve);
 }
 .sidebar-nav-item:hover{
-  color:rgba(220,230,252,0.92);
-  border-color:rgba(124,92,252,0.28);
-  background:rgba(124,92,252,0.08);
+  color:rgba(236,240,255,0.95);
+  border-color:rgba(255,255,255,0.05);
+  background:rgba(255,255,255,0.04);
 }
 .sidebar-nav-item.is-active{
-  color:#f0f5ff;
-  border-color:rgba(124,92,252,0.45);
-  background:linear-gradient(135deg, rgba(124,92,252,0.22), rgba(34,193,255,0.08));
-  box-shadow:0 0 0 1px rgba(124,92,252,0.12);
+  color:#f4f7ff;
+  border-color:rgba(124,92,252,0.22);
+  background:linear-gradient(118deg, rgba(124,92,252,0.14), rgba(34,211,238,0.04));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .sidebar-panels-host{
   position:relative;
@@ -3869,6 +3897,7 @@ body{
   --main-max:920px;
   --stage-radius:18px;
   --chat-input-radius:16px;
+  --xv-layout-active:0;
 }
 @media (max-width:1280px){
   :root{ --sidebar:248px; }
@@ -3935,62 +3964,9 @@ body{
 
 .sidebar-chrome{
   flex-shrink:0;
-  padding:6px 8px 10px;
+  padding:8px 10px 12px;
   border-bottom:1px solid rgba(255,255,255,0.04);
   background:transparent;
-}
-
-.sidebar-nav{
-  display:flex;
-  flex-direction:column;
-  align-items:stretch;
-  gap:18px;
-}
-.sidebar-nav-group{
-  display:flex;
-  flex-direction:column;
-  gap:5px;
-}
-.sidebar-nav-group-label{
-  font-size:10px;
-  font-weight:600;
-  letter-spacing:0.12em;
-  text-transform:uppercase;
-  color:rgba(148,160,188,0.62);
-  padding:0 2px 0 10px;
-}
-.sidebar-nav-items{
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-}
-
-.sidebar-nav-item{
-  flex:0 0 auto !important;
-  width:100% !important;
-  min-width:0 !important;
-  text-align:left !important;
-  padding:8px 10px !important;
-  border-radius:8px !important;
-  font-size:13px !important;
-  font-weight:500 !important;
-  letter-spacing:0 !important;
-  text-transform:none !important;
-  line-height:1.35 !important;
-  border:1px solid transparent !important;
-  background:transparent !important;
-  color:rgba(196,206,232,0.88) !important;
-}
-.sidebar-nav-item:hover{
-  background:rgba(255,255,255,0.04) !important;
-  border-color:transparent !important;
-  color:var(--text-primary) !important;
-}
-.sidebar-nav-item.is-active{
-  color:var(--text-primary) !important;
-  border-color:rgba(124,92,252,0.22) !important;
-  background:linear-gradient(105deg, rgba(124,92,252,0.14), rgba(34,211,238,0.04)) !important;
-  box-shadow:none !important;
 }
 
 .sidebar-inner{
@@ -4301,71 +4277,7 @@ body{
   .rail-in-sidebar .rail-scroll-host{ max-height:none !important; }
 }
 
-/* ═══════════ Xalvion · idle / active · sovereign mark · sidebar scroll ═══════════ */
-
-@keyframes xv-sovereign-spin{
-  to{ transform:rotate(360deg); }
-}
-@keyframes xv-sovereign-breathe{
-  0%, 100%{ opacity:0.38; transform:scale(0.93); }
-  50%{ opacity:1; transform:scale(1.04); }
-}
-@keyframes xv-sovereign-glow{
-  0%, 100%{ filter:drop-shadow(0 0 3px rgba(167,139,250,0.2)); }
-  50%{ filter:drop-shadow(0 0 12px rgba(34,211,238,0.28)); }
-}
-
-.xalvion-sovereign-mark{
-  position:relative;
-  display:inline-flex;
-  width:22px;
-  height:22px;
-  align-items:center;
-  justify-content:center;
-  vertical-align:middle;
-}
-.xalvion-sovereign-mark::before,
-.xalvion-sovereign-mark::after{
-  content:"";
-  position:absolute;
-  border-radius:50%;
-  inset:0;
-  box-sizing:border-box;
-}
-.xalvion-sovereign-mark::before{
-  background:conic-gradient(
-    from 218deg,
-    transparent 0deg,
-    rgba(167,139,250,0.06) 36deg,
-    rgba(167,139,250,0.92) 70deg,
-    rgba(34,211,238,0.45) 118deg,
-    transparent 158deg,
-    transparent 268deg,
-    rgba(124,92,252,0.78) 302deg,
-    transparent 360deg
-  );
-  mask:radial-gradient(circle,transparent 51%,#000 53%,#000 72%,transparent 74%);
-  -webkit-mask:radial-gradient(circle,transparent 51%,#000 53%,#000 72%,transparent 74%);
-  animation:xv-sovereign-spin 2.75s linear infinite;
-}
-.xalvion-sovereign-mark::after{
-  inset:27%;
-  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,0.92),rgba(196,181,254,0.4) 42%,rgba(34,211,238,0.22) 100%);
-  box-shadow:0 0 16px rgba(124,92,252,0.32);
-  animation:xv-sovereign-breathe 1.85s ease-in-out infinite;
-}
-
-.xalvion-sovereign-mark--sm{
-  width:18px;
-  height:18px;
-}
-.xalvion-sovereign-mark--xs{
-  width:14px;
-  height:14px;
-}
-.xalvion-sovereign-mark--xs::after{
-  inset:30%;
-}
+/* Sovereign “signal bloom” mark defined in product-pass block below */
 
 .send-btn.send-btn--thinking,
 .send-btn:has(.xalvion-sovereign-mark){
@@ -4379,7 +4291,6 @@ body{
 .send-btn.send-btn--thinking .xalvion-sovereign-mark{
   width:20px;
   height:20px;
-  animation:xv-sovereign-glow 2.1s ease-in-out infinite;
 }
 
 .xalvion-typing-sovereign{
@@ -4880,74 +4791,12 @@ body{
   transform:translateY(-1px) !important;
 }
 
-@keyframes xv-sovereign-orbit{
-  to{ transform:rotate(360deg); }
-}
-@keyframes xv-sovereign-core{
-  0%,100%{ opacity:0.5; transform:scale(0.92); }
-  50%{ opacity:1; transform:scale(1.06); }
-}
-@keyframes xv-sovereign-halo{
-  0%,100%{ opacity:0.35; filter:blur(0px); }
-  50%{ opacity:0.85; filter:blur(0.5px); }
-}
-
-.xalvion-sovereign-mark::before,
-.xalvion-sovereign-mark::after{
-  animation:none;
-}
-.xalvion-sovereign-mark::before{
-  background:conic-gradient(
-    from 200deg,
-    transparent 0deg,
-    rgba(167,139,250,0.15) 40deg,
-    rgba(167,139,250,0.95) 88deg,
-    rgba(34,211,238,0.55) 130deg,
-    transparent 170deg,
-    transparent 270deg,
-    rgba(99,102,241,0.85) 320deg,
-    transparent 360deg
-  ) !important;
-  animation:xv-sovereign-orbit 2.4s linear infinite !important;
-  mask:radial-gradient(circle,transparent 48%,#000 50%,#000 74%,transparent 76%) !important;
-  -webkit-mask:radial-gradient(circle,transparent 48%,#000 50%,#000 74%,transparent 76%) !important;
-}
-.xalvion-sovereign-mark::after{
-  inset:24% !important;
-  background:radial-gradient(circle at 35% 30%,rgba(255,255,255,0.95),rgba(196,181,254,0.45) 45%,rgba(34,211,238,0.25) 100%) !important;
-  box-shadow:
-    0 0 14px rgba(124,92,252,0.4),
-    0 0 28px rgba(34,211,238,0.12) !important;
-  animation:xv-sovereign-core 1.6s ease-in-out infinite !important;
-}
-.xalvion-sovereign-mark{
-  filter:drop-shadow(0 0 6px rgba(124,92,252,0.25));
-}
-.send-btn.send-btn--thinking .xalvion-sovereign-mark{
-  animation:xv-sovereign-halo 1.8s ease-in-out infinite !important;
-}
-
 .workspace-idle .quick-actions{
   justify-content:center;
 }
 .workspace-idle .chip{
   border-color:rgba(255,255,255,0.06) !important;
   background:rgba(255,255,255,0.025) !important;
-}
-
-.sidebar-nav-group-label{
-  font-size:10px !important;
-  font-weight:600 !important;
-  letter-spacing:0.14em !important;
-  color:rgba(120,134,168,0.5) !important;
-  padding:4px 2px 6px 10px !important;
-}
-.sidebar-nav-items{
-  gap:1px !important;
-}
-.sidebar-nav-item{
-  padding:9px 12px !important;
-  border-radius:10px !important;
 }
 
 .sidebar .notice.info{
@@ -4981,19 +4830,19 @@ body{
 }
 @keyframes xv-signal-bloom{
   0%,100%{
-    opacity:0.25;
-    transform:scale(0.92);
-    filter:blur(0.2px);
+    opacity:0.32;
+    transform:scale(0.96);
+    filter:blur(0px);
   }
   50%{
-    opacity:0.95;
-    transform:scale(1.12);
-    filter:blur(0);
+    opacity:0.88;
+    transform:scale(1.05);
+    filter:blur(0.15px);
   }
 }
 @keyframes xv-signal-rays{
-  0%,100%{ opacity:0.2; transform:scale(1) rotate(0deg); }
-  50%{ opacity:0.55; transform:scale(1.06) rotate(6deg); }
+  0%,100%{ opacity:0.14; transform:scale(1) rotate(0deg); }
+  50%{ opacity:0.42; transform:scale(1.035) rotate(4deg); }
 }
 
 .xalvion-sovereign-mark{
@@ -5018,45 +4867,46 @@ body{
 .xalvion-sovereign-mark .xv-signal-rays{
   position:absolute;
   border-radius:50%;
-  inset:-4px;
+  inset:-5px;
   box-sizing:border-box;
   pointer-events:none;
   background:
     repeating-conic-gradient(
-      from 0deg,
-      transparent 0deg 14deg,
-      rgba(167,139,250,0.14) 14deg 16deg,
-      transparent 16deg 32deg
+      from -11deg,
+      transparent 0deg 40deg,
+      rgba(167,139,250,0.11) 40deg 43deg,
+      rgba(34,211,238,0.08) 43deg 45deg,
+      transparent 45deg 90deg
     );
-  mask:radial-gradient(circle,transparent 42%,#000 44%,#000 58%,transparent 62%);
-  -webkit-mask:radial-gradient(circle,transparent 42%,#000 44%,#000 58%,transparent 62%);
-  animation:xv-signal-rays 3.2s ease-in-out infinite;
-  opacity:0.35;
+  mask:radial-gradient(circle,transparent 40%,#000 42%,#000 56%,transparent 60%);
+  -webkit-mask:radial-gradient(circle,transparent 40%,#000 42%,#000 56%,transparent 60%);
+  animation:xv-signal-rays 4s ease-in-out infinite;
+  opacity:0.28;
 }
 .xalvion-sovereign-mark::before{
   background:conic-gradient(
-    from 198deg,
+    from 192deg,
     transparent 0deg,
-    rgba(167,139,250,0.12) 32deg,
-    rgba(167,139,250,0.92) 76deg,
-    rgba(34,211,238,0.5) 118deg,
-    transparent 156deg,
-    transparent 268deg,
-    rgba(99,102,241,0.88) 312deg,
+    rgba(167,139,250,0.08) 28deg,
+    rgba(167,139,250,0.88) 72deg,
+    rgba(34,211,238,0.42) 112deg,
+    transparent 150deg,
+    transparent 262deg,
+    rgba(99,102,241,0.78) 306deg,
     transparent 360deg
   );
-  mask:radial-gradient(circle,transparent 46%,#000 48%,#000 76%,transparent 78%);
-  -webkit-mask:radial-gradient(circle,transparent 46%,#000 48%,#000 76%,transparent 78%);
-  animation:xv-signal-orbit 2.5s linear infinite;
-  filter:drop-shadow(0 0 6px rgba(124,92,252,0.35));
+  mask:radial-gradient(circle,transparent 47%,#000 49%,#000 74%,transparent 76%);
+  -webkit-mask:radial-gradient(circle,transparent 47%,#000 49%,#000 74%,transparent 76%);
+  animation:xv-signal-orbit 2.85s linear infinite;
+  filter:drop-shadow(0 0 5px rgba(124,92,252,0.28));
 }
 .xalvion-sovereign-mark::after{
-  inset:24%;
-  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,0.96),rgba(196,181,254,0.5) 42%,rgba(34,211,238,0.28) 100%);
+  inset:26%;
+  background:radial-gradient(circle at 34% 30%,rgba(255,255,255,0.94),rgba(196,181,254,0.42) 44%,rgba(34,211,238,0.22) 100%);
   box-shadow:
-    0 0 12px rgba(124,92,252,0.45),
-    0 0 28px rgba(34,211,238,0.12);
-  animation:xv-signal-core 1.55s ease-in-out infinite;
+    0 0 10px rgba(124,92,252,0.38),
+    0 0 22px rgba(34,211,238,0.1);
+  animation:xv-signal-core 1.75s ease-in-out infinite;
 }
 
 .xalvion-sovereign-mark--sm{
@@ -5447,4 +5297,63 @@ body{
   .workspace-thinking .composer-thinking-anchor{
     width:26px !important;
   }
+}
+
+/* —— Xalvion · stage scaffold (idle lift / active stretch) —— */
+.xv-stage-scaffold{
+  display:flex;
+  flex-direction:column;
+  flex:1 1 0;
+  min-height:0;
+  position:relative;
+  z-index:1;
+  transition:justify-content 0.5s var(--sys-curve);
+}
+.workspace-idle .xv-stage-scaffold{
+  justify-content:center;
+}
+.workspace-active .xv-stage-scaffold{
+  justify-content:flex-start;
+}
+.xv-stage-body{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+.workspace-idle .xv-stage-body{
+  flex:0 1 auto;
+}
+.workspace-active .xv-stage-body{
+  flex:1 1 0%;
+}
+.workspace-idle .xv-idle-lift{
+  flex:1 1 auto;
+  min-height:min(8vh,72px);
+  max-height:min(30vh,280px);
+  pointer-events:none;
+}
+.workspace-active .xv-idle-lift{
+  display:none !important;
+}
+
+#workspaceRoot[aria-busy="true"]{
+  cursor:progress;
+}
+
+.workspace-active .msg-card.assistant .customer-message-block{
+  margin-top:2px;
+  padding-left:18px;
+  border-left:2px solid color-mix(in srgb, var(--accent-1) 42%, transparent);
+  box-shadow:inset 1px 0 0 rgba(34,211,238,0.12);
+}
+
+.workspace-active .messages-shell{
+  min-height:min(58vh,640px) !important;
+}
+
+.workspace-idle .sidebar-top{
+  opacity:0.88;
+}
+.workspace-active .sidebar-top{
+  opacity:1;
 }

@@ -1977,6 +1977,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const active = hasConversation || hasLimitCard;
     root.classList.toggle("workspace-idle", !active);
     root.classList.toggle("workspace-active", active);
+    root.style.setProperty("--xv-layout-active", active ? "1" : "0");
   }
 
   function addUserMessage(text) {
@@ -2881,6 +2882,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     state.sending = Boolean(value);
 
     els.workspaceRoot?.classList.toggle("workspace-thinking", state.sending);
+    els.workspaceRoot?.setAttribute("aria-busy", state.sending ? "true" : "false");
 
     if (els.composerStatusLine) {
       const idleCopy =
