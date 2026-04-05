@@ -1843,6 +1843,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="assistant-decision-slot" data-slot="decision"></div>
           <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="customer-message-block">
+            <div class="assistant-context-line js-assistant-context" hidden></div>
             <div class="customer-message-label sr-only">Prepared reply</div>
             <div class="reply-text js-reply-text">${bodyHtml}</div>
           </div>
@@ -2069,6 +2070,35 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     );
 
     return meta;
+  }
+
+  function wrapAssistantMetaFold(metaRow) {
+    const fold = document.createElement("details");
+    fold.className = "assistant-meta-fold";
+    const sum = document.createElement("summary");
+    sum.className = "assistant-meta-fold-summary";
+    sum.textContent = "Details";
+    const body = document.createElement("div");
+    body.className = "assistant-meta-fold-body";
+    body.appendChild(metaRow);
+    fold.appendChild(sum);
+    fold.appendChild(body);
+    return fold;
+  }
+
+  function syncAssistantContextLine(row, data) {
+    const el = row?.querySelector?.(".js-assistant-context");
+    if (!el) return;
+    const card = row.querySelector(".msg-card");
+    if (!data || card?.dataset.placeholder === "true") {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    const posture = operatorPostureLabel(data);
+    const action = displayActionLabel(data);
+    el.textContent = `${posture} · ${action}`;
   }
 
   function getApprovalContext(data = {}) {
@@ -2607,17 +2637,34 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const briefSlot = row.querySelector("[data-slot='brief']");
     if (footer) {
       footer.innerHTML = "";
-      footer.appendChild(createMetaRow(normalized));
       const toolsWrap = document.createElement("div");
       addCopyControl(toolsWrap, replyText, row);
       footer.appendChild(toolsWrap);
+      footer.appendChild(wrapAssistantMetaFold(createMetaRow(normalized)));
     }
     const nextBrief = createDetailsPanel(normalized);
     const existingBrief = briefSlot?.querySelector(".details-wrap") || row.querySelector(".details-wrap");
-    if (existingBrief) existingBrief.replaceWith(nextBrief);
-    else if (briefSlot) briefSlot.appendChild(nextBrief);
-    else footer?.parentElement?.appendChild(nextBrief);
+    if (briefSlot) {
+      briefSlot.querySelector(".approval-banner")?.remove();
+      const approvalBanner = createApprovalBanner(normalized);
+      if (existingBrief) {
+        existingBrief.replaceWith(nextBrief);
+        if (approvalBanner) briefSlot.insertBefore(approvalBanner, briefSlot.firstChild);
+      } else {
+        briefSlot.innerHTML = "";
+        if (approvalBanner) briefSlot.appendChild(approvalBanner);
+        briefSlot.appendChild(nextBrief);
+      }
+    } else if (existingBrief) {
+      existingBrief.replaceWith(nextBrief);
+    } else {
+      const approvalBanner = createApprovalBanner(normalized);
+      const host = footer?.parentElement;
+      if (approvalBanner) host?.appendChild(approvalBanner);
+      host?.appendChild(nextBrief);
+    }
     mountOperatorDecisionPanel(row, normalized, replyText);
+    syncAssistantContextLine(row, normalized);
   }
 
   function addCopyControl(container, replyText, row = null) {
@@ -2715,7 +2762,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function createDetailsPanel(data = {}) {
     const details = document.createElement("details");
     details.className = "details-wrap operator-brief-details";
-    details.open = true;
+    details.open = false;
 
     const decision = data.decision || {};
     const output = data.output || {};
@@ -2726,7 +2773,6 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const trace = thinkingTraceSnippet(data, 5);
     const execDetail = String(data.execution?.detail || data.tool_result?.message || "").trim();
 
-    const approvalBanner = createApprovalBanner(data);
     const explainabilityBrief = buildExplainabilityBriefHtml(data.decision_explainability);
     const explanationInsightsHtml = explainabilityBrief
       ? ""
@@ -2777,11 +2823,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
     details.innerHTML = `
       <summary class="details-toggle">
-        <span>Operator brief</span>
+        <span>Why this decision</span>
         <span class="chev">${ICONS.chevron}</span>
       </summary>
       <div class="details-panel">
-        ${approvalBanner ? approvalBanner.outerHTML : ""}
         ${insightBlock}
         <div class="details-grid">
           ${createDetailBox("Surface action", displayActionLabel(data))}
@@ -3516,21 +3561,27 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const briefSlot = row.querySelector("[data-slot='brief']");
       if (footer) {
         footer.innerHTML = "";
-        footer.appendChild(createMetaRow(data));
-
         const toolsWrap = document.createElement("div");
         addCopyControl(toolsWrap, replyText, row);
         footer.appendChild(toolsWrap);
+        footer.appendChild(wrapAssistantMetaFold(createMetaRow(data)));
 
-        const details = createDetailsPanel(data);
         if (briefSlot) {
           briefSlot.innerHTML = "";
-          briefSlot.appendChild(details);
+          const approvalBanner = createApprovalBanner(data);
+          if (approvalBanner) briefSlot.appendChild(approvalBanner);
+          briefSlot.appendChild(createDetailsPanel(data));
         } else {
-          footer.parentElement.appendChild(details);
+          const approvalBanner = createApprovalBanner(data);
+          const details = createDetailsPanel(data);
+          const host = footer.parentElement;
+          if (approvalBanner) host?.appendChild(approvalBanner);
+          host?.appendChild(details);
         }
         mountOperatorDecisionPanel(row, data, replyText);
       }
+      row.querySelector(".msg-card")?.removeAttribute("data-placeholder");
+      syncAssistantContextLine(row, data);
 
       updateStatsFromResult(data);
       updateRevenueCard(data);
@@ -3597,6 +3648,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         (error && error.message) ||
         "Something went wrong while processing this support request.";
       setAssistantCopy(row, errText);
+      syncAssistantContextLine(row, null);
       setNotice("error", "Request failed", errText);
       authDebugLog("support_failed", error);
     } finally {
@@ -3963,7 +4015,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     return String(value ?? "").replaceAll('"', "&quot;");
   }
 
-  const RAIL_BRIEF_KEY = "xalvion-rail-brief-v1";
+  const RAIL_BRIEF_KEY = "xalvion-rail-brief-v2";
 
   function syncSidebarCapabilityPanels() {
     if (els.sidebarCrmNew) setText(els.sidebarCrmNew, String(state.crmSummary?.new ?? 0));

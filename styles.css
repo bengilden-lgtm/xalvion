@@ -5374,7 +5374,7 @@ body{
 }
 
 .workspace-active .msg-card.assistant .customer-message-block{
-  margin-top:6px;
+  margin-top:0;
   padding-left:0;
   border-left:none;
   box-shadow:none;
@@ -5382,22 +5382,29 @@ body{
 .workspace-active .assistant-result-stack{
   display:flex;
   flex-direction:column;
-  gap:18px !important;
+  gap:20px !important;
 }
-.workspace-active .assistant-result-stack .customer-message-block{
-  order:1;
-}
-.workspace-active .assistant-result-stack .stream-trace-host{
+/* Reply first when settled; stream trace above reply only while steps are visible */
+.workspace-active .assistant-result-stack > .stream-trace-host{
   order:2;
 }
-.workspace-active .assistant-result-stack .assistant-decision-slot{
+.workspace-active .assistant-result-stack > .customer-message-block{
+  order:1;
+}
+.workspace-active .assistant-result-stack > .assistant-decision-slot{
   order:3;
 }
-.workspace-active .assistant-result-stack .assistant-brief-slot{
+.workspace-active .assistant-result-stack > .assistant-brief-slot{
   order:4;
 }
-.workspace-active .assistant-result-stack .assistant-footer{
+.workspace-active .assistant-result-stack > .assistant-footer{
   order:5;
+}
+.workspace-active .assistant-result-stack:has(> .stream-trace-host:not(.stream-trace-host--settled):not(:empty)) > .stream-trace-host{
+  order:1;
+}
+.workspace-active .assistant-result-stack:has(> .stream-trace-host:not(.stream-trace-host--settled):not(:empty)) > .customer-message-block{
+  order:2;
 }
 
 .workspace-active .messages-shell{
@@ -5541,6 +5548,9 @@ body{
 .composer-stripe-fold-summary:hover{
   color:rgba(186,198,232,0.88) !important;
 }
+.composer-stripe-fields .stripe-context-hint{
+  display:none;
+}
 
 /* Idle: slightly quieter hero so the composer leads */
 .workspace-idle .main-stage-kicker{
@@ -5548,4 +5558,245 @@ body{
 }
 .workspace-active .main-stage-kicker{
   opacity:1;
+}
+
+/* ═══ Xalvion · ruthless calm pass (readability, subtraction, no overlap) ═══ */
+
+.workspace-active .workspace-hero-hint{
+  display:none;
+}
+.workspace-idle .workspace-hero-hint{
+  display:block;
+}
+
+.workspace-active .command-brand-tag{
+  display:none;
+}
+
+.notice-sidebar .notice-header{
+  margin-bottom:0;
+}
+.notice-detail-fold{
+  margin-top:8px;
+  border:none;
+  background:transparent;
+}
+.notice-detail-fold-summary{
+  list-style:none;
+  cursor:pointer;
+  user-select:none;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:0.04em;
+  color:rgba(148,162,196,0.65);
+  padding:4px 0;
+}
+.notice-detail-fold-summary::-webkit-details-marker{ display:none; }
+.notice-detail-fold[open] .notice-detail-fold-summary{
+  color:rgba(176,190,220,0.82);
+}
+.notice-sidebar .notice-detail-wrap{
+  padding-top:8px;
+}
+
+.assistant-context-line{
+  font-size:12.5px;
+  line-height:1.5;
+  font-weight:500;
+  color:rgba(158,172,204,0.82);
+  margin:0 0 14px;
+  max-width:62ch;
+}
+.assistant-context-line[hidden]{
+  display:none !important;
+}
+
+.workspace-active .msg-card.assistant .reply-text{
+  font-size:clamp(16px,1.15vw,18px) !important;
+  line-height:1.78 !important;
+  letter-spacing:0.01em !important;
+  padding:18px 20px 22px !important;
+  border-radius:14px !important;
+  background:color-mix(in srgb, var(--l3-base) 82%, rgba(124,92,252,0.06)) !important;
+  border:1px solid rgba(255,255,255,0.045) !important;
+  box-shadow:none !important;
+}
+
+.workspace-active .assistant-decision-slot .decision-panel{
+  border:none !important;
+  border-top:1px solid rgba(124,92,252,0.22) !important;
+  padding:14px 0 16px !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+.workspace-active .decision-panel-top{
+  gap:10px !important;
+}
+.consequence-signal{
+  font-size:11px !important;
+  font-weight:600 !important;
+  letter-spacing:0.04em !important;
+  text-transform:none !important;
+  padding:6px 12px !important;
+}
+
+.approval-banner{
+  margin:0 0 12px;
+  padding:12px 14px;
+  border-radius:12px;
+  border:1px solid rgba(250,204,21,0.22);
+  background:rgba(250,204,21,0.06);
+  font-size:13px;
+  line-height:1.5;
+  color:rgba(240,244,255,0.92);
+}
+
+.assistant-meta-fold{
+  margin-top:4px;
+  border:none;
+  background:transparent;
+}
+.assistant-meta-fold-summary{
+  list-style:none;
+  cursor:pointer;
+  user-select:none;
+  width:max-content;
+  max-width:100%;
+  font-size:12px;
+  font-weight:600;
+  color:rgba(148,162,196,0.72);
+  padding:6px 0 8px;
+  letter-spacing:0.02em;
+}
+.assistant-meta-fold-summary::-webkit-details-marker{ display:none; }
+.assistant-meta-fold[open] .assistant-meta-fold-summary{
+  color:rgba(186,198,232,0.88);
+}
+.assistant-meta-fold-body{
+  padding:4px 0 0;
+}
+.assistant-meta-fold .assistant-meta{
+  margin-top:0 !important;
+  opacity:1 !important;
+  filter:none !important;
+}
+
+.workspace-active .assistant-footer{
+  align-items:flex-start;
+  flex-direction:column;
+  gap:10px;
+}
+
+.operator-brief-details .details-toggle{
+  padding:6px 0 10px !important;
+}
+
+#workspaceRoot:not(.workspace-thinking) .composer-hint-band--integrated{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
+  border-bottom:none;
+}
+#workspaceRoot.workspace-thinking .composer-hint-band--integrated,
+#workspaceRoot .composer-live .composer-hint-band--integrated{
+  position:static;
+  width:auto;
+  height:auto;
+  margin:0 0 8px;
+  padding:0 2px 10px;
+  overflow:visible;
+  clip:auto;
+  white-space:normal;
+  border-bottom:1px solid rgba(255,255,255,0.045);
+}
+
+.composer.composer-chat{
+  position:relative;
+}
+
+.workspace-active .quick-actions{
+  gap:8px !important;
+  margin-top:2px !important;
+}
+.workspace-active .chip{
+  padding:5px 11px !important;
+  font-size:11.5px !important;
+  font-weight:500 !important;
+  border-color:rgba(255,255,255,0.05) !important;
+  background:rgba(255,255,255,0.025) !important;
+  color:rgba(168,182,212,0.78) !important;
+}
+
+.sidebar-inner{
+  gap:12px !important;
+}
+.sidebar-top{
+  padding-bottom:2px;
+}
+.sidebar-nav-item{
+  padding:7px 10px !important;
+  font-size:12px !important;
+}
+.sidebar-capability-card{
+  border:none !important;
+  background:transparent !important;
+  padding:8px 0 !important;
+  gap:8px !important;
+}
+.sidebar-cap-row{
+  padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.sidebar-cap-row:last-child{
+  border-bottom:none;
+}
+.sidebar .auth-card,
+.sidebar .tier-card{
+  border:none !important;
+  padding-top:8px !important;
+}
+
+.workspace-active .msg-head{
+  opacity:0.55;
+}
+.workspace-active .msg-group:hover .msg-head,
+.workspace-active .msg-group:focus-within .msg-head{
+  opacity:0.92;
+}
+
+.workspace-active .messages-shell{
+  min-height:min(52vh,600px) !important;
+}
+
+.workspace-active .main-stage-header{
+  padding-bottom:6px !important;
+}
+.workspace-active .main-stage-title-block h1{
+  font-size:clamp(20px,2vw,26px) !important;
+}
+.workspace-active .workspace-subline{
+  font-size:12.5px !important;
+  color:rgba(158,172,204,0.78) !important;
+  max-width:56ch;
+}
+
+.stream-steps--premium{
+  margin-bottom:0 !important;
+}
+
+.workspace-active .msg-group{
+  border-bottom:none !important;
+  padding:16px 0 22px !important;
+}
+
+.decision-controls button{
+  min-height:36px !important;
+  padding:0 14px !important;
+  font-size:12px !important;
 }

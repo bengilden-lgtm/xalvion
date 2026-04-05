@@ -23,9 +23,9 @@
       <div class="command-strip-left">
         <a class="command-brand" href="/landing" title="Xalvion">
           <span class="command-brand-mark" aria-hidden="true"></span>
-          <span class="command-brand-text">
+            <span class="command-brand-text">
             <span class="command-brand-name">Xalvion</span>
-            <span class="command-brand-tag">AI prepares · You approve</span>
+            <span class="command-brand-tag" aria-hidden="true">AI prepares · You approve</span>
           </span>
         </a>
         <span id="commandModeLine" class="command-mode-pill" translate="no">Operator</span>
@@ -91,14 +91,17 @@
                 </details>
 
                 <h2 class="sr-only" id="noticeRegionLabel">Workspace status</h2>
-                <div id="notice" class="notice info notice-dense" role="status" aria-labelledby="noticeRegionLabel noticeTitle">
+                <div id="notice" class="notice info notice-dense notice-sidebar" role="status" aria-labelledby="noticeRegionLabel noticeTitle">
                   <div class="notice-header">
                     <div class="notice-dot" aria-hidden="true"></div>
                     <div id="noticeTitle" class="notice-title">Booting</div>
                   </div>
-                  <div class="notice-detail-wrap">
-                    <span id="noticeDetail" class="notice-detail">Preparing the operator workspace…</span>
-                  </div>
+                  <details class="notice-detail-fold">
+                    <summary class="notice-detail-fold-summary">Details</summary>
+                    <div class="notice-detail-wrap">
+                      <span id="noticeDetail" class="notice-detail">Preparing the operator workspace…</span>
+                    </div>
+                  </details>
                 </div>
               </section>
 
@@ -210,8 +213,8 @@
                     <div class="rail-scroll scroll-area" id="railScroll">
                       <div class="rail-inner rail-stack" id="railInner">
 
-                        <div class="rail-brief is-open rail-brief-tier-now" data-rail-brief="latest">
-                          <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleLatest">
+                        <div class="rail-brief rail-brief-tier-now" data-rail-brief="latest">
+                          <button type="button" class="rail-brief-toggle" aria-expanded="false" id="railBriefToggleLatest">
                             <span class="rail-brief-toggle-text">
                               <span class="rail-brief-tier rail-brief-tier-now">Now</span>
                               <span class="rail-brief-heading">Latest run</span>
@@ -593,7 +596,7 @@
                   <h1 id="workspacePageTitle">Customer support</h1>
                   <p id="workspaceSubcopy" class="workspace-subline">Connecting the operator workspace…</p>
                 </div>
-                <p class="main-stage-kicker" id="workspaceHeadline">Paste a ticket below. Xalvion drafts the reply and recommended action — you review and approve before anything goes to the customer.</p>
+                <p class="main-stage-kicker workspace-hero-hint" id="workspaceHeadline">Paste a ticket below. Xalvion drafts the reply and recommended action — you review and approve before anything goes to the customer.</p>
               </div>
             </header>
 
@@ -609,12 +612,12 @@
               <footer class="composer-wrap composer-dock xv-composer-foot">
                 <div class="composer-unified">
                   <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
-                    <div class="composer-hint-band">
+                    <div class="composer-hint-band composer-hint-band--integrated">
                       <div class="composer-status-cluster" role="status" aria-live="polite">
                         <span class="composer-thinking-anchor" aria-hidden="true">
                           <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm xv-spark-mark" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span>
                         </span>
-                        <p id="composerStatusLine" class="composer-status-line composer-inline-hint">Describe the case in your own words — Xalvion prepares a clear reply and the recommended next step for your review.</p>
+                        <p id="composerStatusLine" class="composer-status-line composer-inline-hint">Preparing…</p>
                       </div>
                     </div>
                     <div class="quick-actions">
@@ -632,7 +635,7 @@
                       </div>
                     </details>
                     <div class="composer-input-row composer-input-wrap">
-                      <textarea id="messageInput" placeholder="Paste the ticket, email, or a short description of the issue…" autocomplete="off"></textarea>
+                      <textarea id="messageInput" placeholder="Paste the ticket or describe the issue — Xalvion drafts a clear customer-ready reply for your review." autocomplete="off"></textarea>
                       <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                     </div>
                   </div>
