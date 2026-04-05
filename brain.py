@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import threading
 from typing import Any, Dict, List
 
 from state_store import load_state, save_state
 
 BRAIN_STATE_KEY = "brain_v1"
+
+# Process-wide reentrant lock — prevents the load → modify → save
+# race when FastAPI's thread pool runs concurrent support pipelines.
+_brain_lock = threading.RLock()
 
 
 def default_brain() -> Dict[str, Any]:
@@ -27,7 +32,8 @@ def default_brain() -> Dict[str, Any]:
 
 
 def save_brain(brain: Dict[str, Any]) -> None:
-    save_state(BRAIN_STATE_KEY, brain)
+    with _brain_lock:
+        save_state(BRAIN_STATE_KEY, brain)
 
 
 def normalize_rule(rule: Any) -> Dict[str, Any] | None:
@@ -94,12 +100,13 @@ def normalize_brain(brain: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def load_brain() -> Dict[str, Any]:
-    brain = load_state(BRAIN_STATE_KEY, default_brain())
-    brain = normalize_brain(brain)
-    if not brain.get("system_prompt"):
-        update_system_prompt(brain)
-        save_brain(brain)
-    return brain
+    with _brain_lock:
+        brain = load_state(BRAIN_STATE_KEY, default_brain())
+        brain = normalize_brain(brain)
+        if not brain.get("system_prompt"):
+            update_system_prompt(brain)
+            save_state(BRAIN_STATE_KEY, brain)
+        return brain
 
 
 def compute_rule_score(brain: Dict[str, Any], trigger: str) -> float:
@@ -128,58 +135,75 @@ def add_rule(brain: Dict[str, Any], rule: Dict[str, Any] | str) -> None:
     normalized = normalize_rule(rule)
     if not normalized:
         return
-    trigger = normalized["trigger"]
-    existing = next((r for r in brain["learned_rules"] if r.get("trigger") == trigger), None)
-    if existing is None:
-        brain["learned_rules"].append(normalized)
-        brain["rule_weights"][trigger] = 1
-        brain["rule_scores"][trigger] = 1.0
-        brain["rule_outcomes"][trigger] = {"wins": 0, "losses": 0, "closed_wins": 0}
-    else:
-        brain["rule_weights"][trigger] = min(
-            500,
-            int(brain["rule_weights"].get(trigger, 1)) + 1,
-        )
-        brain["rule_scores"][trigger] = min(
-            50.0,
-            round(float(brain["rule_scores"].get(trigger, 1.0)) + 0.2, 4),
-        )
-    update_system_prompt(brain)
-    save_brain(brain)
+    with _brain_lock:
+        # Fresh atomic load-modify-save — prevents lost-update races under
+        # concurrent FastAPI thread-pool workers.
+        state = load_state(BRAIN_STATE_KEY, default_brain())
+        state = normalize_brain(state)
+        trigger = normalized["trigger"]
+        existing = next((r for r in state["learned_rules"] if r.get("trigger") == trigger), None)
+        if existing is None:
+            state["learned_rules"].append(normalized)
+            state["rule_weights"][trigger] = 1
+            state["rule_scores"][trigger] = 1.0
+            state["rule_outcomes"][trigger] = {"wins": 0, "losses": 0, "closed_wins": 0}
+        else:
+            state["rule_weights"][trigger] = min(
+                500,
+                int(state["rule_weights"].get(trigger, 1)) + 1,
+            )
+            state["rule_scores"][trigger] = min(
+                50.0,
+                round(float(state["rule_scores"].get(trigger, 1.0)) + 0.2, 4),
+            )
+        update_system_prompt(state)
+        save_state(BRAIN_STATE_KEY, state)
+        brain.clear()
+        brain.update(state)
 
 
 def register_rule_outcome(brain: Dict[str, Any], trigger: str, *, closed: bool = False, positive: bool = True) -> None:
-    outcomes = brain.setdefault("rule_outcomes", {}).setdefault(trigger, {"wins": 0, "losses": 0, "closed_wins": 0})
-    if positive:
-        outcomes["wins"] = int(outcomes.get("wins", 0)) + 1
-        if closed:
-            outcomes["closed_wins"] = int(outcomes.get("closed_wins", 0)) + 1
-        brain.setdefault("rule_weights", {})[trigger] = int(brain.get("rule_weights", {}).get(trigger, 1)) + 1
-    else:
-        outcomes["losses"] = int(outcomes.get("losses", 0)) + 1
-        brain.setdefault("rule_weights", {})[trigger] = max(1, int(brain.get("rule_weights", {}).get(trigger, 1)) - 1)
-    brain.setdefault("rule_scores", {})[trigger] = compute_rule_score(brain, trigger)
-    update_system_prompt(brain)
-    save_brain(brain)
+    with _brain_lock:
+        state = load_state(BRAIN_STATE_KEY, default_brain())
+        state = normalize_brain(state)
+        outcomes = state.setdefault("rule_outcomes", {}).setdefault(trigger, {"wins": 0, "losses": 0, "closed_wins": 0})
+        if positive:
+            outcomes["wins"] = int(outcomes.get("wins", 0)) + 1
+            if closed:
+                outcomes["closed_wins"] = int(outcomes.get("closed_wins", 0)) + 1
+            state.setdefault("rule_weights", {})[trigger] = int(state.get("rule_weights", {}).get(trigger, 1)) + 1
+        else:
+            outcomes["losses"] = int(outcomes.get("losses", 0)) + 1
+            state.setdefault("rule_weights", {})[trigger] = max(1, int(state.get("rule_weights", {}).get(trigger, 1)) - 1)
+        state.setdefault("rule_scores", {})[trigger] = compute_rule_score(state, trigger)
+        update_system_prompt(state)
+        save_state(BRAIN_STATE_KEY, state)
+        brain.clear()
+        brain.update(state)
 
 
 def decay_rules(brain: Dict[str, Any]) -> None:
-    to_remove = []
-    for rule in brain.get("learned_rules", []):
-        trigger = rule.get("trigger", "unknown_rule")
-        current = float(brain["rule_scores"].get(trigger, 1.0)) * 0.992
-        current = min(current, 50.0)
-        brain["rule_scores"][trigger] = round(current, 4)
-        if current < 0.30:
-            to_remove.append(trigger)
-    if to_remove:
-        brain["learned_rules"] = [r for r in brain["learned_rules"] if r.get("trigger") not in to_remove]
-        for trigger in to_remove:
-            brain["rule_scores"].pop(trigger, None)
-            brain["rule_weights"].pop(trigger, None)
-            brain["rule_outcomes"].pop(trigger, None)
-    update_system_prompt(brain)
-    save_brain(brain)
+    with _brain_lock:
+        state = load_state(BRAIN_STATE_KEY, default_brain())
+        state = normalize_brain(state)
+        to_remove = []
+        for rule in state.get("learned_rules", []):
+            trigger = rule.get("trigger", "unknown_rule")
+            score = float(state["rule_scores"].get(trigger, 1.0)) * 0.992
+            score = min(score, 50.0)
+            state["rule_scores"][trigger] = round(score, 4)
+            if score < 0.30:
+                to_remove.append(trigger)
+        if to_remove:
+            state["learned_rules"] = [r for r in state["learned_rules"] if r.get("trigger") not in to_remove]
+            for trigger in to_remove:
+                state["rule_scores"].pop(trigger, None)
+                state["rule_weights"].pop(trigger, None)
+                state["rule_outcomes"].pop(trigger, None)
+        update_system_prompt(state)
+        save_state(BRAIN_STATE_KEY, state)
+        brain.clear()
+        brain.update(state)
 
 
 def build_system_prompt(brain: Dict[str, Any]) -> str:

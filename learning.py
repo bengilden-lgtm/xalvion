@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from typing import Any, Dict, List
+
+_rules_lock = threading.Lock()
 
 from brain import add_rule, get_top_rule_objects, load_brain, register_rule_outcome, save_brain
 
@@ -20,17 +23,19 @@ PATTERN_STORE_KEY = "decision_patterns_v1"
 def load_rules() -> List[Dict[str, Any]]:
     if not os.path.exists(RULES_FILE):
         return []
-    try:
-        with open(RULES_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data if isinstance(data, list) else []
-    except Exception:
-        return []
+    with _rules_lock:
+        try:
+            with open(RULES_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except Exception:
+            return []
 
 
 def save_rules(rules: List[Dict[str, Any]]) -> None:
-    with open(RULES_FILE, "w", encoding="utf-8") as f:
-        json.dump(rules, f, indent=2, ensure_ascii=False)
+    with _rules_lock:
+        with open(RULES_FILE, "w", encoding="utf-8") as f:
+            json.dump(rules, f, indent=2, ensure_ascii=False)
 
 
 def validate_rule(rule: Dict[str, Any]) -> bool:
@@ -55,14 +60,61 @@ def simulate_rule(rule: Dict[str, Any]) -> bool:
     return True
 
 
+def _credit_amount(base: int, ltv: int, sentiment: int) -> int:
+    """Scale credit amount with LTV wealth and sentiment urgency, capped at validate_rule's $45 ceiling."""
+    ltv_boost = min(10, int(ltv / 200))
+    sentiment_boost = max(0, (4 - min(sentiment, 4)) * 2)
+    return min(45, base + ltv_boost + sentiment_boost)
+
+
 def _candidate_rule(ticket: Dict[str, Any], decision: Dict[str, Any]) -> Dict[str, Any] | None:
     sentiment = int(ticket.get("sentiment", 5) or 5)
     ltv = int(ticket.get("ltv", 0) or 0)
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
-    if sentiment <= 3 and decision.get("action") == "none":
-        return {"trigger": "low_sentiment_no_action", "condition": {"sentiment": "<=3", "issue_type": issue_type}, "action": {"type": "credit", "amount": 15}, "weight": 1.0, "last_used": time.time()}
-    if ltv > 800 and decision.get("action") == "none":
-        return {"trigger": "high_ltv_protection", "condition": {"ltv": ">800", "issue_type": issue_type}, "action": {"type": "credit", "amount": 30}, "weight": 1.0, "last_used": time.time()}
+    action = str(decision.get("action", "none") or "none")
+    triage = ticket.get("triage") or {}
+    urgency = int(triage.get("urgency", 50) or 50)
+
+    if sentiment <= 3 and action == "none":
+        return {
+            "trigger": "low_sentiment_no_action",
+            "condition": {"sentiment": "<=3", "issue_type": issue_type},
+            "action": {"type": "credit", "amount": _credit_amount(15, ltv, sentiment)},
+            "weight": 1.0,
+            "last_used": time.time(),
+        }
+    if ltv > 800 and action == "none":
+        return {
+            "trigger": "high_ltv_protection",
+            "condition": {"ltv": ">800", "issue_type": issue_type},
+            "action": {"type": "credit", "amount": _credit_amount(25, ltv, sentiment)},
+            "weight": 1.0,
+            "last_used": time.time(),
+        }
+    if issue_type == "damaged_order" and sentiment <= 4 and action == "none":
+        return {
+            "trigger": "damaged_order_recovery",
+            "condition": {"issue_type": "damaged_order", "sentiment": "<=4"},
+            "action": {"type": "credit", "amount": _credit_amount(20, ltv, sentiment)},
+            "weight": 1.0,
+            "last_used": time.time(),
+        }
+    if issue_type == "shipping_issue" and sentiment <= 3 and ltv > 200:
+        return {
+            "trigger": "shipping_frustration_vip",
+            "condition": {"issue_type": "shipping_issue", "sentiment": "<=3"},
+            "action": {"type": "credit", "amount": _credit_amount(12, ltv, sentiment)},
+            "weight": 1.0,
+            "last_used": time.time(),
+        }
+    if urgency >= 75 and action == "none" and ltv > 500:
+        return {
+            "trigger": "high_urgency_vip_rescue",
+            "condition": {"urgency_gte": 75, "ltv": ">500"},
+            "action": {"type": "credit", "amount": _credit_amount(18, ltv, sentiment)},
+            "weight": 1.0,
+            "last_used": time.time(),
+        }
     return None
 
 
