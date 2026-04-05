@@ -223,7 +223,7 @@
           <div class="operator-rail-intel-compact">
             <span class="operator-rail-live-badge"><span class="operator-rail-live-pulse" aria-hidden="true"></span> Live</span>
             <div class="operator-rail-title">Operator rail</div>
-            <p class="operator-rail-sub">Outcome, value, capacity, billing, and pipeline — visible while you work.</p>
+            <p class="operator-rail-sub">Latest run, session value, and throughput stay above the fold; everything else tucks into More.</p>
           </div>
         </div>
         <div class="rail-scroll-host scroll-shell" id="railScrollShell" data-show-top="false" data-show-bottom="false">
@@ -272,140 +272,53 @@
               </div>
             </div>
 
-            <div class="rail-brief is-open rail-brief-tier-session" data-rail-brief="value">
+            <div class="rail-brief is-open rail-brief-tier-session rail-brief-snapshot-combo" data-rail-brief="value">
               <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleValue">
                 <span class="rail-brief-toggle-text">
                   <span class="rail-brief-tier rail-brief-tier-session">Session</span>
-                  <span class="rail-brief-heading">Value generated</span>
+                  <span class="rail-brief-heading">Value &amp; throughput</span>
                 </span>
                 <span class="rail-brief-chevron" aria-hidden="true"></span>
               </button>
               <div class="rail-brief-panel" id="railBriefPanelValue">
-            <div class="rail-card rail-surface rail-subtle rail-card-nested">
-              <p class="muted-copy rail-teaser" id="valueRailTeaser">Session and billing impact from your workspace activity.</p>
-              <div class="value-gen-grid">
-                <div class="value-gen-cell">
-                  <div class="value-gen-label">Money moved</div>
-                  <div class="value-gen-num" id="railValueMoney">$0.00</div>
-                </div>
-                <div class="value-gen-cell">
-                  <div class="value-gen-label">Time saved</div>
-                  <div class="value-gen-num" id="railValueTime">—</div>
-                </div>
-                <div class="value-gen-cell">
-                  <div class="value-gen-label">Actions</div>
-                  <div class="value-gen-num" id="railValueActions">0</div>
-                </div>
-                <div class="value-gen-cell">
-                  <div class="value-gen-label">Plan</div>
-                  <div class="value-gen-num tier-pill" id="railSessionTier">FREE</div>
-                </div>
-              </div>
-            </div>
-              </div>
-            </div>
-
-            <div class="rail-brief rail-brief-tier-volume" data-rail-brief="throughput">
-              <button type="button" class="rail-brief-toggle" aria-expanded="false" id="railBriefToggleThroughput">
-                <span class="rail-brief-toggle-text">
-                  <span class="rail-brief-tier rail-brief-tier-volume">Volume</span>
-                  <span class="rail-brief-heading">Throughput</span>
-                </span>
-                <span class="rail-brief-chevron" aria-hidden="true"></span>
-              </button>
-              <div class="rail-brief-panel" id="railBriefPanelThroughput">
-            <div class="rail-card rail-surface rail-metrics-card rail-card-nested" id="dashboardCard">
-              <div class="stat-grid stat-grid-split">
-                <div class="stat-box">
-                  <div id="statInteractions" class="stat-value">0</div>
-                  <div class="stat-label">Tickets handled</div>
-                  <div class="stat-context">Today</div>
-                </div>
-                <div class="stat-divider" aria-hidden="true"></div>
-                <div class="stat-box">
-                  <div id="statActions" class="stat-value">0</div>
-                  <div class="stat-label">Actions completed</div>
-                  <div class="stat-context">Session</div>
-                </div>
-              </div>
-            </div>
-              </div>
-            </div>
-
-            <div class="rail-brief is-open rail-brief-tier-billing" data-rail-brief="refund">
-              <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleRefund">
-                <span class="rail-brief-toggle-text">
-                  <span class="rail-brief-tier rail-brief-tier-billing">Billing</span>
-                  <span class="rail-brief-heading">Refund center · lock state</span>
-                </span>
-                <span class="rail-brief-chevron" aria-hidden="true"></span>
-              </button>
-              <div class="rail-brief-panel" id="railBriefPanelRefund">
-            <div class="rail-card rail-surface refund-card rail-card-nested" id="refundCenterCard">
-              <div class="refund-summary refund-summary-top">
-                <div class="refund-col refund-col-tier">
-                  <div class="refund-metric-label">Tier access</div>
-                  <div class="refund-upgrade-wrap">
-                    <div class="refund-upgrade-card">
-                      <div class="refund-upgrade-title">Unlock live refund execution</div>
-                      <div class="refund-upgrade-sub" id="refundUpgradeTease">Execute refunds from the workspace · Available on Pro and Elite</div>
+                <div class="rail-snapshot-combo">
+                  <div class="rail-card rail-surface rail-subtle rail-card-nested rail-value-card">
+                    <p class="muted-copy rail-teaser" id="valueRailTeaser">Session and billing impact from your workspace activity.</p>
+                    <div class="value-gen-grid">
+                      <div class="value-gen-cell">
+                        <div class="value-gen-label">Money moved</div>
+                        <div class="value-gen-num" id="railValueMoney">$0.00</div>
+                      </div>
+                      <div class="value-gen-cell">
+                        <div class="value-gen-label">Time saved</div>
+                        <div class="value-gen-num" id="railValueTime">—</div>
+                      </div>
+                      <div class="value-gen-cell">
+                        <div class="value-gen-label">Actions</div>
+                        <div class="value-gen-num" id="railValueActions">0</div>
+                      </div>
+                      <div class="value-gen-cell">
+                        <div class="value-gen-label">Plan</div>
+                        <div class="value-gen-num tier-pill" id="railSessionTier">FREE</div>
+                      </div>
                     </div>
-                    <div id="refundTierAccess" class="refund-tier-ready">Ready</div>
+                  </div>
+                  <div class="rail-card rail-surface rail-metrics-card rail-card-nested rail-throughput-compact" id="dashboardCard">
+                    <div class="stat-grid stat-grid-split">
+                      <div class="stat-box">
+                        <div id="statInteractions" class="stat-value">0</div>
+                        <div class="stat-label">Tickets handled</div>
+                        <div class="stat-context">Today</div>
+                      </div>
+                      <div class="stat-divider" aria-hidden="true"></div>
+                      <div class="stat-box">
+                        <div id="statActions" class="stat-value">0</div>
+                        <div class="stat-label">Actions completed</div>
+                        <div class="stat-context">Session</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="refund-summary-divider" aria-hidden="true"></div>
-                <div class="refund-col refund-col-recent">
-                  <div class="refund-recent-head">
-                    <span class="refund-metric-label">Recent refunds</span>
-                    <span id="refundHistoryCount" class="refund-metric-count">0</span>
-                  </div>
-                </div>
-              </div>
-              <div id="refundCenterCopy" class="refund-copy">Connect Stripe, paste a payment intent or charge ID, and execute refunds from the workspace without using the browser console.</div>
-              <div class="refund-actions">
-                <button id="openRefundModalBtn" class="btn refund-cta-btn" type="button">Upgrade to unlock</button>
-                <button id="refreshRefundHistoryBtn" class="refund-link-refresh" type="button">Refresh refund history</button>
-              </div>
-              <div id="refundHistoryList" class="refund-list">
-                <div class="refund-empty">No refund activity yet. Refunds will appear here with status and timestamp.</div>
-              </div>
-            </div>
-              </div>
-            </div>
-
-            <div class="rail-brief is-open rail-brief-tier-quota" data-rail-brief="usage">
-              <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleUsage">
-                <span class="rail-brief-toggle-text">
-                  <span class="rail-brief-tier rail-brief-tier-quota">Quota</span>
-                  <span class="rail-brief-heading">Plan usage</span>
-                </span>
-                <span class="rail-brief-chevron" aria-hidden="true"></span>
-              </button>
-              <div class="rail-brief-panel" id="railBriefPanelUsage">
-            <div class="rail-card rail-surface rail-card-nested" id="usageCard">
-              <div class="usage-block">
-                <div class="plan-grid">
-                  <div class="plan-box">
-                    <div id="planTier" class="stat-value">FREE</div>
-                    <div class="stat-label">Current tier</div>
-                  </div>
-                  <div class="plan-box">
-                    <div id="planUsed" class="stat-value">0</div>
-                    <div class="stat-label">Used</div>
-                  </div>
-                </div>
-                <div class="usage-line">
-                  <span>Limit</span>
-                  <span id="planUsage">50</span>
-                </div>
-                <div class="usage-line">
-                  <span>Remaining</span>
-                  <span id="planRemaining">50</span>
-                </div>
-                <div class="usage-bar"><div id="planBar"></div></div>
-                <div id="usagePanelCopy" class="muted-copy">Your plan sets the amount of support usage available each month.</div>
-              </div>
-            </div>
               </div>
             </div>
 
@@ -425,7 +338,7 @@
               </div>
             </div>
 
-            <div class="rail-card rail-surface" id="crmTodayCard">
+            <div class="rail-card rail-surface rail-pipeline-snapshot" id="crmTodayCard">
               <div class="rail-title">Today</div>
               <div id="crmTodaySummary" class="muted-copy">Sign in to see today’s pipeline, hot deals, and reminder load.</div>
               <div class="refund-summary" style="margin-top:10px">
@@ -456,7 +369,7 @@
               </div>
             </div>
 
-            <div class="rail-card rail-surface" id="revenueCard">
+            <div class="rail-card rail-surface rail-pipeline-snapshot" id="revenueCard">
               <div class="rail-title">Revenue Dashboard</div>
               <div id="revenueSummary" class="muted-copy">Track source performance, reply rate, win rate, and closed revenue as pipeline moves.</div>
               <div class="refund-summary" style="margin-top:10px">
@@ -494,6 +407,72 @@
               </div>
               <div id="sourceList" class="refund-list">
                 <div class="refund-empty">No source performance data yet.</div>
+              </div>
+            </div>
+
+            <details class="rail-details-more">
+              <summary class="rail-details-summary">
+                <span class="rail-details-summary-inner">
+                  <span class="rail-details-title">More</span>
+                  <span class="rail-details-hint">Billing · quota · forecast · queue · system</span>
+                </span>
+                <span class="rail-details-chevron" aria-hidden="true"></span>
+              </summary>
+              <div class="rail-details-body">
+            <div class="rail-card rail-surface refund-card rail-card-nested rail-more-section" id="refundCenterCard">
+              <div class="rail-inline-section-label">Refund center</div>
+              <div class="refund-summary refund-summary-top">
+                <div class="refund-col refund-col-tier">
+                  <div class="refund-metric-label">Tier access</div>
+                  <div class="refund-upgrade-wrap">
+                    <div class="refund-upgrade-card">
+                      <div class="refund-upgrade-title">Unlock live refund execution</div>
+                      <div class="refund-upgrade-sub" id="refundUpgradeTease">Execute refunds from the workspace · Available on Pro and Elite</div>
+                    </div>
+                    <div id="refundTierAccess" class="refund-tier-ready">Ready</div>
+                  </div>
+                </div>
+                <div class="refund-summary-divider" aria-hidden="true"></div>
+                <div class="refund-col refund-col-recent">
+                  <div class="refund-recent-head">
+                    <span class="refund-metric-label">Recent refunds</span>
+                    <span id="refundHistoryCount" class="refund-metric-count">0</span>
+                  </div>
+                </div>
+              </div>
+              <div id="refundCenterCopy" class="refund-copy">Connect Stripe, paste a payment intent or charge ID, and execute refunds from the workspace without using the browser console.</div>
+              <div class="refund-actions">
+                <button id="openRefundModalBtn" class="btn refund-cta-btn" type="button">Upgrade to unlock</button>
+                <button id="refreshRefundHistoryBtn" class="refund-link-refresh" type="button">Refresh refund history</button>
+              </div>
+              <div id="refundHistoryList" class="refund-list">
+                <div class="refund-empty">No refund activity yet. Refunds will appear here with status and timestamp.</div>
+              </div>
+            </div>
+
+            <div class="rail-card rail-surface rail-card-nested rail-more-section" id="usageCard">
+              <div class="rail-inline-section-label">Plan usage</div>
+              <div class="usage-block">
+                <div class="plan-grid">
+                  <div class="plan-box">
+                    <div id="planTier" class="stat-value">FREE</div>
+                    <div class="stat-label">Current tier</div>
+                  </div>
+                  <div class="plan-box">
+                    <div id="planUsed" class="stat-value">0</div>
+                    <div class="stat-label">Used</div>
+                  </div>
+                </div>
+                <div class="usage-line">
+                  <span>Limit</span>
+                  <span id="planUsage">50</span>
+                </div>
+                <div class="usage-line">
+                  <span>Remaining</span>
+                  <span id="planRemaining">50</span>
+                </div>
+                <div class="usage-bar"><div id="planBar"></div></div>
+                <div id="usagePanelCopy" class="muted-copy">Your plan sets the amount of support usage available each month.</div>
               </div>
             </div>
 
@@ -594,6 +573,8 @@
                 Clear request handling is active and ready for the next conversation.
               </div>
             </div>
+              </div>
+            </details>
           </div>
         </div>
         </div>
