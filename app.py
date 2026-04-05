@@ -1883,6 +1883,16 @@ def debug_refund_mode():
     }
 
 
+@app.get("/debug/build-fingerprint")
+def debug_build_fingerprint():
+    return {
+        "app_name": "xalvion",
+        "health_mode": "shallow-ok",
+        "has_workspace_modules_route": True,
+        "timestamp_hint": "2026-04-05-current-app-py",
+    }
+
+
 @app.get("/debug/payment-intent/{payment_intent_id}")
 def debug_payment_intent(payment_intent_id: str):
     try:
