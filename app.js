@@ -1386,7 +1386,14 @@ The workspace already showed you real routing and approval discipline. Pro keeps
         el.classList.add("is-warning");
         el.textContent = `${state.usage} of ${state.limit} runs this month · ${state.remaining} left`;
       } else {
-        el.textContent = `${formatTier(state.tier)} · ${state.remaining} of ${state.limit} runs left this month`;
+        const tier = String(state.tier || "free").toLowerCase();
+        const suffix =
+          tier === "elite" || tier === "dev"
+            ? " · operator-scale capacity"
+            : tier === "pro"
+              ? " · Pro throughput envelope"
+              : " · upgrade when the queue earns it";
+        el.textContent = `${formatTier(state.tier)} · ${state.remaining} of ${state.limit} runs left this month${suffix}`;
       }
     }
     syncMonetizationChrome();
@@ -1519,13 +1526,13 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     const tier = String(state.tier || "free").toLowerCase();
     const upgradeHint =
       tier === "free"
-        ? " Pro adds 500 runs/month + live refunds."
+        ? " Pro unlocks 500 runs/month and live refund execution in-place."
         : tier === "pro"
-          ? " Elite adds 5k runs/month + advanced analytics."
+          ? " Elite lifts the ceiling to 5k runs/month with deeper analytics."
           : "";
     el.textContent =
       tickets > 0 || money > 0 || actions > 0 || mins > 0
-        ? `Workspace value so far: ${tickets} tickets · ${formatMoney(money)} through billing actions (${actions} motions) · ~${mins} min saved.${upgradeHint}`
+        ? `This workspace has already surfaced ${formatMoney(money)} across ${tickets} tickets (${actions} billing motions, ~${mins} min operator time).${upgradeHint}`
         : "";
     el.style.display = tickets > 0 || money > 0 || actions > 0 || mins > 0 ? "block" : "none";
   }
@@ -1758,9 +1765,12 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (els.workspaceSubcopy) {
       if (state.latestRun) {
         const decision = state.latestRun.decision || {};
-        const posture = operatorPostureLabel(state.latestRun);
-        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${posture} · ${formatMetric(state.latestRun.confidence || 0, 2)} conf`;
-        if (els.workspaceSubcopyTier) els.workspaceSubcopyTier.hidden = true;
+        const sig = deriveConsequenceSignal(state.latestRun);
+        els.workspaceSubcopy.textContent = `${displayActionLabel(state.latestRun)} · ${sig.text}`;
+        if (els.workspaceSubcopyTier) {
+          els.workspaceSubcopyTier.hidden = false;
+          els.workspaceSubcopyTier.textContent = `${formatTier(state.tier)} · ${displayQueueLabel({ decision })} · ${operatorPostureLabel(state.latestRun)} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence`;
+        }
       } else if (state.username) {
         els.workspaceSubcopy.textContent = "Get a customer-ready reply instantly";
         if (els.workspaceSubcopyTier) {
@@ -1877,15 +1887,15 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       role === "assistant"
         ? `<div class="msg-body assistant-canvas">
         <div class="stream-trace-host"></div>
-        <div class="assistant-result-stack">
+        <div class="assistant-result-stack assistant-result-stack--decision-first">
           <div class="assistant-decision-slot" data-slot="decision"></div>
-          <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="customer-message-block">
             <div class="assistant-context-line js-assistant-context" hidden></div>
             <div class="customer-message-label reply-hero-label">Customer-ready reply</div>
             <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared by Xalvion — ready to review</div>
             <div class="reply-text js-reply-text">${bodyHtml}</div>
           </div>
+          <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="assistant-footer js-assistant-footer"></div>
         </div>
       </div>`
@@ -2089,39 +2099,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function createMetaRow(data = {}) {
     const meta = document.createElement("div");
-    meta.className = "assistant-meta";
-
+    meta.className = "assistant-meta assistant-meta--inline";
     const confidence = Number(data.confidence || 0);
-
-    meta.appendChild(
-      createMetaChip({
-        icon: ICONS.pulse,
-        text: `${formatMetric(confidence, 2)} conf`,
-        tone: confidenceTone(confidence)
-      })
-    );
-
-    meta.appendChild(
-      createMetaChip({
-        icon: ICONS.spark,
-        text: displayActionLabel(data)
-      })
-    );
-
-    meta.appendChild(
-      createMetaChip({
-        icon: ICONS.ticket,
-        text: displayQueueLabel(data)
-      })
-    );
-
-    meta.appendChild(
-      createMetaChip({
-        icon: ICONS.shield,
-        text: displayRiskLabel(data)
-      })
-    );
-
+    const q = Number(data.quality || 0);
+    const qBit = q > 0 ? `Outcome ${formatMetric(q, 1)} · ` : "";
+    meta.innerHTML = `<span class="assistant-meta-inline">${qBit}${formatMetric(confidence, 2)} confidence · ${escapeHtml(displayQueueLabel(data))} · ${escapeHtml(displayRiskLabel(data))}</span>`;
     return meta;
   }
 
@@ -2130,7 +2112,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     fold.className = "assistant-meta-fold";
     const sum = document.createElement("summary");
     sum.className = "assistant-meta-fold-summary";
-    sum.textContent = "Details";
+    sum.textContent = "Run telemetry";
     const body = document.createElement("div");
     body.className = "assistant-meta-fold-body";
     body.appendChild(metaRow);
@@ -2192,6 +2174,29 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     return "Clear to send";
   }
 
+  function outcomeQualityLabel(data = {}) {
+    const q = Number(data.quality || 0);
+    if (!Number.isFinite(q) || q <= 0) return "—";
+    const fmt = globalThis.__XALVION_FORMAT__;
+    if (fmt && typeof fmt.formatOutcomeQuality === "function") {
+      return `${fmt.formatOutcomeQuality(q)} · ${formatMetric(q, 1)}`;
+    }
+    if (q < 2) return `Low · ${formatMetric(q, 1)}`;
+    if (q < 3.5) return `Moderate · ${formatMetric(q, 1)}`;
+    if (q < 4.5) return `Strong · ${formatMetric(q, 1)}`;
+    return `Excellent · ${formatMetric(q, 1)}`;
+  }
+
+  function costExposureSummary(impact = {}) {
+    const refund = Number(impact.refund_cost || 0);
+    const atRisk = Number(impact.revenue_at_risk || 0);
+    const parts = [];
+    if (refund > 0) parts.push(`Refund ${formatMoney(refund)}`);
+    if (atRisk > 0) parts.push(`At-risk ${formatMoney(atRisk)}`);
+    if (!parts.length) return "—";
+    return parts.join(" · ");
+  }
+
   function normalizeWorkspaceResult(data) {
     if (!data || typeof data !== "object") return data;
     const out = { ...data };
@@ -2206,6 +2211,16 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const tri = out.triage_metadata;
     if (tri && typeof tri === "object") {
       out.triage = { ...(out.triage || {}), ...tri };
+    }
+    const dex = out.decision_explanation;
+    if (dex && typeof dex === "object") {
+      if (!out.execution_tier && dex.execution_tier) {
+        out.execution_tier = dex.execution_tier;
+      }
+      const proj = dex.projected_impact;
+      if (proj && typeof proj === "object") {
+        out.impact = { ...(out.impact || {}), ...proj };
+      }
     }
     return out;
   }
@@ -2376,31 +2391,35 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const risk = String(dec.risk_level || data.triage?.risk_level || "").toLowerCase();
     if (risk === "high") {
       return {
+        variant: "high_risk",
         cls: "signal-high-risk",
-        text: "⚠ High risk",
+        text: "High risk",
         title: "Elevated risk — review before customer send",
       };
     }
     const tier = String(data.execution_tier || "").toLowerCase();
     if (tier === "safe_autopilot_ready") {
       return {
+        variant: "safe",
         cls: "signal-safe",
-        text: "✓ Safe to automate",
-        title: "Meets all automation safety criteria"
+        text: "Safe to automate",
+        title: "Meets all automation safety criteria",
       };
     }
     if (tier === "assist_only") {
       return {
+        variant: "review",
         cls: "signal-review",
-        text: "○ Manual review",
-        title: "Risk signals require human decision"
+        text: "Manual review",
+        title: "Risk signals require human decision",
       };
     }
     if (tier === "approval_required") {
       return {
+        variant: "approval",
         cls: "signal-approval",
-        text: "⚡ Approval required",
-        title: "Awaiting operator approval"
+        text: "Approval required",
+        title: "Awaiting operator approval",
       };
     }
 
@@ -2410,11 +2429,13 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision"
     );
     const money = action === "refund" || action === "charge" || action === "credit";
-    if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
-    if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
-      return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
+    if (req && money) {
+      return { variant: "approval", cls: "signal-approval", text: "Approval required", title: "" };
     }
-    return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
+    if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
+      return { variant: "review", cls: "signal-review", text: "Review recommended", title: "" };
+    }
+    return { variant: "safe", cls: "signal-safe", text: "Safe to send", title: "" };
   }
 
   function mountOperatorDecisionPanel(row, data, initialReply) {
@@ -2434,10 +2455,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     ).trim();
 
     const panel = document.createElement("div");
-    panel.className = "decision-panel";
+    panel.className = `decision-panel decision-panel--consequence-${sig.variant || "safe"}`;
+    panel.dataset.consequenceVariant = sig.variant || "safe";
     panel.innerHTML = `
       <div class="decision-panel-top">
-        <span class="consequence-signal ${sig.cls}" data-role="consequence">${escapeHtml(sig.text)}</span>
+        <span class="consequence-signal ${sig.cls}" data-role="consequence" data-consequence="${escapeHtml(sig.variant || "safe")}">${escapeHtml(sig.text)}</span>
         <div class="decision-controls" data-role="controls"></div>
       </div>
       <div class="decision-panel-note" data-role="note" style="display:none"></div>
@@ -2891,7 +2913,9 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           ${createDetailBox("Risk", riskLabel(data))}
           ${createDetailBox("Priority", String(decision.priority || "medium"))}
           ${createDetailBox("Tool status", toolStatus)}
-          ${createDetailBox("Value surfaced", formatMoney(impact.money_saved || impact.amount || data.amount || 0))}
+          ${createDetailBox("Money saved", formatMoney(impact.money_saved || impact.revenue_saved || impact.amount || data.amount || 0))}
+          ${createDetailBox("Cost exposure", costExposureSummary(impact))}
+          ${createDetailBox("Outcome quality", outcomeQualityLabel(data))}
         </div>
         ${policyNote && policyNote !== internalNote ? `<div class="details-note">${escapeHtml(policyNote)}</div>` : ""}
         ${internalNote ? `<div class="details-note">${escapeHtml(internalNote)}</div>` : ""}
@@ -3218,10 +3242,28 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       <div class="panel-head">
         <div>
           <div class="panel-title">Latest operator run</div>
-          <div class="panel-copy">Posture, value surfaced, and time saved — same signals your sidepanel traces, condensed for the rail.</div>
+          <div class="panel-copy">Impact, exposure, and approval posture from the latest structured response.</div>
         </div>
       </div>
-      <div class="ops-grid">
+      <div class="ops-impact-primary" role="group" aria-label="Impact">
+        <div class="ops-metric ops-metric--impact">
+          <div class="ops-metric-label">Money saved</div>
+          <div class="ops-metric-value" id="opsLatestValue">$0</div>
+        </div>
+        <div class="ops-metric ops-metric--impact">
+          <div class="ops-metric-label">Cost exposure</div>
+          <div class="ops-metric-value" id="opsCostExposure">—</div>
+        </div>
+        <div class="ops-metric ops-metric--impact">
+          <div class="ops-metric-label">Time saved</div>
+          <div class="ops-metric-value" id="opsTimeSaved">—</div>
+        </div>
+        <div class="ops-metric ops-metric--impact">
+          <div class="ops-metric-label">Outcome quality</div>
+          <div class="ops-metric-value" id="opsOutcomeQuality">—</div>
+        </div>
+      </div>
+      <div class="ops-impact-lane ops-grid ops-grid--lane" role="group" aria-label="Routing and posture">
         <div class="ops-metric">
           <div class="ops-metric-label">Action</div>
           <div class="ops-metric-value" id="opsLatestAction">—</div>
@@ -3231,23 +3273,15 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="ops-metric-value" id="opsLatestQueue">—</div>
         </div>
         <div class="ops-metric">
-          <div class="ops-metric-label">Confidence</div>
-          <div class="ops-metric-value" id="opsLatestConfidence">0.00</div>
-        </div>
-        <div class="ops-metric">
-          <div class="ops-metric-label">Protected</div>
-          <div class="ops-metric-value" id="opsLatestValue">$0</div>
-        </div>
-        <div class="ops-metric">
-          <div class="ops-metric-label">Est. time saved</div>
-          <div class="ops-metric-value" id="opsTimeSaved">—</div>
-        </div>
-        <div class="ops-metric">
-          <div class="ops-metric-label">Posture</div>
+          <div class="ops-metric-label">Approval posture</div>
           <div class="ops-metric-value" id="opsPosture">—</div>
         </div>
+        <div class="ops-metric ops-metric--tertiary">
+          <div class="ops-metric-label">Model confidence</div>
+          <div class="ops-metric-value" id="opsLatestConfidence">0.00</div>
+        </div>
       </div>
-      <div class="ops-run-line" id="opsRunNarrative">${ICONS.spark}<span>Waiting for the next operator run.</span></div>
+      <div class="ops-run-line" id="opsRunNarrative">${ICONS.spark}<span class="ops-narrative-text">Waiting for the next operator run.</span></div>
     `;
 
     if (els.railInner) els.railInner.appendChild(card);
@@ -3266,37 +3300,43 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const latestTime = document.getElementById("opsTimeSaved");
     const latestPosture = document.getElementById("opsPosture");
     const latestNarrative = document.getElementById("opsRunNarrative");
+    const latestExposure = document.getElementById("opsCostExposure");
+    const latestQuality = document.getElementById("opsOutcomeQuality");
 
     const decision = data.decision || {};
     const triage = data.triage || {};
     const impact = data.impact || {};
-    const mins = Number(impact.agent_minutes_saved || impact.time_saved_est_min || 0);
+    const minsRaw = Number(impact.agent_minutes_saved || impact.time_saved_est_min || impact.time_saved || 0);
+    const mins = Number.isFinite(minsRaw) ? minsRaw : 0;
+    const sig = deriveConsequenceSignal(data);
 
     if (latestAction) latestAction.textContent = displayActionLabel(data);
     if (latestQueue) latestQueue.textContent = displayQueueLabel({ decision });
     if (latestConfidence) latestConfidence.textContent = formatMetric(data.confidence || 0, 2);
-    if (latestValue) latestValue.textContent = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
+    if (latestValue) {
+      latestValue.textContent = formatMoney(
+        impact.money_saved || impact.revenue_saved || impact.amount || data.amount || 0
+      );
+    }
+    if (latestExposure) latestExposure.textContent = costExposureSummary(impact);
     if (latestTime) {
       latestTime.textContent = mins > 0 ? `${Math.round(mins)} min` : "—";
     }
-    if (latestPosture) latestPosture.textContent = operatorPostureLabel(data);
+    if (latestQuality) latestQuality.textContent = outcomeQualityLabel(data);
+    if (latestPosture) latestPosture.textContent = sig.text;
 
     if (latestNarrative) {
       const reason = explainWhyAction(data);
-      const value = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
-      const posture = operatorPostureLabel(data);
+      const value = formatMoney(impact.money_saved || impact.revenue_saved || impact.amount || data.amount || 0);
       const risk = String(decision.risk_level || triage.risk_level || "medium");
-      const line = `Operator system · ${posture} · ${risk} risk · value surfaced ${value}. ${reason}`;
+      const line = `${sig.text} · ${risk} risk · value ${value}. ${reason}`;
       const sub = latestNarrative.querySelector(".ops-narrative-text");
       if (sub) sub.textContent = line;
       else latestNarrative.innerHTML = `${ICONS.spark}<span class="ops-narrative-text">${escapeHtml(line)}</span>`;
     }
 
     if (els.railRunSummary) {
-      const it = String(
-        data.issue_type || data.meta?.issue_type || data.decision?.issue_type || "general_support"
-      ).replace(/_/g, " ");
-      els.railRunSummary.textContent = `${it} · ${displayActionLabel(data)} · conf ${formatMetric(data.confidence || 0, 2)}`;
+      els.railRunSummary.textContent = `${displayActionLabel(data)} · ${sig.text}`;
     }
     syncApprovalRail(data);
   }
@@ -4058,7 +4098,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     updateSystemNarrative(null);
     updateTopbarStatus();
     syncApprovalRail(null);
-    if (els.railRunSummary) els.railRunSummary.textContent = "Issue type, action, confidence — updates after each support run.";
+    if (els.railRunSummary) els.railRunSummary.textContent = "Latest decision and impact surface here after each run.";
     scrollMessagesToBottom(true);
   }
 

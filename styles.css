@@ -2370,10 +2370,6 @@ h4{font-size:var(--text-base);font-weight:var(--weight-medium);color:var(--text-
   filter:saturate(0.83);
 }
 .decision-panel-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--sp-3)}
-.consequence-signal{display:inline-flex;align-items:center;gap:var(--space-2);padding:4px 12px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase}
-.signal-approval{background:rgba(124,92,252,0.12);border:1px solid rgba(124,92,252,0.30);color:rgba(180,160,255,0.95)}
-.signal-safe{background:rgba(56,217,150,0.10);border:1px solid rgba(56,217,150,0.25);color:rgba(56,217,150,0.95)}
-.signal-review{background:rgba(124,92,252,0.12);border:1px solid rgba(124,92,252,0.30);color:rgba(180,160,255,0.95)}
 .decision-controls{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-2)}
 .decision-panel.decision-state-approved .decision-state-pill,
 .decision-panel.decision-state-rejected .decision-state-pill{
@@ -3352,6 +3348,32 @@ body{
   line-height:1.55;
   color:var(--text-secondary);
 }
+.ops-impact-primary{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:var(--sp-2);
+  margin-bottom:var(--sp-2);
+}
+.ops-impact-lane.ops-grid--lane{
+  margin-top:var(--sp-1);
+}
+.ops-metric--impact{
+  background:color-mix(in srgb, var(--ws-layer-3) 55%, transparent);
+  border-color:var(--border-subtle);
+}
+.ops-metric--impact .ops-metric-value{
+  font-size:16px;
+  font-weight:var(--w-bold);
+  letter-spacing:-0.03em;
+}
+.ops-metric--tertiary{
+  opacity:0.88;
+}
+.ops-metric--tertiary .ops-metric-value{
+  font-size:13px;
+  font-weight:var(--w-medium);
+  color:var(--text-secondary);
+}
 .value-gen-grid{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -3423,20 +3445,61 @@ body{
   margin-bottom:var(--sp-2);
 }
 .consequence-signal{
-  font-size:12px;
-  font-weight:800;
-  letter-spacing:0.1em;
-  padding:var(--sp-3) var(--sp-4);
+  font-size:11px;
+  font-weight:var(--w-bold);
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  padding:8px 14px;
   border-radius:var(--r-pill);
+  border:1px solid transparent;
 }
 .signal-high-risk{
-  background:var(--danger-soft);
-  border:1px solid var(--danger-border);
-  color:#fecaca;
-  box-shadow:0 0 24px rgba(248,113,113,0.12);
+  background:color-mix(in srgb, var(--danger-soft) 70%, transparent);
+  border-color:var(--danger-border);
+  color:#fecdd3;
 }
 .consequence-signal.signal-approval{
-  box-shadow:0 0 28px var(--accent-glow-max);
+  background:color-mix(in srgb, rgba(124,92,252,0.14) 100%, transparent);
+  border-color:rgba(167,139,250,0.35);
+  color:rgba(220,210,255,0.96);
+  box-shadow:none;
+}
+.consequence-signal.signal-safe{
+  background:color-mix(in srgb, var(--success-soft) 85%, transparent);
+  border-color:var(--success-border);
+  color:rgba(180,250,220,0.95);
+}
+.consequence-signal.signal-review{
+  background:color-mix(in srgb, var(--bg-elevated) 40%, rgba(148,163,184,0.08));
+  border-color:rgba(148,163,184,0.22);
+  color:var(--text-secondary);
+}
+.decision-panel--consequence-safe{
+  border-left:3px solid rgba(52,211,153,0.42) !important;
+}
+.decision-panel--consequence-approval{
+  border-left:3px solid rgba(167,139,250,0.5) !important;
+}
+.decision-panel--consequence-high_risk{
+  border-left:3px solid rgba(248,113,113,0.48) !important;
+}
+.decision-panel--consequence-review{
+  border-left:3px solid rgba(148,163,184,0.35) !important;
+}
+.assistant-meta--inline{
+  padding:0;
+  border:none;
+  background:transparent;
+}
+.assistant-meta-inline{
+  font-size:11px;
+  line-height:1.5;
+  color:var(--text-muted);
+  letter-spacing:0.02em;
+}
+.xv-operator-hero .workspace-subline--quiet{
+  font-size:12px;
+  color:var(--text-muted);
 }
 .btn-approve{
   background:linear-gradient(135deg,var(--accent-1),var(--accent-blue));
@@ -5459,38 +5522,55 @@ body{
 
 .workspace-active .msg-card.assistant .customer-message-block{
   margin-top:0;
-  padding-left:var(--sp-3);
+  padding-left:0;
   margin-left:0;
-  border-left:1px solid rgba(124,92,252,0.16);
+  border-left:none;
+  border-top:1px solid rgba(255,255,255,0.055);
+  padding-top:var(--sp-4);
   box-shadow:none;
   position:relative;
+}
+.workspace-active .assistant-result-stack--decision-first .customer-message-block{
+  margin-top:var(--sp-1);
 }
 .workspace-active .assistant-result-stack{
   display:flex;
   flex-direction:column;
   gap:20px !important;
 }
-/* Reply first when settled; stream trace above reply only while steps are visible */
-.workspace-active .assistant-result-stack > .stream-trace-host{
-  order:2;
-}
-.workspace-active .assistant-result-stack > .customer-message-block{
+/* Decision-first canvas: gate and controls lead; reply follows; trace tucks last when idle */
+.workspace-active .assistant-result-stack > .assistant-decision-slot{
   order:1;
 }
-.workspace-active .assistant-result-stack > .assistant-decision-slot{
-  order:3;
+.workspace-active .assistant-result-stack > .customer-message-block{
+  order:2;
 }
 .workspace-active .assistant-result-stack > .assistant-brief-slot{
-  order:4;
+  order:3;
 }
 .workspace-active .assistant-result-stack > .assistant-footer{
+  order:4;
+}
+.workspace-active .assistant-result-stack > .stream-trace-host{
   order:5;
+}
+.workspace-active .assistant-result-stack--decision-first > .assistant-decision-slot:empty{
+  display:none;
 }
 .workspace-active .assistant-result-stack:has(> .stream-trace-host:not(.stream-trace-host--settled):not(:empty)) > .stream-trace-host{
   order:1;
 }
-.workspace-active .assistant-result-stack:has(> .stream-trace-host:not(.stream-trace-host--settled):not(:empty)) > .customer-message-block{
+.workspace-active .assistant-result-stack:has(> .stream-trace-host:not(.stream-trace-host--settled):not(:empty)) > .assistant-decision-slot{
   order:2;
+}
+.workspace-active .assistant-result-stack:has(> .stream-trace-host:not(.stream-trace-host--settled):not(:empty)) > .customer-message-block{
+  order:3;
+}
+.workspace-active .assistant-result-stack:has(> .stream-trace-host:not(.stream-trace-host--settled):not(:empty)) > .assistant-brief-slot{
+  order:4;
+}
+.workspace-active .assistant-result-stack:has(> .stream-trace-host:not(.stream-trace-host--settled):not(:empty)) > .assistant-footer{
+  order:5;
 }
 
 .workspace-active .messages-shell{
@@ -5545,18 +5625,20 @@ body{
   animation-timing-function:cubic-bezier(0.45,0,0.2,1);
 }
 
-/* Reply centerpiece: lighter decision / trace frames */
+/* Decision zone: primary operating surface */
 .workspace-active .assistant-decision-slot .decision-panel{
-  border-radius:16px !important;
-  border:1px solid rgba(255,255,255,0.042) !important;
-  border-top:1px solid rgba(139,92,246,0.28) !important;
-  padding:16px 18px !important;
+  border-radius:18px !important;
+  border:1px solid rgba(255,255,255,0.06) !important;
+  padding:18px 20px !important;
+  margin:0 !important;
   background:linear-gradient(
-    165deg,
-    color-mix(in srgb, var(--decision-surface) 78%, transparent),
-    color-mix(in srgb, var(--l2-base) 88%, rgba(124,92,252,0.04))
+    168deg,
+    color-mix(in srgb, var(--decision-surface) 82%, rgba(124,92,252,0.06)),
+    color-mix(in srgb, var(--l2-base) 90%, rgba(34,211,238,0.03))
   ) !important;
-  box-shadow:none !important;
+  box-shadow:
+    0 20px 50px rgba(0,0,0,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.06) !important;
 }
 .workspace-active .stream-steps--premium{
   border-radius:16px !important;
@@ -5718,14 +5800,6 @@ body{
 .workspace-active .decision-panel-top{
   gap:10px !important;
 }
-.consequence-signal{
-  font-size:11px !important;
-  font-weight:600 !important;
-  letter-spacing:0.04em !important;
-  text-transform:none !important;
-  padding:6px 12px !important;
-}
-
 .approval-banner{
   margin:0 0 12px;
   padding:12px 14px;
@@ -6692,13 +6766,17 @@ body{
   opacity:0.85 !important;
 }
 
-/* —— 6 · Consequence chip: calmer, aligned to control height —— */
+/* —— 6 · Consequence chips: premium calm (no competing glow) —— */
 .workspace-active .consequence-signal{
-  padding:5px 10px !important;
-  font-size:11px !important;
-  font-weight:600 !important;
-  letter-spacing:0.03em !important;
-  border-radius:6px !important;
+  display:inline-flex !important;
+  align-items:center;
+  gap:6px;
+  padding:7px 12px !important;
+  font-size:10px !important;
+  font-weight:var(--w-bold) !important;
+  letter-spacing:0.12em !important;
+  text-transform:uppercase !important;
+  border-radius:var(--r-pill) !important;
 }
 
 .consequence-signal.signal-approval,

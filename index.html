@@ -109,6 +109,7 @@
 
               <section class="sidebar-panel" id="sidebarPanelPlans" data-sidebar-panel="plans" role="tabpanel" aria-labelledby="sidebarTabPlans" aria-label="Plans" hidden aria-hidden="true">
                 <div class="section-label section-label-tight">Plans &amp; capacity</div>
+                <p class="muted-copy sidebar-panel-hint plans-capacity-framing">Higher tiers add monthly headroom, live Stripe refunds, and analytics depth—upgrade when throughput pressure shows up in the rail.</p>
                 <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
                 <div class="tier-card tier-card-plans">
                   <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Handle more tickets · Upgrade to Pro</span><span>→</span></button>
@@ -205,8 +206,26 @@
                           </button>
                           <div class="rail-brief-panel" id="railBriefPanelLatest">
                             <div class="rail-card rail-surface rail-elevated rail-card-nested" id="latestRunRailCard">
-                              <div class="rail-run-summary muted-copy" id="railRunSummary">Issue type, action, confidence — updates after each support run.</div>
-                              <div class="ops-grid">
+                              <div class="rail-run-summary muted-copy" id="railRunSummary">Latest decision and impact surface here after each run.</div>
+                              <div class="ops-impact-primary" role="group" aria-label="Impact">
+                                <div class="ops-metric ops-metric--impact">
+                                  <div class="ops-metric-label">Money saved</div>
+                                  <div class="ops-metric-value" id="opsLatestValue">$0</div>
+                                </div>
+                                <div class="ops-metric ops-metric--impact">
+                                  <div class="ops-metric-label">Cost exposure</div>
+                                  <div class="ops-metric-value" id="opsCostExposure">—</div>
+                                </div>
+                                <div class="ops-metric ops-metric--impact">
+                                  <div class="ops-metric-label">Time saved</div>
+                                  <div class="ops-metric-value" id="opsTimeSaved">—</div>
+                                </div>
+                                <div class="ops-metric ops-metric--impact">
+                                  <div class="ops-metric-label">Outcome quality</div>
+                                  <div class="ops-metric-value" id="opsOutcomeQuality">—</div>
+                                </div>
+                              </div>
+                              <div class="ops-impact-lane ops-grid ops-grid--lane" role="group" aria-label="Routing and posture">
                                 <div class="ops-metric">
                                   <div class="ops-metric-label">Action</div>
                                   <div class="ops-metric-value" id="opsLatestAction">—</div>
@@ -216,20 +235,12 @@
                                   <div class="ops-metric-value" id="opsLatestQueue">—</div>
                                 </div>
                                 <div class="ops-metric">
-                                  <div class="ops-metric-label">Confidence</div>
-                                  <div class="ops-metric-value" id="opsLatestConfidence">0.00</div>
-                                </div>
-                                <div class="ops-metric">
-                                  <div class="ops-metric-label">Money surfaced</div>
-                                  <div class="ops-metric-value" id="opsLatestValue">$0</div>
-                                </div>
-                                <div class="ops-metric">
-                                  <div class="ops-metric-label">Est. time saved</div>
-                                  <div class="ops-metric-value" id="opsTimeSaved">—</div>
-                                </div>
-                                <div class="ops-metric">
-                                  <div class="ops-metric-label">Posture</div>
+                                  <div class="ops-metric-label">Approval posture</div>
                                   <div class="ops-metric-value" id="opsPosture">—</div>
+                                </div>
+                                <div class="ops-metric ops-metric--tertiary">
+                                  <div class="ops-metric-label">Model confidence</div>
+                                  <div class="ops-metric-value" id="opsLatestConfidence">0.00</div>
                                 </div>
                               </div>
                               <div class="ops-run-line" id="opsRunNarrative"><span class="ops-narrative-text">Waiting for the next operator run.</span></div>
@@ -572,7 +583,7 @@
           </div>
 
           <div class="xv-stage-scaffold">
-            <header class="main-stage-header main-stage-hero main-stage-hero--bar">
+            <header class="main-stage-header main-stage-hero main-stage-hero--bar xv-operator-hero">
               <div class="main-stage-identity">
                 <div class="main-stage-title-block">
                   <h1 id="workspacePageTitle">Paste a support ticket</h1>
