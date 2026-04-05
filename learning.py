@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from typing import Any, Dict, List
 
 from brain import add_rule, get_top_rule_objects, load_brain, register_rule_outcome, save_brain
 
+logger = logging.getLogger("xalvion")
+
 try:
     from outcome_store import get_outcome
-except Exception:
+except Exception as _get_outcome_imp_err:
+    logger.warning("outcome_store.get_outcome unavailable", exc_info=True)
+
     def get_outcome(outcome_key):
-        return None
+        raise RuntimeError("outcome_store module unavailable") from _get_outcome_imp_err
 
 RULES_FILE = "learned_rules.json"
 PATTERN_STORE_KEY = "decision_patterns_v1"
@@ -93,10 +98,7 @@ def _score_outcome(
     """
     real: Dict[str, Any] | None = None
     if outcome_key:
-        try:
-            real = get_outcome(outcome_key)
-        except Exception:
-            real = None
+        real = get_outcome(outcome_key)
 
     dec = decision or {}
     decision_action = str(dec.get("action", outcome.get("action", "none")) or "none").lower()
@@ -129,8 +131,11 @@ def _score_outcome(
             if decision_action == "refund":
                 base = min(base, 3.85)
             return round(max(0.0, base), 4)
-        except Exception:
-            pass
+        except Exception as _impact_err:
+            logger.warning(
+                "outcome_store.compute_outcome_impact failed; using heuristic score path",
+                exc_info=True,
+            )
         if real.get("success"):
             score += 2.5
         if real.get("auto_resolved"):
@@ -179,8 +184,9 @@ def _load_patterns() -> dict:
         from state_store import load_state
 
         return load_state(PATTERN_STORE_KEY, {})
-    except Exception:
-        return {}
+    except Exception as _load_err:
+        logger.error("state_store.load_state failed for decision patterns", exc_info=True)
+        raise RuntimeError("state_store.load_state unavailable") from _load_err
 
 
 def _save_patterns(patterns: dict) -> None:
@@ -195,8 +201,9 @@ def _save_patterns(patterns: dict) -> None:
             for old_key in sorted_keys[: len(patterns) - 200]:
                 del patterns[old_key]
         save_state(PATTERN_STORE_KEY, patterns)
-    except Exception:
-        pass
+    except Exception as _save_err:
+        logger.error("state_store.save_state failed for decision patterns", exc_info=True)
+        raise RuntimeError("state_store.save_state unavailable") from _save_err
 
 
 def record_pattern_outcome(
@@ -269,8 +276,11 @@ def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome:
                         rowd = {**rowd, **real_o}
                 _impact = compute_outcome_impact(rowd)
                 record_pattern_outcome(ticket, decision, float(_impact["impact_score"]))
-            except Exception:
-                pass
+            except Exception as _pat_err:
+                logger.warning(
+                    "record_pattern_outcome skipped (compute_outcome_impact or get_outcome failed)",
+                    exc_info=True,
+                )
             return
     candidate["weight"] = round(max(0.05, conversion_weight), 4)
     rules.append(candidate)
@@ -288,8 +298,11 @@ def learn_from_ticket(ticket: Dict[str, Any], decision: Dict[str, Any], outcome:
                 rowd_new = {**rowd_new, **real_on}
         _impact_n = compute_outcome_impact(rowd_new)
         record_pattern_outcome(ticket, decision, float(_impact_n["impact_score"]))
-    except Exception:
-        pass
+    except Exception as _pat_err:
+        logger.warning(
+            "record_pattern_outcome skipped (compute_outcome_impact or get_outcome failed)",
+            exc_info=True,
+        )
 
 
 def apply_learned_rules(ticket: Dict[str, Any], top_rules: List[Dict[str, Any]] | None = None) -> Dict[str, Any] | None:
@@ -304,7 +317,11 @@ def apply_learned_rules(ticket: Dict[str, Any], top_rules: List[Dict[str, Any]] 
             rules = _get_top_rule_objects(_brain, 10)
             if not rules:
                 rules = load_rules()
-        except Exception:
+        except Exception as _brain_rules_err:
+            logger.warning(
+                "brain rule objects unavailable; falling back to learned_rules.json",
+                exc_info=True,
+            )
             rules = load_rules()
     if not rules:
         return None
@@ -367,8 +384,9 @@ def sync_rules_to_brain() -> None:
             trigger = rule.get("trigger", "")
             if trigger and trigger not in existing_triggers:
                 _add_rule(brain, rule)
-    except Exception:
-        pass
+    except Exception as _sync_err:
+        logger.error("sync_rules_to_brain failed", exc_info=True)
+        raise RuntimeError("sync_rules_to_brain failed") from _sync_err
 
 
 def decay_rules() -> None:

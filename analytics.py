@@ -17,6 +17,7 @@ from sqlalchemy.exc import OperationalError, TimeoutError as SQLTimeoutError
 from db import Base, SessionLocal, engine
 
 logger = logging.getLogger("xalvion.analytics")
+_xalvion_logger = logging.getLogger("xalvion")
 
 _DEFAULT_METRICS: dict[str, Any] = {
     "avg_confidence": 0.0,
@@ -35,6 +36,7 @@ _DEFAULT_METRICS: dict[str, Any] = {
 
 _metrics_failure_logged = False
 _metrics_pool_timeout_logged = False
+_outcome_stats_enrich_fail_logged = False
 
 
 def _log_metrics_pool_timeout_once(exc: BaseException) -> None:
@@ -152,7 +154,13 @@ def get_metrics() -> dict[str, Any]:
             approval_rate = round(float(ost.get("human_approved", 0) or 0) / ot * 100, 2)
             good_excellent_outcome_rate = float(ost.get("good_excellent_outcome_rate", 0.0) or 0.0)
         except Exception:
-            pass
+            global _outcome_stats_enrich_fail_logged
+            if not _outcome_stats_enrich_fail_logged:
+                _outcome_stats_enrich_fail_logged = True
+                _xalvion_logger.warning(
+                    "get_metrics: outcome_store.get_outcome_stats enrichment unavailable",
+                    exc_info=True,
+                )
 
         return {
             "avg_confidence": round(float(avg_conf), 2),

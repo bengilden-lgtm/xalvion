@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 from typing import Any, Dict
+
+logger = logging.getLogger("xalvion")
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -40,28 +43,42 @@ from models import (
 
 try:
     from analytics import log_event
-except Exception:
+except Exception as _analytics_imp_err:
+    logger.warning(
+        "analytics.log_event unavailable; events will not be recorded",
+        exc_info=True,
+    )
+
     def log_event(user_input, response, confidence, quality, **kwargs):
         return None
 
 
 try:
     from feedback import process_feedback
-except Exception:
+except Exception as _feedback_imp_err:
+    logger.warning("feedback.process_feedback unavailable", exc_info=True)
+
     def process_feedback(user_input, response, quality):
-        return None
+        raise RuntimeError("feedback module unavailable") from _feedback_imp_err
 
 try:
-    from learning import learn_from_ticket
-except Exception:
+    from learning import get_pattern_expectation, learn_from_ticket
+except Exception as _learning_imp_err:
+    logger.warning("learning module unavailable for learn_from_ticket / get_pattern_expectation", exc_info=True)
+
     def learn_from_ticket(ticket, decision, outcome, outcome_key=None):
-        return None
+        raise RuntimeError("learning.learn_from_ticket unavailable") from _learning_imp_err
+
+    def get_pattern_expectation(ticket, decision):
+        raise RuntimeError("learning.get_pattern_expectation unavailable") from _learning_imp_err
 
 try:
     from outcome_store import log_outcome as _log_outcome
-except Exception:
+except Exception as _outcome_store_imp_err:
+    logger.warning("outcome_store.log_outcome unavailable", exc_info=True)
+
     def _log_outcome(outcome_key, user_id, action, amount, issue_type, tool_result, auto_resolved=True, approved_by_human=False):
-        return {}
+        raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
 
 
 load_dotenv(override=True)
@@ -318,30 +335,20 @@ def build_structured_response(
         quality=float(quality or 0),
         impact_projection=impact_projection,
     )
-    try:
-        from actions import compute_execution_tier as _cet
-
-        execution_tier = _cet(
-            str(final_like["action"]),
-            float(final_like.get("amount", 0) or 0),
-            conf_val,
-            float(quality or 0),
-            str(final_like.get("risk_level", "medium") or "medium"),
-            int(history.get("abuse_score", 0) or 0),
-            int(history.get("refund_count", 0) or 0),
-            str(ticket.get("operator_mode", "balanced") or "balanced"),
-            bool(final_like.get("requires_approval", False)),
-        )
-    except Exception:
-        execution_tier = "approval_required"
+    execution_tier = compute_execution_tier(
+        str(final_like["action"]),
+        float(final_like.get("amount", 0) or 0),
+        conf_val,
+        float(quality or 0),
+        str(final_like.get("risk_level", "medium") or "medium"),
+        int(history.get("abuse_score", 0) or 0),
+        int(history.get("refund_count", 0) or 0),
+        str(ticket.get("operator_mode", "balanced") or "balanced"),
+        bool(final_like.get("requires_approval", False)),
+    )
     decision_explanation["execution_tier"] = execution_tier
 
-    try:
-        from learning import get_pattern_expectation as _gpat
-
-        pat = _gpat({**ticket, "triage": triage}, final_like)
-    except Exception:
-        pat = None
+    pat = get_pattern_expectation({**ticket, "triage": triage}, final_like)
 
     try:
         decision_explainability = build_decision_explainability(
@@ -357,8 +364,9 @@ def build_structured_response(
             quality=float(quality or 0),
             pattern_expectation=pat,
         )
-    except Exception:
-        decision_explainability = None
+    except Exception as _explain_err:
+        logger.error("build_decision_explainability failed", exc_info=True)
+        raise RuntimeError("build_decision_explainability failed") from _explain_err
 
     return {
         "response": customer_message,
@@ -1636,22 +1644,17 @@ def _canonicalize_result(
         "tool_status": tool_status,
     }
 
-    try:
-        from actions import compute_execution_tier as _compute_exec_tier
-
-        _exec_tier = _compute_exec_tier(
-            action=str(decision["action"]),
-            amount=float(decision.get("amount", 0) or 0),
-            confidence=float(decision.get("confidence", 0.9) or 0.9),
-            quality=float(quality or 0),
-            risk_level=str(decision.get("risk_level", "medium") or "medium"),
-            abuse_score=int(history.get("abuse_score", 0) or 0),
-            refund_count=int(history.get("refund_count", 0) or 0),
-            operator_mode=str(ticket.get("operator_mode", "balanced") or "balanced"),
-            requires_approval=bool(decision.get("requires_approval", False)),
-        )
-    except Exception:
-        _exec_tier = "approval_required"
+    _exec_tier = compute_execution_tier(
+        action=str(decision["action"]),
+        amount=float(decision.get("amount", 0) or 0),
+        confidence=float(decision.get("confidence", 0.9) or 0.9),
+        quality=float(quality or 0),
+        risk_level=str(decision.get("risk_level", "medium") or "medium"),
+        abuse_score=int(history.get("abuse_score", 0) or 0),
+        refund_count=int(history.get("refund_count", 0) or 0),
+        operator_mode=str(ticket.get("operator_mode", "balanced") or "balanced"),
+        requires_approval=bool(decision.get("requires_approval", False)),
+    )
 
     impact_projection = {
         "type": str(impact.get("type", "saved") or "saved"),
@@ -1703,8 +1706,9 @@ def _canonicalize_result(
             quality=float(quality or 0),
             pattern_expectation=pattern_expectation,
         )
-    except Exception:
-        decision_explainability = None
+    except Exception as _explain_err:
+        logger.error("build_decision_explainability failed", exc_info=True)
+        raise RuntimeError("build_decision_explainability failed") from _explain_err
 
     safe_message = normalize_text(customer_message)
 
@@ -1992,12 +1996,7 @@ def run_agent(
         "confidence": confidence,
     }
 
-    try:
-        from learning import get_pattern_expectation as _get_pattern_expectation
-
-        _pattern_exp = _get_pattern_expectation(ticket, final_payload)
-    except Exception:
-        _pattern_exp = None
+    _pattern_exp = get_pattern_expectation(ticket, final_payload)
 
     update_memory(user_id, ticket, customer_message, final_payload)
     learn_from_ticket(ticket, final_payload, executed, outcome_key=_outcome_key)

@@ -67,9 +67,14 @@ from utils import normalize_ticket, safe_execute
 
 try:
     from learning import learn_from_ticket
-except Exception:
+except Exception as _app_learning_imp_err:
+    logging.getLogger("xalvion").warning(
+        "learning.learn_from_ticket unavailable in app",
+        exc_info=True,
+    )
+
     def learn_from_ticket(ticket: dict[str, Any], decision: dict[str, Any], outcome: dict[str, Any]) -> None:
-        return None
+        raise RuntimeError("learning.learn_from_ticket unavailable") from _app_learning_imp_err
 
 _METRICS_FALLBACK: dict[str, Any] = {
     "avg_confidence": 0.0,
@@ -92,7 +97,12 @@ _DASHBOARD_TTL: float = 30.0
 
 try:
     from analytics import get_metrics
-except Exception:
+except Exception as _get_metrics_imp_err:
+    logging.getLogger("xalvion").warning(
+        "analytics.get_metrics unavailable; dashboard metrics will use empty defaults",
+        exc_info=True,
+    )
+
     def get_metrics() -> dict[str, Any]:
         return dict(_METRICS_FALLBACK)
 
@@ -106,15 +116,19 @@ try:
         ensure_outcome_columns,
         merge_audit_outcome_digest,
     )
-except Exception:
+except Exception as _outcome_store_imp_err:
+    logging.getLogger("xalvion").warning(
+        "outcome_store import failed; core outcome APIs will raise (stats stub returns zeros)",
+        exc_info=True,
+    )
 
     def _log_real_outcome(*_a: Any, **_k: Any) -> None:
-        return None
+        raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
 
     def merge_audit_outcome_digest(
         audit: dict[str, Any] | None, outcome_key: str | None
     ) -> dict[str, Any] | None:
-        return audit
+        raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
 
     def get_outcome_stats() -> dict[str, Any]:
         return {
@@ -129,16 +143,16 @@ except Exception:
         }
 
     def mark_ticket_reopened(_k: str) -> bool:
-        return False
+        raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
 
     def mark_crm_closed(_k: str) -> bool:
-        return False
+        raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
 
     def ensure_outcome_log_columns() -> None:
-        return None
+        raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
 
     def ensure_outcome_columns() -> None:
-        return None
+        raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
 
 
 load_dotenv(override=True)
