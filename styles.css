@@ -6046,3 +6046,307 @@ body{
   padding:0 2px var(--xv-space-sm) !important;
   margin-bottom:0 !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Phase 2 · Elite structural fix (answer-first column, grounded composer, calm chrome)
+   Overrides prior workspace rules where needed; preserves IDs and behavior hooks.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root{
+  --xv-composer-bar-pad-y:11px;
+  --xv-composer-bar-edge:rgba(255,255,255,0.055);
+  --xv-scroll-pad-bottom:20px;
+}
+
+/* Column: scroll region + composer bar (no overlap, single vertical system) */
+.workspace-conversation-column{
+  display:flex;
+  flex-direction:column;
+  flex:1 1 0%;
+  min-height:0;
+  width:100%;
+  max-width:calc(var(--main-max) + 2 * var(--main-pad-x));
+  margin:0 auto;
+  box-sizing:border-box;
+}
+
+.xv-stage-body.main-stage-body{
+  display:flex !important;
+  flex-direction:column !important;
+  flex:1 1 0% !important;
+  min-height:0 !important;
+  padding-bottom:0 !important;
+}
+
+.workspace-idle .xv-stage-body.main-stage-body{
+  flex:1 1 0% !important;
+  min-height:0 !important;
+}
+
+.workspace-idle .xv-stage-scaffold{
+  justify-content:flex-start !important;
+}
+
+.workspace-idle .main-canvas-inner.main-stage{
+  justify-content:flex-start !important;
+  padding-top:clamp(10px,2.5vh,28px) !important;
+  padding-bottom:max(8px,env(safe-area-inset-bottom,0px)) !important;
+}
+
+/* Messages absorb scroll; composer is a sibling bar (never floats over content) */
+.workspace-conversation-column .messages-zone{
+  flex:1 1 0%;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+.workspace-conversation-column .messages-shell{
+  flex:1 1 0%;
+  min-height:0 !important;
+  display:flex !important;
+  flex-direction:column !important;
+}
+
+.workspace-conversation-column .messages.scroll-area{
+  flex:1 1 0%;
+  min-height:0;
+  overflow:auto !important;
+  scroll-padding-bottom:var(--xv-scroll-pad-bottom);
+}
+
+/* Idle: pin input to bottom of the stage; collapsed thread uses margin auto */
+.workspace-idle .workspace-conversation-column .composer-wrap.composer-dock{
+  margin-top:auto !important;
+  width:100% !important;
+}
+
+.workspace-active .workspace-conversation-column .composer-wrap.composer-dock{
+  margin-top:0 !important;
+  width:100% !important;
+}
+
+/* Composer bar: grounded, low-noise (not a floating card) */
+.workspace-active .composer-wrap.composer-dock,
+.workspace-idle .composer-wrap.composer-dock{
+  flex-shrink:0 !important;
+  position:relative !important;
+  z-index:2;
+  padding:var(--xv-composer-bar-pad-y) 0 max(12px,env(safe-area-inset-bottom,0px)) !important;
+  border-top:1px solid var(--xv-composer-bar-edge) !important;
+  background:color-mix(in srgb, var(--l2-base) 96%, #000 4%) !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+
+.workspace-idle .composer-wrap.composer-dock{
+  border-top-color:rgba(255,255,255,0.04) !important;
+  background:color-mix(in srgb, var(--l2-base) 94%, rgba(124,92,252,0.04)) !important;
+}
+
+.composer-unified{
+  max-width:var(--main-max) !important;
+}
+
+.workspace-active .composer.composer-chat,
+.workspace-idle .composer.composer-chat{
+  border-radius:12px !important;
+  padding:10px 12px 12px !important;
+  gap:9px !important;
+  border:1px solid rgba(255,255,255,0.05) !important;
+  background:color-mix(in srgb, var(--l3-base) 92%, #fff 4%) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+.workspace-idle .composer.composer-chat{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.045) !important;
+}
+
+.workspace-thinking .composer.composer-chat{
+  border-color:rgba(124,92,252,0.16) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+.workspace-active .composer-hint-band--integrated,
+.workspace-idle .composer-hint-band--integrated{
+  border-bottom:1px solid rgba(255,255,255,0.04) !important;
+  padding:0 0 8px !important;
+  margin-bottom:2px !important;
+}
+
+.workspace-active .composer.composer-chat .quick-actions{
+  margin:0 0 6px !important;
+  gap:6px !important;
+}
+
+.workspace-active .composer-stripe-fold{
+  border-top:none !important;
+  padding:4px 0 0 !important;
+  margin-top:0 !important;
+}
+
+.workspace-active .composer-stripe-fold-summary{
+  padding:2px 0 !important;
+}
+
+.workspace-active .composer-stripe-fields{
+  padding-top:8px !important;
+  gap:8px !important;
+}
+
+.workspace-active .composer-chat .send-btn{
+  box-shadow:0 1px 4px rgba(0,0,0,0.2) !important;
+}
+
+.workspace-active .composer-chat .send-btn:hover:not(:disabled){
+  transform:none !important;
+}
+
+/* Thread: reply-first typography, softer chrome */
+.workspace-active .messages{
+  padding:10px 0 calc(var(--xv-scroll-pad-bottom) + 8px) !important;
+}
+
+.workspace-active .msg-group{
+  padding:14px 0 18px !important;
+  border-bottom:1px solid rgba(255,255,255,0.035) !important;
+}
+
+.workspace-active .msg-group:last-child{
+  border-bottom:none !important;
+}
+
+.reply-hero-label{
+  position:static !important;
+  width:auto !important;
+  height:auto !important;
+  margin:-2px 0 12px !important;
+  padding:0 !important;
+  overflow:visible !important;
+  clip:auto !important;
+  white-space:normal !important;
+  border:0 !important;
+  font-size:10px !important;
+  font-weight:600 !important;
+  letter-spacing:0.14em !important;
+  text-transform:uppercase !important;
+  color:rgba(148,162,196,0.5) !important;
+}
+
+.workspace-active .customer-message-block{
+  padding:6px 0 4px !important;
+  margin-top:4px !important;
+}
+
+.workspace-active .msg-card.assistant .reply-text{
+  font-size:clamp(16px,1.12vw,18px) !important;
+  line-height:1.84 !important;
+  letter-spacing:0.01em !important;
+  padding:22px 22px 26px !important;
+  max-width:min(68ch,100%) !important;
+  border-radius:14px !important;
+  background:color-mix(in srgb, var(--l3-base) 94%, #fff 6%) !important;
+  border:1px solid rgba(255,255,255,0.05) !important;
+  box-shadow:none !important;
+}
+
+/* Customer ticket: timeline strip, not a floating right bubble */
+.workspace-active .msg-card.user .msg-body{
+  align-items:stretch !important;
+  padding:0 0 6px !important;
+}
+
+.workspace-active .msg-card.user .reply-text{
+  align-self:stretch !important;
+  max-width:100% !important;
+  text-align:left !important;
+  margin-right:0 !important;
+  padding:14px 16px 16px !important;
+  border-radius:4px 12px 12px 12px !important;
+  border-left:3px solid rgba(124,92,252,0.38) !important;
+  background:rgba(255,255,255,0.028) !important;
+  border-top:1px solid rgba(255,255,255,0.04) !important;
+  border-right:1px solid rgba(255,255,255,0.04) !important;
+  border-bottom:1px solid rgba(255,255,255,0.04) !important;
+  font-size:14.5px !important;
+  line-height:1.68 !important;
+  color:rgba(210,220,248,0.88) !important;
+}
+
+.workspace-active .assistant-result-stack{
+  gap:18px !important;
+}
+
+.workspace-active .assistant-decision-slot .decision-panel,
+.workspace-active .stream-steps--premium{
+  box-shadow:none !important;
+}
+
+/* Sidebar: navigation-first, quieter explainer + status */
+.sidebar-fold{
+  opacity:0.62 !important;
+  margin-bottom:8px !important;
+  background:rgba(255,255,255,0.012) !important;
+  border-color:rgba(255,255,255,0.03) !important;
+}
+
+.sidebar-fold-summary{
+  font-size:10px !important;
+  letter-spacing:0.1em !important;
+  text-transform:uppercase !important;
+  color:rgba(140,154,188,0.55) !important;
+}
+
+.sidebar-fold[open]{
+  opacity:0.92 !important;
+}
+
+.sidebar.glass.rail-col-left{
+  backdrop-filter:blur(12px) saturate(1.08) !important;
+  -webkit-backdrop-filter:blur(12px) saturate(1.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 8px 28px rgba(0,0,0,0.14) !important;
+}
+
+.sidebar .notice.info,
+.sidebar .notice.info.notice-sidebar{
+  background:rgba(255,255,255,0.02) !important;
+  border:1px solid rgba(255,255,255,0.04) !important;
+  box-shadow:none !important;
+}
+
+/* Less competing glow behind copy */
+.main-stage-ambient-glow{
+  opacity:0.42 !important;
+}
+
+.workspace-active .main-stage-ambient-glow{
+  opacity:0.22 !important;
+}
+
+.workspace-atmosphere-glow{
+  opacity:0.75 !important;
+}
+
+.command-strip.glass{
+  backdrop-filter:blur(14px) saturate(1.12) !important;
+  -webkit-backdrop-filter:blur(14px) saturate(1.12) !important;
+  box-shadow:
+    0 6px 22px rgba(0,0,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+.command-status-dot{
+  box-shadow:0 0 8px rgba(124,92,252,0.22) !important;
+}
+
+@media (max-width:900px){
+  .workspace-active .composer-wrap.composer-dock,
+  .workspace-idle .composer-wrap.composer-dock{
+    padding-left:0 !important;
+    padding-right:0 !important;
+  }
+}

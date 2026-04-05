@@ -601,15 +601,14 @@
             </header>
 
             <div class="main-stage-body xv-stage-body">
-              <div class="messages-zone" id="messagesZone">
-                <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
-                  <div id="messages" class="messages scroll-area"></div>
+              <div class="workspace-conversation-column" id="workspaceConversationColumn">
+                <div class="messages-zone" id="messagesZone">
+                  <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
+                    <div id="messages" class="messages scroll-area"></div>
+                  </div>
                 </div>
-              </div>
 
-              <div class="xv-idle-lift" aria-hidden="true"></div>
-
-              <footer class="composer-wrap composer-dock xv-composer-foot">
+                <footer class="composer-wrap composer-dock xv-composer-foot" id="workspaceComposerDock">
                 <div class="composer-unified">
                   <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
                     <div class="composer-hint-band composer-hint-band--integrated">
@@ -640,7 +639,8 @@
                     </div>
                   </div>
                 </div>
-              </footer>
+                </footer>
+              </div>
             </div>
           </div>
         </div>
