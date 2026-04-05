@@ -1806,7 +1806,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function createTypingMarkup() {
     return `
       <span class="xalvion-typing-sovereign" aria-hidden="true">
-        <span class="xalvion-sovereign-mark xalvion-sovereign-mark--xs"></span>
+        <span class="xalvion-sovereign-mark xalvion-sovereign-mark--xs"><span class="xv-signal-rays" aria-hidden="true"></span></span>
       </span>
     `;
   }
@@ -1843,7 +1843,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="assistant-decision-slot" data-slot="decision"></div>
           <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="customer-message-block">
-            <div class="customer-message-label">Prepared reply</div>
+            <div class="customer-message-label sr-only">Prepared reply</div>
             <div class="reply-text js-reply-text">${bodyHtml}</div>
           </div>
           <div class="assistant-footer js-assistant-footer"></div>
@@ -2803,7 +2803,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     wrap.className = "stream-steps stream-steps--premium";
     wrap.innerHTML = `
       <div class="stream-trace-header">
-        <span class="stream-trace-mark" aria-hidden="true"><span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm"></span></span>
+        <span class="stream-trace-mark" aria-hidden="true"><span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm"><span class="xv-signal-rays" aria-hidden="true"></span></span></span>
         <span class="stream-trace-header-copy">
           <span class="stream-trace-kicker">Preparing</span>
           <span class="stream-trace-title">Decision trace</span>
@@ -2883,9 +2883,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     els.workspaceRoot?.classList.toggle("workspace-thinking", state.sending);
 
     if (els.composerStatusLine) {
+      const idleCopy =
+        "Describe the case in your own words — Xalvion prepares a clear reply and the recommended next step for your review.";
       els.composerStatusLine.textContent = state.sending
-        ? "Xalvion is preparing your decision and reply…"
-        : "Paste a customer issue or type a support request…";
+        ? "Preparing your decision and reply…"
+        : idleCopy;
       els.composerStatusLine.classList.toggle("composer-status-live", state.sending);
     }
 
@@ -2893,7 +2895,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       els.sendBtn.disabled = state.sending;
       els.sendBtn.classList.toggle("send-btn--thinking", state.sending);
       els.sendBtn.innerHTML = state.sending
-        ? '<span class="xalvion-sovereign-mark" aria-hidden="true"></span>'
+        ? '<span class="xalvion-sovereign-mark" aria-hidden="true"><span class="xv-signal-rays" aria-hidden="true"></span></span>'
         : ICONS.send;
       els.sendBtn.setAttribute("aria-label", state.sending ? "Sending" : "Send message");
     }

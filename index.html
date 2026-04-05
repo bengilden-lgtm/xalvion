@@ -54,7 +54,7 @@
         <div class="sidebar-chrome">
           <nav class="sidebar-nav" role="tablist" aria-label="Workspace areas">
             <div class="sidebar-nav-group" role="presentation">
-              <span class="sidebar-nav-group-label" id="navGroupOperate">Navigate</span>
+              <span class="sidebar-nav-group-label sr-only">Workspace areas</span>
               <div class="sidebar-nav-items" role="presentation">
                 <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace">Workspace</button>
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount">Access</button>
@@ -575,12 +575,19 @@
 
       <main class="main main-canvas center-canvas">
         <div class="main-canvas-inner canvas-shell main-stage">
+          <div class="main-stage-ambient" aria-hidden="true">
+            <div class="main-stage-ambient-glow"></div>
+            <div class="main-stage-ambient-ripple"></div>
+          </div>
+
           <header class="main-stage-header main-stage-hero">
-            <div class="main-stage-title-block">
-              <h1 id="workspacePageTitle">Customer support</h1>
-              <p id="workspaceSubcopy" class="workspace-subline">Connecting the operator workspace…</p>
+            <div class="main-stage-identity">
+              <div class="main-stage-title-block">
+                <h1 id="workspacePageTitle">Customer support</h1>
+                <p id="workspaceSubcopy" class="workspace-subline">Connecting the operator workspace…</p>
+              </div>
+              <p class="main-stage-kicker" id="workspaceHeadline">Paste a ticket below. Xalvion drafts the reply and recommended action — you review and approve before anything goes to the customer.</p>
             </div>
-            <p class="main-stage-kicker" id="workspaceHeadline">Paste a ticket below. Xalvion drafts the reply and recommended action — you review and approve before anything goes to the customer.</p>
           </header>
 
           <div class="main-stage-body">
@@ -591,7 +598,14 @@
             </div>
 
             <footer class="composer-wrap composer-dock">
-              <p id="composerStatusLine" class="composer-status-line">Paste the customer message or describe the issue — Xalvion prepares a reply for your review.</p>
+              <div class="composer-prelude">
+                <div class="composer-status-cluster" role="status" aria-live="polite">
+                  <span class="composer-thinking-anchor" aria-hidden="true">
+                    <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span></span>
+                  </span>
+                  <p id="composerStatusLine" class="composer-status-line">Describe the case in your own words — Xalvion prepares a clear reply and the recommended next step for your review.</p>
+                </div>
+              </div>
               <div class="quick-actions">
                 <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
                 <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
