@@ -808,6 +808,84 @@
       padding-top: 2px;
     }
 
+    .upgrade-context {
+      display: none;
+      border: 1px solid rgba(124, 92, 252, 0.22);
+      background: linear-gradient(180deg, rgba(124, 92, 252, 0.08), rgba(6, 14, 32, 0.9));
+      border-radius: var(--r-md);
+      padding: 12px 12px 11px;
+      gap: 6px;
+    }
+
+    .upgrade-context.is-visible {
+      display: grid;
+      animation: fadeUp 0.24s var(--ease);
+    }
+
+    .upgrade-context.mode-hard {
+      border-color: rgba(250, 204, 21, 0.24);
+      background: linear-gradient(180deg, rgba(250, 204, 21, 0.07), rgba(12, 10, 28, 0.92));
+    }
+
+    .upgrade-context-eyebrow {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(200, 180, 255, 0.92);
+    }
+
+    .upgrade-context.mode-hard .upgrade-context-eyebrow {
+      color: rgba(253, 230, 138, 0.95);
+    }
+
+    .upgrade-context-primary {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .upgrade-context-secondary {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .upgrade-context-split {
+      margin: 0;
+      font-size: 10px;
+      line-height: 1.45;
+      color: var(--muted-soft);
+      font-family: ui-monospace, monospace;
+    }
+
+    .upgrade-context-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .upgrade-context-link {
+      font-size: 11px;
+      font-weight: 650;
+      color: rgba(147, 197, 253, 0.95);
+      text-decoration: none;
+      margin-top: 2px;
+    }
+
+    .upgrade-context-link:hover {
+      text-decoration: underline;
+    }
+
+    .upgrade-context .is-hidden {
+      display: none !important;
+    }
+
     .stack-gap {
       display: flex;
       flex-direction: column;
@@ -855,6 +933,18 @@
       </div>
 
       <div id="status" class="status"></div>
+
+      <div id="upgradeContextPanel" class="upgrade-context" aria-live="polite">
+        <div class="upgrade-context-eyebrow" id="upgradeContextEyebrow">Capacity</div>
+        <p class="upgrade-context-primary" id="upgradeContextPrimary"></p>
+        <p class="upgrade-context-secondary" id="upgradeContextSecondary"></p>
+        <p class="upgrade-context-split" id="upgradeContextSplit"></p>
+        <div class="upgrade-context-actions">
+          <button type="button" id="upgradeEnrollFreeBtn" class="btn-compact btn-compact-primary is-hidden">Continue with free console</button>
+          <button type="button" id="upgradeDismissSoftBtn" class="btn-texty is-hidden">Not now</button>
+        </div>
+        <a href="#" id="upgradeProLink" class="upgrade-context-link">Pro capacity →</a>
+      </div>
 
       <div id="thinkingPanel" class="thinking">
         <div class="thinking-header">

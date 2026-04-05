@@ -35,6 +35,14 @@ import {
 import { agentStore } from "./stores/agent-store.js";
 import { uiStore } from "./stores/ui-store.js";
 import { sessionStore } from "./stores/session-store.js";
+import {
+  dismissSoftNudgeForPeriod,
+  enrollFreeTier,
+  getUsageSnapshot,
+  loadUsagePlan,
+  recordSuccessfulOperatorRun,
+  recordSuccessfulOperatorRuns,
+} from "./usage-plan.js";
 
 const chromeCtx = createChromeContext(typeof chrome !== "undefined" ? chrome : null);
 const chromeApi = typeof chrome !== "undefined" ? chrome : null;
@@ -126,6 +134,20 @@ const explainImpactValue = document.getElementById("explainImpactValue");
 const explainSessionCard = document.getElementById("explainSessionCard");
 const explainSessionValue = document.getElementById("explainSessionValue");
 
+const capPill = document.getElementById("extensionCapacityPill");
+const upgradeContextPanel = document.getElementById("upgradeContextPanel");
+const upgradeContextEyebrow = document.getElementById("upgradeContextEyebrow");
+const upgradeContextPrimary = document.getElementById("upgradeContextPrimary");
+const upgradeContextSecondary = document.getElementById("upgradeContextSecondary");
+const upgradeContextSplit = document.getElementById("upgradeContextSplit");
+const upgradeEnrollFreeBtn = document.getElementById("upgradeEnrollFreeBtn");
+const upgradeDismissSoftBtn = document.getElementById("upgradeDismissSoftBtn");
+const upgradeProLink = document.getElementById("upgradeProLink");
+
+const scanInboxBtn = document.getElementById("scanInbox");
+const inboxSummary = document.getElementById("inboxSummary");
+const inboxSummaryValue = document.getElementById("inboxSummaryValue");
+
 /** Compat: legacy locals stay in sync with stores for existing closures and guards */
 let lastReply = "";
 let replySnapshotBeforeEdit = "";
@@ -142,9 +164,145 @@ function syncCompatFromStores() {
   thinkingRunId = agentStore.getState().thinkingRunId;
 }
 
-uiStore.subscribe(syncCompatFromStores);
+uiStore.subscribe(() => {
+  syncCompatFromStores();
+  syncPrimaryRunButtons();
+});
 agentStore.subscribe(syncCompatFromStores);
 syncCompatFromStores();
+
+const usageReady = loadUsagePlan().then(() => {
+  refreshUsageChrome();
+  syncPrimaryRunButtons();
+  bindUpgradePanel();
+});
+
+function currentPlanTier() {
+  return sessionStore.getState().planTier;
+}
+
+function updateCapacityPillFromData(data) {
+  if (!capPill) return;
+  if (data?.meta && data.meta.plan_tier) {
+    sessionStore.setState({ planTier: data.meta.plan_tier });
+  }
+  const snap = getUsageSnapshot(currentPlanTier());
+  if (snap.hasProAccess) {
+    const fromServer = data?.meta?.plan_tier;
+    const label = fromServer ? String(fromServer).toUpperCase() : "PRO";
+    capPill.textContent = `Extension · ${label}`;
+    return;
+  }
+  capPill.textContent = `Extension · ${snap.totalOperatorRuns}/${snap.hardThreshold} operator runs`;
+}
+
+function refreshUsageChrome() {
+  const snap = getUsageSnapshot(currentPlanTier());
+  if (capPill) {
+    if (snap.hasProAccess) {
+      const t = currentPlanTier();
+      capPill.textContent = t ? `Extension · ${String(t).toUpperCase()}` : "Extension · PRO";
+    } else {
+      capPill.textContent = `Extension · ${snap.totalOperatorRuns}/${snap.hardThreshold} operator runs`;
+    }
+  }
+
+  if (!upgradeContextPanel) return;
+
+  upgradeContextPanel.classList.remove("is-visible", "mode-soft", "mode-hard");
+
+  if (snap.hasProAccess) {
+    upgradeEnrollFreeBtn?.classList.add("is-hidden");
+    upgradeDismissSoftBtn?.classList.add("is-hidden");
+    if (upgradeContextSplit) upgradeContextSplit.textContent = "";
+    return;
+  }
+
+  if (snap.hardLimited) {
+    upgradeContextPanel.classList.add("is-visible", "mode-hard");
+    if (upgradeContextEyebrow) upgradeContextEyebrow.textContent = "Quota — window limit";
+    if (upgradeContextPrimary) {
+      upgradeContextPrimary.textContent = `You've used ${snap.totalOperatorRuns} operator runs — this window is at capacity (${snap.hardThreshold}).`;
+    }
+    if (upgradeContextSecondary) {
+      upgradeContextSecondary.textContent =
+        "Upgrade for higher capacity and uninterrupted execution. Approval-safe automation continues on Pro. Your current reply stays available to copy or insert.";
+    }
+    if (upgradeContextSplit) {
+      upgradeContextSplit.textContent = `Guest runs ${snap.guestUsageCount} · Free-tier runs ${snap.freeTierUsageCount}`;
+    }
+    upgradeDismissSoftBtn?.classList.add("is-hidden");
+    upgradeEnrollFreeBtn?.classList.toggle("is-hidden", snap.freeTierEnrolled);
+    return;
+  }
+
+  if (snap.showSoftNudge) {
+    upgradeContextPanel.classList.add("is-visible", "mode-soft");
+    if (upgradeContextEyebrow) upgradeContextEyebrow.textContent = "Capacity";
+    if (upgradeContextPrimary) {
+      upgradeContextPrimary.textContent = `You've used ${snap.totalOperatorRuns} operator runs.`;
+    }
+    if (upgradeContextSecondary) {
+      upgradeContextSecondary.textContent =
+        "Upgrade for higher capacity and uninterrupted execution. Approval-safe automation continues on Pro.";
+    }
+    if (upgradeContextSplit) {
+      upgradeContextSplit.textContent = `Guest runs ${snap.guestUsageCount} · Free-tier runs ${snap.freeTierUsageCount}`;
+    }
+    upgradeDismissSoftBtn?.classList.remove("is-hidden");
+    upgradeEnrollFreeBtn?.classList.toggle("is-hidden", snap.freeTierEnrolled);
+    return;
+  }
+
+  if (upgradeContextSplit) upgradeContextSplit.textContent = "";
+  upgradeEnrollFreeBtn?.classList.add("is-hidden");
+  upgradeDismissSoftBtn?.classList.add("is-hidden");
+}
+
+function syncPrimaryRunButtons() {
+  const loading = uiStore.getState().loading;
+  const snap = getUsageSnapshot(currentPlanTier());
+  const block = snap.hardLimited && !snap.hasProAccess;
+  const hint = "Operator quota exhausted for this period. Copy, insert, and review stay available.";
+  if (analyzeBtn) {
+    analyzeBtn.disabled = Boolean(loading || block);
+    analyzeBtn.title = block ? hint : "";
+  }
+  if (scanInboxBtn) {
+    scanInboxBtn.disabled = Boolean(loading || block);
+    scanInboxBtn.title = block ? hint : "";
+  }
+}
+
+function bindUpgradePanel() {
+  if (upgradeEnrollFreeBtn && !upgradeEnrollFreeBtn.dataset.bound) {
+    upgradeEnrollFreeBtn.dataset.bound = "1";
+    upgradeEnrollFreeBtn.addEventListener("click", async () => {
+      await enrollFreeTier();
+      refreshUsageChrome();
+      syncPrimaryRunButtons();
+      showStatus("Free console enrolled — run counts continue on this device; quota resets on the rolling window.");
+    });
+  }
+  if (upgradeDismissSoftBtn && !upgradeDismissSoftBtn.dataset.bound) {
+    upgradeDismissSoftBtn.dataset.bound = "1";
+    upgradeDismissSoftBtn.addEventListener("click", async () => {
+      await dismissSoftNudgeForPeriod();
+      refreshUsageChrome();
+    });
+  }
+  if (upgradeProLink && !upgradeProLink.dataset.bound) {
+    upgradeProLink.dataset.bound = "1";
+    upgradeProLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      showStatus("Pro routing can open your billing or workspace console when wired.");
+    });
+  }
+}
+
+async function ensureUsageReady() {
+  await usageReady;
+}
 
 function renderConsequenceBar(data) {
   if (!consequenceSignal) return;
@@ -252,10 +410,6 @@ function syncReplyFromTextarea() {
   uiStore.setState({ lastReply: next });
   if (replyValue) replyValue.textContent = next || "-";
 }
-
-const scanInboxBtn = document.getElementById("scanInbox");
-const inboxSummary = document.getElementById("inboxSummary");
-const inboxSummaryValue = document.getElementById("inboxSummaryValue");
 
 function showStatus(message, isError = false) {
   uiStore.setState({
@@ -562,13 +716,7 @@ function render(data) {
 
   agentStore.setState({ latestPayload: data });
 
-  const capPill = document.getElementById("extensionCapacityPill");
-  if (data?.meta && data.meta.plan_tier) {
-    sessionStore.setState({ planTier: data.meta.plan_tier });
-  }
-  if (capPill && data?.meta && data.meta.plan_tier) {
-    capPill.textContent = `Extension · ${String(data.meta.plan_tier).toUpperCase()}`;
-  }
+  updateCapacityPillFromData(data);
 
   const decision = getDecisionData(data);
   const triage = getTriageData(data);
@@ -692,6 +840,9 @@ function render(data) {
   } else {
     showStatus("Ready.");
   }
+
+  refreshUsageChrome();
+  syncPrimaryRunButtons();
 }
 
 async function extractText(tabId) {
@@ -766,6 +917,18 @@ function buildInboxSummary(results) {
 }
 
 async function analyze() {
+  await ensureUsageReady();
+  const preSnap = getUsageSnapshot(currentPlanTier());
+  if (preSnap.hardLimited && !preSnap.hasProAccess) {
+    showStatus(
+      "Operator quota exhausted for this period. Copy, insert, and approval flows stay available for your current reply.",
+      false
+    );
+    refreshUsageChrome();
+    syncPrimaryRunButtons();
+    return;
+  }
+
   uiStore.setState({ loading: true });
   try {
     agentStore.setState((s) => ({
@@ -835,6 +998,9 @@ async function analyze() {
     showStatus("Generating decision...");
     const data = await res.json();
     render(data);
+    await recordSuccessfulOperatorRun(currentPlanTier());
+    refreshUsageChrome();
+    syncPrimaryRunButtons();
     showStatus("Ready.");
   } catch (err) {
     console.error("Analyze failed:", err);
@@ -843,10 +1009,23 @@ async function analyze() {
     if (emptyState) emptyState.style.display = "grid";
   } finally {
     uiStore.setState({ loading: false });
+    syncPrimaryRunButtons();
   }
 }
 
 async function scanInbox() {
+  await ensureUsageReady();
+  const preSnap = getUsageSnapshot(currentPlanTier());
+  if (preSnap.hardLimited && !preSnap.hasProAccess) {
+    showStatus(
+      "Operator quota exhausted for this period. Copy, insert, and approval flows stay available for your current reply.",
+      false
+    );
+    refreshUsageChrome();
+    syncPrimaryRunButtons();
+    return;
+  }
+
   uiStore.setState({ loading: true });
   try {
     agentStore.setState((s) => ({
@@ -886,7 +1065,26 @@ async function scanInbox() {
     }
 
     const thinkingPromise = playThinkingSequence(currentRunId, "inbox");
-    const threads = await extractThreads(tab.id);
+    let threads = await extractThreads(tab.id);
+
+    const preLoopSnap = getUsageSnapshot(currentPlanTier());
+    if (!preLoopSnap.hasProAccess && threads.length) {
+      const remaining = Math.max(0, preLoopSnap.hardThreshold - preLoopSnap.totalOperatorRuns);
+      if (remaining <= 0) {
+        agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
+        hideThinkingPanel();
+        showStatus(
+          "Operator quota exhausted for this period. Copy, insert, and approval flows stay available for your current reply.",
+          false
+        );
+        if (emptyState) emptyState.style.display = "grid";
+        return;
+      }
+      if (threads.length > remaining) {
+        threads = threads.slice(0, remaining);
+        showStatus(`Capacity: analyzing first ${remaining} visible row(s) this window.`, false);
+      }
+    }
 
     if (!threads.length) {
       agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
@@ -925,6 +1123,10 @@ async function scanInbox() {
       return;
     }
 
+    await recordSuccessfulOperatorRuns(currentPlanTier(), results.length);
+    refreshUsageChrome();
+    syncPrimaryRunButtons();
+
     const summary = buildInboxSummary(results);
     const summaryText =
       `${summary.total} tickets scanned\n` +
@@ -943,6 +1145,7 @@ async function scanInbox() {
     if (emptyState) emptyState.style.display = "grid";
   } finally {
     uiStore.setState({ loading: false });
+    syncPrimaryRunButtons();
   }
 }
 
