@@ -1843,7 +1843,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="assistant-decision-slot" data-slot="decision"></div>
           <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="customer-message-block">
-            <div class="customer-message-label">Customer-facing message</div>
+            <div class="customer-message-label">Prepared reply</div>
             <div class="reply-text js-reply-text">${bodyHtml}</div>
           </div>
           <div class="assistant-footer js-assistant-footer"></div>
@@ -2880,9 +2880,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function setSending(value) {
     state.sending = Boolean(value);
 
+    els.workspaceRoot?.classList.toggle("workspace-thinking", state.sending);
+
     if (els.composerStatusLine) {
       els.composerStatusLine.textContent = state.sending
-        ? "Preparing decision · streaming trace active in the canvas…"
+        ? "Xalvion is preparing your decision and reply…"
         : "Paste a customer issue or type a support request…";
       els.composerStatusLine.classList.toggle("composer-status-live", state.sending);
     }
