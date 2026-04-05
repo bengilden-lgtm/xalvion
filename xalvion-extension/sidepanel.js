@@ -1,4 +1,7 @@
 import { createChromeContext } from "./chrome-context.js";
+import { agentStore } from "./stores/agent-store.js";
+import { uiStore } from "./stores/ui-store.js";
+import { sessionStore } from "./stores/session-store.js";
 
 const chromeCtx = createChromeContext(typeof chrome !== "undefined" ? chrome : null);
 
@@ -89,11 +92,25 @@ const explainImpactValue = document.getElementById("explainImpactValue");
 const explainSessionCard = document.getElementById("explainSessionCard");
 const explainSessionValue = document.getElementById("explainSessionValue");
 
+/** Compat: legacy locals stay in sync with stores for existing closures and guards */
 let lastReply = "";
 let replySnapshotBeforeEdit = "";
 let explainabilityOpen = false;
 let thinkingRunId = 0;
 let replyEditing = false;
+
+function syncCompatFromStores() {
+  const ui = uiStore.getState();
+  lastReply = ui.lastReply;
+  replySnapshotBeforeEdit = ui.replySnapshotBeforeEdit;
+  explainabilityOpen = ui.explainabilityOpen;
+  replyEditing = ui.replyEditing;
+  thinkingRunId = agentStore.getState().thinkingRunId;
+}
+
+uiStore.subscribe(syncCompatFromStores);
+agentStore.subscribe(syncCompatFromStores);
+syncCompatFromStores();
 
 /** Keep aligned with `format.deriveConsequencePresentation` in workspace_modules.js */
 function deriveConsequencePresentation(data) {
@@ -222,8 +239,7 @@ function renderOperatorBrief(data) {
 }
 
 function resetReplyEditor() {
-  replyEditing = false;
-  replySnapshotBeforeEdit = "";
+  uiStore.setState({ replyEditing: false, replySnapshotBeforeEdit: "" });
   if (replyTextarea) {
     replyTextarea.classList.add("is-hidden");
     replyTextarea.value = "";
@@ -233,11 +249,19 @@ function resetReplyEditor() {
 }
 
 function setReplyEditing(on) {
-  replyEditing = Boolean(on);
-  const text = lastReply || "";
+  const editing = Boolean(on);
+  if (editing) {
+    uiStore.setState((s) => ({
+      ...s,
+      replyEditing: true,
+      replySnapshotBeforeEdit: s.lastReply,
+    }));
+  } else {
+    uiStore.setState({ replyEditing: false });
+  }
+  const text = uiStore.getState().lastReply || "";
   if (replyTextarea && replyValue && replyToggleEditBtn) {
-    if (replyEditing) {
-      replySnapshotBeforeEdit = lastReply;
+    if (editing) {
       replyTextarea.value = text;
       replyTextarea.classList.remove("is-hidden");
       replyValue.classList.add("is-hidden");
@@ -245,13 +269,13 @@ function setReplyEditing(on) {
       replyTextarea.focus();
     } else {
       let next = replyTextarea.classList.contains("is-hidden")
-        ? lastReply
+        ? uiStore.getState().lastReply
         : normalize(replyTextarea.value);
-      if (!next && replySnapshotBeforeEdit) {
-        next = replySnapshotBeforeEdit;
+      const snap = uiStore.getState().replySnapshotBeforeEdit;
+      if (!next && snap) {
+        next = snap;
       }
-      replySnapshotBeforeEdit = "";
-      lastReply = next;
+      uiStore.setState({ lastReply: next, replySnapshotBeforeEdit: "" });
       if (replyValue) replyValue.textContent = next || "-";
       replyTextarea.classList.add("is-hidden");
       replyValue.classList.remove("is-hidden");
@@ -269,9 +293,9 @@ function setReplyEditing(on) {
 }
 
 function syncReplyFromTextarea() {
-  if (!replyTextarea || !replyEditing) return;
+  if (!replyTextarea || !uiStore.getState().replyEditing) return;
   const next = normalize(replyTextarea.value);
-  lastReply = next;
+  uiStore.setState({ lastReply: next });
   if (replyValue) replyValue.textContent = next || "-";
 }
 
@@ -280,16 +304,23 @@ const inboxSummary = document.getElementById("inboxSummary");
 const inboxSummaryValue = document.getElementById("inboxSummaryValue");
 
 function showStatus(message, isError = false) {
+  uiStore.setState({
+    statusMessage: message || "",
+    statusIsError: Boolean(isError),
+  });
+
   if (!statusBox) return;
 
-  if (!message) {
+  const { statusMessage: msg, statusIsError: err } = uiStore.getState();
+
+  if (!msg) {
     statusBox.textContent = "";
     statusBox.className = "status";
     return;
   }
 
-  statusBox.textContent = message;
-  statusBox.className = isError ? "status show error" : "status show";
+  statusBox.textContent = msg;
+  statusBox.className = err ? "status show error" : "status show";
 }
 
 function showPanel() {
@@ -813,14 +844,17 @@ function renderExplainabilitySections(data) {
   explainabilityWrap.classList.toggle("hidden", !hasAny);
   if (!hasAny) {
     explainabilityWrap.classList.remove("open");
-    explainabilityOpen = false;
+    uiStore.setState({ explainabilityOpen: false });
   }
 }
 
 function toggleExplainability(forceOpen = null) {
   if (!explainabilityWrap || explainabilityWrap.classList.contains("hidden")) return;
-  explainabilityOpen = typeof forceOpen === "boolean" ? forceOpen : !explainabilityOpen;
-  explainabilityWrap.classList.toggle("open", explainabilityOpen);
+  uiStore.setState((s) => ({
+    ...s,
+    explainabilityOpen: typeof forceOpen === "boolean" ? forceOpen : !s.explainabilityOpen,
+  }));
+  explainabilityWrap.classList.toggle("open", uiStore.getState().explainabilityOpen);
 }
 
 function hideThinkingPanel() {
@@ -890,11 +924,11 @@ async function playThinkingSequence(runId, mode = "single") {
       ];
 
   for (const item of sequence) {
-    if (runId !== thinkingRunId) return;
+    if (runId !== agentStore.getState().thinkingRunId) return;
     showStatus(item.status);
     setThinkingStep(item.index, "active", item.subtitle);
     await delay(180);
-    if (runId !== thinkingRunId) return;
+    if (runId !== agentStore.getState().thinkingRunId) return;
     setThinkingStep(item.index, "done", item.subtitle);
   }
 }
@@ -965,7 +999,12 @@ function render(data) {
   ensureEnterpriseCards();
   resetReplyEditor();
 
+  agentStore.setState({ latestPayload: data });
+
   const capPill = document.getElementById("extensionCapacityPill");
+  if (data?.meta && data.meta.plan_tier) {
+    sessionStore.setState({ planTier: data.meta.plan_tier });
+  }
   if (capPill && data?.meta && data.meta.plan_tier) {
     capPill.textContent = `Extension · ${String(data.meta.plan_tier).toUpperCase()}`;
   }
@@ -1001,7 +1040,7 @@ function render(data) {
   if (replyValue) replyValue.textContent = reply || "-";
   if (statusValue) statusValue.textContent = formatStatus(status) || "-";
 
-  lastReply = reply;
+  uiStore.setState({ lastReply: reply });
   if (replyStack) replyStack.classList.toggle("is-visible", !!reply);
 
   updateStatusBadge(status);
@@ -1322,30 +1361,35 @@ async function insertIntoGmail(tabId, text) {
 }
 
 async function analyze() {
-  thinkingRunId += 1;
-  const currentRunId = thinkingRunId;
-
-  hidePanel();
-  hideHeaderInsight();
-  hideInboxSummary();
-  if (emptyState) emptyState.style.display = "none";
-
-  if (copyBtn) {
-    copyBtn.disabled = true;
-    copyBtn.style.display = "none";
-  }
-
-  if (insertBtn) {
-    insertBtn.disabled = true;
-    insertBtn.style.display = "none";
-  }
-
-  lastReply = "";
-  resetReplyEditor();
-  toggleExplainability(false);
-  startThinkingPanel();
-
+  uiStore.setState({ loading: true });
   try {
+    agentStore.setState((s) => ({
+      ...s,
+      thinkingRunId: s.thinkingRunId + 1,
+      latestPayload: null,
+    }));
+    const currentRunId = agentStore.getState().thinkingRunId;
+
+    hidePanel();
+    hideHeaderInsight();
+    hideInboxSummary();
+    if (emptyState) emptyState.style.display = "none";
+
+    if (copyBtn) {
+      copyBtn.disabled = true;
+      copyBtn.style.display = "none";
+    }
+
+    if (insertBtn) {
+      insertBtn.disabled = true;
+      insertBtn.style.display = "none";
+    }
+
+    uiStore.setState({ lastReply: "", replyEditing: false, replySnapshotBeforeEdit: "" });
+    resetReplyEditor();
+    toggleExplainability(false);
+    startThinkingPanel();
+
     const tab = await chromeCtx.getActiveTab();
 
     if (!tab?.id) {
@@ -1359,7 +1403,7 @@ async function analyze() {
     const text = await extractText(tab.id);
 
     if (!text) {
-      thinkingRunId += 1;
+      agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
       hideThinkingPanel();
       showStatus("No readable content found on this page.", true);
       if (emptyState) emptyState.style.display = "grid";
@@ -1392,34 +1436,41 @@ async function analyze() {
     hideThinkingPanel();
     showStatus("Backend not reachable. Make sure app.py is running on 127.0.0.1:8000.", true);
     if (emptyState) emptyState.style.display = "grid";
+  } finally {
+    uiStore.setState({ loading: false });
   }
 }
 
 async function scanInbox() {
-  thinkingRunId += 1;
-  const currentRunId = thinkingRunId;
-
-  hidePanel();
-  hideHeaderInsight();
-  hideInboxSummary();
-  if (emptyState) emptyState.style.display = "none";
-
-  if (copyBtn) {
-    copyBtn.disabled = true;
-    copyBtn.style.display = "none";
-  }
-
-  if (insertBtn) {
-    insertBtn.disabled = true;
-    insertBtn.style.display = "none";
-  }
-
-  lastReply = "";
-  resetReplyEditor();
-  toggleExplainability(false);
-  startThinkingPanel();
-
+  uiStore.setState({ loading: true });
   try {
+    agentStore.setState((s) => ({
+      ...s,
+      thinkingRunId: s.thinkingRunId + 1,
+      latestPayload: null,
+    }));
+    const currentRunId = agentStore.getState().thinkingRunId;
+
+    hidePanel();
+    hideHeaderInsight();
+    hideInboxSummary();
+    if (emptyState) emptyState.style.display = "none";
+
+    if (copyBtn) {
+      copyBtn.disabled = true;
+      copyBtn.style.display = "none";
+    }
+
+    if (insertBtn) {
+      insertBtn.disabled = true;
+      insertBtn.style.display = "none";
+    }
+
+    uiStore.setState({ lastReply: "", replyEditing: false, replySnapshotBeforeEdit: "" });
+    resetReplyEditor();
+    toggleExplainability(false);
+    startThinkingPanel();
+
     const tab = await chromeCtx.getActiveTab();
 
     if (!tab?.id) {
@@ -1433,7 +1484,7 @@ async function scanInbox() {
     const threads = await extractThreads(tab.id);
 
     if (!threads.length) {
-      thinkingRunId += 1;
+      agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
       hideThinkingPanel();
       showStatus("No inbox threads found on this page.", true);
       if (emptyState) emptyState.style.display = "grid";
@@ -1485,6 +1536,8 @@ async function scanInbox() {
     hideThinkingPanel();
     showStatus("Inbox scan failed.", true);
     if (emptyState) emptyState.style.display = "grid";
+  } finally {
+    uiStore.setState({ loading: false });
   }
 }
 
