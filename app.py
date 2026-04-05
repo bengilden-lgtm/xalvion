@@ -1954,53 +1954,21 @@ def serve_landing():
 
 @app.get("/health")
 def health():
-    """Shallow liveness: process is up (use /health/deep for readiness)."""
-    return {"status": "ok", "service": "xalvion-sovereign-brain"}
+    return {
+        "status": "ok",
+        "service": "xalvion",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
 @app.get("/health/deep")
-def health_deep(db: Session = Depends(get_db)):
-    from sqlalchemy import text as _text
-
-    checks: dict[str, Any] = {}
-    mode = (os.getenv("ENVIRONMENT", "development") or "development").strip()
-    checks["mode"] = mode
-
+def health_deep():
     try:
-        db.execute(_text("SELECT 1"))
-        checks["database"] = "ok"
-    except Exception as exc:
-        checks["database"] = f"error: {exc}"
-
-    try:
-        checks["users"] = db.query(User).count()
-        checks["tickets"] = db.query(Ticket).count()
-        checks["actions"] = db.query(ActionLog).count()
-    except Exception as exc:
-        checks["tables"] = f"error: {exc}"
-
-    try:
-        checks["operator_mode"] = get_operator_mode(db)
-    except Exception as exc:
-        checks["operator_mode"] = f"error: {exc}"
-
-    env_lower = mode.lower()
-    if env_lower == "production":
-        raw_jwt = os.getenv("JWT_SECRET")
-        checks["jwt_secret"] = "configured" if (raw_jwt and raw_jwt.strip()) else "missing"
-    else:
-        checks["jwt_secret"] = "n/a"
-
-    checks["stripe"] = "configured" if STRIPE_KEY else "missing"
-    checks["openai"] = "configured" if os.getenv("OPENAI_API_KEY", "").strip() else "missing"
-
-    degraded = any(isinstance(v, str) and v.startswith("error") for v in checks.values())
-    if checks.get("jwt_secret") == "missing":
-        degraded = True
-
-    checks["status"] = "degraded" if degraded else "ok"
-    checks["service"] = "xalvion-sovereign-brain"
-    return checks
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+        return {"status": "ok", "db": "connected"}
+    except Exception as e:
+        return {"status": "degraded", "error": str(e)[:200]}
 
 
 # =============================================================================
