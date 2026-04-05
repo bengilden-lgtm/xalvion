@@ -223,7 +223,7 @@
           <div class="operator-rail-intel-compact">
             <span class="operator-rail-live-badge"><span class="operator-rail-live-pulse" aria-hidden="true"></span> Live</span>
             <div class="operator-rail-title">Operator rail</div>
-            <p class="operator-rail-sub">Latest run, session value, and throughput stay above the fold; everything else tucks into More.</p>
+            <p class="operator-rail-sub">Latest run first — expand session metrics or open Pipeline / More when you need depth.</p>
           </div>
         </div>
         <div class="rail-scroll-host scroll-shell" id="railScrollShell" data-show-top="false" data-show-bottom="false">
@@ -272,8 +272,8 @@
               </div>
             </div>
 
-            <div class="rail-brief is-open rail-brief-tier-session rail-brief-snapshot-combo" data-rail-brief="value">
-              <button type="button" class="rail-brief-toggle" aria-expanded="true" id="railBriefToggleValue">
+            <div class="rail-brief rail-brief-tier-session rail-brief-snapshot-combo" data-rail-brief="value">
+              <button type="button" class="rail-brief-toggle" aria-expanded="false" id="railBriefToggleValue">
                 <span class="rail-brief-toggle-text">
                   <span class="rail-brief-tier rail-brief-tier-session">Session</span>
                   <span class="rail-brief-heading">Value &amp; throughput</span>
@@ -338,6 +338,15 @@
               </div>
             </div>
 
+            <details class="rail-details-pipeline">
+              <summary class="rail-details-summary rail-details-summary-pipeline">
+                <span class="rail-details-summary-inner">
+                  <span class="rail-details-title">Pipeline &amp; revenue</span>
+                  <span class="rail-details-hint">Today’s CRM snapshot · revenue dashboard</span>
+                </span>
+                <span class="rail-details-chevron" aria-hidden="true"></span>
+              </summary>
+              <div class="rail-details-body rail-details-body-pipeline">
             <div class="rail-card rail-surface rail-pipeline-snapshot" id="crmTodayCard">
               <div class="rail-title">Today</div>
               <div id="crmTodaySummary" class="muted-copy">Sign in to see today’s pipeline, hot deals, and reminder load.</div>
@@ -409,6 +418,8 @@
                 <div class="refund-empty">No source performance data yet.</div>
               </div>
             </div>
+              </div>
+            </details>
 
             <details class="rail-details-more">
               <summary class="rail-details-summary">
