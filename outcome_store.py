@@ -66,6 +66,13 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _tool_response_json(tool_result: dict[str, Any]) -> str:
+    try:
+        return json.dumps(tool_result, ensure_ascii=False, default=str)[:4000]
+    except Exception:
+        return "{}"
+
+
 def ensure_outcome_log_columns() -> None:
     """Lazy migration for action_outcome_log — same pattern as app.ensure_user_columns."""
     try:
@@ -136,7 +143,7 @@ def log_outcome(
             dispute_filed=0,
             ticket_reopened=0,
             crm_closed=0,
-            tool_response_json=json.dumps(tool_result, ensure_ascii=False)[:4000],
+            tool_response_json=_tool_response_json(tool_result if isinstance(tool_result, dict) else {"raw": tool_result}),
             created_at=now,
             updated_at=now,
         )

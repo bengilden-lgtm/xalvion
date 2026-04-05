@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List
 
 VALID_MODES = {"conservative", "balanced", "delight", "fraud_aware"}
@@ -17,6 +18,29 @@ HANDLED_ISSUE_TYPES = frozenset({
 MAX_AUTO_REFUND_AMOUNT: float = 50.0
 MAX_AUTO_CREDIT_AMOUNT: float = 30.0
 MAX_APPROVAL_THRESHOLD: float = 25.0
+
+
+def execution_requires_operator_gate(action: str, amount: Any) -> bool:
+    """
+    Single source of truth for “must not auto-execute without operator approval”.
+    Mirrors FastAPI workspace policy (app.check_requires_approval) so agent execution
+    cannot drift from API gates.
+    """
+    norm = str(action or "none").strip().lower()
+    try:
+        value = float(amount or 0)
+    except (TypeError, ValueError):
+        value = 0.0
+    if norm in {"refund", "charge"}:
+        return True
+    live = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
+    try:
+        thresh = float(os.getenv("APPROVAL_THRESHOLD", str(MAX_APPROVAL_THRESHOLD)))
+    except (TypeError, ValueError):
+        thresh = float(MAX_APPROVAL_THRESHOLD)
+    if live and norm == "credit" and value > thresh:
+        return True
+    return False
 
 
 def _to_int(value: Any, default: int = 0) -> int:

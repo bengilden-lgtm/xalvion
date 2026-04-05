@@ -34,13 +34,21 @@ def save_rules(rules: List[Dict[str, Any]]) -> None:
 
 
 def validate_rule(rule: Dict[str, Any]) -> bool:
-    amount = int(rule["action"].get("amount", 0) or 0)
+    if not isinstance(rule, dict):
+        return False
+    act = rule.get("action")
+    if not isinstance(act, dict):
+        return False
+    try:
+        amount = int(act.get("amount", 0) or 0)
+    except (TypeError, ValueError):
+        return False
     if amount > 50:
         return False
     condition = rule.get("condition")
     if condition is None or not isinstance(condition, dict):
         return False
-    if rule["action"].get("type") == "refund":
+    if act.get("type") == "refund":
         return False
     return True
 

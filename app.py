@@ -54,12 +54,12 @@ from sqlalchemy.orm import Session
 from agent import run_agent, local_fallback_reply, build_audit_summary_payload
 from actions import (
     build_ticket as build_support_ticket,
+    execution_requires_operator_gate,
     merge_impact_with_business_projection,
     system_decision,
     triage_ticket,
     HANDLED_ISSUE_TYPES,
     MAX_AUTO_REFUND_AMOUNT,
-    MAX_APPROVAL_THRESHOLD,
 )
 from db import Base, SessionLocal, engine, init_db
 from memory import get_user_memory
@@ -197,9 +197,6 @@ STREAM_CHUNK_SIZE = int(os.getenv("STREAM_CHUNK_SIZE", "18"))
 STREAM_CHUNK_DELAY = float(os.getenv("STREAM_CHUNK_DELAY", "0.02"))
 STATUS_STEP_DELAY = float(os.getenv("STATUS_STEP_DELAY", "0.22"))
 MAX_AUTO_REFUND = float(os.getenv("MAX_AUTO_REFUND", str(MAX_AUTO_REFUND_AMOUNT)))
-
-APPROVAL_THRESHOLD = float(os.getenv("APPROVAL_THRESHOLD", str(MAX_APPROVAL_THRESHOLD)))
-LIVE_MODE = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
 
 REFUND_RULES: dict[str, Any] = {
     "enabled": True,
@@ -1147,13 +1144,22 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
     tool_result = result.get("tool_result") or {}
     impact = result.get("impact") or {}
     reply = result.get("reply") or result.get("response") or result.get("final") or "No response"
-    execution = result.get("execution") or {
-        "action": result.get("action", "none"),
-        "amount": result.get("amount", 0),
-        "status": result.get("tool_status", tool_result.get("status", "unknown")),
-        "auto_resolved": bool(impact.get("auto_resolved", False)),
-        "requires_approval": bool((result.get("decision") or {}).get("requires_approval", False)),
+    _tool_st = str(result.get("tool_status", tool_result.get("status", "")) or "").lower()
+    _needs_appr = bool((result.get("decision") or {}).get("requires_approval", False)) or _tool_st in {
+        "pending_approval",
+        "manual_review",
     }
+    execution = dict(
+        result.get("execution")
+        or {
+            "action": result.get("action", "none"),
+            "amount": result.get("amount", 0),
+            "status": result.get("tool_status", tool_result.get("status", "unknown")),
+            "auto_resolved": bool(impact.get("auto_resolved", False)),
+            "requires_approval": _needs_appr,
+        }
+    )
+    execution["requires_approval"] = bool(execution.get("requires_approval", False)) or _needs_appr
     trust_audit, outcome_correlation_key = _attach_trust_layer(result)
 
     return {
@@ -1959,16 +1965,7 @@ def apply_learning_feedback(runtime_ticket: dict[str, Any], result: dict[str, An
 
 
 def check_requires_approval(action: str, amount: float) -> bool:
-    normalized = str(action or "none").strip().lower()
-    value = float(amount or 0)
-
-    if normalized in {"refund", "charge"}:
-        return True
-
-    if LIVE_MODE and normalized == "credit" and value > APPROVAL_THRESHOLD:
-        return True
-
-    return False
+    return execution_requires_operator_gate(action, amount)
 
 
 def build_approval_hold_message(action: str, amount: float) -> str:

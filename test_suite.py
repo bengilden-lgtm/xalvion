@@ -167,6 +167,56 @@ class TestBusinessImpactProjection:
         assert merged.get("agent_minutes_saved", 0) >= 0
 
 
+class TestExecutionOperatorGate:
+    def test_refund_always_gated(self):
+        from actions import execution_requires_operator_gate
+
+        assert execution_requires_operator_gate("refund", 10) is True
+
+    def test_charge_always_gated(self):
+        from actions import execution_requires_operator_gate
+
+        assert execution_requires_operator_gate("charge", 5) is True
+
+    def test_credit_not_gated_when_not_live(self, monkeypatch):
+        from actions import execution_requires_operator_gate
+
+        monkeypatch.setenv("LIVE_MODE", "false")
+        assert execution_requires_operator_gate("credit", 100) is False
+
+    def test_credit_gated_when_live_above_threshold(self, monkeypatch):
+        from actions import execution_requires_operator_gate
+
+        monkeypatch.setenv("LIVE_MODE", "true")
+        monkeypatch.setenv("APPROVAL_THRESHOLD", "25")
+        assert execution_requires_operator_gate("credit", 30) is True
+        assert execution_requires_operator_gate("credit", 10) is False
+
+
+class TestAgentExecuteActionApproval:
+    def test_refund_preserved_while_pending(self, monkeypatch):
+        import agent as agent_mod
+
+        def _no_refund(*_a, **_k):
+            raise AssertionError("process_refund must not run before operator approval")
+
+        monkeypatch.setattr(agent_mod, "process_refund", _no_refund)
+        ticket = {
+            "issue_type": "general_support",
+            "issue": "please refund",
+            "customer": "pytest_user",
+            "order_status": "unknown",
+        }
+        out = agent_mod.execute_action(
+            ticket,
+            {"action": "refund", "amount": 20, "requires_approval": False},
+        )
+        assert out["tool_status"] == "pending_approval"
+        assert out["action"] == "refund"
+        assert out["amount"] == 20
+        assert out.get("tool_result", {}).get("status") == "pending_approval"
+
+
 # =============================================================================
 # security.py
 # =============================================================================
@@ -285,6 +335,12 @@ class TestLearning:
         }
         # Empty dict condition is valid (was the original bug — False positive)
         assert validate_rule(rule) is True
+
+    def test_validate_rule_rejects_malformed(self):
+        from learning import validate_rule
+
+        assert validate_rule({}) is False
+        assert validate_rule({"action": "not_a_dict"}) is False
 
 
 # =============================================================================

@@ -17,6 +17,7 @@ from actions import (
     build_ticket,
     compute_execution_tier,
     execute_action as dispatch_integrated_action,
+    execution_requires_operator_gate,
     merge_impact_with_business_projection,
     system_decision,
     triage_ticket,
@@ -40,7 +41,7 @@ from models import (
 try:
     from analytics import log_event
 except Exception:
-    def log_event(user_input, response, confidence, quality):
+    def log_event(user_input, response, confidence, quality, **kwargs):
         return None
 
 
@@ -160,7 +161,7 @@ def polish_message(message: str) -> str:
 
 def normalize_text(text: str) -> str:
     if not isinstance(text, str):
-        return text
+        return "" if text is None else str(text)
 
     # Try common mojibake repair paths. Running more than once helps when a
     # string has been mis-decoded repeatedly through different layers.
@@ -500,13 +501,26 @@ def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
 
 
 def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Dict[str, Any]:
-    safe_action = normalize_action_payload(action_payload)
+    safe_action = dict(normalize_action_payload(action_payload))
+    if execution_requires_operator_gate(safe_action["action"], safe_action["amount"]):
+        safe_action["requires_approval"] = True
     action = safe_action["action"]
     amount = safe_action["amount"]
 
     if safe_action.get("requires_approval"):
-        result = {"status": "pending_approval", "type": "approval_gate", "message": "Action held for approval"}
-        return {"action": "review", "amount": 0, "tool_result": result, "tool_status": result["status"]}
+        result = {
+            "status": "pending_approval",
+            "type": "approval_gate",
+            "message": "Action held for approval",
+            "proposed_action": action,
+            "proposed_amount": amount,
+        }
+        return {
+            "action": action,
+            "amount": amount,
+            "tool_result": result,
+            "tool_status": str(result["status"]),
+        }
 
     request_context = ticket.get("request_context") or {}
     customer_email = str(ticket.get("customer_email") or request_context.get("sender") or "").strip()
@@ -1031,6 +1045,8 @@ def compute_quality(
         score += 0.04
     elif tool_status in {"error", "pending_review"}:
         score -= 0.06
+    elif tool_status in {"pending_approval", "manual_review", "approved_pending_execution"}:
+        score -= 0.04
     action = str(executed.get("action", "none") or "none")
     if action == "review":
         score -= 0.08
@@ -1615,7 +1631,8 @@ def _canonicalize_result(
         "queue": queue,
         "status": status,
         "risk_level": str(final_action.get("risk_level", triage.get("risk_level", "medium")) or "medium"),
-        "requires_approval": bool(final_action.get("requires_approval", False)),
+        "requires_approval": bool(final_action.get("requires_approval", False))
+        or tool_status in {"pending_approval", "manual_review"},
         "tool_status": tool_status,
     }
 
@@ -1650,6 +1667,8 @@ def _canonicalize_result(
         "time_saved": float(impact.get("time_saved", 0) or 0),
         "confidence_band": dict(impact.get("confidence_band") or {}),
     }
+    if tool_status in {"pending_approval", "manual_review", "approved_pending_execution"}:
+        impact_projection["auto_resolved"] = False
 
     hd = hard_decision if hard_decision is not None else final_action
     br_list = brain_rules or []
@@ -1928,6 +1947,9 @@ def run_agent(
             "confidence": confidence,
         }
 
+    if execution_requires_operator_gate(final_action.get("action", "none"), final_action.get("amount", 0)):
+        final_action = {**final_action, "requires_approval": True}
+
     executed = execute_action(ticket, final_action)
     thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
     quality = compute_quality(confidence, triage, executed, user_memory, llm_used)
@@ -1939,14 +1961,17 @@ def run_agent(
         f":{uuid.uuid4().hex[:12]}"
     )
     _tool_result = executed.get("tool_result") or {"status": executed.get("tool_status", "unknown")}
+    _exec_ts = str(executed.get("tool_status", "") or "").lower()
+    _exec_act = str(executed.get("action", "none") or "none")
+    _held_for_operator = _exec_ts in {"pending_approval", "manual_review", "approved_pending_execution"}
     _log_outcome(
         outcome_key=_outcome_key,
         user_id=user_id,
-        action=str(executed.get("action", "none") or "none"),
+        action=_exec_act,
         amount=float(executed.get("amount", 0) or 0),
         issue_type=str(ticket.get("issue_type", "general_support") or "general_support"),
         tool_result=_tool_result,
-        auto_resolved=bool(executed.get("action", "none") in {"refund", "credit", "none"}),
+        auto_resolved=(not _held_for_operator) and _exec_act in {"refund", "credit", "none"},
         approved_by_human=False,
     )
 
@@ -1977,7 +2002,15 @@ def run_agent(
     update_memory(user_id, ticket, customer_message, final_payload)
     learn_from_ticket(ticket, final_payload, executed, outcome_key=_outcome_key)
     process_feedback(clean, customer_message, quality)
-    log_event(clean, customer_message, confidence, quality)
+    log_event(
+        clean,
+        customer_message,
+        confidence,
+        quality,
+        issue_type=str(ticket.get("issue_type", "general_support") or "general_support"),
+        action=str(final_payload.get("action", "none") or "none"),
+        amount=float(final_payload.get("amount", 0) or 0),
+    )
     if quality > 0.92:
         brain_growth = load_brain()
         add_rule(brain_growth, "Maintain strong clarity and confident tone.")
