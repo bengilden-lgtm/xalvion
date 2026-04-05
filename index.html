@@ -18,7 +18,7 @@
     <div class="workspace-atmosphere-grain"></div>
   </div>
 
-  <div class="workspace-root" id="workspaceRoot">
+  <div class="workspace-root workspace-idle" id="workspaceRoot">
     <header class="command-strip glass" id="commandStrip">
       <div class="command-strip-left">
         <a class="command-brand" href="/landing" title="Xalvion">
@@ -594,8 +594,10 @@
           </header>
 
           <div class="main-stage-body">
-            <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
-              <div id="messages" class="messages scroll-area"></div>
+            <div class="messages-zone" id="messagesZone">
+              <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
+                <div id="messages" class="messages scroll-area"></div>
+              </div>
             </div>
 
             <footer class="composer-wrap composer-dock">

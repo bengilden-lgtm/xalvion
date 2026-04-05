@@ -1805,10 +1805,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function createTypingMarkup() {
     return `
-      <span class="typing" aria-hidden="true">
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
+      <span class="xalvion-typing-sovereign" aria-hidden="true">
+        <span class="xalvion-sovereign-mark xalvion-sovereign-mark--xs"></span>
       </span>
     `;
   }
@@ -1951,6 +1949,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     empty.className = "empty-state";
     empty.innerHTML = buildEmptyStateHtml();
     els.messages.appendChild(empty);
+    syncWorkspaceLayoutMode();
 
     empty.querySelector("#emptySignupCta")?.addEventListener("click", () => {
       if (!isAuthenticated()) {
@@ -1970,12 +1969,23 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     els.messages?.querySelector(".empty-state")?.remove();
   }
 
+  function syncWorkspaceLayoutMode() {
+    const root = els.workspaceRoot;
+    if (!root || !els.messages) return;
+    const hasConversation = Boolean(els.messages.querySelector(".msg-group"));
+    const hasLimitCard = Boolean(els.messages.querySelector(".empty-state .limit-moment-card"));
+    const active = hasConversation || hasLimitCard;
+    root.classList.toggle("workspace-idle", !active);
+    root.classList.toggle("workspace-active", active);
+  }
+
   function addUserMessage(text) {
     clearEmptyState();
     const row = createMessageGroup("user", escapeHtml(text).replace(/\n/g, "<br>"));
     els.messages?.appendChild(row);
     scrollMessagesToBottom(true);
     refreshMessageShellGlow();
+    syncWorkspaceLayoutMode();
     return row;
   }
 
@@ -1986,6 +1996,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     els.messages?.appendChild(row);
     scrollMessagesToBottom(true);
     refreshMessageShellGlow();
+    syncWorkspaceLayoutMode();
     return row;
   }
 
@@ -2791,7 +2802,13 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const wrap = document.createElement("div");
     wrap.className = "stream-steps stream-steps--premium";
     wrap.innerHTML = `
-      <div class="stream-trace-header"><span class="stream-trace-kicker">Preparing</span><span class="stream-trace-title">Decision trace</span></div>
+      <div class="stream-trace-header">
+        <span class="stream-trace-mark" aria-hidden="true"><span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm"></span></span>
+        <span class="stream-trace-header-copy">
+          <span class="stream-trace-kicker">Preparing</span>
+          <span class="stream-trace-title">Decision trace</span>
+        </span>
+      </div>
       <div class="stream-step-row">
       <div class="stream-step active"><div class="stream-step-dot"></div><span>Reviewing</span></div>
       <div class="stream-step"><div class="stream-step-dot"></div><span>Routing</span></div>
@@ -2872,7 +2889,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
     if (els.sendBtn) {
       els.sendBtn.disabled = state.sending;
-      els.sendBtn.innerHTML = state.sending ? ICONS.status : ICONS.send;
+      els.sendBtn.classList.toggle("send-btn--thinking", state.sending);
+      els.sendBtn.innerHTML = state.sending
+        ? '<span class="xalvion-sovereign-mark" aria-hidden="true"></span>'
+        : ICONS.send;
       els.sendBtn.setAttribute("aria-label", state.sending ? "Sending" : "Send message");
     }
 
@@ -4670,6 +4690,8 @@ function bindEvents() {
     } else {
       setNotice("success", "Workspace synced", `Signed in as ${state.username}. The operator workspace is ready.`);
     }
+
+    syncWorkspaceLayoutMode();
   }
 
   function hardBindCoreComposer() {
