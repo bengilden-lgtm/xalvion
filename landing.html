@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Xalvion — AI support that decides and acts</title>
+  <title>Xalvion — Approval-safe support decisioning & actioning</title>
+  <meta name="description" content="Xalvion prepares governed support actions—replies, credits, refunds, escalations—so your team approves with context, full logging, and risk controls. Not autonomous AI; approval-safe operations." />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><text x='32' y='48' font-family='Georgia,serif' font-size='48' font-weight='700' fill='%23ffffff' text-anchor='middle'>X</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -49,7 +50,7 @@
       top:50%;
       transform:translate(-50%,-50%);
       display:flex;
-      gap:48px;
+      gap:40px;
       align-items:center;
       list-style:none;
       margin:0;
@@ -57,10 +58,20 @@
     }
     .nav-links a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:500}
     .nav-links a:hover{color:var(--text)}
-    .nav-cta{
-      height:42px;padding:0 20px;border-radius:12px;border:1px solid rgba(124,92,252,.42);
-      background:rgba(124,92,252,.12);color:var(--text);font-size:14px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;
+    .nav-cta-group{display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .nav-cta-secondary{
+      height:42px;padding:0 18px;border-radius:12px;border:1px solid var(--line2);
+      background:rgba(255,255,255,.04);color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;
+      transition:color .15s ease,border-color .15s ease,background .15s ease;
     }
+    .nav-cta-secondary:hover{color:var(--text);border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.06)}
+    .nav-cta-primary{
+      height:42px;padding:0 22px;border-radius:12px;border:1px solid rgba(124,92,252,.44);
+      background:linear-gradient(135deg,rgba(124,92,252,.22),rgba(79,142,247,.14));color:var(--text);font-size:14px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;
+      box-shadow:0 0 28px rgba(124,92,252,.2);
+      transition:transform .15s ease,box-shadow .15s ease;
+    }
+    .nav-cta-primary:hover{transform:translateY(-1px);box-shadow:0 0 36px rgba(124,92,252,.28)}
     .hero{
       min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
       padding:120px 24px 80px;
@@ -73,7 +84,7 @@
     .eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 8px var(--violet)}
     .hero h1{
       font-family:'Cormorant Garamond',serif;font-size:clamp(58px,9vw,120px);font-weight:700;line-height:1;letter-spacing:-.03em;
-      max-width:960px;margin-bottom:16px;
+      max-width:980px;margin-bottom:16px;
     }
     .hero h1 em{
       font-style:italic;background:linear-gradient(135deg,#a78bfa 0%,#60a5fa 50%,#34d399 100%);
@@ -81,18 +92,29 @@
     }
     .hero p{
       font-family:'Cormorant Garamond',serif;font-size:clamp(22px,3vw,34px);font-style:italic;color:rgba(215,225,250,.86);
-      max-width:860px;margin-bottom:24px;
+      max-width:880px;margin-bottom:24px;
     }
     .hero .subcopy{
-      font-family:'Outfit',sans-serif;font-style:normal;font-size:18px;line-height:1.8;max-width:760px;
-      color:rgba(222,230,250,.88);margin-bottom:42px;
+      font-family:'Outfit',sans-serif;font-style:normal;font-size:18px;line-height:1.8;max-width:780px;
+      color:rgba(222,230,250,.88);margin-bottom:28px;
+    }
+    .trust-strip{
+      display:flex;flex-wrap:wrap;justify-content:center;gap:10px 20px;
+      max-width:900px;margin:0 auto 36px;
+      font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(180,195,230,.72);
+    }
+    .trust-strip span{display:inline-flex;align-items:center;gap:8px}
+    .trust-strip span::before{
+      content:"";width:4px;height:4px;border-radius:50%;background:rgba(124,92,252,.75);
+      box-shadow:0 0 8px rgba(124,92,252,.4);
     }
     .hero-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:64px}
     .btn-primary,.btn-ghost{
       height:54px;padding:0 30px;border-radius:16px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-weight:600;
     }
     .btn-primary{
-      background:linear-gradient(135deg,#7c5cfc,#4f8ef7);color:#fff;box-shadow:0 0 40px rgba(124,92,252,.35),0 8px 24px rgba(0,0,0,.3)
+      background:linear-gradient(135deg,#7c5cfc,#4f8ef7);color:#fff;box-shadow:0 0 40px rgba(124,92,252,.35),0 8px 24px rgba(0,0,0,.3);
+      border:1px solid rgba(124,92,252,.35);
     }
     .btn-ghost{
       border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text);backdrop-filter:blur(12px)
@@ -122,17 +144,18 @@
     .pill.success{background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.25);color:#6ee7b7}
     .pill.info{background:rgba(96,165,250,.10);border-color:rgba(96,165,250,.22);color:#93c5fd}
     .pill.violet{background:rgba(167,139,250,.10);border-color:rgba(167,139,250,.22);color:#c4b5fd}
+    .pill.neutral{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:rgba(210,220,245,.85)}
     section{position:relative;z-index:2}
     .container{max-width:1120px;margin:0 auto;padding:0 24px}
     .section-label{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(167,139,250,.8);margin-bottom:16px}
     .section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(40px,5vw,68px);font-weight:700;letter-spacing:-.025em;line-height:1.05;margin-bottom:18px}
-    .section-desc{font-size:17px;color:rgba(215,225,250,.92);max-width:620px;line-height:1.75}
+    .section-desc{font-size:17px;color:rgba(215,225,250,.92);max-width:680px;line-height:1.75}
     .stats{padding:60px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
     .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px}
     .stat-item{padding:32px 24px;text-align:center;border-right:1px solid var(--line)}
     .stat-item:last-child{border-right:none}
-    .stat-number{font-family:'Cormorant Garamond',serif;font-size:60px;font-weight:700;letter-spacing:-.04em;line-height:1;margin-bottom:8px}
-    .stat-label{font-size:13px;color:rgba(215,225,250,.88);font-weight:500}
+    .stat-number{font-family:'Cormorant Garamond',serif;font-size:clamp(44px,5vw,60px);font-weight:700;letter-spacing:-.04em;line-height:1;margin-bottom:8px}
+    .stat-label{font-size:13px;color:rgba(215,225,250,.88);font-weight:500;line-height:1.45}
     .how,.positioning{padding:120px 0}
     .proof{padding:0 0 120px}
     .pricing{padding:140px 0 120px}
@@ -146,6 +169,10 @@
     .price-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;color:rgba(215,225,250,.92)}
     .price-list div{padding-left:18px;position:relative}
     .price-list div::before{content:"•";position:absolute;left:0;color:rgba(167,139,250,.86)}
+    .tier-why{
+      margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08);
+      font-size:13px;font-weight:600;color:rgba(170,205,255,.82);line-height:1.55;
+    }
     .center{text-align:center}
     footer{padding:48px 24px 80px;color:var(--muted2);text-align:center}
 
@@ -440,22 +467,26 @@
       text-align:center;
       font-size:14px;
       color:rgba(205,215,242,.74);
+      max-width:720px;margin-left:auto;margin-right:auto;line-height:1.65;
     }
+
+    .pricing-closing{
+      margin-top:40px;
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      align-items:center;
+      gap:14px;
+    }
+    .pricing-closing .btn-primary{font-weight:700}
 
     @media (max-width:900px){
       nav{padding:16px 24px}
-      .nav-links{
-      position:absolute;
-      left:50%;
-      top:50%;
-      transform:translate(-50%,-50%);
-      display:flex;
-      gap:48px;
-      align-items:center;
-      list-style:none;
-      margin:0;
-      padding:0;
-    }
+      .nav-links{gap:22px}
+      .nav-links a{font-size:12px}
+      .nav-cta-group{gap:8px}
+      .nav-cta-secondary{padding:0 14px;font-size:12px}
+      .nav-cta-primary{padding:0 16px;font-size:13px}
       .stats-grid,.cards,.pricing-grid,.proof-shell,.proof-metrics{grid-template-columns:1fr}
       .stat-item{border-right:none;border-bottom:1px solid var(--line)}
       .stat-item:last-child{border-bottom:none}
@@ -464,6 +495,7 @@
       .plan-badge{top:16px;right:16px}
       .pricing{padding:120px 0 100px}
       .proof{padding:0 0 100px}
+      .trust-strip{gap:8px 14px;font-size:11px}
     }
   </style>
 </head>
@@ -474,7 +506,7 @@
   <div class="page">
     <nav>
       <a class="nav-brand" href="#">
-        <svg width="210" height="42" viewBox="0 0 210 42">
+        <svg width="210" height="42" viewBox="0 0 210 42" aria-label="Xalvion">
           <text x="0" y="34" font-family="Georgia,'Times New Roman',serif" font-size="34" font-weight="700" fill="#ffffff" letter-spacing="-0.5">X</text>
           <text x="33" y="24" font-family="'Helvetica Neue',Arial,sans-serif" font-size="13" font-weight="300" fill="#ffffff" letter-spacing="5" opacity="0.9">ALVION</text>
           <text x="34" y="34" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5.5" font-weight="400" fill="rgba(255,255,255,0.28)" letter-spacing="3.5">AUTONOMOUS SUPPORT</text>
@@ -482,32 +514,42 @@
       </a>
       <ul class="nav-links">
         <li><a href="#how">How it works</a></li>
-        <li><a href="#positioning">Why it converts</a></li>
+        <li><a href="#governance">Trust &amp; controls</a></li>
+        <li><a href="#proof">Outcomes</a></li>
         <li><a href="#pricing">Pricing</a></li>
       </ul>
-      <a class="nav-cta" href="/">Open workspace →</a>
+      <div class="nav-cta-group">
+        <a class="nav-cta-secondary" href="/">Workspace</a>
+        <a class="nav-cta-primary" href="#pricing">Get started</a>
+      </div>
     </nav>
 
     <section class="hero">
       <div class="eyebrow">
         <div class="eyebrow-dot"></div>
-        AI OPERATOR THAT PREPARES THE RIGHT DECISION
+        Approval-safe decisioning &amp; actioning
       </div>
-      <h1>Resolve support tickets instantly —<br/><em>without giving AI control</em></h1>
-      <p>Xalvion prepares the right action — reply, refund, credit, or escalation — so your team can approve in one click and move faster without trusting a black-box bot.</p>
+      <h1>Support decisions, prepared and <em>actioned</em> —<br/>with governance, not guesswork</h1>
+      <p>Xalvion is not “another AI chat.” It is an operator layer that proposes governed outcomes—replies, credits, refunds, escalations—so humans approve with policy context, caps, and a clear audit trail.</p>
       <div class="subcopy">
-        This is not just another AI layer. Xalvion reads the ticket, shows the decision, keeps risk visible, and turns support speed into a clear ROI story your team can trust.
+        Risk stays visible. Actions stay bounded. Every customer-visible move is tied to a decision record your team can review—so you get speed without surrendering control.
+      </div>
+      <div class="trust-strip">
+        <span>Human oversight</span>
+        <span>Policy &amp; caps</span>
+        <span>Action logging</span>
+        <span>Escalation paths</span>
       </div>
       <div class="hero-actions">
-        <a class="btn-primary" href="/">Try the workspace →</a>
-        <a class="btn-ghost" href="#pricing">See plans →</a>
+        <a class="btn-primary" href="#pricing">Get started — choose your plan</a>
+        <a class="btn-ghost" href="/">Explore the workspace</a>
       </div>
       <div class="hero-demo">
         <div class="demo-bar">
           <div class="demo-dot red"></div>
           <div class="demo-dot yellow"></div>
           <div class="demo-dot green"></div>
-          <span class="demo-title">XALVION WORKSPACE — LIVE</span>
+          <span class="demo-title">XALVION WORKSPACE — DECISION PREVIEW</span>
         </div>
         <div class="demo-body">
           <div class="demo-msg">
@@ -515,13 +557,14 @@
             <div class="demo-bubble user">I was charged twice for my order last week.</div>
           </div>
           <div class="demo-msg">
-            <div class="demo-avatar ai">AI</div>
-            <div class="demo-bubble ai">I’ve confirmed the duplicate charge and prepared a $25 refund under duplicate-charge protection. Review is ready now.</div>
+            <div class="demo-avatar ai">XV</div>
+            <div class="demo-bubble ai">Duplicate charge confirmed against billing policy. Proposed action: $25 refund (cap matched). Review shows policy clause, amount, and customer thread—approve to execute or edit before send.</div>
           </div>
           <div class="demo-pills">
-            <div class="pill success">Approval ready</div>
+            <div class="pill success">Awaiting approval</div>
             <div class="pill info">Confidence 0.96</div>
-            <div class="pill violet">Billing protection</div>
+            <div class="pill violet">Policy: duplicate charge</div>
+            <div class="pill neutral">Logged · reversible</div>
           </div>
         </div>
       </div>
@@ -531,20 +574,20 @@
       <div class="container">
         <div class="stats-grid">
           <div class="stat-item">
-            <div class="stat-number">3</div>
-            <div class="stat-label">Core action types locked down</div>
+            <div class="stat-number">1</div>
+            <div class="stat-label">Approval gate before customer-visible actions you designate as controlled</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number">80%</div>
-            <div class="stat-label">Of repetitive tickets Xalvion is built to prepare instantly</div>
+            <div class="stat-number">~80%</div>
+            <div class="stat-label">Of repetitive support volume Xalvion is built to triage and pre-resolve</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number">1 click</div>
-            <div class="stat-label">From AI recommendation to human approval</div>
+            <div class="stat-number">Faster</div>
+            <div class="stat-label">From open ticket to proposed resolution in a single structured pass</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number">2.4 hrs</div>
-            <div class="stat-label">Estimated time saved from a single inbox scan demo</div>
+            <div class="stat-number">Full</div>
+            <div class="stat-label">Operational clarity—decision, rationale, policy touchpoints, approver</div>
           </div>
         </div>
       </div>
@@ -553,80 +596,83 @@
     <section id="how" class="how">
       <div class="container">
         <div class="section-label">How it works</div>
-        <div class="section-title">What actually happens after a ticket lands</div>
-        <div class="section-desc"></div>
+        <div class="section-title">From ticket to <br/>traceable outcome</div>
+        <div class="section-desc">Each step is designed so automation accelerates the queue while accountability stays with your team.</div>
         <div class="cards">
           <div class="card">
-            <h3>1. Customer message received</h3>
-            <p>Duplicate charges, late shipments, damaged orders, and refund requests are routed differently instead of getting the same generic assistant answer.</p>
+            <h3>1. Ingest &amp; classify</h3>
+            <p>Duplicates, shipping failures, damaged goods, and refund asks are separated from generic “help” noise—so the model works on the right problem class, not one-size replies.</p>
           </div>
           <div class="card">
-            <h3>2. Xalvion prepares the decision</h3>
-            <p>The model can suggest, but only controlled actions survive: none, refund, credit, or review. Amounts stay capped and higher-risk moves stay visible before anyone approves them.</p>
+            <h3>2. Propose within guardrails</h3>
+            <p>Xalvion surfaces a concrete next action: message, credit, refund, escalate, or hold. Amounts respect caps; sensitive paths stay flagged; nothing customer-facing ships without the approval model you configure.</p>
           </div>
           <div class="card">
-            <h3>3. Your team approves and value shows up</h3>
-            <p>Usage, remaining volume, projected time saved, and upgrade prompts stay visible inside the workspace so product value naturally turns into subscription pressure.</p>
+            <h3>3. Approve, execute, record</h3>
+            <p>Your operator confirms or edits once. The workspace captures what was decided, why, and who signed off—so leadership, QA, and finance see the same operational truth.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="positioning" class="positioning">
+    <section id="governance" class="positioning">
       <div class="container">
-        <div class="section-label">Why teams trust it</div>
-        <div class="section-title">Automation matters. <br/>Control is what makes it sell.</div>
-        <div class="section-desc"></div>
+        <div class="section-label">Trust &amp; controls</div>
+        <div class="section-title">Safer automation is <br/>bounded automation</div>
+        <div class="section-desc">Buyers do not adopt “smart bots.” They adopt systems that reduce workload while keeping reputational and financial risk in check.</div>
         <div class="cards">
           <div class="card">
-            <h3>AI prepares. Your team stays in control.</h3>
-            <p>Actions are constrained, tied to policy logic, and surfaced with clear approval context so operators move faster without blindly handing over customer outcomes.</p>
+            <h3>Human oversight by design</h3>
+            <p>Approvals land where your policy says they should. Operators see the proposed action, confidence, and policy hooks—not a black-box completion.</p>
           </div>
           <div class="card">
-            <h3>Better demo moment</h3>
-            <p>The workspace shows the action, the confidence, the review state, and the time-saving upside. That creates a stronger “this can actually run support” moment.</p>
+            <h3>Risk controls you can explain</h3>
+            <p>Caps, allowed action types, and escalation rules keep edge cases out of silent auto-resolution. The interface makes the boundary obvious before anyone clicks.</p>
           </div>
           <div class="card">
-            <h3>Clearer revenue hook</h3>
-            <p>Free proves the workflow. Growth unlocks real throughput. Operator becomes the high-scale support tier. The product now points directly at paid conversion.</p>
+            <h3>Logging that holds up internally</h3>
+            <p>Tickets, decisions, and outcomes stay linked for retrospectives, coaching, and compliance conversations—so “what happened” is never reconstructed from chat logs.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="proof">
+    <section id="proof" class="proof">
       <div class="container">
+        <div class="section-label">Operational proof</div>
+        <div class="section-title" style="max-width:720px">Outcomes buyers actually <br/>measure in support</div>
+        <div class="section-desc" style="margin-bottom:8px">Resolution velocity, queue relief, and a cleaner story for leadership—without promising magic.</div>
         <div class="proof-shell">
           <div class="proof-card">
-            <div class="proof-kicker">Why teams stick with it</div>
-            <div class="proof-quote">“It feels less like another AI tool and more like we hired a fast, disciplined support operator that already knows what to do.”</div>
+            <div class="proof-kicker">Why teams adopt</div>
+            <div class="proof-quote">“It feels less like an AI demo and more like a disciplined operator handoff—fast prep, visible policy, human sign-off.”</div>
             <div class="proof-subcopy">
-              The best proof is not just that it replies — it prepares the right move fast enough to change how a team works. Xalvion makes the action visible, keeps the workflow controlled, and turns each support interaction into a more credible product moment.
+              Proof is not clever prose. It is shorter cycle time on repeatable issues, fewer context switches for agents, and an audit trail that makes automation defensible in front of finance and customers.
             </div>
             <div class="proof-metrics">
               <div class="proof-metric">
-                <div class="proof-metric-value">Real</div>
-                <div class="proof-metric-label">The first demo that feels like an actual operator flow, not a chatbot wrapper.</div>
+                <div class="proof-metric-value">Velocity</div>
+                <div class="proof-metric-label">Structured decision prep so first meaningful resolution moves arrive sooner on routine work.</div>
               </div>
               <div class="proof-metric">
-                <div class="proof-metric-value">Live</div>
-                <div class="proof-metric-label">Action state, ticket outcome, approval flow, and usage pressure all show up in one loop.</div>
+                <div class="proof-metric-value">Relief</div>
+                <div class="proof-metric-label">Less manual triage and rewrite work—operators review and approve instead of rebuilding every thread.</div>
               </div>
               <div class="proof-metric">
-                <div class="proof-metric-value">Clear</div>
-                <div class="proof-metric-label">The customer sees the result. The operator sees the reason. The product earns trust.</div>
+                <div class="proof-metric-value">Safer</div>
+                <div class="proof-metric-label">Automation narrative your org can stand behind: bounded actions, explicit approval, full traceability.</div>
               </div>
             </div>
           </div>
 
           <div class="testimonial-card">
-            <div class="testimonial-kicker">Real feedback</div>
+            <div class="testimonial-kicker">Operator feedback</div>
             <blockquote>
-              “We tried generic AI support before and it always looked smart until a real edge case showed up. Xalvion felt different because the decision path was visible, approvals stayed in our hands, and the upgrade story was built into the product instead of bolted on after.”
+              “Generic AI support looked smart until an edge case hit finance. Xalvion was different—the path was visible, approvals stayed with us, and we could show exactly what was proposed and who released it.”
             </blockquote>
             <div class="testimonial-author">
-              <strong>Head of Support, early-stage SaaS team</strong>
-              <span>Early access feedback</span>
+              <strong>Head of Support, early-stage SaaS</strong>
+              <span>Early access</span>
             </div>
           </div>
         </div>
@@ -636,76 +682,84 @@
     <section id="pricing" class="pricing">
       <div class="container">
         <div class="section-label">Pricing</div>
-        <div class="section-title">Operator pricing. <br/>Scale as your queue grows.</div>
+        <div class="section-title">Plans that track <br/>how support actually scales</div>
         <div class="section-desc">
-          Start free, prove the workflow, then upgrade when support volume and approval pressure make the ROI obvious.
-          The product is designed to turn “this is useful” into “we should pay for this.”
+          Start free to validate the approval loop, then step up when ticket volume and review workload make the economics undeniable.
+          At every tier, you are buying throughput and operational clarity—not another seat tax hidden as “AI.”
         </div>
+        <p class="section-desc" style="margin-top:14px;font-size:15px;color:rgba(195,208,235,.78);max-width:720px">
+          Compared to loaded support headcount—recruiting, training, management attention, and attrition—specialized operator software is usually far less expensive than adding another FTE. Xalvion is priced to win on that trade while keeping governance intact.
+        </p>
 
-        <div class="pricing-kicker">Start free • upgrade when the time savings are obvious</div>
+        <div class="pricing-kicker">Free to prove workflow · upgrade when volume forces the issue</div>
 
         <div class="pricing-grid">
           <div class="price-card">
             <h3>Starter</h3>
             <div class="price">$29 <span>/ month</span></div>
-            <p class="plan-subcopy">For small teams that want an approval-first AI operator without adding another headcount cost.</p>
+            <p class="plan-subcopy">For lean teams that need governed decision prep without expanding payroll.</p>
+            <div class="tier-why"><strong>When Starter fits:</strong> You are proving the loop—bounded actions, approvals, and logging—on a modest monthly queue.</div>
             <div class="price-list">
               <div>100 monthly tickets</div>
               <div>Approval-first operator workspace</div>
-              <div>Core decision and reply flow</div>
+              <div>Core decision, reply, and review flow</div>
             </div>
             <div class="plan-cta">
-              <a class="plan-btn secondary" href="/">Start Starter</a>
-              <div class="plan-meta">Fastest path to a real support workflow.</div>
+              <a class="plan-btn secondary" href="/">Start on Starter</a>
+              <div class="plan-meta">Lowest commitment path to real governance.</div>
             </div>
           </div>
 
-          <div class="price-card featured">
-            <div class="plan-badge">Most Popular</div>
+          <div class="price-card featured" id="growth-plan">
+            <div class="plan-badge">Best ROI</div>
             <h3>Growth</h3>
             <div class="price"><span class="price-anchor">$149</span>$99 <span>/ month</span></div>
-            <p class="plan-subcopy">For growing teams replacing manual support work with a faster, clearer operator workflow.</p>
-            <div class="price-value-note">Built to save hours every month before you even think about more headcount.</div>
+            <p class="plan-subcopy">For teams where queue growth is showing up as overtime, SLA pressure, and hiring conversations.</p>
+            <div class="price-value-note">The tier most teams land on when “we need another hire” is on the table—but headcount is not.</div>
+            <div class="tier-why"><strong>Why Growth matters:</strong> Ten times the monthly volume versus Starter, with routing and dashboard depth that matches a busier operation.</div>
             <div class="price-list">
               <div>1,000 monthly tickets</div>
               <div>Inbox scan and stronger routing</div>
-              <div>Full dashboard visibility</div>
+              <div>Full dashboard visibility across workload</div>
             </div>
             <div class="plan-cta">
-              <a class="plan-btn primary" href="/">Upgrade to Growth →</a>
-              <div class="plan-meta">The clearest ROI point for most teams.</div>
+              <a class="plan-btn primary" href="/">Choose Growth</a>
+              <div class="plan-meta">Primary recommendation for scaling queues.</div>
             </div>
           </div>
 
           <div class="price-card">
             <h3>Operator</h3>
             <div class="price">$299 <span>/ month</span></div>
-            <p class="plan-subcopy">For teams that want to run support at scale with stronger visibility, approvals, and higher throughput.</p>
-            <div class="price-value-note">Built for serious support volume without the human bottleneck.</div>
+            <p class="plan-subcopy">For high-volume support orgs that need throughput, multi-seat coordination, and advanced operational visibility.</p>
+            <div class="price-value-note">Five thousand tickets and advanced surfaces—built for teams where support is a cost center under executive scrutiny.</div>
+            <div class="tier-why"><strong>Why Operator:</strong> When missed SLAs or audit questions are expensive, the extra headroom and depth pay for themselves versus reactive hiring.</div>
             <div class="price-list">
               <div>5,000 monthly tickets</div>
               <div>Advanced dashboard access</div>
-              <div>Multi-seat support story</div>
+              <div>Multi-seat operational story</div>
             </div>
             <div class="plan-cta">
-              <a class="plan-btn secondary" href="/">Go Operator →</a>
-              <div class="plan-meta">For higher-volume support operations.</div>
+              <a class="plan-btn secondary" href="/">Go Operator</a>
+              <div class="plan-meta">For serious queue volume and shared ownership.</div>
             </div>
           </div>
         </div>
 
         <div class="pricing-footnote">
-          No contracts. Cancel anytime. Upgrade when the queue, time savings, and operator pressure make the next tier obvious.
+          <strong style="color:rgba(225,230,250,.88)">Free tier:</strong> Use Xalvion on limited volume to validate approvals, logging, and team workflow—then upgrade when the queue outgrows it.
+          No long-term contracts. Cancel anytime. Higher tiers exist because volume, visibility, and coordination requirements step up together—not to arbitrary-feature you into the next bracket.
         </div>
 
-        <div class="center" style="margin-top:38px">
-          <a class="btn-primary" href="/">Try the operator workspace now →</a>
+        <div class="pricing-closing">
+          <a class="btn-primary" href="#growth-plan">Get started — Growth</a>
+          <a class="btn-ghost" href="/">Explore the workspace</a>
         </div>
       </div>
     </section>
 
     <footer>
-      Xalvion — autonomous support that resolves, acts, and makes the ROI obvious.
+      Xalvion — approval-safe support decisioning, actioning, and operational clarity.
     </footer>
   </div>
 
