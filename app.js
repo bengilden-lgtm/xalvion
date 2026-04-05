@@ -392,9 +392,9 @@ if (typeof window.pulseRail !== "function") {
     if (!isAuthenticated()) {
       return {
         key: `guest-${getEffectiveUsage(state.usage)}`,
-        title: "You hit the preview wall — unlock full operator capacity",
-        detail: `You’ve already seen the workflow work. Create a free account for ${FREE_USAGE_LIMIT} runs/month, saved threads, and uninterrupted decisioning.`,
-        body: `You’ve hit your preview limit — and Xalvion is already generating value. Create a free account to unlock ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same approval-safe workflow. Every blocked action is lost momentum.`
+        title: "Continue where you left off — unlock full access",
+        detail: `You’ve seen how Xalvion prepares replies. Create a free account for ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same workflow.`,
+        body: `Continue without limits — free accounts get ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same draft-and-review flow. Sign up under Access when you’re ready.`
       };
     }
 
@@ -416,8 +416,8 @@ if (typeof window.pulseRail !== "function") {
     if (tier === "pro") {
       return {
         key: `pro-${getEffectiveUsage(state.usage)}`,
-        title: "Pro capacity reached — don’t let throughput stall",
-        detail: `${valuePrefix}Unlock Elite for 5,000 tickets/month, deeper analytics, and more execution headroom before volume turns into drag.`,
+        title: "Pro capacity reached — momentum is already here",
+        detail: `${valuePrefix}Upgrade to Elite for 5,000 tickets/month, advanced dashboard depth, and room to scale without another hard stop.`,
         body: `${valuePrefix}You’ve reached the Pro monthly ticket limit.
 
 You’re already running a serious operator surface. Elite adds headroom (5,000 tickets/month), advanced analytics, and team scale so growth doesn’t hit another wall next quarter.`
@@ -426,8 +426,8 @@ You’re already running a serious operator surface. Elite adds headroom (5,000 
 
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
-      title: "Free plan capacity reached — the value is already visible",
-      detail: `${valuePrefix}Unlock Pro for 500 tickets/month, live refund execution, and uninterrupted operator runs before the next valuable action gets blocked.`,
+      title: "Free plan capacity reached — you proved the value",
+      detail: `${valuePrefix}Upgrade to Pro for 500 tickets/month, live refund execution, and uninterrupted operator runs.`,
       body: `${valuePrefix}You’ve used all ${FREE_USAGE_LIMIT} free runs this month.
 
 The workspace already showed you real routing and approval discipline. Pro keeps that loop running with higher limits, the refund center live, and priority routing when volume spikes.`
@@ -455,7 +455,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       meta.appendChild(
         createMetaChip({
           icon: ICONS.warn,
-          text: isAuthenticated() ? "Unlock more capacity" : "Unlock full operator capacity",
+          text: isAuthenticated() ? "Upgrade required" : "Sign up — full access",
           tone: "review"
         })
       );
@@ -1375,8 +1375,8 @@ The workspace already showed you real routing and approval discipline. Pro keeps
         const runWord = rem === 1 ? "run" : "runs";
         el.textContent =
           rem <= 0
-            ? "Preview complete • unlock full operator capacity"
-            : `Preview mode • ${rem} operator ${runWord} remaining`;
+            ? "Preview complete • unlock full access"
+            : `Preview mode • ${rem} ${runWord} remaining`;
         if (state.remaining <= 0) el.classList.add("is-limit");
         else if (pct >= 0.75) el.classList.add("is-warning");
       } else if (state.atLimit) {
@@ -1911,55 +1911,69 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const tierLc = String(state.tier || "free").toLowerCase();
     const atCap = guest ? getGuestUsage() >= GUEST_USAGE_LIMIT : state.atLimit;
     const previewLeft = guest ? Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()) : state.remaining;
-    const guestApproaching =
-      guest && previewLeft > 0 && previewLeft <= Math.max(1, Math.ceil(GUEST_USAGE_LIMIT * 0.34));
+    const previewRunsWord = previewLeft === 1 ? "run" : "runs";
 
     if (atCap) {
       const n = guest ? getGuestUsage() : state.usage;
       const capEyebrow = guest ? "Preview" : tierLc === "pro" ? "Pro capacity" : "Capacity";
       const capTitle = guest
-        ? "Unlock full operator capacity"
+        ? "You hit the preview wall"
         : tierLc === "pro"
-          ? "Pro limit reached"
+          ? "Pro capacity reached"
           : tierLc === "elite"
-            ? "Plan limit reached"
-            : "Free plan limit reached";
+            ? "Plan capacity reached"
+            : "Free plan capacity reached";
+      const capLead = guest
+        ? "You already saw the workflow work. Keep the same operator flow under a free account."
+        : `You ran <strong>${n}</strong> full operator ${n === 1 ? "run" : "runs"} this cycle.`;
       const capBody = guest
-        ? `You just saw Xalvion complete the workflow — unlock ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same operator flow.`
+        ? `Unlock ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same approval-safe workflow before the next valuable action gets blocked.`
         : tierLc === "pro"
-          ? "You maxed Pro — the workspace already proved throughput. Elite unlocks 5,000 tickets/month and advanced analytics so the next growth step isn’t another hard stop."
-          : "You used this month’s allocation — the operator loop is working. Upgrade to Pro for 500 runs/month, live refunds, and priority routing when volume spikes.";
+          ? "Elite adds 5,000 tickets/month, deeper analytics, and more execution headroom so volume does not become drag."
+          : "Upgrade to Pro for 500 runs/month, live refunds, and priority routing when the next customer decision matters.";
       const ctaLabel = guest
-        ? "Unlock full operator capacity"
+        ? "Unlock full access"
         : tierLc === "pro"
-          ? "Scale without another wall · Upgrade to Elite"
-          : "Keep momentum · Upgrade to Pro";
+          ? "Upgrade to Elite"
+          : "Upgrade to Pro";
       return `
-      <div class="empty-card limit-moment-card empty-card-premium">
+      <div class="empty-card limit-moment-card empty-card-premium empty-card-conversion">
         <div class="empty-cap-eyebrow">${capEyebrow}</div>
         <h2>${capTitle}</h2>
-        <p class="limit-moment-lead">${guest ? "You’ve used your preview runs — continue with the same flow under a free account." : `You ran <strong>${n}</strong> full scenario${n === 1 ? "" : "s"} this cycle.`}</p>
+        <p class="limit-moment-lead">${capLead}</p>
         <p>${capBody}</p>
+        <div class="empty-flow-strip empty-flow-strip-compact" aria-hidden="true">
+          <span>Prepare</span>
+          <span>Approve</span>
+          <span>Execute</span>
+        </div>
         <button type="button" class="limit-cta" id="emptySignupCta">${ctaLabel}</button>
         ${guest ? `<button type="button" class="limit-secondary-link" id="emptyLoginLink">Already have an account? Log in</button>` : ""}
       </div>`;
     }
 
-    const previewRunsWord = previewLeft === 1 ? "run" : "runs";
-    const chipHintGuest = guestApproaching
-      ? `Preview · ${previewLeft} ${previewRunsWord} left — sign up to save threads`
-      : `Preview · ${previewLeft} ${previewRunsWord} remaining`;
+    const chipHintGuest = guest
+      ? `Preview mode · ${previewLeft} operator ${previewRunsWord} remaining`
+      : `${formatTier(state.tier)} · ${state.remaining} operator runs this period`;
 
     return `
       <div class="empty-card empty-card-premium empty-card-launch">
-        <p class="empty-launch-directive">Paste a real customer message</p>
-        <p class="empty-launch-outcome">Xalvion prepares a ready-to-send reply</p>
-        <p class="empty-launch-review">Review, edit, or approve before sending</p>
+        <p class="empty-launch-directive">Make a support decision</p>
+        <p class="empty-launch-outcome">AI prepares the reply and the action</p>
+        <p class="empty-launch-review">You review, edit, or approve before anything executes</p>
+        <div class="empty-flow-strip" aria-hidden="true">
+          <span>Analyze ticket</span>
+          <span>Prepare action</span>
+          <span>Approve &amp; execute</span>
+        </div>
         <div class="empty-actions empty-actions-intent" role="group" aria-label="Example ticket">
-          <button type="button" class="chip empty-intent-chip" data-fill="A customer says: I was charged twice.">Example: duplicate charge</button>
+          <button type="button" class="chip empty-intent-chip" data-fill="A customer says: I was charged twice.">Duplicate charge</button>
+          <button type="button" class="chip empty-intent-chip" data-fill="A customer says: my package is late and I need an update.">Late package</button>
+          <button type="button" class="chip empty-intent-chip" data-fill="A customer says: my order arrived damaged and I want help.">Damaged order</button>
         </div>
         <div class="empty-actions empty-actions-launch">
-          <span class="empty-chip-hint">${guest ? chipHintGuest : `${formatTier(state.tier)} · ${state.remaining} runs this period`}</span>
+          <span class="empty-chip-hint">${chipHintGuest}</span>
+          <span class="empty-chip-hint empty-chip-hint-secondary">Approval-safe actions stay gated until you decide</span>
         </div>
       </div>`;
   }
@@ -2491,7 +2505,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       return;
     }
     if (approval.approved) {
-      setTerminal("Action executed", "✓  Customer updated · outcome logged");
+      setTerminal("Approved", "✓  Sent to customer");
       return;
     }
 
@@ -2508,7 +2522,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const ap = document.createElement("button");
       ap.type = "button";
       ap.className = "btn-approve";
-      ap.textContent = "Approve & Execute";
+      ap.textContent = "Approve";
       controls.append(rej, ed, ap);
 
       ed.addEventListener("click", () => {
@@ -2582,7 +2596,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
               [rej, ed, ap].forEach((b) => {
                 b.disabled = false;
               });
-              ap.textContent = "Approve & Execute";
+              ap.textContent = "Approve";
               sendEdited.disabled = false;
               sendEdited.textContent = "Send edited reply";
             }
@@ -2674,12 +2688,12 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
             [rej, ed, ap].forEach((b) => {
               b.disabled = false;
             });
-            ap.textContent = "Approve & Execute";
+            ap.textContent = "Approve";
           }
           return;
         }
-        setTerminal("Action executed", "✓  Customer updated · outcome logged");
-        setNotice("success", "Action executed", "Decision approved, customer updated, and outcome tracked.");
+        setTerminal("Approved", "✓  Sent to customer");
+        setNotice("success", "Cleared", "Operator cleared this response — copy when ready.");
       });
     };
 
@@ -2993,7 +3007,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const hasThread = Boolean(els.messages?.querySelector(".msg-group"));
     if (!hasThread) {
       els.composerStatusLine.textContent = isAuthenticated()
-        ? "Paste a ticket below to generate the decision and action."
+        ? "Paste a ticket below to start."
         : "Paste below — preview mode includes a few full runs.";
       return;
     }
@@ -3002,8 +3016,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const rw = left === 1 ? "run" : "runs";
       els.composerStatusLine.textContent =
         left > 0
-          ? `Review the decision above, then run another case · ${left} preview ${rw} left`
-          : "Upgrade to continue executing outcomes — full access keeps threads, usage, and approval-safe actions live.";
+          ? `Review the draft above, then try another case · ${left} preview ${rw} left`
+          : "Continue with full access — sign up under Access to keep threads and monthly runs.";
       return;
     }
     els.composerStatusLine.textContent = "Paste the next ticket, or refine this thread.";
@@ -4098,16 +4112,22 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   const RAIL_BRIEF_KEY = "xalvion-rail-brief-v2";
 
   function syncSidebarCapabilityPanels() {
-    if (els.sidebarCrmNew) setText(els.sidebarCrmNew, String(state.crmSummary?.new ?? 0));
-    if (els.sidebarCrmDue) setText(els.sidebarCrmDue, String(state.crmSummary?.due_followups ?? 0));
-    if (els.sidebarCrmTodayDue) setText(els.sidebarCrmTodayDue, String(state.crmDailySummary?.due_followups ?? 0));
-    if (els.sidebarCrmTodayClosed) setText(els.sidebarCrmTodayClosed, String(state.crmDailySummary?.closed_today ?? 0));
+    const crmNew = Number(state.crmSummary?.new ?? 0);
+    const crmDue = Number(state.crmSummary?.due_followups ?? 0);
+    const crmDueToday = Number(state.crmDailySummary?.due_followups ?? 0);
+    const crmClosedToday = Number(state.crmDailySummary?.closed_today ?? 0);
+    if (els.sidebarCrmNew) setText(els.sidebarCrmNew, crmNew > 0 ? String(crmNew) : "—");
+    if (els.sidebarCrmDue) setText(els.sidebarCrmDue, crmDue > 0 ? String(crmDue) : "—");
+    if (els.sidebarCrmTodayDue) setText(els.sidebarCrmTodayDue, crmDueToday > 0 ? String(crmDueToday) : "—");
+    if (els.sidebarCrmTodayClosed) setText(els.sidebarCrmTodayClosed, crmClosedToday > 0 ? String(crmClosedToday) : "—");
     const t = state.revenueMetrics?.totals || {};
     const revenue = Number(t.revenue || 0);
-    if (els.sidebarRevenueTotal) setText(els.sidebarRevenueTotal, `$${revenue.toFixed(2)}`);
-    if (els.sidebarRevenueReply) setText(els.sidebarRevenueReply, `${Number(t.reply_rate || 0).toFixed(1)}%`);
-    if (els.sidebarRevenueWin) setText(els.sidebarRevenueWin, `${Number(t.win_rate || 0).toFixed(1)}%`);
-    if (els.sidebarRevenueSource) setText(els.sidebarRevenueSource, state.revenueMetrics?.best_source || "manual");
+    const replyRate = Number(t.reply_rate || 0);
+    const winRate = Number(t.win_rate || 0);
+    if (els.sidebarRevenueTotal) setText(els.sidebarRevenueTotal, revenue > 0 ? `$${revenue.toFixed(2)}` : "Waiting for first run");
+    if (els.sidebarRevenueReply) setText(els.sidebarRevenueReply, replyRate > 0 ? `${replyRate.toFixed(1)}%` : "Populates after runs");
+    if (els.sidebarRevenueWin) setText(els.sidebarRevenueWin, winRate > 0 ? `${winRate.toFixed(1)}%` : "Outcome tracking idle");
+    if (els.sidebarRevenueSource) setText(els.sidebarRevenueSource, revenue > 0 ? (state.revenueMetrics?.best_source || "manual") : "No activity yet");
   }
 
   function initWorkspaceChromeShell() {
