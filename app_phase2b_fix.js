@@ -40,7 +40,6 @@
     systemPanelCopy: document.getElementById("systemPanelCopy"),
     brandSubcopy: document.getElementById("brandSubcopy"),
     workspaceSubcopy: document.getElementById("workspaceSubcopy"),
-    workspaceHeadline: document.getElementById("workspaceHeadline"),
     dashboardCard: document.getElementById("dashboardCard"),
     usageCard: document.getElementById("usageCard"),
     accountCard: document.getElementById("accountCard"),
@@ -2017,27 +2016,21 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
   }
 
   function updateTopbarStatus() {
-    if (els.workspaceHeadline) {
-      els.workspaceHeadline.textContent = state.username
-        ? `AI support operator for ${state.username}`
-        : "AI support that resolves cases with visible reasoning and controlled action flow";
-    }
-
     if (els.workspaceSubcopy) {
       if (state.latestRun) {
         const decision = state.latestRun.decision || {};
-        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} plan · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence.`;
+        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${formatMetric(state.latestRun.confidence || 0, 2)} conf`;
+      } else if (state.username) {
+        els.workspaceSubcopy.textContent = `${state.username} · ${formatTier(state.tier)} · Paste a ticket; prepared reply lands here for review.`;
       } else {
-        els.workspaceSubcopy.textContent = state.username
-          ? `${formatTier(state.tier)} plan · live response loop · action visibility · premium support execution.`
-          : "Guest preview · response ready · visible action handling and premium support presentation.";
+        els.workspaceSubcopy.textContent = "Guest preview · paste a case below — prepared reply and routing appear after the run.";
       }
     }
 
     if (els.brandSubcopy) {
       els.brandSubcopy.textContent = state.username
-        ? `Signed in as ${state.username}. Workspace state, plan data, and support activity stay persistent.`
-        : "Premium AI support operations with visible action handling and a cleaner customer-ready surface.";
+        ? `Signed in as ${state.username}. Session and plan state persist across visits.`
+        : "Drafts and billing moves stay gated until you release them.";
     }
 
     updateAuthStatus();

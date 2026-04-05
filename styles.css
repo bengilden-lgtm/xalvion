@@ -6673,3 +6673,402 @@ body{
 .command-status-dot{
   box-shadow:0 0 5px rgba(124,92,252,0.14) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAUNCH MODE — Xalvion workspace (final polish)
+   Intent: visible intentional empty state, precision composer, operational header,
+   reply-forward typography, calmer chrome, sovereign spark at rest + under load.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root{
+  --xv-launch-1:4px;
+  --xv-launch-2:8px;
+  --xv-launch-3:12px;
+  --xv-launch-4:16px;
+  --xv-launch-5:20px;
+  --xv-launch-6:24px;
+  --xv-launch-8:32px;
+}
+
+/* Command strip: identity only; no secondary slogan competing with center status */
+.command-brand-tag,
+.command-brand-tag--strip{
+  display:none !important;
+}
+
+/* Sidebar textual mark (replaces heavy SVG) */
+.brand-compact--textual{
+  padding:0 2px var(--xv-launch-3) !important;
+}
+.brand-wordmark{
+  font-family:Outfit,var(--font-sans);
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:-0.02em;
+  color:var(--text-secondary);
+  margin-bottom:var(--xv-launch-2);
+}
+.sidebar-fold--quiet{
+  border-color:rgba(255,255,255,0.035) !important;
+  background:rgba(255,255,255,0.012) !important;
+}
+.sidebar-fold--quiet .sidebar-fold-summary{
+  font-size:10px !important;
+  letter-spacing:0.1em !important;
+  text-transform:uppercase !important;
+  color:rgba(140,154,188,0.55) !important;
+  padding:6px 8px !important;
+}
+
+/* Operational header bar — title + one status line */
+.main-stage-hero--bar{
+  padding-top:var(--xv-launch-3) !important;
+  padding-bottom:var(--xv-launch-2) !important;
+}
+.workspace-idle .main-stage-hero--bar{
+  padding-top:clamp(var(--xv-launch-3),2.5vh,var(--xv-launch-6)) !important;
+}
+.main-stage-hero--bar .main-stage-title-block h1{
+  font-family:Outfit,var(--font-sans) !important;
+  font-size:clamp(17px,1.65vw,21px) !important;
+  font-weight:600 !important;
+  letter-spacing:-0.02em !important;
+  line-height:1.2 !important;
+}
+.workspace-idle .main-stage-hero--bar .main-stage-title-block h1{
+  font-size:clamp(19px,2vw,24px) !important;
+}
+.main-stage-hero--bar .workspace-subline{
+  margin-top:var(--xv-launch-1) !important;
+  font-size:12px !important;
+  line-height:1.45 !important;
+  max-width:62ch !important;
+  color:rgba(158,172,204,0.82) !important;
+}
+
+/* Idle: show messages canvas with intentional empty state (was collapsed + hidden) */
+#workspaceRoot.workspace-idle .messages-zone:not(:has(.limit-moment-card)){
+  flex:1 1 auto !important;
+  min-height:min(220px,34vh) !important;
+  max-height:none !important;
+  opacity:1 !important;
+  overflow:visible !important;
+  pointer-events:auto !important;
+  margin:0 0 var(--xv-launch-3) !important;
+}
+#workspaceRoot.workspace-idle .messages-zone:not(:has(.limit-moment-card)) .messages-shell{
+  min-height:min(200px,32vh) !important;
+  max-height:min(52vh,520px) !important;
+  border:1px solid rgba(255,255,255,0.045) !important;
+  border-radius:12px !important;
+  background:linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--l3-peak) 91%, #fff 5%) 0%,
+    color-mix(in srgb, var(--l3-base) 94%, #fff 4%) 100%
+  ) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+#workspaceRoot.workspace-idle .empty-state:not(:has(.limit-moment-card)){
+  display:flex !important;
+  min-height:0 !important;
+  padding:var(--xv-launch-4) var(--xv-launch-3) var(--xv-launch-5) !important;
+  align-items:center !important;
+  justify-content:center !important;
+}
+#workspaceRoot.workspace-idle .xv-stage-body{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+}
+#workspaceRoot.workspace-idle .workspace-conversation-column{
+  min-height:0 !important;
+  flex:1 1 auto !important;
+}
+
+/* Launch empty state */
+.empty-card-launch{
+  padding:var(--xv-launch-5) var(--xv-launch-4) var(--xv-launch-6) !important;
+  text-align:center !important;
+  max-width:520px !important;
+  margin:0 auto !important;
+}
+.empty-card-launch .empty-hero-mark{
+  display:none !important;
+}
+.empty-launch-mark{
+  display:flex;
+  justify-content:center;
+  margin-bottom:var(--xv-launch-3);
+}
+.xv-spark-mark--idle{
+  opacity:0.85;
+}
+.xv-spark-mark--idle .xv-signal-rays{
+  animation-duration:5.5s !important;
+  opacity:0.2 !important;
+}
+.xv-spark-mark--idle::before{
+  animation-duration:4.2s !important;
+  filter:drop-shadow(0 0 4px rgba(124,92,252,0.15)) !important;
+}
+.xv-spark-mark--idle::after{
+  animation-duration:2.4s ease-in-out infinite !important;
+}
+.empty-launch-eyebrow{
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:0.18em;
+  text-transform:uppercase;
+  color:rgba(140,154,188,0.5);
+  margin:0 0 var(--xv-launch-2);
+}
+.empty-launch-title{
+  font-family:Outfit,var(--font-sans);
+  font-size:clamp(18px,2.4vw,22px) !important;
+  font-weight:600 !important;
+  letter-spacing:-0.025em !important;
+  line-height:1.25 !important;
+  color:var(--text-primary) !important;
+  margin:0 !important;
+}
+.empty-launch-lead{
+  margin:var(--xv-launch-3) auto 0 !important;
+  max-width:44ch !important;
+  font-size:13px !important;
+  line-height:1.55 !important;
+  color:rgba(186,198,228,0.88) !important;
+}
+.empty-launch-examples{
+  list-style:none;
+  margin:var(--xv-launch-5) auto 0 !important;
+  padding:0 !important;
+  max-width:46ch !important;
+  text-align:left !important;
+  display:flex !important;
+  flex-direction:column !important;
+  gap:var(--xv-launch-3) !important;
+}
+.empty-launch-examples li{
+  display:grid;
+  grid-template-columns:72px 1fr;
+  gap:var(--xv-launch-3);
+  align-items:start;
+  padding:var(--xv-launch-3) var(--xv-launch-3);
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.04);
+  background:rgba(255,255,255,0.018);
+}
+.empty-launch-ex-label{
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  color:rgba(167,139,250,0.75);
+}
+.empty-launch-ex-copy{
+  font-size:12.5px;
+  line-height:1.5;
+  color:rgba(200,210,238,0.82);
+}
+.empty-launch-posture,
+.empty-launch-plan-hint{
+  margin:var(--xv-launch-4) auto 0 !important;
+  max-width:48ch !important;
+  font-size:11.5px !important;
+  line-height:1.5 !important;
+  color:rgba(148,162,196,0.72) !important;
+}
+.empty-actions-launch{
+  margin-top:var(--xv-launch-4) !important;
+  justify-content:center !important;
+}
+.empty-actions-launch .empty-chip-hint{
+  font-size:11px !important;
+  letter-spacing:0.02em !important;
+  color:rgba(140,154,188,0.65) !important;
+}
+
+@media (max-width:560px){
+  .empty-launch-examples li{
+    grid-template-columns:1fr;
+  }
+  .empty-launch-ex-label{
+    margin-bottom:2px;
+  }
+}
+
+/* Precision composer — thinner, quieter, less “card” */
+#workspaceRoot .composer-wrap.composer-dock{
+  margin-top:var(--xv-launch-3) !important;
+  padding-bottom:var(--xv-launch-2) !important;
+  gap:var(--xv-launch-2) !important;
+}
+#workspaceRoot .composer-unified{
+  max-width:min(var(--main-max,920px),100%) !important;
+}
+#workspaceRoot .composer.composer-chat{
+  padding:var(--xv-launch-2) var(--xv-launch-3) var(--xv-launch-3) !important;
+  border-radius:12px !important;
+  gap:var(--xv-launch-2) !important;
+  border:1px solid rgba(255,255,255,0.042) !important;
+  background:color-mix(in srgb, var(--l2-base) 94%, rgba(255,255,255,0.03)) !important;
+  box-shadow:none !important;
+}
+#workspaceRoot.workspace-idle .composer.composer-chat{
+  padding:var(--xv-launch-3) var(--xv-launch-3) var(--xv-launch-3) !important;
+  border-radius:14px !important;
+  background:color-mix(in srgb, var(--l2-base) 93%, rgba(124,92,252,0.04)) !important;
+  box-shadow:
+    0 0 0 1px rgba(124,92,252,0.05),
+    0 12px 40px rgba(0,0,0,0.14) !important;
+}
+#workspaceRoot.workspace-thinking .composer.composer-chat{
+  border-color:rgba(124,92,252,0.14) !important;
+  box-shadow:0 0 0 1px rgba(124,92,252,0.06), 0 8px 28px rgba(0,0,0,0.12) !important;
+}
+#workspaceRoot .composer-hint-band{
+  margin:0 0 var(--xv-launch-1) !important;
+  padding:0 2px var(--xv-launch-2) !important;
+  border-bottom:1px solid rgba(255,255,255,0.035) !important;
+}
+#workspaceRoot .composer-status-cluster{
+  gap:var(--xv-launch-2) !important;
+  min-height:1.25em !important;
+  align-items:center !important;
+}
+#workspaceRoot .composer-chat .quick-actions{
+  margin:0 !important;
+  padding:0 1px !important;
+  gap:var(--xv-launch-2) !important;
+}
+#workspaceRoot .composer.composer-chat .chip,
+#workspaceRoot .quick-actions .chip{
+  padding:3px 9px !important;
+  min-height:26px !important;
+  font-size:11px !important;
+  border-radius:999px !important;
+  border:1px solid rgba(255,255,255,0.055) !important;
+  background:rgba(255,255,255,0.02) !important;
+}
+#workspaceRoot .composer-stripe-fold-summary{
+  padding:var(--xv-launch-1) 0 0 !important;
+  font-size:10.5px !important;
+  color:rgba(140,154,188,0.58) !important;
+}
+#workspaceRoot .composer-stripe-fields{
+  padding-top:var(--xv-launch-2) !important;
+  gap:var(--xv-launch-2) !important;
+}
+#workspaceRoot .composer-chat textarea{
+  min-height:36px !important;
+  max-height:min(34vh,200px) !important;
+  padding:8px 11px !important;
+  font-size:14px !important;
+  line-height:1.5 !important;
+  border-radius:9px !important;
+  border:1px solid rgba(255,255,255,0.055) !important;
+  background:color-mix(in srgb, var(--l3-base) 90%, rgba(255,255,255,0.05)) !important;
+  box-shadow:none !important;
+}
+#workspaceRoot .composer-chat textarea:focus{
+  border-color:rgba(124,92,252,0.32) !important;
+  box-shadow:0 0 0 2px rgba(124,92,252,0.07) !important;
+}
+#workspaceRoot.workspace-idle .composer-chat textarea{
+  min-height:40px !important;
+}
+#workspaceRoot .composer-chat .send-btn,
+#workspaceRoot .send-btn.send-btn--thinking{
+  width:38px !important;
+  min-width:38px !important;
+  height:38px !important;
+  border-radius:9px !important;
+  box-shadow:0 1px 6px rgba(0,0,0,0.2) !important;
+}
+#workspaceRoot .send-btn:hover:not(:disabled){
+  box-shadow:0 2px 10px rgba(124,92,252,0.18) !important;
+}
+
+/* Thinking: subtler command strip pulse (trust, not disco) */
+#workspaceRoot.workspace-thinking .command-strip.glass{
+  border-color:rgba(124,92,252,0.14) !important;
+  box-shadow:
+    0 4px 18px rgba(0,0,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* Reply as centerpiece — softer chrome, reading rhythm */
+#workspaceRoot.workspace-active .msg-card.assistant .reply-text{
+  font-size:clamp(15.5px,1.05vw,17.5px) !important;
+  line-height:1.72 !important;
+  letter-spacing:0.011em !important;
+  padding:var(--xv-launch-4) var(--xv-launch-5) !important;
+  border-radius:12px !important;
+  max-width:min(64ch,100%) !important;
+}
+#workspaceRoot.workspace-active .customer-message-label,
+#workspaceRoot.workspace-active .reply-hero-label{
+  font-size:10px !important;
+  letter-spacing:0.12em !important;
+  text-transform:uppercase !important;
+  color:rgba(130,144,178,0.48) !important;
+  margin-bottom:var(--xv-launch-2) !important;
+  font-weight:700 !important;
+}
+
+/* Actions: compact execution tools */
+#workspaceRoot.workspace-active .msg-actions{
+  gap:var(--xv-launch-2) !important;
+  padding:var(--xv-launch-3) 0 0 2px !important;
+}
+#workspaceRoot.workspace-active .act-btn{
+  height:28px !important;
+  padding:0 9px !important;
+  font-size:11.5px !important;
+  border-radius:7px !important;
+}
+
+/* Sidebar: navigation-forward, lower contrast on idle */
+#workspaceRoot.workspace-idle .sidebar.glass.rail-col-left{
+  opacity:0.92 !important;
+  filter:none !important;
+}
+#workspaceRoot .sidebar-nav-item{
+  padding:7px 10px !important;
+  border-radius:9px !important;
+  font-size:12px !important;
+}
+#workspaceRoot .sidebar-nav-item.is-active{
+  border-color:rgba(124,92,252,0.2) !important;
+  background:linear-gradient(118deg, rgba(124,92,252,0.1), rgba(34,211,238,0.03)) !important;
+  box-shadow:none !important;
+}
+
+/* Sovereign spark under load — refined bloom (signature) */
+@keyframes xv-launch-sovereign-bloom{
+  0%,100%{ opacity:0.85; transform:scale(1); filter:brightness(1); }
+  50%{ opacity:1; transform:scale(1.04); filter:brightness(1.08); }
+}
+#workspaceRoot.workspace-thinking [data-xv-thinking-glyph].xalvion-sovereign-mark,
+#workspaceRoot .send-btn.send-btn--thinking .xalvion-sovereign-mark{
+  animation:xv-launch-sovereign-bloom 1.9s ease-in-out infinite !important;
+}
+#workspaceRoot.workspace-thinking [data-xv-thinking-glyph].xalvion-sovereign-mark::before,
+#workspaceRoot .send-btn.send-btn--thinking .xalvion-sovereign-mark::before{
+  animation-duration:1.45s !important;
+}
+#workspaceRoot.workspace-thinking [data-xv-thinking-glyph].xalvion-sovereign-mark .xv-signal-rays,
+#workspaceRoot .send-btn.send-btn--thinking .xalvion-sovereign-mark .xv-signal-rays{
+  opacity:0.38 !important;
+  animation-duration:2.4s !important;
+}
+
+/* Remove obsolete hero-hint rules (element retired) */
+.workspace-active .workspace-hero-hint,
+.workspace-idle .workspace-hero-hint{
+  display:none !important;
+}
+
+/* Idle scaffold: top-weighted flow so empty state + composer read as one column */
+#workspaceRoot.workspace-idle .xv-stage-scaffold{
+  justify-content:flex-start !important;
+}

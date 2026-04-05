@@ -61,7 +61,6 @@ if (typeof window.pulseRail !== "function") {
     systemPanelCopy: document.getElementById("systemPanelCopy"),
     brandSubcopy: document.getElementById("brandSubcopy"),
     workspaceSubcopy: document.getElementById("workspaceSubcopy"),
-    workspaceHeadline: document.getElementById("workspaceHeadline"),
     dashboardCard: document.getElementById("dashboardCard"),
     usageCard: document.getElementById("usageCard"),
     accountCard: document.getElementById("accountCard"),
@@ -1735,28 +1734,22 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     }
     syncCommandStripCapacity();
 
-    if (els.workspaceHeadline) {
-      els.workspaceHeadline.textContent = state.username
-        ? `Signed in · ${state.username}`
-        : "AI prepares. You approve.";
-    }
-
     if (els.workspaceSubcopy) {
       if (state.latestRun) {
         const decision = state.latestRun.decision || {};
         const posture = operatorPostureLabel(state.latestRun);
-        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} operator · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${posture} · ${formatMetric(state.latestRun.confidence || 0, 2)} conf.`;
+        els.workspaceSubcopy.textContent = `${formatTier(state.tier)} · ${displayActionLabel(state.latestRun)} · ${displayQueueLabel({ decision })} · ${posture} · ${formatMetric(state.latestRun.confidence || 0, 2)} conf`;
+      } else if (state.username) {
+        els.workspaceSubcopy.textContent = `${state.username} · ${formatTier(state.tier)} · Paste a ticket; prepared reply lands here for review.`;
       } else {
-        els.workspaceSubcopy.textContent = state.username
-          ? `${formatTier(state.tier)} plan · approval-first operator workspace · sovereign routing visible on every run.`
-          : "Guest preview · run a case to see routing, posture, and the operator brief.";
+        els.workspaceSubcopy.textContent = "Guest preview · paste a case below — prepared reply and routing appear after the run.";
       }
     }
 
     if (els.brandSubcopy) {
       els.brandSubcopy.textContent = state.username
-        ? `Signed in as ${state.username}. Workspace state, plan data, and support activity stay persistent.`
-        : "Premium AI support operations with visible action handling and a cleaner customer-ready surface.";
+        ? `Signed in as ${state.username}. Session and plan state persist across visits.`
+        : "Drafts and billing moves stay gated until you release them.";
     }
 
     updateAuthStatus();
@@ -1874,16 +1867,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const previewLeft = guest ? Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()) : state.remaining;
     const guestApproaching =
       guest && previewLeft > 0 && previewLeft <= Math.max(1, Math.ceil(GUEST_USAGE_LIMIT * 0.34));
-    const teaser =
+    const planHint =
       guest || tierLc === "free"
-        ? `<div class="empty-panel empty-panel-elevated">
-            <div class="empty-panel-label">At Pro / Elite</div>
-            <p class="empty-panel-copy">500+ runs · live refund execution · full dashboard · priority routing.</p>
-          </div>`
-        : `<div class="empty-panel empty-panel-elevated">
-            <div class="empty-panel-label">Elite</div>
-            <p class="empty-panel-copy">5,000 runs · advanced analytics · maximum operator throughput.</p>
-          </div>`;
+        ? "Pro / Elite unlock higher monthly runs and live refund execution."
+        : "Elite adds maximum throughput and deeper analytics.";
 
     if (atCap) {
       const n = guest ? getGuestUsage() : state.usage;
@@ -1916,28 +1903,28 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       </div>`;
     }
 
+    const postureLine = state.latestRun
+      ? `${displayActionLabel(state.latestRun)} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence`
+      : "No runs yet — your next paste starts the prep sequence.";
+
     return `
-      <div class="empty-card empty-card-premium">
-        <div class="empty-hero-mark" aria-hidden="true"></div>
-        <div class="empty-eyebrow">
-          <div class="empty-eyebrow-dot" aria-hidden="true"></div>
-          Operator console
+      <div class="empty-card empty-card-premium empty-card-launch">
+        <div class="empty-launch-mark" aria-hidden="true">
+          <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm xv-spark-mark xv-spark-mark--idle" data-xv-thinking-glyph>
+            <span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span>
+          </span>
         </div>
-        <h1>AI prepares. You approve.</h1>
-        <p class="empty-lead">Paste a customer issue — Xalvion classifies risk, applies policy, drafts the customer-ready message, and holds billing moves until you release them.</p>
-        <div class="empty-grid">
-          <div class="empty-panel empty-panel-elevated">
-            <div class="empty-panel-label">Consequence-first canvas</div>
-            <p class="empty-panel-copy">Each result opens with the consequence signal, approval controls, operator brief, then the customer-facing text — so nothing risky ships by accident.</p>
-          </div>
-          <div class="empty-panel">
-            <div class="empty-panel-label">Recent posture</div>
-            <p class="empty-panel-copy">${state.latestRun ? `${displayActionLabel(state.latestRun)} · ${formatMetric(state.latestRun.confidence || 0, 2)} confidence` : "No runs yet — your next case lands with signal, controls, brief, and reply in that order."}</p>
-          </div>
-          ${teaser}
-        </div>
-        <div class="empty-actions">
-          <span class="empty-chip-hint">${guest ? (guestApproaching ? `Almost through preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} left — sign in to keep state` : `Guest preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} remaining`) : `${formatTier(state.tier)} · ${state.remaining} runs left this period`}</span>
+        <p class="empty-launch-eyebrow">Ready</p>
+        <h2 class="empty-launch-title">Paste a ticket to prepare the reply.</h2>
+        <p class="empty-launch-lead">Xalvion reads the case, drafts customer-ready language, and holds risky moves until you approve.</p>
+        <ul class="empty-launch-examples" aria-label="Example scenarios">
+          <li><span class="empty-launch-ex-label">Shipping</span><span class="empty-launch-ex-copy">Late or damaged shipment — policy-aligned response in one pass.</span></li>
+          <li><span class="empty-launch-ex-label">Billing</span><span class="empty-launch-ex-copy">Duplicate charge or refund ask — clear next step, gated execution.</span></li>
+        </ul>
+        <p class="empty-launch-posture">${postureLine}</p>
+        <p class="empty-launch-plan-hint">${planHint}</p>
+        <div class="empty-actions empty-actions-launch">
+          <span class="empty-chip-hint">${guest ? (guestApproaching ? `Preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} left — sign in to keep threads` : `Guest preview · ${previewLeft} run${previewLeft === 1 ? "" : "s"} left`) : `${formatTier(state.tier)} · ${state.remaining} runs this period`}</span>
         </div>
       </div>`;
   }
@@ -2938,10 +2925,9 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     els.workspaceRoot?.setAttribute("aria-busy", state.sending ? "true" : "false");
 
     if (els.composerStatusLine) {
-      const idleCopy =
-        "Describe the case in your own words — Xalvion prepares a clear reply and the recommended next step for your review.";
+      const idleCopy = "Idle · ready for the next case";
       els.composerStatusLine.textContent = state.sending
-        ? "Preparing your decision and reply…"
+        ? "Preparing reply and operator brief…"
         : idleCopy;
       els.composerStatusLine.classList.toggle("composer-status-live", state.sending);
     }
