@@ -60,14 +60,17 @@
           <div class="sidebar-inner sidebar-panels-host">
 
             <section class="sidebar-panel is-active" id="sidebarPanelWorkspace" data-sidebar-panel="workspace" role="tabpanel" aria-labelledby="sidebarTabWorkspace" aria-label="Workspace" aria-hidden="false">
-              <div class="brand brand-compact">
-                <svg width="168" height="30" viewBox="0 0 200 36" aria-hidden="true">
-                  <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="currentColor" letter-spacing="-0.5">X</text>
-                  <text x="26" y="19" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="300" fill="currentColor" letter-spacing="4" opacity="0.9">ALVION</text>
-                  <text x="27" y="29" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5" font-weight="400" fill="currentColor" opacity="0.28" letter-spacing="3">OPERATOR ENGINE</text>
-                </svg>
-                <div class="brand-sub" id="brandSubcopy">Autonomous support prepares decisions — your team approves.</div>
-              </div>
+              <details class="sidebar-fold sidebar-fold--brand">
+                <summary class="sidebar-fold-summary">Workspace identity</summary>
+                <div class="brand brand-compact">
+                  <svg width="168" height="30" viewBox="0 0 200 36" aria-hidden="true">
+                    <text x="0" y="28" font-family="Georgia,'Times New Roman',serif" font-size="26" font-weight="700" fill="currentColor" letter-spacing="-0.5">X</text>
+                    <text x="26" y="19" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="300" fill="currentColor" letter-spacing="4" opacity="0.9">ALVION</text>
+                    <text x="27" y="29" font-family="'Helvetica Neue',Arial,sans-serif" font-size="5" font-weight="400" fill="currentColor" opacity="0.28" letter-spacing="3">OPERATOR ENGINE</text>
+                  </svg>
+                  <div class="brand-sub" id="brandSubcopy">Autonomous support prepares decisions — your team approves.</div>
+                </div>
+              </details>
 
               <div class="section-label section-label-tight">Workspace notice</div>
               <div id="notice" class="notice info notice-dense">
@@ -175,8 +178,8 @@
 
       <main class="main main-canvas center-canvas">
         <div class="main-canvas-inner glass canvas-shell canvas-command-hero">
-          <header class="workspace-heading-row canvas-header canvas-stage-header">
-            <div class="title">
+          <header class="workspace-heading-row canvas-header canvas-stage-header canvas-heading-compact">
+            <div class="title canvas-title-inline">
               <h1 id="workspacePageTitle">Customer support</h1>
               <p id="workspaceSubcopy" class="workspace-subline">Operator workspace loading…</p>
             </div>
@@ -223,7 +226,7 @@
           <div class="operator-rail-intel-compact">
             <span class="operator-rail-live-badge"><span class="operator-rail-live-pulse" aria-hidden="true"></span> Live</span>
             <div class="operator-rail-title">Operator rail</div>
-            <p class="operator-rail-sub">Latest run first — expand session metrics or open Pipeline / More when you need depth.</p>
+            <p class="operator-rail-sub">Latest run first — expand sections for pipeline, billing, and queue depth.</p>
           </div>
         </div>
         <div class="rail-scroll-host scroll-shell" id="railScrollShell" data-show-top="false" data-show-bottom="false">
