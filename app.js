@@ -317,52 +317,35 @@ if (typeof window.pulseRail !== "function") {
     const style = document.createElement("style");
     style.id = "xalvion-runtime-styles";
     style.textContent = `
+      :root {
+        --xv-thread-max: 860px;
+        --xv-thread-text: rgba(240, 244, 255, 0.96);
+        --xv-thread-muted: rgba(165, 178, 214, 0.56);
+        --xv-thread-line: rgba(255, 255, 255, 0.06);
+        --xv-thread-chip: rgba(255, 255, 255, 0.035);
+        --xv-thread-chip-border: rgba(255, 255, 255, 0.07);
+      }
+
       #workspaceRoot,
-      #workspaceRoot::before,
-      #workspaceRoot::after,
+      .workspace-root {
+        max-width: 1180px;
+      }
+
       #messagesShell,
+      .messages-shell,
+      .messagesShell,
+      .thread-shell,
+      .conversation-shell,
+      .messages-zone,
+      .scroll-shell,
+      .workspace-thread-surface,
+      .workspace-thread-shell,
       #messagesShell::before,
       #messagesShell::after,
-      .messages-shell,
       .messages-shell::before,
       .messages-shell::after,
-      .messagesShell,
-      .messagesShell::before,
-      .messagesShell::after,
-      .thread-shell,
-      .thread-shell::before,
-      .thread-shell::after,
-      .conversation-shell,
-      .conversation-shell::before,
-      .conversation-shell::after,
-      .messages-zone,
-      .messages-zone::before,
-      .messages-zone::after,
-      .scroll-shell,
       .scroll-shell::before,
-      .scroll-shell::after,
-      .workspace-active .messages-shell,
-      .workspace-idle .messages-shell,
-      .main .messages-shell.scroll-shell,
-      .assistant-result-stack,
-      .assistant-decision-slot,
-      .assistant-brief-slot,
-      .customer-message-block,
-      .details-wrap,
-      .operator-brief-details,
-      .details-panel,
-      .details-insight-stack,
-      .details-grid,
-      .details-box,
-      .details-note,
-      .details-insight,
-      .details-trace,
-      .details-toggle,
-      .decision-panel,
-      .ops-card,
-      .ops-shell,
-      .thread-card,
-      .thread-frame {
+      .scroll-shell::after {
         background: transparent !important;
         background-image: none !important;
         border: none !important;
@@ -371,29 +354,37 @@ if (typeof window.pulseRail !== "function") {
         -webkit-backdrop-filter: none !important;
       }
 
+      #messagesShell {
+        max-width: var(--xv-thread-max);
+        margin: 0 auto;
+        padding: 8px 0 0 !important;
+      }
+
       .messages,
       #messages {
         display: flex;
         flex-direction: column;
-        gap: 34px;
-        padding: 34px 40px 28px;
+        gap: 0;
+        padding: 0 8px 28px !important;
         background: transparent !important;
-        max-width: 920px;
-        margin: 0 auto;
       }
 
       .msg-group {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
         width: 100%;
+        margin: 0;
+        padding: 28px 0 0;
         animation: xalvionThreadIn .18s cubic-bezier(.22,1,.36,1) both;
       }
 
-      .msg-group.user {
-        align-items: flex-end;
+      .msg-group:first-child {
+        padding-top: 8px;
       }
 
+      .msg-group + .msg-group {
+        border-top: 1px solid var(--xv-thread-line);
+      }
+
+      .msg-group.user,
       .msg-group.assistant {
         align-items: stretch;
       }
@@ -404,22 +395,29 @@ if (typeof window.pulseRail !== "function") {
       }
 
       .msg-card,
-      .msg-card:hover {
-        width: min(860px, 100%);
-        max-width: min(860px, 100%);
+      .msg-card.user,
+      .msg-card.assistant,
+      .msg-card[data-placeholder="true"] {
+        width: 100%;
+        max-width: 100%;
+        padding: 0 !important;
+        margin: 0 !important;
         border: none !important;
         border-radius: 0 !important;
         background: transparent !important;
+        background-image: none !important;
         box-shadow: none !important;
         backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
         overflow: visible;
-        transform: none !important;
       }
 
       .msg-card::before,
       .msg-card::after,
       .customer-message-block::before,
-      .customer-message-block::after {
+      .customer-message-block::after,
+      .assistant-result-stack::before,
+      .assistant-result-stack::after {
         display: none !important;
         content: none !important;
       }
@@ -429,9 +427,9 @@ if (typeof window.pulseRail !== "function") {
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        padding: 0 0 4px;
-        border: none !important;
+        padding: 0 0 10px;
         background: transparent !important;
+        border: none !important;
       }
 
       .msg-who {
@@ -439,11 +437,11 @@ if (typeof window.pulseRail !== "function") {
         align-items: center;
         gap: 8px;
         min-width: 0;
+        color: var(--xv-thread-muted);
         font-size: 11px;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: .12em;
-        color: rgba(176, 188, 221, .58);
-        font-weight: 800;
+        letter-spacing: 0.11em;
       }
 
       .msg-badge {
@@ -453,105 +451,110 @@ if (typeof window.pulseRail !== "function") {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255,255,255,.035);
-        border: 1px solid rgba(255,255,255,.05);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: none !important;
       }
 
       .msg-badge svg {
         width: 10px;
         height: 10px;
-        opacity: .84;
+        opacity: 0.82;
       }
 
       .msg-time {
         white-space: nowrap;
-        color: rgba(148, 162, 204, .30);
+        color: rgba(148, 162, 204, 0.34);
         font-size: 10px;
-        letter-spacing: .06em;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
       }
 
       .msg-body,
-      .msg-body.assistant-canvas {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        backdrop-filter: none !important;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-
-      .reply-text {
-        font-size: 17px;
-        line-height: 1.78;
-        color: rgba(241, 245, 255, .98);
-        white-space: pre-wrap;
-        word-break: break-word;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        max-width: 800px;
-      }
-
-      .msg-group.user .reply-text {
-        color: rgba(226, 233, 255, .90);
-      }
-
-      .customer-message-label,
-      .reply-hero-label {
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: .12em;
-        text-transform: uppercase;
-        color: rgba(143, 156, 198, .50);
-        margin: 0 0 8px;
-      }
-
-      .reply-value-reinforcement,
-      .assistant-context-line {
-        margin: 0 0 8px;
-        font-size: 13px;
-        line-height: 1.55;
-        color: rgba(188, 198, 228, .70);
-      }
-
-      .details-wrap {
-        margin: 0 0 8px !important;
-        padding: 0 !important;
-      }
-
-      .details-toggle {
-        padding: 0 !important;
-        min-height: auto !important;
-        border-radius: 0 !important;
-        color: rgba(170, 183, 220, .72) !important;
-        font-size: 13px !important;
-      }
-
+      .assistant-canvas,
+      .assistant-result-stack,
+      .assistant-decision-slot,
+      .assistant-brief-slot,
+      .stream-trace-host,
+      .customer-message-block,
+      .reply-text,
+      .details-wrap,
+      .operator-brief-details,
       .details-panel,
       .details-grid,
       .details-box,
       .details-note,
       .details-insight,
       .details-trace {
+        background: transparent !important;
+        background-image: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      .assistant-canvas {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .assistant-result-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .customer-message-block {
         padding: 0 !important;
-        gap: 10px !important;
         border-radius: 0 !important;
+      }
+
+      .customer-message-label,
+      .reply-hero-label {
+        margin: 0 0 10px;
+        color: rgba(153, 168, 206, 0.44);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .reply-value-reinforcement,
+      .assistant-context-line {
+        margin: 0 0 8px;
+        color: rgba(186, 198, 230, 0.72);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .reply-text,
+      .js-reply-text {
+        max-width: 760px;
+        color: var(--xv-thread-text);
+        font-size: 17px;
+        line-height: 1.72;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        white-space: pre-wrap;
+        word-break: break-word;
+        padding: 0 !important;
+        border-radius: 0 !important;
+      }
+
+      .msg-group.user .reply-text,
+      .msg-group.user .js-reply-text {
+        color: rgba(226, 233, 252, 0.94);
       }
 
       .assistant-footer {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
+        gap: 12px;
         flex-wrap: wrap;
         padding-top: 4px;
-        background: transparent !important;
-        border: none !important;
       }
 
       .assistant-meta {
@@ -568,70 +571,159 @@ if (typeof window.pulseRail !== "function") {
         min-height: 26px;
         padding: 0 10px;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,.06);
-        background: rgba(255,255,255,.025);
-        color: rgba(214, 224, 249, .70);
+        border: 1px solid var(--xv-thread-chip-border);
+        background: var(--xv-thread-chip);
+        color: rgba(214, 224, 249, 0.68);
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: .01em;
+        letter-spacing: 0;
         box-shadow: none !important;
       }
 
       .meta-chip svg {
         width: 10px;
         height: 10px;
-        opacity: .78;
+        opacity: 0.78;
       }
 
       .meta-chip.safe {
-        border-color: rgba(52,211,153,.14);
-        background: rgba(52,211,153,.045);
-        color: rgba(194,255,222,.90);
+        border-color: rgba(52, 211, 153, 0.14);
+        background: rgba(52, 211, 153, 0.05);
+        color: rgba(194, 255, 222, 0.90);
       }
 
       .meta-chip.review {
-        border-color: rgba(250,204,21,.14);
-        background: rgba(250,204,21,.045);
-        color: rgba(255,233,160,.88);
+        border-color: rgba(250, 204, 21, 0.12);
+        background: rgba(250, 204, 21, 0.05);
+        color: rgba(255, 233, 160, 0.88);
       }
 
       .meta-chip.risk,
       .meta-chip.error {
-        border-color: rgba(248,113,113,.16);
-        background: rgba(248,113,113,.05);
-        color: rgba(255,208,208,.90);
+        border-color: rgba(248, 113, 113, 0.14);
+        background: rgba(248, 113, 113, 0.05);
+        color: rgba(255, 208, 208, 0.88);
       }
 
-      .approval-rail,
-      .approvalRailWrap,
-      #approvalRailWrap,
-      .approval-strip {
-        background: transparent !important;
-        border-top: 1px solid rgba(255,255,255,.06) !important;
-        box-shadow: none !important;
-        backdrop-filter: none !important;
+      .details-wrap {
+        margin: 0 0 4px !important;
+        padding: 0 !important;
+      }
+
+      .details-toggle {
+        padding: 0 !important;
+        min-height: auto !important;
         border-radius: 0 !important;
+        color: rgba(165, 178, 214, 0.68) !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+
+      .details-toggle:hover,
+      .details-wrap[open] .details-toggle {
+        transform: none !important;
+        color: rgba(190, 202, 232, 0.82) !important;
+      }
+
+      .details-panel {
+        margin-top: 10px !important;
+        padding: 0 !important;
+        gap: 10px !important;
+      }
+
+      .details-grid {
+        gap: 10px !important;
+        padding: 0 !important;
+      }
+
+      .details-box,
+      .details-note,
+      .details-insight,
+      .details-trace {
+        padding: 0 !important;
+        border-radius: 0 !important;
+        color: rgba(188, 198, 226, 0.72);
+      }
+
+      .xalvion-typing-shell,
+      .xalvion-stream-shell,
+      .stream-steps,
+      .stream-step {
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+
+      .stream-steps {
+        margin: 0 0 6px !important;
+        padding: 0 !important;
       }
 
       .empty-state,
       .limit-moment-card {
-        background: rgba(255,255,255,.025);
-        border: 1px solid rgba(255,255,255,.05);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.025) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
         box-shadow: none !important;
         backdrop-filter: blur(10px);
       }
 
+      #approvalRailWrap,
+      .approval-rail-wrap,
+      .approvalRailWrap,
+      .approval-rail,
+      .approval-strip {
+        margin-top: 12px !important;
+        padding: 14px 0 0 !important;
+        border-top: 1px solid var(--xv-thread-line) !important;
+        background: transparent !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+      }
+
+      #approvalRailWrap .meta-chip,
+      #approvalRailWrap .approval-pill,
+      #approvalRailWrap .approval-chip {
+        background: rgba(255, 255, 255, 0.03) !important;
+        box-shadow: none !important;
+      }
+
+      .composer.composer-chat,
+      .composer-shell,
+      .workspace-composer-shell {
+        border-radius: 18px !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        background: rgba(13, 17, 30, 0.88) !important;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22) !important;
+        backdrop-filter: blur(12px);
+      }
+
+      .composer.composer-chat textarea,
+      .composer.composer-chat input,
+      .workspace-composer-shell textarea,
+      .workspace-composer-shell input {
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+
       @media (max-width: 1100px) {
-        .messages,
-        #messages {
-          padding: 26px 24px 20px;
-          gap: 28px;
+        #messagesShell {
           max-width: 100%;
+          padding-top: 0 !important;
         }
 
-        .reply-text {
+        .messages,
+        #messages {
+          padding: 0 0 24px !important;
+        }
+
+        .reply-text,
+        .js-reply-text {
           font-size: 16px;
-          line-height: 1.7;
+          line-height: 1.68;
         }
       }
     `;
