@@ -328,6 +328,41 @@ if (typeof window.pulseRail !== "function") {
         45% { box-shadow: inset 0 0 0 1px rgb(var(--xv-violet) / 0.11) !important; }
       }
 
+      @keyframes xvAccessPanelPulse {
+        0% {
+          box-shadow: 0 0 0 0 rgb(var(--xv-violet-core) / 0),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+        }
+        40% {
+          box-shadow: 0 0 0 2px rgb(var(--xv-violet) / 0.32),
+            0 14px 42px rgb(var(--xv-violet-core) / 0.14),
+            inset 0 0 0 1px rgb(var(--xv-violet) / 0.2) !important;
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgb(var(--xv-violet-core) / 0),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+        }
+      }
+
+      #sidebarPanelAccount .auth-card.xv-access-panel-pulse {
+        animation: xvAccessPanelPulse 1.45s ease-out 1 !important;
+        border-radius: 12px !important;
+      }
+
+      .command-status-chip.command-status-chip--open-access {
+        cursor: pointer !important;
+        outline: none !important;
+      }
+
+      .command-status-chip.command-status-chip--open-access:hover {
+        border-color: rgb(var(--xv-violet) / 0.22) !important;
+        background: rgb(var(--xv-violet-core) / 0.07) !important;
+      }
+
+      .command-status-chip.command-status-chip--open-access:focus-visible {
+        box-shadow: 0 0 0 2px rgb(var(--xv-violet-core) / 0.22) !important;
+      }
+
       #workspaceRoot,
       .workspace-root {
         background: transparent !important;
@@ -349,8 +384,8 @@ if (typeof window.pulseRail !== "function") {
 
       #workspaceRoot .workspace-atmosphere-glow,
       #workspaceRoot .main-stage-ambient-glow {
-        opacity: 0.26 !important;
-        filter: saturate(0.98) !important;
+        opacity: 0.32 !important;
+        filter: saturate(1.02) !important;
       }
 
       #workspaceRoot #messagesShell.shell-live,
@@ -458,7 +493,7 @@ if (typeof window.pulseRail !== "function") {
       .msg-group + .msg-group,
       #workspaceRoot .msg-group + .msg-group {
         padding-top: 18px !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.035) !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.048) !important;
       }
 
       .msg-group--limit-cta {
@@ -859,9 +894,9 @@ if (typeof window.pulseRail !== "function") {
       .empty-card,
       .limit-moment-card {
         border-radius: 18px !important;
-        background: rgba(11, 15, 30, 0.58) !important;
-        border: 1px solid rgba(255, 255, 255, 0.055) !important;
-        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.14) !important;
+        background: rgba(18, 22, 42, 0.62) !important;
+        border: 1px solid rgba(255, 255, 255, 0.07) !important;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12) !important;
         backdrop-filter: blur(10px) !important;
         -webkit-backdrop-filter: blur(10px) !important;
       }
@@ -909,9 +944,9 @@ if (typeof window.pulseRail !== "function") {
       .input-wrap,
       .composer-shell,
       .composer-panel {
-        background: rgba(8, 11, 24, 0.42) !important;
-        border-color: rgba(255, 255, 255, 0.045) !important;
-        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.1) !important;
+        background: rgba(14, 18, 36, 0.5) !important;
+        border-color: rgba(255, 255, 255, 0.055) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08) !important;
         backdrop-filter: blur(6px) !important;
         -webkit-backdrop-filter: blur(6px) !important;
       }
@@ -923,9 +958,9 @@ if (typeof window.pulseRail !== "function") {
       .composer textarea,
       .composer input,
       #messageInput {
-        background: rgba(5, 8, 18, 0.55) !important;
-        border-color: rgba(255, 255, 255, 0.04) !important;
-        color: rgba(235, 240, 252, 0.94) !important;
+        background: rgba(10, 14, 28, 0.58) !important;
+        border-color: rgba(255, 255, 255, 0.055) !important;
+        color: rgba(238, 242, 252, 0.95) !important;
         box-shadow: none !important;
       }
 
@@ -947,23 +982,23 @@ if (typeof window.pulseRail !== "function") {
 
       #workspaceRoot #sidebarShell.sidebar,
       #workspaceRoot #sidebarShell.sidebar.glass {
-        background: rgba(5, 8, 18, 0.16) !important;
-        border-color: rgba(255, 255, 255, 0.03) !important;
-        box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.12) !important;
+        background: rgba(12, 16, 32, 0.22) !important;
+        border-color: rgba(255, 255, 255, 0.045) !important;
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.08) !important;
       }
 
       #workspaceRoot #sidebarShell .sidebar-nav-group-label {
-        color: rgb(var(--xv-violet) / 0.26) !important;
+        color: rgb(var(--xv-violet) / 0.34) !important;
       }
 
       #workspaceRoot #sidebarShell .sidebar-nav-item:not(.is-active) {
-        color: rgba(156, 170, 204, 0.42) !important;
+        color: rgba(168, 182, 214, 0.52) !important;
       }
 
       #workspaceRoot #sidebarShell .rail-inner .rail-card,
       #workspaceRoot #sidebarShell .sidebar-capability-card {
-        background: rgba(255, 255, 255, 0.02) !important;
-        border-color: rgba(255, 255, 255, 0.035) !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+        border-color: rgba(255, 255, 255, 0.055) !important;
         box-shadow: none !important;
       }
 
@@ -999,8 +1034,8 @@ if (typeof window.pulseRail !== "function") {
       #workspaceRoot .left-rail,
       #workspaceRoot .rail,
       #workspaceRoot .sidebar-card {
-        background: rgba(7, 10, 22, 0.18) !important;
-        border-color: rgba(255, 255, 255, 0.035) !important;
+        background: rgba(12, 16, 30, 0.24) !important;
+        border-color: rgba(255, 255, 255, 0.048) !important;
         box-shadow: none !important;
       }
 
@@ -1008,7 +1043,7 @@ if (typeof window.pulseRail !== "function") {
       #workspaceRoot .workspace-sidebar a,
       #workspaceRoot .sidebar-shell button,
       #workspaceRoot .workspace-sidebar button {
-        opacity: 0.74;
+        opacity: 0.92;
       }
 
       #workspaceRoot .command-strip {
@@ -1086,6 +1121,62 @@ if (typeof window.pulseRail !== "function") {
     localStorage.removeItem(GUEST_USAGE_KEY);
     localStorage.removeItem(GUEST_USAGE_RESET_KEY);
     state.lastLimitNoticeKey = "";
+  }
+
+  let guestAccessPulseTimer = 0;
+
+  function focusGuestAccessFlow(options = {}) {
+    const { intent = "signup", fromPreviewWall = false, silent = false } = options;
+    const tab =
+      document.getElementById("sidebarTabAccount") ||
+      document.querySelector("#sidebarShell [data-sidebar-tab=\"account\"]");
+    tab?.click();
+
+    const run = () => {
+      const scroll = document.getElementById("sidebarScroll");
+      const card = document.getElementById("authAccessCard") || document.querySelector("#sidebarPanelAccount .auth-card");
+      card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      if (scroll && card) {
+        const top = card.offsetTop - 10;
+        if (Number.isFinite(top)) scroll.scrollTop = Math.max(0, top);
+      }
+
+      if (card) {
+        card.classList.remove("xv-access-panel-pulse");
+        void card.offsetWidth;
+        card.classList.add("xv-access-panel-pulse");
+        window.clearTimeout(guestAccessPulseTimer);
+        guestAccessPulseTimer = window.setTimeout(() => {
+          card.classList.remove("xv-access-panel-pulse");
+        }, 1650);
+      }
+
+      els.usernameInput?.focus({ preventScroll: true });
+
+      if (silent) return;
+
+      if (intent === "login") {
+        setNotice(
+          "info",
+          "Log in to unlock the workspace",
+          "Use your username and password in Access. Your preview thread stays here until you sign in."
+        );
+      } else if (fromPreviewWall) {
+        setNotice(
+          "info",
+          "Finish unlock in Access",
+          "You already saw the workflow work. Add a username and password in the Access panel, then tap Sign up — same flow with saved threads and monthly runs."
+        );
+      } else {
+        setNotice(
+          "info",
+          "Open Access to continue",
+          "Choose a username and password, then Sign up — or Log in if you already have an account."
+        );
+      }
+    };
+
+    requestAnimationFrame(() => requestAnimationFrame(run));
   }
 
   function maybeResetGuestUsage(force = false) {
@@ -1222,7 +1313,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     pushLimitMessage();
 
     if (!isAuthenticated()) {
-      els.usernameInput?.focus();
+      focusGuestAccessFlow({ intent: "signup", fromPreviewWall: true, silent: true });
       return false;
     }
 
@@ -2027,6 +2118,12 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     else setText(els.authStatus, "Session: guest");
   }
 
+  function syncAuthAccessBridge() {
+    const bridge = document.getElementById("authAccessBridge");
+    if (!bridge) return;
+    bridge.style.display = isAuthenticated() ? "none" : "";
+  }
+
   function updateStreamStatus(text = "Response: ready") {
     setText(els.streamStatus, text);
   }
@@ -2066,6 +2163,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     syncCommandStripCapacity();
     refreshEmptyStateContent();
     if (!state.sending) refreshComposerIdleHint();
+    syncAuthAccessBridge();
   }
 
   function syncMonetizationChrome() {
@@ -2127,6 +2225,27 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     }
     syncMonetizationChrome();
     syncComposerPreviewChrome();
+    syncCommandStripAccessCta();
+  }
+
+  function syncCommandStripAccessCta() {
+    const chip = els.commandPlanCapacity?.closest?.(".command-status-chip");
+    if (!chip || !els.commandPlanCapacity) return;
+    const guest = !isAuthenticated();
+    const atCap = guest && state.remaining <= 0;
+    chip.classList.toggle("command-status-chip--open-access", atCap);
+    if (atCap) {
+      chip.setAttribute("role", "button");
+      chip.setAttribute("tabindex", "0");
+      chip.setAttribute(
+        "aria-label",
+        "Preview complete. Open Access panel to sign up or log in."
+      );
+    } else {
+      chip.removeAttribute("role");
+      chip.removeAttribute("tabindex");
+      chip.removeAttribute("aria-label");
+    }
   }
 
   function syncComposerPreviewChrome() {
@@ -2660,10 +2779,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
             ? "Plan capacity reached"
             : "Free plan capacity reached";
       const capLead = guest
-        ? "You already saw the workflow work. Keep the same operator flow under a free account."
+        ? "Preview did its job — the same operator flow continues under a free account."
         : `You ran <strong>${n}</strong> full operator ${n === 1 ? "run" : "runs"} this cycle.`;
       const capBody = guest
-        ? `Unlock ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same approval-safe workflow before the next valuable action gets blocked.`
+        ? `Open <strong>Access</strong> in the left rail: create your account in one step for ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same approval-safe workflow.`
         : tierLc === "pro"
           ? "Elite adds 5,000 tickets/month, deeper analytics, and more execution headroom so volume does not become drag."
           : "Upgrade to Pro for 500 runs/month, live refunds, and priority routing when the next customer decision matters.";
@@ -2718,7 +2837,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!empty) return;
     empty.querySelector("#emptySignupCta")?.addEventListener("click", () => {
       if (!isAuthenticated()) {
-        els.signupBtn?.click();
+        focusGuestAccessFlow({ intent: "signup", fromPreviewWall: true, silent: false });
         return;
       }
       const t = String(state.tier || "free").toLowerCase();
@@ -2726,7 +2845,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       else upgradePlan("pro");
     });
     empty.querySelector("#emptyLoginLink")?.addEventListener("click", () => {
-      els.usernameInput?.focus();
+      focusGuestAccessFlow({ intent: "login", fromPreviewWall: true, silent: false });
     });
   }
 
@@ -4640,7 +4759,12 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!tier) return;
 
     if (!state.token || !state.username) {
-      setNotice("warning", "Authentication required", "Create an account or log in before upgrading the workspace plan.");
+      setNotice(
+        "warning",
+        "Account required to upgrade",
+        "Create a free account or log in under Access, then open Plans to upgrade billing."
+      );
+      focusGuestAccessFlow({ intent: "signup", fromPreviewWall: false, silent: true });
       return;
     }
 
@@ -5329,6 +5453,22 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   }
 
 function bindEvents() {
+    if (els.commandStrip && !els.commandStrip.dataset.xvAccessCtaBound) {
+      els.commandStrip.dataset.xvAccessCtaBound = "1";
+      els.commandStrip.addEventListener("click", (e) => {
+        const chip = e.target.closest?.(".command-status-chip--open-access");
+        if (!chip || !els.commandStrip.contains(chip)) return;
+        focusGuestAccessFlow({ intent: "signup", fromPreviewWall: true, silent: false });
+      });
+      els.commandStrip.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const chip = e.target.closest?.(".command-status-chip--open-access");
+        if (!chip || !els.commandStrip.contains(chip)) return;
+        e.preventDefault();
+        focusGuestAccessFlow({ intent: "signup", fromPreviewWall: true, silent: false });
+      });
+    }
+
     els.sendBtn?.addEventListener("click", sendMessage);
     els.signupBtn?.addEventListener("click", signup);
     els.loginBtn?.addEventListener("click", login);

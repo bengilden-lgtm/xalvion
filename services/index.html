@@ -48,19 +48,21 @@
         <div class="sidebar-chrome">
           <nav class="sidebar-nav" role="tablist" aria-label="Workspace areas">
             <div class="sidebar-nav-group" role="presentation">
-              <span class="sidebar-nav-group-label" aria-hidden="true">Navigate</span>
+              <span class="sidebar-nav-group-label" aria-hidden="true">Operate</span>
               <div class="sidebar-nav-items" role="presentation">
                 <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace">Workspace</button>
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount">Access</button>
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans">Plans</button>
               </div>
-              <div class="sidebar-nav-divider" aria-hidden="true"></div>
+              <div class="sidebar-nav-divider sidebar-nav-divider--section" aria-hidden="true"></div>
+              <span class="sidebar-nav-group-label sidebar-nav-group-label--sub" aria-hidden="true">Signals</span>
               <div class="sidebar-nav-items" role="presentation">
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations">Integrations</button>
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm">CRM</button>
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue">Revenue</button>
               </div>
-              <div class="sidebar-nav-divider" aria-hidden="true"></div>
+              <div class="sidebar-nav-divider sidebar-nav-divider--section" aria-hidden="true"></div>
+              <span class="sidebar-nav-group-label sidebar-nav-group-label--sub" aria-hidden="true">Tools</span>
               <div class="sidebar-nav-items" role="presentation">
                 <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="more" data-nav-cluster="tools" aria-selected="false" aria-controls="sidebarPanelMore" id="sidebarTabMore">More</button>
               </div>
@@ -89,7 +91,10 @@
 
               <section class="sidebar-panel" id="sidebarPanelAccount" data-sidebar-panel="account" role="tabpanel" aria-labelledby="sidebarTabAccount" aria-label="Account access" hidden aria-hidden="true">
                 <div class="section-label section-label-tight">Account / access</div>
-                <div class="auth-card">
+                <p id="authAccessBridge" class="muted-copy auth-access-bridge">
+                  Same workspace after signup — saved threads, monthly runs, and the preview workflow you already used.
+                </p>
+                <div class="auth-card" id="authAccessCard">
                   <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
                   <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
                   <p id="authHints" class="muted-copy auth-hints">
