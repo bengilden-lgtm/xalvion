@@ -1,15 +1,15 @@
 /* Xalvion — depth + hierarchy (design tokens + legacy aliases) */
 :root{
-  /* Calm dark — warm-neutral base, muted accents (Claude-adjacent rhythm) */
-  --l1-bg:hsl(220, 9%, 10.5%);
-  --l2-base:hsl(218, 8%, 13.2%);
-  --l2-grad-peak:hsl(218, 9%, 14.8%);
-  --l2-header:hsl(220, 8%, 12.8%);
-  --l3-peak:hsl(216, 8%, 17%);
-  --l3-base:hsl(216, 7%, 15.2%);
-  --l3-base-dim:hsl(216, 7%, 13.5%);
-  --decision-surface:hsl(216, 8%, 16.5%);
-  --focal-glow:rgba(200, 175, 155, 0.06);
+  /* Calm dark — cool-violet base (Xalvion identity, Claude-adjacent layout rhythm) */
+  --l1-bg:hsl(258, 14%, 9.8%);
+  --l2-base:hsl(256, 11%, 12.6%);
+  --l2-grad-peak:hsl(255, 12%, 14%);
+  --l2-header:hsl(256, 10%, 12.2%);
+  --l3-peak:hsl(254, 10%, 16%);
+  --l3-base:hsl(252, 9%, 14.4%);
+  --l3-base-dim:hsl(252, 9%, 12.8%);
+  --decision-surface:hsl(252, 10%, 15.8%);
+  --focal-glow:rgba(167, 139, 250, 0.07);
 
   --bg-root:var(--l1-bg);
   --bg-deep:var(--l1-bg);
@@ -17,24 +17,24 @@
   --bg-panel:hsl(216, 7%, 14.5%);
   --bg-elevated:hsl(214, 7%, 17%);
   --bg-hover:hsl(214, 6%, 21%);
-  --ambient-purple:rgba(139,120,180,0.05);
-  --ambient-blue:rgba(120,160,185,0.04);
+  --ambient-purple:rgba(124,92,252,0.085);
+  --ambient-blue:rgba(99,102,241,0.045);
   --ambient-center:rgba(110,115,140,0.04);
   --border-ghost:rgba(255,255,255,0.04);
   --border-subtle:rgba(255,255,255,0.065);
   --border-soft:rgba(255,255,255,0.085);
   --border-medium:rgba(255,255,255,0.12);
   --border-strong:rgba(255,255,255,0.16);
-  --border-accent:rgba(180,150,130,0.22);
-  --accent-1:hsl(265, 32%, 62%);
-  --accent-2:hsl(250, 22%, 58%);
+  --border-accent:rgba(167,139,250,0.28);
+  --accent-1:hsl(262, 58%, 68%);
+  --accent-2:hsl(252, 48%, 62%);
   --accent-blue:hsl(200, 28%, 58%);
   --accent-blue-2:hsl(198, 26%, 52%);
   --accent-soft:rgba(255,255,255,0.04);
-  --accent-glow:rgba(200,165,140,0.08);
-  /* Primary action — matte warm (conversation UI, Claude-like) */
-  --action-solid:hsl(17, 42%, 54%);
-  --action-solid-hover:hsl(17, 44%, 48%);
+  --accent-glow:rgba(124,92,252,0.12);
+  /* Primary action — Xalvion violet (CTAs, approve, preview unlock) */
+  --action-solid:hsl(262, 58%, 54%);
+  --action-solid-hover:hsl(262, 62%, 48%);
   --action-muted:rgba(255,255,255,0.06);
   --success:#38d996;
   --success-soft:rgba(56,217,150,0.12);
@@ -172,11 +172,11 @@
 
   /* Continuous surface tonal stack (Layer 0–4) */
   --ws-layer-0: var(--l1-bg);
-  --ws-layer-1: hsl(220, 8%, 11.5%);
-  --ws-layer-2: hsl(218, 7%, 14%);
-  --ws-layer-2b:hsl(220, 8%, 12.5%);
-  --ws-layer-3: hsl(216, 7%, 16%);
-  --ws-layer-4: hsl(214, 6%, 18%);
+  --ws-layer-1: hsl(258, 12%, 10.8%);
+  --ws-layer-2: hsl(256, 10%, 13.4%);
+  --ws-layer-2b:hsl(256, 10%, 12.2%);
+  --ws-layer-3: hsl(254, 9%, 15.6%);
+  --ws-layer-4: hsl(252, 8%, 17.5%);
 }
 
 @media (max-width:1280px){
@@ -3131,9 +3131,9 @@ body{
   text-transform:none;
   padding:var(--sp-2) var(--sp-3);
   border-radius:var(--r-pill);
-  border:1px solid var(--border-subtle);
-  background:var(--action-muted);
-  color:var(--text-muted);
+  border:1px solid rgba(124,92,252,0.18);
+  background:linear-gradient(180deg, rgba(124,92,252,0.09), rgba(124,92,252,0.03));
+  color:rgba(210,200,245,0.88);
   flex-shrink:0;
 }
 .command-strip-center{
@@ -3425,9 +3425,9 @@ body{
   margin:var(--sp-4) auto;
   padding:var(--sp-6);
   border-radius:var(--radius-card);
-  border:1px solid var(--border-soft);
-  background:linear-gradient(180deg, color-mix(in srgb, var(--decision-surface) 90%, #fff 4%), var(--decision-surface));
-  box-shadow:var(--shadow-md), inset 0 1px 0 var(--ws-surface-edge);
+  border:1px solid rgba(124,92,252,0.2);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--decision-surface) 88%, rgba(124,92,252,0.06)), var(--decision-surface));
+  box-shadow:var(--shadow-md), inset 0 1px 0 var(--ws-surface-edge), 0 0 48px rgba(124,92,252,0.08);
   text-align:center;
 }
 .limit-moment-card h2{
@@ -3443,17 +3443,18 @@ body{
   min-height:44px;
   padding:0 var(--sp-6);
   border-radius:12px;
-  border:none;
+  border:1px solid rgba(255,255,255,0.1);
   cursor:pointer;
   font-weight:550;
   color:#faf8f6;
-  background:var(--action-solid);
-  box-shadow:0 1px 2px rgba(0,0,0,0.2);
-  transition:transform var(--motion-press) var(--sys-curve), background-color var(--motion-hover) var(--sys-curve);
+  background:linear-gradient(145deg, hsl(262, 58%, 56%), hsl(252, 52%, 46%));
+  box-shadow:0 2px 12px rgba(124,92,252,0.28), 0 1px 2px rgba(0,0,0,0.25);
+  transition:transform var(--motion-press) var(--sys-curve), filter var(--motion-hover) var(--sys-curve), box-shadow var(--motion-hover) var(--sys-curve);
 }
 .limit-moment-card .limit-cta:hover{
-  background:var(--action-solid-hover);
+  filter:brightness(1.06);
   transform:translateY(-0.5px);
+  box-shadow:0 4px 20px rgba(124,92,252,0.32), 0 1px 2px rgba(0,0,0,0.25);
 }
 .limit-secondary-link{
   display:block;
@@ -3493,7 +3494,7 @@ body{
   font-weight:600;
   letter-spacing:0.11em;
   text-transform:uppercase;
-  color:rgba(124,138,170,0.42);
+  color:rgba(167,139,250,0.38);
   padding:2px 6px 7px 8px;
 }
 .sidebar-nav-items{
@@ -3534,10 +3535,10 @@ body{
   background:rgba(255,255,255,0.04);
 }
 .sidebar-nav-item.is-active{
-  color:var(--text-primary);
-  border-color:transparent;
-  background:rgba(255,255,255,0.055);
-  box-shadow:none;
+  color:rgba(244,240,255,0.98);
+  border-color:rgba(124,92,252,0.22);
+  background:linear-gradient(105deg, rgba(124,92,252,0.14), rgba(124,92,252,0.04));
+  box-shadow:inset 3px 0 0 rgba(167,139,250,0.85);
 }
 .sidebar-panels-host{
   position:relative;
@@ -3843,7 +3844,7 @@ body{
 }
 
 #workspaceRoot.mono-guest-preview{
-  --mono-tint: rgba(34,193,255,0.04);
+  --mono-tint: rgba(124,92,252,0.055);
 }
 #workspaceRoot.mono-guest-preview .command-status-chip .command-capacity{
   font-family:Outfit,var(--font-sans);
@@ -3860,8 +3861,9 @@ body{
   box-shadow:0 0 0 1px rgba(250,204,21,0.15);
 }
 .command-auth-chip.is-guest-chip{
-  border-color:rgba(34,193,255,0.28);
-  color:rgba(190,230,255,0.9);
+  border-color:rgba(167,139,250,0.35);
+  color:rgba(220,210,252,0.92);
+  background:rgba(124,92,252,0.06);
 }
 .command-capacity.is-warning{
   color:rgba(253,224,71,0.95) !important;
@@ -4568,7 +4570,8 @@ body{
 .workspace-atmosphere-glow{
   position:absolute;
   inset:-20% -10% 40% -10%;
-  background:radial-gradient(ellipse 60% 45% at 50% 0%, rgba(255,255,255,0.04), transparent 70%);
+  background:radial-gradient(ellipse 58% 42% at 50% 0%, rgba(167,139,250,0.09), transparent 68%),
+    radial-gradient(ellipse 60% 45% at 50% 0%, rgba(255,255,255,0.03), transparent 70%);
   pointer-events:none;
 }
 .workspace-atmosphere-falloff{
@@ -4618,16 +4621,16 @@ body{
   gap:10px;
   padding:7px 16px;
   border-radius:999px;
-  background:rgba(255,255,255,0.025);
-  border:1px solid var(--border-ghost);
+  background:rgba(124,92,252,0.06);
+  border:1px solid rgba(124,92,252,0.14);
   max-width:min(520px,92vw);
 }
 .command-status-dot{
   width:6px;
   height:6px;
   border-radius:50%;
-  background:var(--action-solid);
-  box-shadow:none;
+  background:linear-gradient(145deg, #c4b5fd, #7c3aed);
+  box-shadow:0 0 10px rgba(124,92,252,0.45);
   animation:xv-command-dot 2.4s ease-in-out infinite;
 }
 @keyframes xv-command-dot{
@@ -4843,14 +4846,14 @@ body{
 
 body{
   background:
-    radial-gradient(ellipse 90% 55% at 50% -8%, rgba(124,92,252,0.09), transparent 58%),
-    radial-gradient(ellipse 45% 40% at 100% 88%, rgba(34,211,238,0.07), transparent 62%),
-    linear-gradient(180deg, var(--l1-bg) 0%, hsl(230, 24%, 9%) 100%) !important;
+    radial-gradient(ellipse 90% 55% at 50% -8%, rgba(124,92,252,0.12), transparent 58%),
+    radial-gradient(ellipse 48% 42% at 100% 88%, rgba(99,102,241,0.09), transparent 62%),
+    linear-gradient(180deg, var(--l1-bg) 0%, hsl(258, 22%, 8%) 100%) !important;
 }
 .workspace-atmosphere{
   background:
-    radial-gradient(ellipse 70% 45% at 50% -5%, rgba(124,92,252,0.06), transparent 60%),
-    radial-gradient(ellipse 42% 35% at 95% 75%, rgba(34,211,238,0.05), transparent 65%) !important;
+    radial-gradient(ellipse 72% 48% at 50% -5%, rgba(124,92,252,0.085), transparent 60%),
+    radial-gradient(ellipse 44% 36% at 95% 78%, rgba(79,70,229,0.07), transparent 65%) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -5176,12 +5179,12 @@ body{
 }
 
 .workspace-idle .sidebar.glass.rail-col-left{
-  opacity:0.9;
-  filter:saturate(0.97);
+  opacity:0.94;
+  filter:saturate(1.02);
 }
 .workspace-active .sidebar.glass.rail-col-left{
   opacity:1;
-  filter:saturate(1);
+  filter:saturate(1.04);
 }
 
 .workspace-idle .sidebar-chrome{
@@ -7285,33 +7288,33 @@ body{
 
 #workspaceRoot .sidebar-nav-group-label{
   letter-spacing:0.13em !important;
-  color:rgba(108,124,158,0.36) !important;
+  color:rgba(167,139,250,0.34) !important;
 }
 #workspaceRoot .sidebar-nav-item{
   padding:6px 10px !important;
 }
-#workspaceRoot .sidebar-nav-item.is-active{
-  border-color:transparent !important;
-  background:rgba(255,255,255,0.055) !important;
-}
 
-
-/* === Shell polish: Claude-like calm, no neon glass === */
+/* === Shell polish: Claude-like calm, Xalvion violet signal (not generic gray) === */
 #workspaceRoot .command-strip{
   background:color-mix(in srgb, var(--l2-header) 99%, transparent) !important;
   box-shadow:none !important;
 }
 
-#workspaceRoot .command-mode-pill,
+#workspaceRoot .command-mode-pill{
+  background:linear-gradient(180deg, rgba(124,92,252,0.1), rgba(124,92,252,0.03)) !important;
+  border-color:rgba(124,92,252,0.2) !important;
+  box-shadow:none !important;
+  color:rgba(210,200,248,0.9) !important;
+}
 #workspaceRoot .command-status-chip{
-  background:rgba(255,255,255,0.03) !important;
-  border-color:var(--border-ghost) !important;
+  background:rgba(124,92,252,0.06) !important;
+  border-color:rgba(124,92,252,0.16) !important;
   box-shadow:none !important;
 }
 
 #workspaceRoot .workspace-atmosphere-glow{
-  opacity:0.5 !important;
-  filter:saturate(0.85) !important;
+  opacity:0.62 !important;
+  filter:saturate(1.02) !important;
 }
 
 #workspaceRoot .main{
@@ -7336,8 +7339,8 @@ body{
 }
 
 #workspaceRoot .messages-shell{
-  border:1px solid var(--border-ghost) !important;
-  background:color-mix(in srgb, var(--l3-base) 97%, transparent) !important;
+  border:1px solid rgba(124,92,252,0.09) !important;
+  background:color-mix(in srgb, var(--l3-base) 96%, rgba(124,92,252,0.04)) !important;
   box-shadow:none !important;
 }
 
@@ -7367,9 +7370,10 @@ body{
 #workspaceRoot .assistant-decision-slot .decision-panel{
   border-radius:var(--stage-radius) !important;
   padding:18px 20px 14px !important;
-  background:color-mix(in srgb, var(--l3-base) 94%, #fff 6%) !important;
-  border:1px solid var(--border-subtle) !important;
-  box-shadow:0 8px 28px rgba(0,0,0,0.12) !important;
+  background:color-mix(in srgb, var(--l3-base) 90%, rgba(124,92,252,0.06)) !important;
+  border:1px solid rgba(255,255,255,0.06) !important;
+  border-top:1px solid rgba(167,139,250,0.32) !important;
+  box-shadow:0 8px 28px rgba(0,0,0,0.12), inset 0 1px 0 rgba(124,92,252,0.06) !important;
 }
 
 #workspaceRoot .assistant-result-stack:has(.approval-banner) > .assistant-decision-slot .decision-panel{
@@ -7414,12 +7418,12 @@ body{
 }
 
 #workspaceRoot .btn-approve{
-  box-shadow:0 1px 2px rgba(0,0,0,0.2) !important;
+  box-shadow:0 1px 2px rgba(0,0,0,0.2), 0 6px 20px rgba(124,92,252,0.18) !important;
 }
 
 #workspaceRoot .btn-approve:hover:not(:disabled){
   background:var(--action-solid-hover) !important;
-  box-shadow:0 2px 10px rgba(0,0,0,0.2) !important;
+  box-shadow:0 2px 10px rgba(0,0,0,0.22), 0 8px 26px rgba(124,92,252,0.28) !important;
 }
 
 #workspaceRoot .composer-wrap{
@@ -7440,9 +7444,15 @@ body{
 }
 
 #workspaceRoot .chip:hover{
-  background:rgba(255,255,255,0.055) !important;
-  border-color:var(--border-soft) !important;
-  color:var(--text-primary) !important;
+  background:rgba(124,92,252,0.08) !important;
+  border-color:rgba(167,139,250,0.32) !important;
+  color:rgba(238,235,255,0.96) !important;
+}
+#workspaceRoot .chip.active,
+#workspaceRoot .chip[data-active="true"]{
+  background:rgba(124,92,252,0.14) !important;
+  border-color:rgba(196,181,254,0.4) !important;
+  color:rgba(221,214,255,0.98) !important;
 }
 
 #workspaceRoot .composer textarea{
@@ -7455,8 +7465,8 @@ body{
 }
 
 #workspaceRoot .composer textarea:focus{
-  border-color:rgba(255,255,255,0.12) !important;
-  box-shadow:0 0 0 3px rgba(255,255,255,0.04) !important;
+  border-color:rgba(167,139,250,0.38) !important;
+  box-shadow:0 0 0 3px rgba(124,92,252,0.14) !important;
 }
 
 #workspaceRoot .send-btn{
@@ -7468,10 +7478,10 @@ body{
 }
 
 #workspaceRoot .sidebar-nav-item.is-active{
-  background:rgba(255,255,255,0.055) !important;
-  border-color:transparent !important;
-  box-shadow:none !important;
-  color:var(--text-primary) !important;
+  background:linear-gradient(105deg, rgba(124,92,252,0.16), rgba(124,92,252,0.05)) !important;
+  border-color:rgba(124,92,252,0.24) !important;
+  box-shadow:inset 3px 0 0 rgba(196,181,254,0.9) !important;
+  color:rgba(246,243,255,0.98) !important;
 }
 
 #workspaceRoot .sidebar-capability-card{
@@ -7482,14 +7492,15 @@ body{
 
 #workspaceRoot .upgrade-btn,
 #workspaceRoot .stripe-connect-btn{
-  background:rgba(255,255,255,0.03) !important;
-  border-color:var(--border-subtle) !important;
+  background:linear-gradient(180deg, rgba(124,92,252,0.12), rgba(124,92,252,0.04)) !important;
+  border-color:rgba(124,92,252,0.22) !important;
+  color:rgba(236,232,255,0.95) !important;
 }
 
 #workspaceRoot .upgrade-btn:hover,
 #workspaceRoot .stripe-connect-btn:hover{
-  background:rgba(255,255,255,0.055) !important;
-  border-color:var(--border-soft) !important;
+  background:linear-gradient(180deg, rgba(124,92,252,0.2), rgba(124,92,252,0.08)) !important;
+  border-color:rgba(196,181,254,0.38) !important;
 }
 
 @media (min-width: 1100px){
