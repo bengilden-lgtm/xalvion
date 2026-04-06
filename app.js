@@ -317,46 +317,32 @@ if (typeof window.pulseRail !== "function") {
     const style = document.createElement("style");
     style.id = "xalvion-runtime-styles";
     style.textContent = `
-      /* Keep the overall workspace layout intact */
+      :root {
+        --xv-thread-max: 920px;
+      }
+
       #workspaceRoot,
-      #workspaceRoot > .workspace,
-      .workspace,
-      .main,
-      .main-stage {
-        max-width: none !important;
+      .workspace-root {
+        background: transparent !important;
       }
 
-      /* Fix rail / right sidebar so it keeps its own surface and width */
-      .rail,
-      .workspace-rail,
-      .right-rail,
-      #railInner,
-      .rail-inner,
-      #latestRunRailCard,
-      .rail-card,
-      .dashboard-card,
-      .usage-card,
-      .account-card,
-      .refund-center-card,
-      .crm-card,
-      .revenue-card,
-      .forecast-card {
-        background: rgba(10, 14, 30, 0.72) !important;
-        border: 1px solid rgba(255,255,255,0.07) !important;
-        box-shadow: none !important;
-        backdrop-filter: blur(10px) !important;
-        -webkit-backdrop-filter: blur(10px) !important;
-        border-radius: 18px !important;
+      #workspaceRoot.workspace-active,
+      #workspaceRoot.workspace-thinking,
+      #workspaceRoot.workspace-idle {
+        background: transparent !important;
       }
 
-      #railInner,
-      .rail-inner {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 14px !important;
+      .messages,
+      #messages {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        padding: 20px 28px 20px;
+        background: transparent !important;
+        max-width: var(--xv-thread-max);
+        margin: 0 auto;
       }
 
-      /* Remove the misty thread shell only, not the entire app chrome */
       #messagesShell,
       #messagesShell::before,
       #messagesShell::after,
@@ -378,124 +364,329 @@ if (typeof window.pulseRail !== "function") {
       .scroll-shell,
       .scroll-shell::before,
       .scroll-shell::after,
-      .main .messages-shell.scroll-shell,
       .workspace-active .messages-shell,
-      .workspace-idle .messages-shell {
+      .workspace-idle .messages-shell,
+      .workspace-thinking .messages-shell,
+      .main .messages-shell.scroll-shell {
         background: transparent !important;
         background-image: none !important;
         border: none !important;
         box-shadow: none !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-      }
-
-      /* Remove reintroduced boxed cards around thread internals */
-      #messagesShell .msg-card,
-      #messagesShell .customer-message-block,
-      #messagesShell .assistant-result-stack,
-      #messagesShell .assistant-canvas,
-      #messagesShell .assistant-decision-slot,
-      #messagesShell .assistant-brief-slot,
-      #messagesShell .decision-panel,
-      #messagesShell .ops-card,
-      #messagesShell .ops-shell,
-      #messagesShell .details-wrap,
-      #messagesShell .details-panel,
-      #messagesShell .details-grid,
-      #messagesShell .details-box,
-      #messagesShell .details-note,
-      #messagesShell .details-trace,
-      #messagesShell .thread-card,
-      #messagesShell .thread-frame,
-      .messages-shell .msg-card,
-      .messages-shell .customer-message-block,
-      .messages-shell .assistant-result-stack,
-      .messages-shell .assistant-canvas,
-      .messages-shell .assistant-decision-slot,
-      .messages-shell .assistant-brief-slot,
-      .messages-shell .decision-panel,
-      .messages-shell .ops-card,
-      .messages-shell .ops-shell,
-      .messages-shell .details-wrap,
-      .messages-shell .details-panel,
-      .messages-shell .details-grid,
-      .messages-shell .details-box,
-      .messages-shell .details-note,
-      .messages-shell .details-trace,
-      .messages-shell .thread-card,
-      .messages-shell .thread-frame {
-        background: transparent !important;
-        background-image: none !important;
-        border: none !important;
-        box-shadow: none !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        border-radius: 0 !important;
-      }
-
-      /* Thread flow refinement */
-      .messages,
-      #messages {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 28px !important;
-        padding: 24px 28px 18px !important;
-        background: transparent !important;
       }
 
       .msg-group {
-        gap: 8px !important;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+        animation: none !important;
+      }
+
+      .msg-group.user,
+      .msg-group.assistant {
+        align-items: stretch;
+      }
+
+      .msg-group + .msg-group {
+        padding-top: 24px;
+        border-top: 1px solid rgba(255,255,255,.045);
+      }
+
+      .msg-group--limit-cta {
+        padding-top: 0 !important;
+        border-top: none !important;
+      }
+
+      .msg-card,
+      .msg-card.user,
+      .msg-card.assistant,
+      .msg-body,
+      .msg-body.assistant-canvas,
+      .assistant-result-stack,
+      .stream-trace-host,
+      .assistant-decision-slot,
+      .assistant-brief-slot,
+      .customer-message-block,
+      .assistant-footer,
+      .details-wrap,
+      .operator-brief-details,
+      .details-panel,
+      .details-insight-stack,
+      .details-grid,
+      .details-box,
+      .details-note,
+      .details-insight,
+      .details-trace,
+      .details-toggle,
+      .details-toggle:hover,
+      .details-wrap[open] .details-toggle,
+      .assistant-meta-fold,
+      .assistant-meta-fold-body,
+      .assistant-meta-fold-summary,
+      .xalvion-typing-shell,
+      .xalvion-stream-shell,
+      .stream-steps,
+      .stream-step,
+      .stream-trace-host {
+        background: transparent !important;
+        background-image: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      .msg-card {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 0 !important;
+        overflow: visible;
+        padding: 0 !important;
+      }
+
+      .msg-card::before,
+      .msg-card::after,
+      .customer-message-block::before,
+      .customer-message-block::after,
+      #messagesShell::before,
+      #messagesShell::after {
+        display: none !important;
+        content: none !important;
       }
 
       .msg-head {
-        padding: 0 0 4px !important;
-        background: transparent !important;
-        border: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 0 6px;
       }
 
-      .msg-who,
-      .customer-message-label,
-      .reply-hero-label {
-        color: rgba(170, 183, 220, 0.54) !important;
-        letter-spacing: 0.12em !important;
+      .msg-who {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: .14em;
+        color: rgba(154, 167, 201, .36);
+        font-weight: 700;
+      }
+
+      .msg-badge {
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,.025);
+        border: 1px solid rgba(255,255,255,.04);
+      }
+
+      .msg-badge svg {
+        width: 9px;
+        height: 9px;
+        opacity: .55;
       }
 
       .msg-time {
-        color: rgba(148, 162, 204, 0.30) !important;
+        white-space: nowrap;
+        color: rgba(148, 162, 204, .22);
+        font-size: 10px;
+        letter-spacing: .06em;
+        text-transform: uppercase;
       }
 
-      .reply-text,
-      .js-reply-text {
+      .customer-message-label,
+      .reply-hero-label,
+      .reply-value-reinforcement,
+      .assistant-context-line,
+      .assistant-meta,
+      .assistant-footer,
+      .js-assistant-context {
+        display: none !important;
+      }
+
+      .reply-text {
+        font-size: 18px;
+        line-height: 1.7;
+        color: rgba(242, 246, 255, .96);
+        white-space: pre-wrap;
+        word-break: break-word;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
         padding: 0 !important;
         border-radius: 0 !important;
-        font-size: 17px !important;
-        line-height: 1.68 !important;
+        max-width: 760px;
       }
 
-      .assistant-footer {
-        padding-top: 6px !important;
+      .msg-group.user .reply-text {
+        color: rgba(228, 234, 248, .90);
+        font-size: 17px;
       }
 
-      .meta-chip {
-        background: rgba(255,255,255,0.03) !important;
-        border: 1px solid rgba(255,255,255,0.06) !important;
+      .msg-group.user .msg-head {
+        opacity: .78;
+      }
+
+      .msg-group.assistant .msg-head {
+        opacity: .72;
+      }
+
+      .details-wrap,
+      .details-panel,
+      .details-grid,
+      .details-box,
+      .details-note,
+      .details-insight,
+      .details-trace {
+        margin: 0 !important;
+        padding: 0 !important;
+        gap: 10px !important;
+      }
+
+      .details-toggle {
+        padding: 0 !important;
+        min-height: auto !important;
+        border-radius: 0 !important;
+        color: rgba(170, 183, 220, .46) !important;
+        font-size: 11px !important;
+      }
+
+      .details-toggle svg,
+      .details-toggle .icon,
+      .details-toggle [class*="icon"] {
+        opacity: .45;
+      }
+
+      .empty-state {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+
+      .empty-card,
+      .limit-moment-card {
+        border-radius: 18px !important;
+        background: rgba(11, 15, 30, .62) !important;
+        border: 1px solid rgba(255,255,255,.06) !important;
+        box-shadow: 0 16px 44px rgba(0,0,0,.18) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+      }
+
+      .empty-flow-strip,
+      .empty-actions,
+      .empty-chip-hint,
+      .empty-intent-chip {
+        opacity: .82;
+      }
+
+      .chip,
+      .empty-intent-chip,
+      [data-fill],
+      .composer .chip,
+      .input-chip,
+      .prompt-chip {
+        background: rgba(255,255,255,.025) !important;
+        border-color: rgba(255,255,255,.055) !important;
+        color: rgba(216, 223, 241, .68) !important;
         box-shadow: none !important;
       }
 
-      .meta-chip.review {
-        background: rgba(250,204,21,0.05) !important;
+      .chip:hover,
+      .empty-intent-chip:hover,
+      [data-fill]:hover {
+        background: rgba(255,255,255,.04) !important;
+        border-color: rgba(255,255,255,.075) !important;
+        color: rgba(228, 234, 247, .84) !important;
       }
 
-      /* Keep the composer as a subtle product surface */
       .composer,
+      .composer-chat,
+      .input-wrap,
       .composer-shell,
-      .composer-card,
-      .input-wrap {
+      .composer-panel {
+        background: rgba(10, 14, 28, .56) !important;
+        border-color: rgba(255,255,255,.055) !important;
+        box-shadow: 0 8px 26px rgba(0,0,0,.14) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+      }
+
+      .composer textarea,
+      .composer input,
+      #messageInput {
+        background: rgba(5, 8, 18, .72) !important;
+        border-color: rgba(255,255,255,.045) !important;
+        color: rgba(235, 240, 252, .94) !important;
+        box-shadow: none !important;
+      }
+
+      .composer textarea::placeholder,
+      .composer input::placeholder,
+      #messageInput::placeholder {
+        color: rgba(171, 183, 212, .42) !important;
+      }
+
+      #workspaceRoot .sidebar-shell,
+      #workspaceRoot .workspace-sidebar,
+      #workspaceRoot aside,
+      #workspaceRoot [data-rail],
+      #workspaceRoot .right-rail,
+      #workspaceRoot .left-rail,
+      #workspaceRoot .rail,
+      #workspaceRoot .ops-card,
+      #workspaceRoot .panel-card,
+      #workspaceRoot .metric-card,
+      #workspaceRoot .sidebar-card {
         backdrop-filter: blur(10px) !important;
         -webkit-backdrop-filter: blur(10px) !important;
+      }
+
+      #workspaceRoot .sidebar-shell,
+      #workspaceRoot .workspace-sidebar,
+      #workspaceRoot aside,
+      #workspaceRoot .left-rail,
+      #workspaceRoot .rail,
+      #workspaceRoot .sidebar-card {
+        background: rgba(7, 10, 22, .22) !important;
+        border-color: rgba(255,255,255,.04) !important;
+        box-shadow: none !important;
+      }
+
+      #workspaceRoot .sidebar-shell a,
+      #workspaceRoot .workspace-sidebar a,
+      #workspaceRoot .sidebar-shell button,
+      #workspaceRoot .workspace-sidebar button {
+        opacity: .78;
+      }
+
+      .notice,
+      .top-status,
+      .preview-pill,
+      .plan-pill,
+      .status-chip,
+      .meta-chip {
+        box-shadow: none !important;
+      }
+
+      @media (max-width: 1100px) {
+        .messages,
+        #messages {
+          padding: 18px 20px 16px;
+          gap: 22px;
+        }
+
+        .reply-text {
+          font-size: 17px;
+          line-height: 1.64;
+          max-width: 100%;
+        }
       }
     `;
     document.head.appendChild(style);
