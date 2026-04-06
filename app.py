@@ -13,7 +13,7 @@ This version hardens:
 
 from __future__ import annotations
 
-print("🚀 APP.PY STARTING...", flush=True)
+print("[BOOT] APP.PY STARTING...", flush=True)
 
 import asyncio
 import json
@@ -282,10 +282,19 @@ if STRIPE_KEY:
     stripe.api_key = STRIPE_KEY
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
-INDEX_PATH = os.path.join(BASE_DIR, "index.html")
+_SERVICES_DIR = os.path.join(BASE_DIR, "services")
+INDEX_PATH = (
+    os.path.join(_SERVICES_DIR, "index.html")
+    if os.path.isfile(os.path.join(_SERVICES_DIR, "index.html"))
+    else os.path.join(BASE_DIR, "index.html")
+)
 APP_JS_PATH = os.path.join(BASE_DIR, "app.js")
 WORKSPACE_MODULES_JS_PATH = os.path.join(BASE_DIR, "workspace_modules.js")
-STYLES_CSS_PATH = os.path.join(BASE_DIR, "styles.css")
+STYLES_CSS_PATH = (
+    os.path.join(_SERVICES_DIR, "styles.css")
+    if os.path.isfile(os.path.join(_SERVICES_DIR, "styles.css"))
+    else os.path.join(BASE_DIR, "styles.css")
+)
 LANDING_PATH = os.path.join(BASE_DIR, "landing.html")
 FLUID_DIR = os.path.join(BASE_DIR, "fluid")
 WORKSPACE_CLIENT_DIR = os.path.join(BASE_DIR, "workspace-client")
