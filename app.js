@@ -321,19 +321,19 @@ if (typeof window.pulseRail !== "function") {
         --xv-bg-0: #0c0f1c;
         --xv-bg-1: #12162a;
         --xv-bg-2: #181d35;
-        --xv-surface: rgba(24, 28, 48, 0.44);
-        --xv-surface-soft: rgba(22, 25, 44, 0.30);
-        --xv-surface-strong: rgba(28, 32, 54, 0.72);
-        --xv-line: rgba(144, 126, 255, 0.12);
-        --xv-line-soft: rgba(255, 255, 255, 0.05);
+        --xv-surface: rgba(26, 30, 54, 0.34);
+        --xv-surface-soft: rgba(22, 25, 44, 0.22);
+        --xv-surface-strong: rgba(28, 32, 54, 0.60);
+        --xv-line: rgba(144, 126, 255, 0.10);
+        --xv-line-soft: rgba(255, 255, 255, 0.04);
         --xv-text: rgba(244, 246, 255, 0.96);
         --xv-text-soft: rgba(194, 201, 225, 0.78);
         --xv-text-dim: rgba(150, 160, 192, 0.58);
         --xv-purple: #8d6cff;
         --xv-purple-soft: rgba(141, 108, 255, 0.18);
-        --xv-panel-radius: 20px;
-        --xv-panel-shadow: 0 14px 38px rgba(4, 5, 12, 0.18);
-        --xv-focus: rgba(141, 108, 255, 0.22);
+        --xv-panel-radius: 18px;
+        --xv-panel-shadow: 0 10px 28px rgba(4, 5, 12, 0.14);
+        --xv-focus: rgba(141, 108, 255, 0.20);
       }
 
       html, body {
@@ -354,7 +354,7 @@ if (typeof window.pulseRail !== "function") {
       }
 
       #sidebarShell {
-        background: linear-gradient(180deg, rgba(12, 16, 34, 0.86), rgba(10, 13, 30, 0.78)) !important;
+        background: linear-gradient(180deg, rgba(14, 18, 38, 0.82), rgba(10, 13, 30, 0.72)) !important;
         border-right: 1px solid rgba(255,255,255,0.045) !important;
         box-shadow: inset -1px 0 0 rgba(255,255,255,0.018);
       }
@@ -397,8 +397,8 @@ if (typeof window.pulseRail !== "function") {
       #sidebarShell .sidebar-box,
       #sidebarShell .account-card,
       #sidebarShell .auth-card {
-        background: rgba(255,255,255,0.026) !important;
-        border: 1px solid rgba(255,255,255,0.045) !important;
+        background: rgba(255,255,255,0.030) !important;
+        border: 1px solid rgba(255,255,255,0.042) !important;
         border-radius: 16px !important;
         box-shadow: none !important;
       }
@@ -411,12 +411,12 @@ if (typeof window.pulseRail !== "function") {
       #sidebarShell input,
       #sidebarShell .auth-input,
       #sidebarShell textarea {
-        min-height: 46px;
-        border-radius: 14px !important;
-        background: rgba(255,255,255,0.035) !important;
-        border: 1px solid rgba(255,255,255,0.075) !important;
+        min-height: 44px;
+        border-radius: 13px !important;
+        background: rgba(255,255,255,0.042) !important;
+        border: 1px solid rgba(255,255,255,0.072) !important;
         color: var(--xv-text) !important;
-        font-size: 15px !important;
+        font-size: 14.5px !important;
       }
 
       #sidebarShell input:focus,
@@ -454,9 +454,9 @@ if (typeof window.pulseRail !== "function") {
       .thread-shell,
       .conversation-shell,
       .messages-zone {
-        background: linear-gradient(180deg, rgba(26, 30, 52, 0.28), rgba(14, 18, 34, 0.20)) !important;
-        border: 1px solid rgba(255,255,255,0.045) !important;
-        border-radius: 20px !important;
+        background: linear-gradient(180deg, rgba(30, 34, 58, 0.20), rgba(14, 18, 34, 0.16)) !important;
+        border: 1px solid rgba(255,255,255,0.038) !important;
+        border-radius: 18px !important;
         box-shadow: none !important;
         backdrop-filter: none !important;
       }
@@ -464,8 +464,8 @@ if (typeof window.pulseRail !== "function") {
       #messages {
         display: flex;
         flex-direction: column;
-        gap: 20px;
-        padding: 32px 32px 136px;
+        gap: 16px;
+        padding: 24px 24px 120px;
         max-width: 1120px;
         margin: 0 auto;
         background: transparent !important;
@@ -549,8 +549,8 @@ if (typeof window.pulseRail !== "function") {
       }
 
       .reply-text {
-        font-size: 18px;
-        line-height: 1.7;
+        font-size: 17px;
+        line-height: 1.72;
         letter-spacing: -0.01em;
         color: var(--xv-text);
         max-width: 900px;
@@ -564,10 +564,10 @@ if (typeof window.pulseRail !== "function") {
 
       .assistant-footer {
         margin-top: 16px;
-        padding: 14px 16px;
-        border-radius: 16px;
-        background: rgba(255,255,255,0.024);
-        border: 1px solid rgba(255,255,255,0.05);
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(255,255,255,0.018);
+        border: 1px solid rgba(255,255,255,0.045);
       }
 
       .assistant-meta {
@@ -577,11 +577,11 @@ if (typeof window.pulseRail !== "function") {
       }
 
       .meta-chip {
-        min-height: 32px;
-        padding: 0 12px;
+        min-height: 30px;
+        padding: 0 10px;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.07);
-        background: rgba(255,255,255,0.032);
+        border: 1px solid rgba(255,255,255,0.062);
+        background: rgba(255,255,255,0.028);
         color: rgba(222, 228, 246, 0.82);
         font-size: 12px;
         font-weight: 600;
@@ -594,17 +594,17 @@ if (typeof window.pulseRail !== "function") {
       .empty-state {
         display: flex;
         justify-content: center;
-        padding: 10px 0 24px;
+        padding: 8px 0 24px;
       }
 
       .empty-card {
         width: min(100%, 700px);
         margin: 0 auto;
-        padding: 22px 22px;
-        border-radius: 20px;
-        background: linear-gradient(180deg, rgba(18,22,44,0.62), rgba(10, 13, 28, 0.56));
-        border: 1px solid rgba(255,255,255,0.055);
-        box-shadow: 0 10px 28px rgba(3, 5, 12, 0.18);
+        padding: 20px 20px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(18,22,44,0.46), rgba(10, 13, 28, 0.40));
+        border: 1px solid rgba(255,255,255,0.048);
+        box-shadow: 0 8px 18px rgba(3, 5, 12, 0.12);
       }
 
       .empty-card h2,
@@ -647,8 +647,8 @@ if (typeof window.pulseRail !== "function") {
       .empty-chip-hint-secondary {
         padding: 9px 12px;
         border-radius: 999px;
-        background: rgba(255,255,255,0.032);
-        border: 1px solid rgba(255,255,255,0.055);
+        background: rgba(255,255,255,0.028);
+        border: 1px solid rgba(255,255,255,0.05);
         font-size: 13px;
         color: rgba(210, 218, 242, 0.78);
       }
@@ -658,17 +658,17 @@ if (typeof window.pulseRail !== "function") {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 52px;
+        min-height: 50px;
         padding: 0 20px;
         margin-top: 18px;
         border: none;
-        border-radius: 16px;
+        border-radius: 14px;
         background: linear-gradient(135deg, #8d6cff, #6f58ff);
         color: #fff;
         font-size: 16px;
         font-weight: 700;
         cursor: pointer;
-        box-shadow: 0 12px 30px rgba(111, 88, 255, 0.28);
+        box-shadow: 0 10px 22px rgba(111, 88, 255, 0.22);
       }
 
       .limit-secondary-link,
@@ -687,46 +687,78 @@ if (typeof window.pulseRail !== "function") {
       .composer-chat,
       .input-wrap,
       .composer-shell {
-        background: rgba(255,255,255,0.024) !important;
-        border: 1px solid rgba(255,255,255,0.05) !important;
-        border-radius: 20px !important;
+        background: rgba(255,255,255,0.030) !important;
+        border: 1px solid rgba(255,255,255,0.045) !important;
+        border-radius: 18px !important;
         box-shadow: none !important;
       }
 
       .composer,
       .composer-chat,
       .composer-shell {
-        padding: 12px !important;
+        padding: 10px !important;
       }
 
       textarea,
       #messageInput,
       .message-input {
-        min-height: 68px;
-        padding: 14px 14px !important;
-        background: rgba(255,255,255,0.032) !important;
-        border: 1px solid rgba(255,255,255,0.055) !important;
-        border-radius: 16px !important;
+        min-height: 56px;
+        padding: 12px 12px !important;
+        background: rgba(255,255,255,0.040) !important;
+        border: 1px solid rgba(255,255,255,0.052) !important;
+        border-radius: 15px !important;
         color: var(--xv-text) !important;
-        font-size: 17px !important;
+        font-size: 16px !important;
+      }
+
+      textarea::placeholder,
+      #messageInput::placeholder,
+      .message-input::placeholder {
+        color: rgba(210, 218, 242, 0.62) !important;
+      }
+
+      .composer-input-row,
+      .composer-input-wrap {
+        gap: 10px !important;
+        align-items: flex-end !important;
+      }
+
+      .composer .quick-actions {
+        gap: 8px !important;
+      }
+
+      .composer .chip {
+        padding: 8px 10px !important;
+        border-radius: 999px !important;
+        background: rgba(255,255,255,0.028) !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+        color: rgba(222, 228, 246, 0.86) !important;
+        font-size: 12.5px !important;
+        font-weight: 650 !important;
+      }
+
+      .composer .chip:hover {
+        background: rgba(141,108,255,0.10) !important;
+        border-color: rgba(141,108,255,0.18) !important;
+        transform: translateY(-1px);
       }
 
       textarea:focus,
       #messageInput:focus,
       .message-input:focus {
         outline: none !important;
-        border-color: rgba(141,108,255,0.30) !important;
-        box-shadow: 0 0 0 4px rgba(141,108,255,0.11);
+        border-color: rgba(141,108,255,0.26) !important;
+        box-shadow: 0 0 0 4px rgba(141,108,255,0.10);
       }
 
       #sendBtn,
       .send-btn {
-        width: 46px;
-        height: 46px;
-        border-radius: 14px !important;
+        width: 44px;
+        height: 44px;
+        border-radius: 13px !important;
         background: linear-gradient(135deg, #8d6cff, #6f58ff) !important;
         border: none !important;
-        box-shadow: 0 10px 26px rgba(111, 88, 255, 0.22) !important;
+        box-shadow: 0 8px 18px rgba(111, 88, 255, 0.18) !important;
       }
 
       @media (max-width: 1200px) {
@@ -738,7 +770,7 @@ if (typeof window.pulseRail !== "function") {
           padding: 20px;
         }
         .reply-text {
-          font-size: 17px;
+          font-size: 16px;
         }
       }
     `;
