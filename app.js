@@ -327,11 +327,31 @@ if (typeof window.pulseRail !== "function") {
       }
 
       #messagesShell,
+      #messagesShell::before,
+      #messagesShell::after,
       .messages-shell,
+      .messages-shell::before,
+      .messages-shell::after,
       .messagesShell,
+      .messagesShell::before,
+      .messagesShell::after,
       .thread-shell,
-      .conversation-shell {
+      .thread-shell::before,
+      .thread-shell::after,
+      .conversation-shell,
+      .conversation-shell::before,
+      .conversation-shell::after,
+      .messages-zone,
+      .messages-zone::before,
+      .messages-zone::after,
+      .scroll-shell,
+      .scroll-shell::before,
+      .scroll-shell::after,
+      .workspace-active .messages-shell,
+      .workspace-idle .messages-shell,
+      .main .messages-shell.scroll-shell {
         background: transparent !important;
+        background-image: none !important;
         border: none !important;
         box-shadow: none !important;
         backdrop-filter: none !important;
@@ -476,6 +496,62 @@ if (typeof window.pulseRail !== "function") {
       .assistant-context-line {
         margin: 0 0 8px;
       }
+
+      .details-wrap,
+      .operator-brief-details,
+      .details-panel,
+      .details-insight-stack,
+      .details-grid,
+      .details-box,
+      .details-note,
+      .details-insight,
+      .details-trace,
+      .details-toggle,
+      .details-toggle:hover,
+      .details-wrap[open] .details-toggle {
+        background: transparent !important;
+        background-image: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+      }
+
+      .details-wrap {
+        margin: 0 0 10px !important;
+        padding: 0 !important;
+      }
+
+      .details-toggle {
+        padding: 0 !important;
+        min-height: auto !important;
+        border-radius: 0 !important;
+        color: rgba(170, 183, 220, .78) !important;
+      }
+
+      .details-toggle:hover,
+      .details-wrap[open] .details-toggle {
+        transform: none !important;
+      }
+
+      .details-panel {
+        margin-top: 10px !important;
+        padding: 0 !important;
+        gap: 12px !important;
+      }
+
+      .details-grid {
+        gap: 12px !important;
+        padding: 0 !important;
+      }
+
+      .details-box,
+      .details-note,
+      .details-insight,
+      .details-trace {
+        padding: 0 !important;
+        border-radius: 0 !important;
+      }
+
 
       .customer-message-label,
       .reply-hero-label {
