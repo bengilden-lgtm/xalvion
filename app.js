@@ -318,25 +318,29 @@ if (typeof window.pulseRail !== "function") {
     style.id = "xalvion-runtime-styles";
     style.textContent = `
       :root {
-        --xv-bg-0: #0b0d16;
-        --xv-bg-1: #111425;
-        --xv-bg-2: #171a2d;
-        --xv-surface: rgba(22, 24, 40, 0.56);
-        --xv-surface-soft: rgba(24, 27, 46, 0.42);
-        --xv-surface-strong: rgba(26, 29, 48, 0.78);
-        --xv-line: rgba(144, 126, 255, 0.14);
-        --xv-line-soft: rgba(255, 255, 255, 0.06);
+        --xv-bg-0: #0c0f1c;
+        --xv-bg-1: #12162a;
+        --xv-bg-2: #181d35;
+        --xv-surface: rgba(24, 28, 48, 0.44);
+        --xv-surface-soft: rgba(22, 25, 44, 0.30);
+        --xv-surface-strong: rgba(28, 32, 54, 0.72);
+        --xv-line: rgba(144, 126, 255, 0.12);
+        --xv-line-soft: rgba(255, 255, 255, 0.05);
         --xv-text: rgba(244, 246, 255, 0.96);
         --xv-text-soft: rgba(194, 201, 225, 0.78);
         --xv-text-dim: rgba(150, 160, 192, 0.58);
         --xv-purple: #8d6cff;
         --xv-purple-soft: rgba(141, 108, 255, 0.18);
-        --xv-panel-radius: 22px;
-        --xv-panel-shadow: 0 16px 42px rgba(4, 5, 12, 0.22);
+        --xv-panel-radius: 20px;
+        --xv-panel-shadow: 0 14px 38px rgba(4, 5, 12, 0.18);
+        --xv-focus: rgba(141, 108, 255, 0.22);
       }
 
       html, body {
-        background: radial-gradient(circle at top center, rgba(86, 72, 180, 0.13), transparent 28%), linear-gradient(180deg, #0a0c16 0%, #0c1020 100%) !important;
+        background:
+          radial-gradient(900px 520px at 50% -120px, rgba(141, 108, 255, 0.16), transparent 60%),
+          radial-gradient(1200px 640px at 10% 0%, rgba(99, 102, 241, 0.10), transparent 62%),
+          linear-gradient(180deg, #0b0e1a 0%, #0d1226 100%) !important;
         color: var(--xv-text);
       }
 
@@ -350,24 +354,24 @@ if (typeof window.pulseRail !== "function") {
       }
 
       #sidebarShell {
-        background: linear-gradient(180deg, rgba(9, 12, 24, 0.9), rgba(10, 13, 28, 0.82)) !important;
-        border-right: 1px solid rgba(255,255,255,0.05) !important;
-        box-shadow: inset -1px 0 0 rgba(255,255,255,0.02);
+        background: linear-gradient(180deg, rgba(12, 16, 34, 0.86), rgba(10, 13, 30, 0.78)) !important;
+        border-right: 1px solid rgba(255,255,255,0.045) !important;
+        box-shadow: inset -1px 0 0 rgba(255,255,255,0.018);
       }
 
       #sidebarShell [data-sidebar-tab] {
-        min-height: 44px;
-        border-radius: 16px;
-        padding: 0 14px;
-        font-size: 15px;
+        min-height: 40px;
+        border-radius: 14px;
+        padding: 0 12px;
+        font-size: 14px;
         font-weight: 600;
         letter-spacing: -0.01em;
       }
 
       #sidebarShell [data-sidebar-tab].is-active,
       #sidebarShell [data-sidebar-tab][aria-selected="true"] {
-        background: linear-gradient(90deg, rgba(141,108,255,0.16), rgba(80, 92, 180, 0.08)) !important;
-        border: 1px solid rgba(141,108,255,0.34) !important;
+        background: linear-gradient(90deg, rgba(141,108,255,0.14), rgba(80, 92, 180, 0.07)) !important;
+        border: 1px solid rgba(141,108,255,0.30) !important;
         color: rgba(249, 250, 255, 0.98) !important;
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
       }
@@ -393,21 +397,33 @@ if (typeof window.pulseRail !== "function") {
       #sidebarShell .sidebar-box,
       #sidebarShell .account-card,
       #sidebarShell .auth-card {
-        background: rgba(255,255,255,0.03) !important;
-        border: 1px solid rgba(255,255,255,0.05) !important;
-        border-radius: 18px !important;
+        background: rgba(255,255,255,0.026) !important;
+        border: 1px solid rgba(255,255,255,0.045) !important;
+        border-radius: 16px !important;
         box-shadow: none !important;
+      }
+
+      #sidebarShell .account-card,
+      #sidebarShell .auth-card {
+        padding: 16px !important;
       }
 
       #sidebarShell input,
       #sidebarShell .auth-input,
       #sidebarShell textarea {
-        min-height: 48px;
+        min-height: 46px;
         border-radius: 14px !important;
-        background: rgba(255,255,255,0.04) !important;
-        border: 1px solid rgba(255,255,255,0.08) !important;
+        background: rgba(255,255,255,0.035) !important;
+        border: 1px solid rgba(255,255,255,0.075) !important;
         color: var(--xv-text) !important;
         font-size: 15px !important;
+      }
+
+      #sidebarShell input:focus,
+      #sidebarShell textarea:focus {
+        outline: none !important;
+        border-color: rgba(141,108,255,0.34) !important;
+        box-shadow: 0 0 0 4px rgba(141,108,255,0.12);
       }
 
       #sidebarShell .auth-helper,
@@ -424,15 +440,23 @@ if (typeof window.pulseRail !== "function") {
         gap: 8px !important;
       }
 
+      #sidebarShell #signupBtn,
+      #sidebarShell #loginBtn,
+      #sidebarShell #logoutBtn,
+      #sidebarShell .btn,
+      #sidebarShell button {
+        border-radius: 14px;
+      }
+
       #messagesShell,
       .messages-shell,
       .scroll-shell,
       .thread-shell,
       .conversation-shell,
       .messages-zone {
-        background: linear-gradient(180deg, rgba(26, 29, 46, 0.34), rgba(15, 18, 30, 0.24)) !important;
-        border: 1px solid rgba(255,255,255,0.05) !important;
-        border-radius: 24px !important;
+        background: linear-gradient(180deg, rgba(26, 30, 52, 0.28), rgba(14, 18, 34, 0.20)) !important;
+        border: 1px solid rgba(255,255,255,0.045) !important;
+        border-radius: 20px !important;
         box-shadow: none !important;
         backdrop-filter: none !important;
       }
@@ -440,9 +464,9 @@ if (typeof window.pulseRail !== "function") {
       #messages {
         display: flex;
         flex-direction: column;
-        gap: 18px;
-        padding: 28px 30px 128px;
-        max-width: 1100px;
+        gap: 20px;
+        padding: 32px 32px 136px;
+        max-width: 1120px;
         margin: 0 auto;
         background: transparent !important;
       }
@@ -465,8 +489,8 @@ if (typeof window.pulseRail !== "function") {
         justify-content: space-between;
         gap: 16px;
         padding: 0 0 12px;
-        margin-bottom: 8px;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
+        margin-bottom: 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.045);
       }
 
       .msg-who {
@@ -501,7 +525,7 @@ if (typeof window.pulseRail !== "function") {
 
       .reply-value-reinforcement {
         display: block;
-        margin: 0 0 10px;
+        margin: 0 0 12px;
         font-size: 13px;
         font-weight: 600;
         color: rgba(190, 197, 222, 0.8);
@@ -509,10 +533,10 @@ if (typeof window.pulseRail !== "function") {
 
       .msg-group.user .reply-text {
         display: block;
-        padding: 18px 20px;
-        border-radius: 18px;
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.06);
+        padding: 16px 18px;
+        border-radius: 16px;
+        background: rgba(255,255,255,0.042);
+        border: 1px solid rgba(255,255,255,0.055);
         box-shadow: none;
       }
 
@@ -526,7 +550,7 @@ if (typeof window.pulseRail !== "function") {
 
       .reply-text {
         font-size: 18px;
-        line-height: 1.65;
+        line-height: 1.7;
         letter-spacing: -0.01em;
         color: var(--xv-text);
         max-width: 900px;
@@ -539,11 +563,11 @@ if (typeof window.pulseRail !== "function") {
       }
 
       .assistant-footer {
-        margin-top: 14px;
+        margin-top: 16px;
         padding: 14px 16px;
-        border-radius: 18px;
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 16px;
+        background: rgba(255,255,255,0.024);
+        border: 1px solid rgba(255,255,255,0.05);
       }
 
       .assistant-meta {
@@ -556,8 +580,8 @@ if (typeof window.pulseRail !== "function") {
         min-height: 32px;
         padding: 0 12px;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.07);
+        background: rgba(255,255,255,0.032);
         color: rgba(222, 228, 246, 0.82);
         font-size: 12px;
         font-weight: 600;
@@ -576,17 +600,17 @@ if (typeof window.pulseRail !== "function") {
       .empty-card {
         width: min(100%, 700px);
         margin: 0 auto;
-        padding: 24px 26px;
-        border-radius: 24px;
-        background: linear-gradient(180deg, rgba(18,21,38,0.76), rgba(11,14,27,0.7));
-        border: 1px solid rgba(255,255,255,0.06);
-        box-shadow: var(--xv-panel-shadow);
+        padding: 22px 22px;
+        border-radius: 20px;
+        background: linear-gradient(180deg, rgba(18,22,44,0.62), rgba(10, 13, 28, 0.56));
+        border: 1px solid rgba(255,255,255,0.055);
+        box-shadow: 0 10px 28px rgba(3, 5, 12, 0.18);
       }
 
       .empty-card h2,
       .empty-launch-outcome {
-        font-size: 34px;
-        line-height: 1.1;
+        font-size: 30px;
+        line-height: 1.12;
         font-weight: 700;
         letter-spacing: -0.03em;
         color: rgba(248, 249, 255, 0.98);
@@ -605,8 +629,8 @@ if (typeof window.pulseRail !== "function") {
       .empty-launch-review,
       .limit-moment-lead,
       .empty-card p {
-        font-size: 17px;
-        line-height: 1.65;
+        font-size: 16px;
+        line-height: 1.7;
         color: rgba(210, 218, 242, 0.86);
       }
 
@@ -621,10 +645,10 @@ if (typeof window.pulseRail !== "function") {
       .empty-flow-strip span,
       .empty-chip-hint,
       .empty-chip-hint-secondary {
-        padding: 10px 14px;
+        padding: 9px 12px;
         border-radius: 999px;
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.06);
+        background: rgba(255,255,255,0.032);
+        border: 1px solid rgba(255,255,255,0.055);
         font-size: 13px;
         color: rgba(210, 218, 242, 0.78);
       }
@@ -663,21 +687,36 @@ if (typeof window.pulseRail !== "function") {
       .composer-chat,
       .input-wrap,
       .composer-shell {
-        background: rgba(255,255,255,0.03) !important;
-        border: 1px solid rgba(255,255,255,0.06) !important;
-        border-radius: 22px !important;
+        background: rgba(255,255,255,0.024) !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+        border-radius: 20px !important;
         box-shadow: none !important;
+      }
+
+      .composer,
+      .composer-chat,
+      .composer-shell {
+        padding: 12px !important;
       }
 
       textarea,
       #messageInput,
       .message-input {
-        min-height: 74px;
-        background: rgba(255,255,255,0.04) !important;
-        border: 1px solid rgba(255,255,255,0.06) !important;
+        min-height: 68px;
+        padding: 14px 14px !important;
+        background: rgba(255,255,255,0.032) !important;
+        border: 1px solid rgba(255,255,255,0.055) !important;
         border-radius: 16px !important;
         color: var(--xv-text) !important;
         font-size: 17px !important;
+      }
+
+      textarea:focus,
+      #messageInput:focus,
+      .message-input:focus {
+        outline: none !important;
+        border-color: rgba(141,108,255,0.30) !important;
+        box-shadow: 0 0 0 4px rgba(141,108,255,0.11);
       }
 
       #sendBtn,
@@ -687,12 +726,12 @@ if (typeof window.pulseRail !== "function") {
         border-radius: 14px !important;
         background: linear-gradient(135deg, #8d6cff, #6f58ff) !important;
         border: none !important;
-        box-shadow: none !important;
+        box-shadow: 0 10px 26px rgba(111, 88, 255, 0.22) !important;
       }
 
       @media (max-width: 1200px) {
         #messages {
-          padding: 22px 20px 120px;
+          padding: 24px 20px 120px;
         }
         .empty-card {
           width: 100%;
