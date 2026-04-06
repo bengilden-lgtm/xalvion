@@ -357,6 +357,66 @@ if (typeof window.pulseRail !== "function") {
         backdrop-filter: none !important;
       }
 
+      #workspaceRoot #messagesShell,
+      #workspaceRoot #messagesShell > *,
+      #workspaceRoot .messages-shell,
+      #workspaceRoot .messages-shell > *,
+      #workspaceRoot .thread-shell,
+      #workspaceRoot .thread-shell > *,
+      #workspaceRoot .conversation-shell,
+      #workspaceRoot .conversation-shell > *,
+      #workspaceRoot .messages-zone,
+      #workspaceRoot .messages-zone > *,
+      #workspaceRoot .scroll-shell,
+      #workspaceRoot .scroll-shell > *,
+      #workspaceRoot .decision-panel,
+      #workspaceRoot .decision-panel > *,
+      #workspaceRoot .ops-card,
+      #workspaceRoot .ops-card > *,
+      #workspaceRoot .approval-banner,
+      #workspaceRoot .assistant-meta-fold,
+      #workspaceRoot .assistant-meta-fold-body,
+      #workspaceRoot .assistant-tools,
+      #workspaceRoot .customer-message-block,
+      #workspaceRoot .assistant-canvas,
+      #workspaceRoot .assistant-result-stack,
+      #workspaceRoot .assistant-decision-slot,
+      #workspaceRoot .assistant-brief-slot,
+      #workspaceRoot .reply-text,
+      #workspaceRoot .js-reply-text {
+        background: transparent !important;
+        background-image: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      #workspaceRoot .msg-card,
+      #workspaceRoot .msg-card.assistant,
+      #workspaceRoot .msg-card.user,
+      #workspaceRoot .customer-message-block,
+      #workspaceRoot .decision-panel,
+      #workspaceRoot .ops-card {
+        border-radius: 0 !important;
+      }
+
+      #workspaceRoot #messagesShell::before,
+      #workspaceRoot #messagesShell::after,
+      #workspaceRoot .messages-shell::before,
+      #workspaceRoot .messages-shell::after,
+      #workspaceRoot .thread-shell::before,
+      #workspaceRoot .thread-shell::after,
+      #workspaceRoot .conversation-shell::before,
+      #workspaceRoot .conversation-shell::after,
+      #workspaceRoot .decision-panel::before,
+      #workspaceRoot .decision-panel::after,
+      #workspaceRoot .ops-card::before,
+      #workspaceRoot .ops-card::after {
+        display: none !important;
+        content: none !important;
+      }
+
       .msg-group {
         display: flex;
         flex-direction: column;
