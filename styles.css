@@ -185,6 +185,7 @@ body[data-ui="claude"]{
   --cld-sidebar-expanded: 272px;
   --cld-sidebar-collapsed: 72px;
   --cld-thread-max: 860px;
+  --main-max: min(var(--cld-thread-max), 94vw);
 }
 
 body[data-ui="claude"] .glass{
@@ -220,6 +221,17 @@ body[data-ui="claude"] #sidebarShell{
 body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"]{
   width: var(--cld-sidebar-collapsed) !important;
   max-width: var(--cld-sidebar-collapsed) !important;
+  overflow: hidden;
+}
+
+/* Collapse must shrink the grid track (otherwise the column stays wide and feels “stuck”) */
+body[data-ui="claude"] .app.workspace-grid:has(#sidebarShell[data-sidebar-collapsed="true"]){
+  grid-template-columns: var(--cld-sidebar-collapsed) minmax(0, 1fr) !important;
+}
+
+/* Icon-only rail: hide scroll panels so the strip stays clean like Claude’s collapsed nav */
+body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-scroll-host{
+  display: none !important;
 }
 
 body[data-ui="claude"] .sidebar-topbar{
@@ -388,28 +400,139 @@ body[data-ui="claude"] .composer-wrap.composer-dock{
 }
 
 body[data-ui="claude"] .composer.composer-chat{
-  background: rgba(255,255,255,0.05) !important;
-  border: 1px solid rgba(255,255,255,0.09) !important;
-  border-radius: 16px !important;
-  padding: 12px 12px 12px !important;
+  background: rgba(18, 20, 34, 0.55) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  border-radius: 18px !important;
+  padding: 12px 14px 14px !important;
 }
 
 body[data-ui="claude"] .composer-hint-band--integrated{
   padding: 0 2px 6px;
 }
 
+/* Single “Claude-style” input well: textarea + send share one rounded surface */
+body[data-ui="claude"] .composer-field{
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px 6px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(10, 12, 22, 0.6);
+  box-sizing: border-box;
+}
+body[data-ui="claude"] .composer-field:focus-within{
+  border-color: rgba(124, 92, 252, 0.38);
+  box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.09);
+}
+body[data-ui="claude"] .composer-field textarea,
 body[data-ui="claude"] #messageInput{
-  background: rgba(10, 12, 22, 0.35) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  border-radius: 14px !important;
-  min-height: 52px !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: 48px !important;
+  max-height: min(38vh, 240px) !important;
+  padding: 11px 6px 11px 0 !important;
   font-size: 15px !important;
+  line-height: 1.55 !important;
+}
+body[data-ui="claude"] .composer-field textarea:focus,
+body[data-ui="claude"] #messageInput:focus{
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] .composer-field .send-btn,
+body[data-ui="claude"] #sendBtn{
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 1px;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 42px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 8px rgba(124, 92, 252, 0.22) !important;
+  background: linear-gradient(135deg, var(--accent-1), #6f58ff) !important;
 }
 
-body[data-ui="claude"] #sendBtn{
-  border-radius: 14px !important;
+/* Idle: centered hero + thread width; no nested “dashboard card” around empty state */
+body[data-ui="claude"] #workspaceRoot.workspace-idle .workspace-conversation-column .messages-zone:not(:has(.limit-moment-card)){
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  margin: 0 0 8px !important;
+  display: flex;
+  flex-direction: column;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-idle .messages-zone:not(:has(.limit-moment-card)) .messages-shell{
+  flex: 1 1 0%;
+  min-height: 0 !important;
+  max-height: none !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border: none !important;
+  background: transparent !important;
   box-shadow: none !important;
-  background: linear-gradient(135deg, var(--accent-1), #6f58ff) !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-idle .messages:not(:has(.limit-moment-card)){
+  padding: 8px 4px !important;
+  width: 100%;
+  max-width: var(--cld-thread-max);
+  margin: 0 auto !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-idle .empty-state:not(:has(.limit-moment-card)){
+  padding: 12px 8px !important;
+  width: 100%;
+  justify-content: center !important;
+}
+body[data-ui="claude"] .empty-card-launch--claude{
+  padding: 0 !important;
+  text-align: center !important;
+  max-width: 40ch !important;
+  margin: 0 auto !important;
+}
+body[data-ui="claude"] .empty-card-launch--claude .empty-launch-directive{
+  font-size: clamp(22px, 3.2vw, 28px) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+  color: rgba(246, 248, 255, 0.96) !important;
+}
+body[data-ui="claude"] .empty-card-launch--claude .empty-launch-outcome{
+  margin: 12px 0 0 !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+  color: rgba(168, 180, 210, 0.82) !important;
+}
+body[data-ui="claude"] .empty-card-launch--claude .empty-launch-plan-hint{
+  margin: 14px 0 0 !important;
+  font-size: 12px !important;
+}
+
+body[data-ui="claude"] #workspaceRoot.workspace-idle .workspace-conversation-column .composer-wrap.composer-dock{
+  margin-top: auto !important;
+}
+body[data-ui="claude"] .composer-unified{
+  max-width: var(--cld-thread-max) !important;
+}
+
+/* Beat later #workspaceRoot textarea rules — single well stays borderless inside .composer-field */
+body[data-ui="claude"] #workspaceRoot .composer-field textarea,
+body[data-ui="claude"] #workspaceRoot #messageInput{
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] #workspaceRoot .composer-field textarea:focus,
+body[data-ui="claude"] #workspaceRoot #messageInput:focus{
+  border: none !important;
+  box-shadow: none !important;
 }
 
 @media (max-width: 900px){

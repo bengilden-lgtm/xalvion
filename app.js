@@ -2373,6 +2373,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     return wrapper;
   }
 
+  function isClaudeShell() {
+    return typeof document !== "undefined" && document.body?.dataset?.ui === "claude";
+  }
+
   function buildEmptyStateHtml() {
     const guest = !isAuthenticated();
     const tierLc = String(state.tier || "free").toLowerCase();
@@ -2422,6 +2426,15 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const chipHintGuest = guest
       ? `Preview mode · ${previewLeft} operator ${previewRunsWord} remaining`
       : `${formatTier(state.tier)} · ${state.remaining} operator runs this period`;
+
+    if (isClaudeShell()) {
+      return `
+      <div class="empty-card empty-card-premium empty-card-launch empty-card-launch--claude">
+        <p class="empty-launch-directive">What should we handle?</p>
+        <p class="empty-launch-outcome">Paste a message or tap an example in the box below.</p>
+        <p class="empty-launch-plan-hint empty-launch-plan-hint--quiet">${chipHintGuest}</p>
+      </div>`;
+    }
 
     return `
       <div class="empty-card empty-card-premium empty-card-launch">
