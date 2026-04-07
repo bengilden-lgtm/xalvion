@@ -312,10 +312,145 @@ if (typeof window.pulseRail !== "function") {
   };
 
   function ensureInjectedStyles() {
-    // When running the Claude-clone UI, keep styles fully in `styles.css`
-    // to avoid runtime overrides drifting from the intended layout.
+    // In Claude-mode we keep the bulk of styling in `styles.css`, but we still
+    // allow a small, surgical runtime override for spacing/rail/composer rhythm.
+    // This avoids architecture changes while letting us refine the merged UI.
     try {
-      if (document?.body?.dataset?.ui === "claude") return;
+      if (document?.body?.dataset?.ui === "claude") {
+        if (!document.getElementById("xalvion-claude-tweaks")) {
+          const claudeStyle = document.createElement("style");
+          claudeStyle.id = "xalvion-claude-tweaks";
+          claudeStyle.textContent = `
+            /* Xalvion surgical merge: Claude-style rhythm refinements (no logic changes) */
+            body[data-ui="claude"]{
+              --cld-sidebar-expanded: 268px;
+              --cld-sidebar-collapsed: 52px;
+              --cld-thread-max: 880px;
+              --cld-open-composer: min(700px, 92vw);
+            }
+
+            /* Thinner, calmer left rail with tighter icon rhythm */
+            body[data-ui="claude"] #sidebarShell{
+              padding: 10px 8px 12px !important;
+              background: rgba(18, 17, 24, 0.90) !important;
+              border-right-color: rgba(255,255,255,0.055) !important;
+            }
+            body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"]{
+              padding: 10px 5px 12px !important;
+            }
+            body[data-ui="claude"] .sidebar-collapse-btn{
+              width: 38px !important;
+              height: 38px !important;
+              border-radius: 12px !important;
+              background: rgba(255,255,255,0.035) !important;
+              border-color: rgba(255,255,255,0.075) !important;
+            }
+            body[data-ui="claude"] .sidebar-nav-item{
+              min-height: 40px !important;
+              border-radius: 12px !important;
+              gap: 9px !important;
+              padding: 0 11px !important;
+            }
+            body[data-ui="claude"] .sidebar-nav-item:hover{
+              background: rgba(255,255,255,0.055) !important;
+              border-color: rgba(255,255,255,0.055) !important;
+            }
+            body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-item{
+              width: 42px !important;
+              height: 42px !important;
+              min-height: 42px !important;
+              margin: 0 auto 6px !important;
+            }
+            body[data-ui="claude"] .sidebar-nav-icon{
+              width: 18px !important;
+              min-width: 18px !important;
+              height: 18px !important;
+              font-size: 15px !important;
+            }
+
+            /* Cleaner workspace shell: slightly more editorial center column */
+            body[data-ui="claude"] .main-canvas-inner.main-stage{
+              padding: 20px 18px 16px !important;
+            }
+            body[data-ui="claude"] #messages{
+              padding: 18px 0 154px !important;
+              gap: 16px !important;
+            }
+
+            /* Flatter conversation flow; reduce visual “card” energy */
+            body[data-ui="claude"] .msg-group .reply-body{
+              padding-left: 12px !important;
+            }
+            body[data-ui="claude"] .msg-group .reply-body::before{
+              width: 2px !important;
+              opacity: 0.9 !important;
+            }
+            body[data-ui="claude"] .assistant-footer{
+              padding-top: 8px !important;
+            }
+            body[data-ui="claude"] .msg-actions{
+              padding: 12px 0 0 14px !important;
+              gap: 6px !important;
+              opacity: 0.62 !important;
+            }
+            body[data-ui="claude"] .msg-group:hover .msg-actions,
+            body[data-ui="claude"] .msg-group:focus-within .msg-actions,
+            body[data-ui="claude"] .msg-group.assistant.show-actions .msg-actions{
+              opacity: 0.92 !important;
+            }
+            body[data-ui="claude"] .act-btn{
+              height: 28px !important;
+              padding: 0 9px !important;
+              border-radius: 9px !important;
+            }
+
+            /* Better composer: more premium, centered, less bulky */
+            body[data-ui="claude"] .composer-wrap.composer-dock{
+              max-width: var(--cld-thread-max) !important;
+              margin: 0 auto !important;
+            }
+            body[data-ui="claude"] .composer.composer-chat{
+              border-radius: 20px !important;
+              padding: 11px 13px 13px !important;
+              background: rgba(20, 21, 30, 0.62) !important;
+              border-color: rgba(255,255,255,0.085) !important;
+            }
+            body[data-ui="claude"] #workspaceRoot.workspace-active .composer.composer-chat{
+              background: rgba(20, 21, 30, 0.70) !important;
+            }
+            body[data-ui="claude"] .composer-hint-band--integrated{
+              padding-bottom: 5px !important;
+            }
+            body[data-ui="claude"] .composer-field{
+              border-radius: 15px !important;
+              padding: 6px 8px 6px 12px !important;
+              background: rgba(10, 12, 22, 0.52) !important;
+              border-color: rgba(255,255,255,0.085) !important;
+            }
+            body[data-ui="claude"] .composer-field:focus-within{
+              border-color: rgba(124, 92, 252, 0.34) !important;
+              box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.085) !important;
+            }
+            body[data-ui="claude"] .composer-field textarea,
+            body[data-ui="claude"] #messageInput{
+              min-height: 46px !important;
+              padding: 10px 6px 10px 0 !important;
+              font-size: 15px !important;
+              line-height: 1.58 !important;
+            }
+            body[data-ui="claude"] .composer-field .send-btn,
+            body[data-ui="claude"] #sendBtn{
+              width: 40px !important;
+              min-width: 40px !important;
+              height: 40px !important;
+              border-radius: 12px !important;
+              box-shadow: 0 1px 8px rgba(124, 92, 252, 0.20) !important;
+            }
+          `;
+          document.head.appendChild(claudeStyle);
+        }
+        return;
+      }
     } catch {}
     if (document.getElementById("xalvion-runtime-styles")) return;
 
