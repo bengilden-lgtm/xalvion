@@ -175,6 +175,255 @@
   --ws-layer-4: hsl(226, 21%, 21%);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Claude clone (purple) — clean, expandable sidebar + minimal chat column
+   Enabled via: <body data-ui="claude">
+   Keeps all existing IDs/JS hooks intact.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body[data-ui="claude"]{
+  --cld-sidebar-expanded: 272px;
+  --cld-sidebar-collapsed: 72px;
+  --cld-thread-max: 860px;
+}
+
+body[data-ui="claude"] .glass{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+}
+
+body[data-ui="claude"] .command-strip.glass{
+  background: rgba(10, 12, 22, 0.72) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+body[data-ui="claude"] .app.workspace-grid{
+  padding: 0 !important;
+  grid-template-columns: var(--cld-sidebar-expanded) minmax(0,1fr) !important;
+  height: 100vh;
+}
+
+body[data-ui="claude"] #sidebarShell{
+  background: rgba(12, 14, 26, 0.86) !important;
+  border-right: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 0 !important;
+  padding: 10px 10px 12px !important;
+  width: var(--cld-sidebar-expanded) !important;
+  max-width: var(--cld-sidebar-expanded) !important;
+  transition: width 180ms var(--sys-curve), max-width 180ms var(--sys-curve);
+}
+
+body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"]{
+  width: var(--cld-sidebar-collapsed) !important;
+  max-width: var(--cld-sidebar-collapsed) !important;
+}
+
+body[data-ui="claude"] .sidebar-topbar{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  padding: 2px 2px 10px;
+}
+
+body[data-ui="claude"] .sidebar-collapse-btn{
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  color: rgba(244, 247, 255, 0.92);
+}
+body[data-ui="claude"] .sidebar-collapse-btn:hover{
+  background: rgba(255,255,255,0.08);
+}
+body[data-ui="claude"] .sidebar-collapse-glyph{
+  display:block;
+  width: 14px;
+  height: 14px;
+  margin: 0 auto;
+  border-left: 2px solid rgba(244,247,255,0.85);
+  border-right: 2px solid rgba(244,247,255,0.35);
+  border-radius: 2px;
+  opacity: 0.95;
+}
+body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-collapse-glyph{
+  border-left-color: rgba(244,247,255,0.35);
+  border-right-color: rgba(244,247,255,0.85);
+}
+
+body[data-ui="claude"] .sidebar-chrome{
+  padding: 0 !important;
+}
+
+body[data-ui="claude"] .sidebar-nav-group-label,
+body[data-ui="claude"] .sidebar-nav-divider{
+  opacity: 0.85;
+}
+
+body[data-ui="claude"] .sidebar-nav-item{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+  color: rgba(214, 222, 244, 0.84);
+  background: transparent;
+  border: 1px solid transparent;
+}
+body[data-ui="claude"] .sidebar-nav-item:hover{
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.06);
+}
+body[data-ui="claude"] .sidebar-nav-item.is-active{
+  background: rgba(124, 92, 252, 0.14);
+  border-color: rgba(124, 92, 252, 0.26);
+  color: rgba(246, 248, 255, 0.98);
+}
+
+body[data-ui="claude"] .sidebar-nav-icon{
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.95;
+}
+
+body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-group-label,
+body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-divider{
+  display:none;
+}
+
+body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-item{
+  justify-content:center;
+  padding: 0;
+}
+body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-label{
+  display:none;
+}
+
+body[data-ui="claude"] .sidebar-scroll-host{
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+body[data-ui="claude"] .main-canvas-inner.main-stage{
+  padding: 22px 18px 18px !important;
+}
+
+body[data-ui="claude"] .messages-shell{
+  border: none !important;
+  background: transparent !important;
+}
+
+body[data-ui="claude"] #messages{
+  max-width: var(--cld-thread-max) !important;
+  margin: 0 auto !important;
+  padding: 16px 0 140px !important;
+  gap: 18px !important;
+}
+
+body[data-ui="claude"] .msg-card{
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+body[data-ui="claude"] .msg-head{
+  border: none !important;
+  padding: 0 0 8px !important;
+  margin: 0 !important;
+}
+
+body[data-ui="claude"] .msg-time{
+  display:none !important;
+}
+
+body[data-ui="claude"] .msg-who{
+  font-size: 12px !important;
+  letter-spacing: 0.10em !important;
+  color: rgba(160, 172, 200, 0.72) !important;
+}
+
+body[data-ui="claude"] .msg-group.user .reply-text{
+  background: rgba(255,255,255,0.05) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 14px !important;
+  padding: 14px 16px !important;
+  max-width: var(--cld-thread-max);
+}
+
+body[data-ui="claude"] .msg-group.assistant .customer-message-block{
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+body[data-ui="claude"] .reply-hero-label,
+body[data-ui="claude"] .reply-value-reinforcement{
+  display:none !important;
+}
+
+body[data-ui="claude"] .reply-text{
+  font-size: 15.5px !important;
+  line-height: 1.72 !important;
+  color: rgba(244, 247, 255, 0.96) !important;
+}
+
+body[data-ui="claude"] .composer-wrap.composer-dock{
+  max-width: var(--cld-thread-max);
+  margin: 0 auto;
+}
+
+body[data-ui="claude"] .composer.composer-chat{
+  background: rgba(255,255,255,0.05) !important;
+  border: 1px solid rgba(255,255,255,0.09) !important;
+  border-radius: 16px !important;
+  padding: 12px 12px 12px !important;
+}
+
+body[data-ui="claude"] .composer-hint-band--integrated{
+  padding: 0 2px 6px;
+}
+
+body[data-ui="claude"] #messageInput{
+  background: rgba(10, 12, 22, 0.35) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  border-radius: 14px !important;
+  min-height: 52px !important;
+  font-size: 15px !important;
+}
+
+body[data-ui="claude"] #sendBtn{
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  background: linear-gradient(135deg, var(--accent-1), #6f58ff) !important;
+}
+
+@media (max-width: 900px){
+  body[data-ui="claude"] .app.workspace-grid{
+    grid-template-columns: 1fr !important;
+  }
+  body[data-ui="claude"] #sidebarShell{
+    display:none !important;
+  }
+  body[data-ui="claude"] .main-canvas-inner.main-stage{
+    padding: 18px 14px 14px !important;
+  }
+}
+
 @media (max-width:1280px){
   :root{
     --sidebar:208px;

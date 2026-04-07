@@ -10,7 +10,7 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><text x='32' y='48' font-family='Georgia,serif' font-size='48' font-weight='700' fill='%23ffffff' text-anchor='middle'>X</text></svg>" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
+<body data-ui="claude">
   <div class="workspace-atmosphere" aria-hidden="true">
     <div class="workspace-atmosphere-glow"></div>
     <div class="workspace-atmosphere-falloff"></div>
@@ -44,25 +44,51 @@
     </header>
 
     <div class="app workspace-grid workspace-body workspace-split">
-      <aside class="sidebar glass rail-col rail-col-left sidebar-app-rail" id="sidebarShell" data-sidebar-active="workspace">
+      <aside class="sidebar glass rail-col rail-col-left sidebar-app-rail" id="sidebarShell" data-sidebar-active="workspace" data-sidebar-collapsed="false">
         <div class="sidebar-chrome">
+          <div class="sidebar-topbar" role="presentation">
+            <button id="sidebarCollapseBtn" class="icon-btn sidebar-collapse-btn" type="button" title="Toggle sidebar" aria-label="Toggle sidebar">
+              <span class="sidebar-collapse-glyph" aria-hidden="true"></span>
+            </button>
+          </div>
           <nav class="sidebar-nav" role="tablist" aria-label="Workspace areas">
             <div class="sidebar-nav-group" role="presentation">
               <span class="sidebar-nav-group-label" aria-hidden="true">Navigate</span>
               <div class="sidebar-nav-items" role="presentation">
-                <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace">Workspace</button>
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount">Access</button>
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans">Plans</button>
+                <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace" title="Workspace">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⌂</span>
+                  <span class="sidebar-nav-label">Workspace</span>
+                </button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount" title="Access">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⌁</span>
+                  <span class="sidebar-nav-label">Access</span>
+                </button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans" title="Plans">
+                  <span class="sidebar-nav-icon" aria-hidden="true">◈</span>
+                  <span class="sidebar-nav-label">Plans</span>
+                </button>
               </div>
               <div class="sidebar-nav-divider" aria-hidden="true"></div>
               <div class="sidebar-nav-items" role="presentation">
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations">Integrations</button>
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm">CRM</button>
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue">Revenue</button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations" title="Integrations">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⛓</span>
+                  <span class="sidebar-nav-label">Integrations</span>
+                </button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm" title="CRM">
+                  <span class="sidebar-nav-icon" aria-hidden="true">◎</span>
+                  <span class="sidebar-nav-label">CRM</span>
+                </button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue" title="Revenue">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⌾</span>
+                  <span class="sidebar-nav-label">Revenue</span>
+                </button>
               </div>
               <div class="sidebar-nav-divider" aria-hidden="true"></div>
               <div class="sidebar-nav-items" role="presentation">
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="more" data-nav-cluster="tools" aria-selected="false" aria-controls="sidebarPanelMore" id="sidebarTabMore">More</button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="more" data-nav-cluster="tools" aria-selected="false" aria-controls="sidebarPanelMore" id="sidebarTabMore" title="More">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⋯</span>
+                  <span class="sidebar-nav-label">More</span>
+                </button>
               </div>
             </div>
           </nav>

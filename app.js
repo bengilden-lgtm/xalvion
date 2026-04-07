@@ -312,6 +312,11 @@ if (typeof window.pulseRail !== "function") {
   };
 
   function ensureInjectedStyles() {
+    // When running the Claude-clone UI, keep styles fully in `styles.css`
+    // to avoid runtime overrides drifting from the intended layout.
+    try {
+      if (document?.body?.dataset?.ui === "claude") return;
+    } catch {}
     if (document.getElementById("xalvion-runtime-styles")) return;
 
     const style = document.createElement("style");
@@ -4601,7 +4606,36 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function initWorkspaceChromeShell() {
     initSidebarNav();
+    initSidebarCollapse();
     initRailBriefToggles();
+  }
+
+  function initSidebarCollapse() {
+    const shell = els.sidebarShell;
+    if (!shell || shell.dataset.sidebarCollapseBound) return;
+    shell.dataset.sidebarCollapseBound = "1";
+
+    const btn = document.getElementById("sidebarCollapseBtn");
+    const KEY = "xalvion-sidebar-collapsed";
+
+    const apply = (collapsed) => {
+      const on = Boolean(collapsed);
+      shell.dataset.sidebarCollapsed = on ? "true" : "false";
+      try {
+        localStorage.setItem(KEY, on ? "1" : "0");
+      } catch {}
+    };
+
+    let initial = false;
+    try {
+      initial = (localStorage.getItem(KEY) || "0") === "1";
+    } catch {}
+    apply(initial);
+
+    btn?.addEventListener("click", () => {
+      const isCollapsed = shell.dataset.sidebarCollapsed === "true";
+      apply(!isCollapsed);
+    });
   }
 
   function initSidebarNav() {
