@@ -2561,12 +2561,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const greet = openingTimeGreeting();
       const headline = nick ? `${greet}, ${nick}` : greet;
       return `
-      <div class="empty-card empty-card-premium empty-card-launch empty-card-launch--claude">
-        <div class="cld-open-hero" aria-hidden="false">
-          <span class="cld-open-mark" aria-hidden="true"></span>
-          <h2 class="cld-open-greeting">${headline}</h2>
-        </div>
-        <p class="empty-launch-outcome cld-open-sub">What ticket should we work through?</p>
+      <div class="empty-card empty-card-launch empty-card-launch--claude empty-thread-open" role="status">
+        <p class="empty-thread-line"><span class="empty-thread-greet">${headline}</span><span class="empty-thread-sep"> · </span>What ticket should we work through?</p>
         <p class="empty-launch-plan-hint empty-launch-plan-hint--quiet">${chipHintGuest}</p>
       </div>`;
     }

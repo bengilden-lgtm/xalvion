@@ -695,20 +695,21 @@ body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-unified{
 body[data-ui="claude"] #workspaceRoot.workspace-idle .composer.composer-chat{
   width: 100% !important;
   max-width: var(--cld-open-composer) !important;
-  padding: 22px 24px 18px !important;
-  border-radius: 22px !important;
-  background: rgba(26, 27, 38, 0.82) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: none !important;
   box-shadow: none !important;
-  gap: 14px !important;
+  gap: 10px !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle:not(.workspace-thinking) .composer-hint-band--integrated{
   display: none !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-field{
-  border-radius: 16px !important;
-  padding: 8px 10px 8px 16px !important;
-  background: rgba(12, 13, 20, 0.55) !important;
+  border-radius: 12px !important;
+  padding: 8px 10px !important;
+  background: rgba(255, 255, 255, 0.022) !important;
+  border: 1px solid rgba(255, 255, 255, 0.065) !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-field textarea,
 body[data-ui="claude"] #workspaceRoot.workspace-idle #messageInput{
@@ -8841,13 +8842,13 @@ body[data-ui="claude"] #workspaceRoot .composer-unified{
   width:100% !important;
 }
 
+/* Composer surface: flattened in “Claude pass (final)” below — avoid duelling !important blocks */
 body[data-ui="claude"] #workspaceRoot .composer.composer-chat{
-  /* One primary input surface only */
-  border-radius:14px !important;
-  border:1px solid rgba(255,255,255,0.055) !important;
-  background:rgba(18,18,24,0.52) !important;
+  padding:0 !important;
+  border:none !important;
+  border-radius:0 !important;
+  background:transparent !important;
   box-shadow:none !important;
-  padding:10px 12px 11px !important;
 }
 
 body[data-ui="claude"] #workspaceRoot .composer-hint-band--integrated{
@@ -9098,4 +9099,45 @@ body[data-ui="claude"] #workspaceRoot .composer-chat .chip{
   border-color:rgba(255,255,255,0.05) !important;
   color:rgba(160,172,200,0.85) !important;
   padding:4px 9px !important;
+}
+
+/* Thread open (Claude): JS empty state — one quiet line, not a second page hero */
+body[data-ui="claude"] #workspaceRoot .empty-thread-open{
+  padding:0 !important;
+  margin:0 !important;
+  max-width:min(62ch,100%) !important;
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+body[data-ui="claude"] #workspaceRoot .empty-thread-line{
+  margin:0 !important;
+  font-family:var(--font-sans) !important;
+  font-size:13.5px !important;
+  font-weight:500 !important;
+  line-height:1.45 !important;
+  letter-spacing:-0.01em !important;
+  color:rgba(210,218,242,0.88) !important;
+}
+body[data-ui="claude"] #workspaceRoot .empty-thread-greet{
+  font-weight:600 !important;
+  color:rgba(236,241,252,0.92) !important;
+}
+body[data-ui="claude"] #workspaceRoot .empty-thread-sep{
+  font-weight:500 !important;
+  color:rgba(140,154,188,0.45) !important;
+}
+
+/* Never show the static HTML page title block in Claude — empty state carries context */
+body[data-ui="claude"] #workspaceRoot .main-stage-header.main-stage-hero{
+  display:none !important;
+}
+
+/* Hard pin grid columns: aside = 1, main canvas = 2 (avoids any stray auto-placement bugs) */
+body[data-ui="claude"] #workspaceRoot .app.workspace-grid > aside#sidebarShell{
+  grid-column:1 !important;
+}
+body[data-ui="claude"] #workspaceRoot .app.workspace-grid > main.main.main-canvas{
+  grid-column:2 !important;
+  min-width:0 !important;
 }
