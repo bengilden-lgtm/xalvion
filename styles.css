@@ -9184,3 +9184,71 @@ body[data-ui="claude"] #workspaceRoot .composer-chat .quick-actions{
   opacity: 0.58 !important;
   margin-top: 4px !important;
 }
+
+/* Premium Claude: make system/limit states feel native, not CTA cards */
+body[data-ui="claude"] #workspaceRoot .limit-moment-card,
+body[data-ui="claude"] .limit-moment-card--claude{
+  background: transparent !important;
+  border: 1px solid rgba(255,255,255,0.045) !important;
+  border-left-color: rgba(255,255,255,0.07) !important;
+  border-radius: 10px !important;
+  padding: 10px 10px !important;
+}
+body[data-ui="claude"] .limit-moment-card--claude .limit-moment-card__eyebrow{
+  letter-spacing: 0.12em !important;
+  font-weight: 650 !important;
+  color: rgba(154, 170, 201, 0.62) !important;
+}
+body[data-ui="claude"] .limit-moment-card--claude .limit-moment-card__title{
+  font-weight: 650 !important;
+  color: rgba(236, 241, 252, 0.92) !important;
+}
+body[data-ui="claude"] .limit-moment-card--claude .limit-moment-card__lead,
+body[data-ui="claude"] .limit-moment-card--claude .limit-moment-card__body{
+  color: rgba(154, 170, 201, 0.74) !important;
+}
+body[data-ui="claude"] .limit-moment-card--claude .limit-cta--claude{
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  color: rgba(236,241,252,0.92) !important;
+  font-weight: 600 !important;
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+}
+body[data-ui="claude"] .limit-moment-card--claude .limit-secondary-link--claude{
+  color: rgba(154, 170, 201, 0.78) !important;
+  text-decoration: underline;
+  text-decoration-color: rgba(255,255,255,0.18);
+  text-underline-offset: 3px;
+}
+
+/* Premium Claude: input should feel like the primary surface */
+body[data-ui="claude"] #workspaceRoot .composer-chat .composer-input-row{
+  border-radius: 14px !important;
+  background: rgba(255,255,255,0.02) !important;
+  border-color: rgba(255,255,255,0.06) !important;
+}
+body[data-ui="claude"] #workspaceRoot .composer-chat textarea{
+  font-size: 15px !important;
+  line-height: 1.55 !important;
+  letter-spacing: 0.005em !important;
+  color: rgba(236,241,252,0.92) !important;
+}
+body[data-ui="claude"] #workspaceRoot .composer-chat textarea::placeholder{
+  color: rgba(154, 170, 201, 0.52) !important;
+}
+body[data-ui="claude"] #workspaceRoot .composer-chat .send-btn{
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] #workspaceRoot .composer-chat .send-btn:hover:not(:disabled){
+  background: rgba(255,255,255,0.045) !important;
+  border-color: rgba(255,255,255,0.075) !important;
+}
+
+/* Premium Claude: quiet the command strip “status pill” marketing energy */
+body[data-ui="claude"] .command-status-chip{
+  background: rgba(255,255,255,0.02) !important;
+  border-color: rgba(255,255,255,0.055) !important;
+}
