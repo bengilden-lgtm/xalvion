@@ -9365,3 +9365,74 @@ body[data-ui="claude"] #workspaceRoot .notice.notice-sidebar .notice-title{
   font-weight:500 !important;
   color:rgba(154,168,198,0.78) !important;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Claude: remove remaining "dashboard container" cues
+   - kill main panel borders/gradients
+   - remove composer dock bar (only the input well remains)
+   - quiet top strip + sidebar further
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Center column must be a page, not a framed module */
+body[data-ui="claude"] .main,
+body[data-ui="claude"] main.main,
+body[data-ui="claude"] .main.main-canvas{
+  background: #14141a !important;
+  background-image: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove any remaining "stage shell" edges */
+body[data-ui="claude"] #workspaceRoot .main-canvas-inner,
+body[data-ui="claude"] #workspaceRoot .canvas-shell,
+body[data-ui="claude"] #workspaceRoot .main-stage{
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Composer dock should disappear; only the input surface should read */
+body[data-ui="claude"] #workspaceRoot .composer-wrap.composer-dock{
+  background: transparent !important;
+  border-top: none !important;
+  box-shadow: none !important;
+  padding: 10px 0 max(10px, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Neutralize non-Claude workspace composer bar styles (these are the "box in a box" culprit) */
+body[data-ui="claude"] #workspaceRoot.workspace-active .composer-wrap.composer-dock,
+body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-wrap.composer-dock{
+  position: static !important;
+  z-index: auto !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Top strip: reduce dashboard presence (keep functionality) */
+body[data-ui="claude"] .command-strip.glass{
+  background: rgba(10, 10, 14, 0.86) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+}
+body[data-ui="claude"] .command-status-chip{
+  background: transparent !important;
+  border-color: rgba(255,255,255,0.05) !important;
+}
+body[data-ui="claude"] .command-mode-pill{
+  display: none !important;
+}
+
+/* Sidebar: even quieter utility rail */
+body[data-ui="claude"] #sidebarShell{
+  background: rgba(10, 10, 14, 0.72) !important;
+  border-right: 1px solid rgba(255,255,255,0.03) !important;
+}
+body[data-ui="claude"] .sidebar-nav-item{
+  color: rgba(176, 186, 212, 0.64) !important;
+}
+body[data-ui="claude"] .sidebar-nav-item.is-active,
+body[data-ui="claude"] .sidebar-nav-item[aria-selected="true"]{
+  box-shadow: inset 2px 0 0 rgba(124, 92, 252, 0.28) !important;
+}
