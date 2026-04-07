@@ -182,9 +182,9 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 body[data-ui="claude"]{
-  --cld-sidebar-expanded: 292px;
-  --cld-sidebar-collapsed: 56px;
-  --cld-thread-max: 860px;
+  --cld-sidebar-expanded: 276px;
+  --cld-sidebar-collapsed: 52px;
+  --cld-thread-max: min(720px, 94vw);
   --cld-open-composer: min(720px, 92vw);
   --main-max: min(var(--cld-thread-max), 94vw);
 }
@@ -413,7 +413,18 @@ body[data-ui="claude"] .sidebar-scroll-host{
 }
 
 body[data-ui="claude"] .main-canvas-inner.main-stage{
-  padding: 22px 18px 18px !important;
+  padding: 16px 20px 14px !important;
+}
+
+/* Flat canvas: no vignette layers competing with the thread */
+body[data-ui="claude"] .main-stage-ambient,
+body[data-ui="claude"] .main-stage-ambient *{
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+body[data-ui="claude"] .workspace-atmosphere{
+  opacity: 0.18 !important;
 }
 
 body[data-ui="claude"] .messages-shell{
@@ -425,7 +436,15 @@ body[data-ui="claude"] #messages{
   max-width: var(--cld-thread-max) !important;
   margin: 0 auto !important;
   padding: 16px 0 140px !important;
-  gap: 18px !important;
+  gap: 22px !important;
+}
+
+body[data-ui="claude"] #workspaceRoot .workspace-conversation-column,
+body[data-ui="claude"] #workspaceRoot .main-stage-body.xv-stage-body{
+  max-width: calc(var(--cld-thread-max) + 48px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: 100% !important;
 }
 
 body[data-ui="claude"] .msg-card{
@@ -512,31 +531,33 @@ body[data-ui="claude"] .composer-wrap.composer-dock{
 }
 
 body[data-ui="claude"] .composer.composer-chat{
-  background: rgba(18, 20, 34, 0.55) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  border-radius: 18px !important;
-  padding: 12px 14px 14px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
 }
 
 body[data-ui="claude"] .composer-hint-band--integrated{
   padding: 0 2px 6px;
 }
 
-/* Single “Claude-style” input well: textarea + send share one rounded surface */
+/* Single input surface (#1a1a22) — textarea + send, no nested tray */
 body[data-ui="claude"] .composer-field{
   display: flex;
   align-items: flex-end;
   gap: 8px;
   width: 100%;
-  padding: 6px 8px 6px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.09);
-  background: rgba(10, 12, 22, 0.6);
+  padding: 6px 8px 6px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: #1a1a22;
   box-sizing: border-box;
+  box-shadow: none;
 }
 body[data-ui="claude"] .composer-field:focus-within{
-  border-color: rgba(124, 92, 252, 0.38);
-  box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.09);
+  border-color: rgba(255,255,255,0.11);
+  box-shadow: none;
 }
 body[data-ui="claude"] .composer-field textarea,
 body[data-ui="claude"] #messageInput{
@@ -563,12 +584,13 @@ body[data-ui="claude"] #sendBtn{
   flex-shrink: 0;
   align-self: flex-end;
   margin-bottom: 1px;
-  width: 42px !important;
-  min-width: 42px !important;
-  height: 42px !important;
-  border-radius: 12px !important;
-  box-shadow: 0 1px 8px rgba(124, 92, 252, 0.22) !important;
-  background: linear-gradient(135deg, var(--accent-1), #6f58ff) !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  background: rgba(255,255,255,0.05) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
 }
 
 /* —— Claude opening: vertically centered stack, hero composer —— */
@@ -578,7 +600,7 @@ body[data-ui="claude"] #workspaceRoot.workspace-idle .main.main-canvas{
   box-shadow: none !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .workspace-atmosphere{
-  opacity: 0.42;
+  opacity: 0.16 !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .command-strip.glass{
   background: rgba(14, 15, 20, 0.55) !important;
@@ -590,14 +612,17 @@ body[data-ui="claude"] #workspaceRoot.workspace-idle .command-mode-pill{
 body[data-ui="claude"] #workspaceRoot.workspace-idle .command-strip-center{
   opacity: 0.72;
 }
-body[data-ui="claude"] #workspaceRoot.workspace-idle .main-stage-header.main-stage-hero{
+body[data-ui="claude"] #workspaceRoot.workspace-idle .main-stage-header.main-thread-header{
   display: none !important;
 }
+body[data-ui="claude"] #workspaceRoot.workspace-active .main-stage-header.main-thread-header{
+  display: block !important;
+}
 body[data-ui="claude"] #workspaceRoot.workspace-idle .workspace-conversation-column:not(:has(.limit-moment-card)){
-  justify-content: center !important;
-  align-items: center !important;
-  min-height: calc(100dvh - 56px) !important;
-  padding: 16px 18px 24px !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+  min-height: 0 !important;
+  padding: 12px 18px 20px !important;
   box-sizing: border-box !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .workspace-conversation-column:has(.limit-moment-card){
@@ -618,8 +643,8 @@ body[data-ui="claude"] #workspaceRoot.workspace-idle .messages-zone:not(:has(.li
   min-height: 0 !important;
   max-height: none !important;
   display: flex !important;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -633,50 +658,14 @@ body[data-ui="claude"] #workspaceRoot.workspace-idle .messages:not(:has(.limit-m
 body[data-ui="claude"] #workspaceRoot.workspace-idle .empty-state:not(:has(.limit-moment-card)){
   padding: 0 6px !important;
   width: 100%;
-  justify-content: center !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
 }
 body[data-ui="claude"] .empty-card-launch--claude{
   padding: 0 !important;
-  text-align: center !important;
-  max-width: 42ch !important;
-  margin: 0 auto !important;
-}
-body[data-ui="claude"] .cld-open-hero{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin: 0 auto 2px;
-}
-body[data-ui="claude"] .cld-open-mark{
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: radial-gradient(circle at 32% 30%, #c4b5fd, #7c3aed 52%, #4c1d95);
-  box-shadow: 0 0 22px rgba(124, 92, 252, 0.32);
-  flex-shrink: 0;
-}
-body[data-ui="claude"] .cld-open-greeting{
-  font-family: "Cormorant Garamond", Georgia, serif !important;
-  font-size: clamp(28px, 4vw, 40px) !important;
-  font-weight: 600 !important;
-  font-style: italic;
-  letter-spacing: -0.02em !important;
-  line-height: 1.12 !important;
+  text-align: left !important;
+  max-width: min(62ch, 100%) !important;
   margin: 0 !important;
-  color: rgba(252, 252, 255, 0.97) !important;
-}
-body[data-ui="claude"] .empty-card-launch--claude .cld-open-sub.empty-launch-outcome{
-  margin: 14px 0 0 !important;
-  font-size: 15px !important;
-  font-weight: 400 !important;
-  line-height: 1.55 !important;
-  color: rgba(168, 182, 212, 0.84) !important;
-}
-body[data-ui="claude"] .empty-card-launch--claude .empty-launch-plan-hint{
-  margin: 16px 0 0 !important;
-  font-size: 12px !important;
-  opacity: 0.82;
 }
 
 body[data-ui="claude"] #workspaceRoot.workspace-idle .workspace-conversation-column .composer-wrap.composer-dock{
@@ -708,8 +697,9 @@ body[data-ui="claude"] #workspaceRoot.workspace-idle:not(.workspace-thinking) .c
 body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-field{
   border-radius: 12px !important;
   padding: 8px 10px !important;
-  background: rgba(255, 255, 255, 0.022) !important;
-  border: 1px solid rgba(255, 255, 255, 0.065) !important;
+  background: #1a1a22 !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow: none !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-field textarea,
 body[data-ui="claude"] #workspaceRoot.workspace-idle #messageInput{
@@ -733,62 +723,6 @@ body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-chat .chip{
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-stripe-fold-summary{
   opacity: 0.62;
-}
-
-body[data-ui="claude"] .limit-moment-card--claude{
-  max-width: 440px !important;
-  margin: 0 auto !important;
-  padding: 32px 28px !important;
-  text-align: center !important;
-  background: rgba(22, 23, 32, 0.65) !important;
-  border: 1px solid rgba(255,255,255,0.07) !important;
-  border-radius: 18px !important;
-  box-shadow: none !important;
-}
-body[data-ui="claude"] .limit-moment-card--claude .limit-moment-card__eyebrow{
-  font-size: 10px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.16em !important;
-  text-transform: uppercase !important;
-  color: rgba(167, 139, 250, 0.75) !important;
-  margin: 0 0 14px !important;
-}
-body[data-ui="claude"] .limit-moment-card--claude .limit-moment-card__title{
-  font-family: var(--font-sans) !important;
-  font-size: clamp(19px, 2.4vw, 22px) !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.02em !important;
-  margin: 0 !important;
-  color: rgba(248, 250, 255, 0.96) !important;
-}
-body[data-ui="claude"] .limit-moment-card--claude .limit-moment-card__lead{
-  margin: 14px 0 0 !important;
-  font-size: 14px !important;
-  line-height: 1.55 !important;
-  color: rgba(186, 196, 224, 0.9) !important;
-}
-body[data-ui="claude"] .limit-moment-card--claude .limit-moment-card__body{
-  margin: 12px 0 0 !important;
-  font-size: 13px !important;
-  line-height: 1.5 !important;
-  color: rgba(150, 162, 196, 0.78) !important;
-}
-body[data-ui="claude"] .limit-moment-card--claude .limit-cta--claude{
-  margin-top: 24px !important;
-  width: 100% !important;
-  max-width: 320px !important;
-  border-radius: 12px !important;
-  padding: 12px 18px !important;
-  font-weight: 600 !important;
-}
-body[data-ui="claude"] .limit-moment-card--claude .limit-secondary-link--claude{
-  margin-top: 14px !important;
-  display: inline-block !important;
-  background: none !important;
-  border: none !important;
-  color: rgba(196, 181, 253, 0.9) !important;
-  font-size: 13px !important;
-  cursor: pointer !important;
 }
 
 body[data-ui="claude"] .composer-unified{
@@ -896,25 +830,27 @@ body[data-ui="claude"] #workspaceRoot.workspace-active .edit-mode-sheet{
 body[data-ui="claude"] #workspaceRoot.workspace-active .original-response-block{
   border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
-/* One input chrome: outer composer only; field is borderless inside */
+/* Active thread: no outer composer tray — one #1a1a22 input row only */
 body[data-ui="claude"] #workspaceRoot.workspace-active .composer.composer-chat{
-  padding: 12px 14px 14px !important;
-  background: rgba(26, 27, 38, 0.78) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
   box-shadow: none !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-active .composer-field{
-  border: none !important;
-  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  background: #1a1a22 !important;
   box-shadow: none !important;
-  padding: 4px 4px 4px 10px !important;
+  border-radius: 12px !important;
+  padding: 6px 8px 6px 12px !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-active .composer-field:focus-within{
+  border-color: rgba(255, 255, 255, 0.11) !important;
   box-shadow: none !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-active .composer.composer-chat:focus-within{
-  border-color: rgba(124, 92, 252, 0.38) !important;
-  box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.09) !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-active .composer-chat .chip{
   background: transparent !important;
@@ -5464,24 +5400,29 @@ body{
   color:rgba(196,206,232,0.88) !important;
 }
 
-.main-stage-hero{
+.main-stage-hero,
+.main-thread-header{
   transition:opacity 0.45s var(--sys-curve), transform 0.5s var(--sys-curve);
 }
-.workspace-idle .main-stage-hero{
+.workspace-idle .main-stage-hero,
+.workspace-idle .main-thread-header{
   padding-top:clamp(12px,4vh,36px);
   padding-bottom:4px;
 }
-.workspace-idle .main-stage-hero .main-stage-kicker{
+.workspace-idle .main-stage-hero .main-stage-kicker,
+.workspace-idle .main-thread-header .main-stage-kicker{
   font-size:15px;
   line-height:1.55;
   color:rgba(188,200,228,0.82);
   max-width:52ch;
 }
-.workspace-active .main-stage-hero{
+.workspace-active .main-stage-hero,
+.workspace-active .main-thread-header{
   padding-top:10px;
   padding-bottom:4px;
 }
-.workspace-active .main-stage-hero .main-stage-kicker{
+.workspace-active .main-stage-hero .main-stage-kicker,
+.workspace-active .main-thread-header .main-stage-kicker{
   font-size:13px;
   line-height:1.5;
   color:rgba(158,172,204,0.78);
@@ -7581,24 +7522,29 @@ body{
 }
 
 /* Operational header bar — title + one status line */
-.main-stage-hero--bar{
+.main-stage-hero--bar,
+.main-thread-header{
   padding-top:var(--xv-launch-3) !important;
   padding-bottom:var(--xv-launch-2) !important;
 }
-.workspace-idle .main-stage-hero--bar{
+.workspace-idle .main-stage-hero--bar,
+.workspace-idle .main-thread-header{
   padding-top:clamp(var(--xv-launch-3),2.5vh,var(--xv-launch-6)) !important;
 }
-.main-stage-hero--bar .main-stage-title-block h1{
+.main-stage-hero--bar .main-stage-title-block h1,
+.main-thread-header .main-stage-title-block h1{
   font-family:Outfit,var(--font-sans) !important;
   font-size:clamp(17px,1.65vw,21px) !important;
   font-weight:600 !important;
   letter-spacing:-0.02em !important;
   line-height:1.2 !important;
 }
-.workspace-idle .main-stage-hero--bar .main-stage-title-block h1{
+.workspace-idle .main-stage-hero--bar .main-stage-title-block h1,
+.workspace-idle .main-thread-header .main-stage-title-block h1{
   font-size:clamp(19px,2vw,24px) !important;
 }
-.main-stage-hero--bar .workspace-subline{
+.main-stage-hero--bar .workspace-subline,
+.main-thread-header .workspace-subline{
   margin-top:var(--xv-launch-1) !important;
   font-size:12px !important;
   line-height:1.45 !important;
@@ -7963,7 +7909,8 @@ body{
   min-height:0 !important;
 }
 
-#workspaceRoot .main-stage-hero--bar{
+#workspaceRoot .main-stage-hero--bar,
+#workspaceRoot .main-thread-header{
   padding-top:clamp(8px,1.6vh,18px) !important;
   padding-bottom:clamp(4px,1vh,10px) !important;
 }
@@ -8918,26 +8865,34 @@ body[data-ui="claude"] #workspaceRoot .sidebar-panel-hint{
   color:rgba(140,154,188,0.66) !important;
 }
 
-/* Kill hero feel: make the "Paste a support ticket" area read like a small thread label */
-body[data-ui="claude"] #workspaceRoot .main-stage-hero--bar{
-  padding-top:8px !important;
-  padding-bottom:6px !important;
+/* Thread header (not hero): low-weight label + muted metadata */
+body[data-ui="claude"] #workspaceRoot .main-thread-header{
+  padding-top:4px !important;
+  padding-bottom:2px !important;
+  max-width:min(var(--cld-thread-max),100%) !important;
+  margin:0 auto !important;
 }
-body[data-ui="claude"] #workspaceRoot .main-stage-hero--bar .main-stage-title-block h1{
-  font-size:clamp(13px, 1.1vw, 15px) !important;
+body[data-ui="claude"] #workspaceRoot .main-thread-header .main-stage-title-block h1{
+  font-family:var(--font-sans) !important;
+  font-size:clamp(12px, 1vw, 13px) !important;
   font-weight:560 !important;
-  letter-spacing:-0.01em !important;
-  line-height:1.25 !important;
-  color:rgba(226,232,255,0.88) !important;
+  letter-spacing:0.04em !important;
+  text-transform:uppercase !important;
+  line-height:1.3 !important;
+  color:rgba(154,170,201,0.72) !important;
 }
-body[data-ui="claude"] #workspaceRoot .main-stage-hero--bar .workspace-subline{
-  margin-top:4px !important;
+body[data-ui="claude"] #workspaceRoot .main-thread-header .workspace-subline{
+  margin-top:3px !important;
   font-size:11px !important;
-  color:rgba(140,154,188,0.60) !important;
+  font-weight:450 !important;
+  color:rgba(140,154,188,0.55) !important;
   max-width:72ch !important;
 }
-body[data-ui="claude"] #workspaceRoot .main-stage-hero--bar .workspace-subline--quiet{
-  display:none !important;
+body[data-ui="claude"] #workspaceRoot .main-thread-header .workspace-subline--quiet{
+  display:block !important;
+  margin-top:2px !important;
+  font-size:10.5px !important;
+  color:rgba(140,154,188,0.48) !important;
 }
 
 /* Make the center column feel like a continuous page, not a framed panel */
@@ -9069,10 +9024,10 @@ body[data-ui="claude"] #workspaceRoot .composer.composer-chat{
   gap:10px !important;
 }
 body[data-ui="claude"] #workspaceRoot .composer-chat .composer-input-row{
-  padding:8px 10px !important;
+  padding:6px 8px 6px 12px !important;
   border-radius:12px !important;
-  border:1px solid rgba(255,255,255,0.065) !important;
-  background:rgba(255,255,255,0.022) !important;
+  border:1px solid rgba(255,255,255,0.07) !important;
+  background:#1a1a22 !important;
   box-shadow:none !important;
 }
 body[data-ui="claude"] #workspaceRoot .composer-chat textarea{
@@ -9128,11 +9083,6 @@ body[data-ui="claude"] #workspaceRoot .empty-thread-sep{
   color:rgba(140,154,188,0.45) !important;
 }
 
-/* Never show the static HTML page title block in Claude — empty state carries context */
-body[data-ui="claude"] #workspaceRoot .main-stage-header.main-stage-hero{
-  display:none !important;
-}
-
 /* Hard pin grid columns: aside = 1, main canvas = 2 (avoids any stray auto-placement bugs) */
 body[data-ui="claude"] #workspaceRoot .app.workspace-grid > aside#sidebarShell{
   grid-column:1 !important;
@@ -9174,8 +9124,8 @@ body[data-ui="claude"] #workspaceRoot .composer.composer-chat{
   gap: 8px !important;
 }
 body[data-ui="claude"] #workspaceRoot .composer-chat .composer-input-row{
-  background: rgba(255,255,255,0.018) !important;
-  border-color: rgba(255,255,255,0.055) !important;
+  background: #1a1a22 !important;
+  border-color: rgba(255,255,255,0.07) !important;
 }
 body[data-ui="claude"] #workspaceRoot .composer-chat textarea{
   min-height: 46px !important;
@@ -9224,9 +9174,9 @@ body[data-ui="claude"] .limit-moment-card--claude .limit-secondary-link--claude{
 
 /* Premium Claude: input should feel like the primary surface */
 body[data-ui="claude"] #workspaceRoot .composer-chat .composer-input-row{
-  border-radius: 14px !important;
-  background: rgba(255,255,255,0.02) !important;
-  border-color: rgba(255,255,255,0.06) !important;
+  border-radius: 12px !important;
+  background: #1a1a22 !important;
+  border-color: rgba(255,255,255,0.07) !important;
 }
 body[data-ui="claude"] #workspaceRoot .composer-chat textarea{
   font-size: 15px !important;
@@ -9251,4 +9201,16 @@ body[data-ui="claude"] #workspaceRoot .composer-chat .send-btn:hover:not(:disabl
 body[data-ui="claude"] .command-status-chip{
   background: rgba(255,255,255,0.02) !important;
   border-color: rgba(255,255,255,0.055) !important;
+}
+
+/* Thinking state: no lifted chrome / glow on strip or composer */
+body[data-ui="claude"] #workspaceRoot.workspace-thinking .command-strip,
+body[data-ui="claude"] #workspaceRoot.workspace-thinking .composer.composer-chat{
+  box-shadow: none !important;
+  filter: none !important;
+  animation: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-thinking .composer-field,
+body[data-ui="claude"] #workspaceRoot.workspace-thinking .composer-input-row{
+  border-color: rgba(255,255,255,0.08) !important;
 }

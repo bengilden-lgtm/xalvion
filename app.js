@@ -323,17 +323,17 @@ if (typeof window.pulseRail !== "function") {
           claudeStyle.textContent = `
             /* Xalvion surgical merge: Claude-style rhythm refinements (no logic changes) */
             body[data-ui="claude"]{
-              --cld-sidebar-expanded: 268px;
+              --cld-sidebar-expanded: 276px;
               --cld-sidebar-collapsed: 52px;
-              --cld-thread-max: 880px;
-              --cld-open-composer: min(700px, 92vw);
+              --cld-thread-max: min(720px, 94vw);
+              --cld-open-composer: min(720px, 92vw);
             }
 
             /* Thinner, calmer left rail with tighter icon rhythm */
             body[data-ui="claude"] #sidebarShell{
-              padding: 10px 8px 12px !important;
-              background: rgba(18, 17, 24, 0.90) !important;
-              border-right-color: rgba(255,255,255,0.055) !important;
+              padding: 8px 7px 12px !important;
+              background: rgba(16, 16, 20, 0.94) !important;
+              border-right-color: rgba(255,255,255,0.045) !important;
             }
             body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"]{
               padding: 10px 5px 12px !important;
@@ -346,14 +346,14 @@ if (typeof window.pulseRail !== "function") {
               border-color: rgba(255,255,255,0.075) !important;
             }
             body[data-ui="claude"] .sidebar-nav-item{
-              min-height: 40px !important;
-              border-radius: 12px !important;
-              gap: 9px !important;
-              padding: 0 11px !important;
+              min-height: 38px !important;
+              border-radius: 10px !important;
+              gap: 8px !important;
+              padding: 0 10px !important;
             }
             body[data-ui="claude"] .sidebar-nav-item:hover{
-              background: rgba(255,255,255,0.055) !important;
-              border-color: rgba(255,255,255,0.055) !important;
+              background: rgba(255,255,255,0.04) !important;
+              border-color: rgba(255,255,255,0.04) !important;
             }
             body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-item{
               width: 42px !important;
