@@ -8570,21 +8570,22 @@ body{
 }
 
 .workspace-idle .empty-launch-outcome{
-  margin-top:10px !important;
-  font-size:clamp(34px,4vw,48px) !important;
-  line-height:0.98 !important;
-  letter-spacing:-0.05em !important;
-  font-weight:700 !important;
-  color:rgba(244,247,255,0.98) !important;
-  max-width:12ch !important;
+  /* Thread header, not a landing hero */
+  margin-top:6px !important;
+  font-size:clamp(16px,1.6vw,20px) !important;
+  line-height:1.25 !important;
+  letter-spacing:-0.01em !important;
+  font-weight:650 !important;
+  color:rgba(244,247,255,0.92) !important;
+  max-width:60ch !important;
 }
 
 .workspace-idle .empty-launch-review{
-  margin-top:14px !important;
-  font-size:16px !important;
-  line-height:1.52 !important;
-  color:rgba(200,210,232,0.88) !important;
-  max-width:42ch !important;
+  margin-top:8px !important;
+  font-size:12.5px !important;
+  line-height:1.55 !important;
+  color:rgba(166,180,210,0.74) !important;
+  max-width:72ch !important;
 }
 
 .workspace-idle .empty-flow-strip{
@@ -8593,13 +8594,13 @@ body{
 }
 
 .workspace-idle .empty-flow-strip span{
-  min-height:30px !important;
-  padding:0 12px !important;
+  min-height:26px !important;
+  padding:0 10px !important;
   border-radius:999px !important;
-  background:rgba(255,255,255,0.025) !important;
-  border:1px solid rgba(255,255,255,0.06) !important;
-  color:rgba(212,220,242,0.82) !important;
-  font-size:12px !important;
+  background:transparent !important;
+  border:1px solid rgba(255,255,255,0.045) !important;
+  color:rgba(188,200,228,0.74) !important;
+  font-size:11px !important;
 }
 
 .workspace-idle .empty-actions-intent{
@@ -8640,10 +8641,11 @@ body{
 }
 
 .workspace-idle .composer-chat{
-  border-radius:18px !important;
-  background:linear-gradient(180deg, rgba(18,22,40,0.82), rgba(14,18,33,0.86)) !important;
-  border:1px solid rgba(255,255,255,0.06) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.04), 0 14px 36px rgba(0,0,0,0.16) !important;
+  /* One native surface; no “panel-in-panel” look */
+  border-radius:14px !important;
+  background:rgba(18, 18, 24, 0.42) !important;
+  border:1px solid rgba(255,255,255,0.045) !important;
+  box-shadow:none !important;
 }
 
 .workspace-idle .composer textarea{
@@ -8684,12 +8686,16 @@ body{
 }
 
 #workspaceRoot .messages-shell{
-  border-top:1px solid rgba(255,255,255,0.06) !important;
-  border-radius:18px 18px 0 0 !important;
+  /* Remove center “card” feel entirely */
+  border:none !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
 }
 
 #workspaceRoot .messages{
-  padding:12px 14px 12px !important;
+  /* Flatter transcript: page-like, not inset */
+  padding:10px 0 14px !important;
   gap:10px !important;
 }
 
@@ -8739,17 +8745,25 @@ body{
 }
 
 #workspaceRoot .composer-wrap{
-  padding:10px 14px 12px !important;
+  /* Keep composer anchored but remove outer shell weight */
+  padding:8px 0 10px !important;
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
 }
 
 #workspaceRoot .composer{
-  min-height:56px !important;
-  padding:6px !important;
+  min-height:auto !important;
+  padding:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
 }
 
 #workspaceRoot .composer textarea{
-  min-height:34px !important;
-  max-height:96px !important;
+  min-height:40px !important;
+  max-height:110px !important;
   padding:10px 12px !important;
 }
 
@@ -8758,8 +8772,9 @@ body{
 }
 
 #workspaceRoot .chip{
-  padding:4px 9px !important;
+  padding:4px 10px !important;
   font-size:10.5px !important;
+  opacity:0.9 !important;
 }
 
 #workspaceRoot .messages-shell::before,
@@ -8775,15 +8790,16 @@ body{
   opacity:0.38 !important;
 }
 
+/* Kill remaining “dashboard chrome” shadows in the center column */
 #workspaceRoot .messages-shell,
 #workspaceRoot .composer-wrap,
 #workspaceRoot .customer-message-block{
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.03), 0 8px 28px rgba(62,46,130,0.08) !important;
+  box-shadow:none !important;
 }
 
 @media (max-width: 900px){
   #workspaceRoot .messages{
-    padding:10px 10px 10px !important;
+    padding:10px 0 10px !important;
   }
   #workspaceRoot .reply-text,
   #workspaceRoot .msg-card.assistant .reply-text{
@@ -8793,4 +8809,74 @@ body{
   #workspaceRoot .customer-message-block{
     padding:16px 16px 16px !important;
   }
+}
+
+/* === Claude pass: flatten center + calmer sidebar === */
+body[data-ui="claude"] #workspaceRoot .main-stage-body{
+  /* Keep the eye on the thread (less “page layout” padding) */
+  padding-left:var(--main-pad-x) !important;
+  padding-right:var(--main-pad-x) !important;
+}
+
+body[data-ui="claude"] #workspaceRoot .messages-zone{
+  background:transparent !important;
+}
+
+body[data-ui="claude"] #workspaceRoot .messages-shell.scroll-shell,
+body[data-ui="claude"] #workspaceRoot .messages-shell.scroll-shell::before,
+body[data-ui="claude"] #workspaceRoot .messages-shell.scroll-shell::after{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+
+body[data-ui="claude"] #workspaceRoot .composer-wrap.composer-dock{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+
+body[data-ui="claude"] #workspaceRoot .composer-unified{
+  /* Ensure the thread and composer share the same “page” width */
+  width:100% !important;
+}
+
+body[data-ui="claude"] #workspaceRoot .composer.composer-chat{
+  /* One primary input surface only */
+  border-radius:14px !important;
+  border:1px solid rgba(255,255,255,0.055) !important;
+  background:rgba(18,18,24,0.52) !important;
+  box-shadow:none !important;
+  padding:10px 12px 11px !important;
+}
+
+body[data-ui="claude"] #workspaceRoot .composer-hint-band--integrated{
+  padding:0 2px 5px !important;
+  opacity:0.85;
+}
+
+body[data-ui="claude"] #workspaceRoot .quick-actions{
+  opacity:0.75;
+}
+
+body[data-ui="claude"] #workspaceRoot .chip{
+  border-color:rgba(255,255,255,0.055) !important;
+  background:transparent !important;
+}
+
+body[data-ui="claude"] #sidebarShell{
+  /* Thinner / calmer rail */
+  background:rgba(16,16,22,0.84) !important;
+  border-right:1px solid rgba(255,255,255,0.045) !important;
+  box-shadow:none !important;
+}
+
+body[data-ui="claude"] .sidebar-nav-item.is-active{
+  background:rgba(124,92,252,0.10) !important;
+  border-color:rgba(124,92,252,0.16) !important;
+}
+
+body[data-ui="claude"] .sidebar-nav-item:hover{
+  background:rgba(255,255,255,0.035) !important;
+  border-color:rgba(255,255,255,0.04) !important;
 }
