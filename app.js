@@ -444,7 +444,7 @@ if (typeof window.pulseRail !== "function") {
               min-width: 40px !important;
               height: 40px !important;
               border-radius: 12px !important;
-              box-shadow: 0 1px 8px rgba(124, 92, 252, 0.20) !important;
+              box-shadow: none !important;
             }
           `;
           document.head.appendChild(claudeStyle);

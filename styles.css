@@ -203,6 +203,47 @@ body[data-ui="claude"] .command-strip.glass{
   border-bottom: 1px solid rgba(255,255,255,0.08) !important;
 }
 
+/* Top bar: lighter, slimmer, less “pill” */
+body[data-ui="claude"] .command-strip{
+  min-height: 48px;
+}
+body[data-ui="claude"] .command-strip.glass{
+  padding: 8px 14px !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] .command-brand-mark{
+  box-shadow: none !important;
+}
+body[data-ui="claude"] .command-mode-pill{
+  background: transparent !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  color: rgba(170, 182, 208, 0.78) !important;
+  border-radius: 999px !important;
+  padding: 6px 10px !important;
+}
+body[data-ui="claude"] .command-status-chip{
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] .command-auth-chip{
+  background: transparent !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: none !important;
+}
+
+/* Motion: Claude is calm (no “lift” on hover) */
+body[data-ui="claude"] .btn:hover,
+body[data-ui="claude"] .ghost-btn:hover,
+body[data-ui="claude"] .upgrade-btn:hover,
+body[data-ui="claude"] .icon-btn:hover,
+body[data-ui="claude"] .send-btn:hover,
+body[data-ui="claude"] .chip:hover{
+  transform: none !important;
+}
+
 body[data-ui="claude"] .app.workspace-grid{
   padding: 0 !important;
   grid-template-columns: var(--cld-sidebar-expanded) minmax(0,1fr) !important;
@@ -441,11 +482,11 @@ body[data-ui="claude"] .msg-group .reply-body::before{
 }
 
 body[data-ui="claude"] .msg-group.user .reply-body::before{
-  background: rgba(124, 92, 252, 0.22);
+  background: rgba(255,255,255,0.06);
 }
 
 body[data-ui="claude"] .msg-group.assistant .reply-body::before{
-  background: rgba(255,255,255,0.06);
+  background: rgba(124, 92, 252, 0.22);
 }
 
 body[data-ui="claude"] .assistant-footer{
