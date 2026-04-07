@@ -9141,3 +9141,46 @@ body[data-ui="claude"] #workspaceRoot .app.workspace-grid > main.main.main-canva
   grid-column:2 !important;
   min-width:0 !important;
 }
+
+/* Claude polish: idle view should feel like a top-aligned thread, not a centered panel */
+body[data-ui="claude"] #workspaceRoot.workspace-idle .main-stage-body.xv-stage-body{
+  padding-top: 6px !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-idle .workspace-conversation-column{
+  justify-content:flex-start !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-idle .messages-zone{
+  margin-bottom: 8px !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-idle .empty-state:not(:has(.limit-moment-card)){
+  padding: 6px 0 0 !important;
+}
+body[data-ui="claude"] #workspaceRoot .empty-thread-line{
+  font-size: 13px !important;
+  color: rgba(214, 222, 243, 0.84) !important;
+}
+body[data-ui="claude"] #workspaceRoot .empty-launch-plan-hint{
+  margin-top: 8px !important;
+  opacity: 0.62 !important;
+}
+
+/* Claude polish: remove remaining composer tray; keep only the input well */
+body[data-ui="claude"] #workspaceRoot .composer-wrap.composer-dock{
+  background: transparent !important;
+  border-top: none !important;
+  padding-top: 8px !important;
+}
+body[data-ui="claude"] #workspaceRoot .composer.composer-chat{
+  gap: 8px !important;
+}
+body[data-ui="claude"] #workspaceRoot .composer-chat .composer-input-row{
+  background: rgba(255,255,255,0.018) !important;
+  border-color: rgba(255,255,255,0.055) !important;
+}
+body[data-ui="claude"] #workspaceRoot .composer-chat textarea{
+  min-height: 46px !important;
+}
+body[data-ui="claude"] #workspaceRoot .composer-chat .quick-actions{
+  opacity: 0.58 !important;
+  margin-top: 4px !important;
+}
