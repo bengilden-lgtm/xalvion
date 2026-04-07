@@ -404,47 +404,12 @@ if (typeof window.pulseRail !== "function") {
               border-radius: 9px !important;
             }
 
-            /* Better composer: more premium, centered, less bulky */
-            body[data-ui="claude"] .composer-wrap.composer-dock{
+            /* Composer: do not re-box here. This tag is appended after styles.css and
+               previously used !important to override the flattened chat-first composer. */
+            body[data-ui="claude"] #workspaceRoot .composer-wrap.composer-dock{
               max-width: var(--cld-thread-max) !important;
-              margin: 0 auto !important;
-            }
-            body[data-ui="claude"] .composer.composer-chat{
-              border-radius: 20px !important;
-              padding: 11px 13px 13px !important;
-              background: rgba(20, 21, 30, 0.62) !important;
-              border-color: rgba(255,255,255,0.085) !important;
-            }
-            body[data-ui="claude"] #workspaceRoot.workspace-active .composer.composer-chat{
-              background: rgba(20, 21, 30, 0.70) !important;
-            }
-            body[data-ui="claude"] .composer-hint-band--integrated{
-              padding-bottom: 5px !important;
-            }
-            body[data-ui="claude"] .composer-field{
-              border-radius: 15px !important;
-              padding: 6px 8px 6px 12px !important;
-              background: rgba(10, 12, 22, 0.52) !important;
-              border-color: rgba(255,255,255,0.085) !important;
-            }
-            body[data-ui="claude"] .composer-field:focus-within{
-              border-color: rgba(124, 92, 252, 0.34) !important;
-              box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.085) !important;
-            }
-            body[data-ui="claude"] .composer-field textarea,
-            body[data-ui="claude"] #messageInput{
-              min-height: 46px !important;
-              padding: 10px 6px 10px 0 !important;
-              font-size: 15px !important;
-              line-height: 1.58 !important;
-            }
-            body[data-ui="claude"] .composer-field .send-btn,
-            body[data-ui="claude"] #sendBtn{
-              width: 40px !important;
-              min-width: 40px !important;
-              height: 40px !important;
-              border-radius: 12px !important;
-              box-shadow: none !important;
+              margin-left: auto !important;
+              margin-right: auto !important;
             }
           `;
           document.head.appendChild(claudeStyle);
