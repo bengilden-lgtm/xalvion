@@ -2377,6 +2377,20 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     return typeof document !== "undefined" && document.body?.dataset?.ui === "claude";
   }
 
+  function openingTimeGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  }
+
+  function openingDisplayName() {
+    const raw = String(state.username || "").trim();
+    if (!raw) return "";
+    const first = raw.split(/[._\-@]/)[0] || raw;
+    return first.length ? first.charAt(0).toUpperCase() + first.slice(1) : "";
+  }
+
   function buildEmptyStateHtml() {
     const guest = !isAuthenticated();
     const tierLc = String(state.tier || "free").toLowerCase();
@@ -2388,25 +2402,36 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const n = guest ? getGuestUsage() : state.usage;
       const capEyebrow = guest ? "Preview" : tierLc === "pro" ? "Pro capacity" : "Capacity";
       const capTitle = guest
-        ? "You hit the preview wall"
+        ? "Preview limit reached"
         : tierLc === "pro"
           ? "Pro capacity reached"
           : tierLc === "elite"
             ? "Plan capacity reached"
             : "Free plan capacity reached";
       const capLead = guest
-        ? "You already saw the workflow work. Keep the same operator flow under a free account."
+        ? "Create a free account for more monthly runs and the same approval-safe flow."
         : `You ran <strong>${n}</strong> full operator ${n === 1 ? "run" : "runs"} this cycle.`;
       const capBody = guest
-        ? `Unlock ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same approval-safe workflow before the next valuable action gets blocked.`
+        ? `${FREE_USAGE_LIMIT} runs/month, saved threads, and continued access before the next gated action.`
         : tierLc === "pro"
-          ? "Elite adds 5,000 tickets/month, deeper analytics, and more execution headroom so volume does not become drag."
-          : "Upgrade to Pro for 500 runs/month, live refunds, and priority routing when the next customer decision matters.";
+          ? "Elite adds 5,000 tickets/month and deeper execution headroom."
+          : "Pro unlocks 500 runs/month, live refunds, and priority routing.";
       const ctaLabel = guest
-        ? "Unlock full access"
+        ? "Continue with free account"
         : tierLc === "pro"
           ? "Upgrade to Elite"
           : "Upgrade to Pro";
+      if (isClaudeShell()) {
+        return `
+      <div class="empty-card limit-moment-card limit-moment-card--claude">
+        <p class="limit-moment-card__eyebrow">${capEyebrow}</p>
+        <h2 class="limit-moment-card__title">${capTitle}</h2>
+        <p class="limit-moment-card__lead">${capLead}</p>
+        <p class="limit-moment-card__body">${capBody}</p>
+        <button type="button" class="limit-cta limit-cta--claude" id="emptySignupCta">${ctaLabel}</button>
+        ${guest ? `<button type="button" class="limit-secondary-link limit-secondary-link--claude" id="emptyLoginLink">Log in instead</button>` : ""}
+      </div>`;
+      }
       return `
       <div class="empty-card limit-moment-card empty-card-premium empty-card-conversion">
         <div class="empty-cap-eyebrow">${capEyebrow}</div>
@@ -2428,10 +2453,16 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       : `${formatTier(state.tier)} · ${state.remaining} operator runs this period`;
 
     if (isClaudeShell()) {
+      const nick = openingDisplayName();
+      const greet = openingTimeGreeting();
+      const headline = nick ? `${greet}, ${nick}` : greet;
       return `
       <div class="empty-card empty-card-premium empty-card-launch empty-card-launch--claude">
-        <p class="empty-launch-directive">What should we handle?</p>
-        <p class="empty-launch-outcome">Paste a message or tap an example in the box below.</p>
+        <div class="cld-open-hero" aria-hidden="false">
+          <span class="cld-open-mark" aria-hidden="true"></span>
+          <h2 class="cld-open-greeting">${headline}</h2>
+        </div>
+        <p class="empty-launch-outcome cld-open-sub">What ticket should we work through?</p>
         <p class="empty-launch-plan-hint empty-launch-plan-hint--quiet">${chipHintGuest}</p>
       </div>`;
     }
@@ -2459,7 +2490,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   }
 
   function focusAccessPanel() {
-    const accessTab = els.sidebarShell?.querySelector?.('[data-sidebar-tab="access"]');
+    const accessTab = els.sidebarShell?.querySelector?.('[data-sidebar-tab="account"]');
     if (accessTab) accessTab.click();
     els.usernameInput?.scrollIntoView?.({ behavior: "smooth", block: "center" });
     window.setTimeout(() => els.usernameInput?.focus?.(), 120);
@@ -4618,8 +4649,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   }
 
   function initWorkspaceChromeShell() {
-    initSidebarNav();
     initSidebarCollapse();
+    initSidebarNav();
     initRailBriefToggles();
   }
 
@@ -4634,6 +4665,9 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const apply = (collapsed) => {
       const on = Boolean(collapsed);
       shell.dataset.sidebarCollapsed = on ? "true" : "false";
+      if (document.body?.dataset?.ui === "claude" && btn) {
+        btn.setAttribute("data-cld-tip", on ? "Expand sidebar" : "Collapse sidebar");
+      }
       try {
         localStorage.setItem(KEY, on ? "1" : "0");
       } catch {}
@@ -4641,8 +4675,15 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
     let initial = false;
     try {
-      initial = (localStorage.getItem(KEY) || "0") === "1";
-    } catch {}
+      const raw = localStorage.getItem(KEY);
+      if (document.body?.dataset?.ui === "claude") {
+        initial = raw === null ? true : raw === "1";
+      } else {
+        initial = (raw || "0") === "1";
+      }
+    } catch {
+      initial = false;
+    }
     apply(initial);
 
     btn?.addEventListener("click", () => {
@@ -4657,6 +4698,19 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!shell || !tabs.length) return;
     if (shell.dataset.sidebarNavBound) return;
     shell.dataset.sidebarNavBound = "1";
+
+    const expandIfClaudeRail = () => {
+      if (!isClaudeShell()) return;
+      if (shell.dataset.sidebarCollapsed !== "true") return;
+      shell.dataset.sidebarCollapsed = "false";
+      try {
+        localStorage.setItem("xalvion-sidebar-collapsed", "0");
+      } catch {}
+      const btn = document.getElementById("sidebarCollapseBtn");
+      if (btn && document.body?.dataset?.ui === "claude") {
+        btn.setAttribute("data-cld-tip", "Collapse sidebar");
+      }
+    };
 
     const applyTab = (key) => {
       const panels = shell.querySelectorAll("[data-sidebar-panel]");
@@ -4685,7 +4739,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     };
 
     tabs.forEach((btn) => {
-      btn.addEventListener("click", () => applyTab(btn.getAttribute("data-sidebar-tab") || "workspace"));
+      btn.addEventListener("click", () => {
+        expandIfClaudeRail();
+        applyTab(btn.getAttribute("data-sidebar-tab") || "workspace");
+      });
     });
 
     let initial = "workspace";

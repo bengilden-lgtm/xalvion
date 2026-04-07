@@ -44,10 +44,10 @@
     </header>
 
     <div class="app workspace-grid workspace-body workspace-split">
-      <aside class="sidebar glass rail-col rail-col-left sidebar-app-rail" id="sidebarShell" data-sidebar-active="workspace" data-sidebar-collapsed="false">
+      <aside class="sidebar glass rail-col rail-col-left sidebar-app-rail" id="sidebarShell" data-sidebar-active="workspace" data-sidebar-collapsed="true" data-cld-rail="1">
         <div class="sidebar-chrome">
           <div class="sidebar-topbar" role="presentation">
-            <button id="sidebarCollapseBtn" class="icon-btn sidebar-collapse-btn" type="button" title="Toggle sidebar" aria-label="Toggle sidebar">
+            <button id="sidebarCollapseBtn" class="icon-btn sidebar-collapse-btn" type="button" title="Toggle sidebar" aria-label="Toggle sidebar" data-cld-tip="Expand sidebar">
               <span class="sidebar-collapse-glyph" aria-hidden="true"></span>
             </button>
           </div>
@@ -55,37 +55,37 @@
             <div class="sidebar-nav-group" role="presentation">
               <span class="sidebar-nav-group-label" aria-hidden="true">Navigate</span>
               <div class="sidebar-nav-items" role="presentation">
-                <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace" title="Workspace">
+                <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace" title="Workspace" data-cld-tip="Workspace">
                   <span class="sidebar-nav-icon" aria-hidden="true">⌂</span>
                   <span class="sidebar-nav-label">Workspace</span>
                 </button>
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount" title="Access">
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount" title="Access" data-cld-tip="Access">
                   <span class="sidebar-nav-icon" aria-hidden="true">⌁</span>
                   <span class="sidebar-nav-label">Access</span>
                 </button>
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans" title="Plans">
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans" title="Plans" data-cld-tip="Plans">
                   <span class="sidebar-nav-icon" aria-hidden="true">◈</span>
                   <span class="sidebar-nav-label">Plans</span>
                 </button>
               </div>
               <div class="sidebar-nav-divider" aria-hidden="true"></div>
               <div class="sidebar-nav-items" role="presentation">
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations" title="Integrations">
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations" title="Integrations" data-cld-tip="Integrations">
                   <span class="sidebar-nav-icon" aria-hidden="true">⛓</span>
                   <span class="sidebar-nav-label">Integrations</span>
                 </button>
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm" title="CRM">
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm" title="CRM" data-cld-tip="CRM">
                   <span class="sidebar-nav-icon" aria-hidden="true">◎</span>
                   <span class="sidebar-nav-label">CRM</span>
                 </button>
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue" title="Revenue">
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue" title="Revenue" data-cld-tip="Revenue">
                   <span class="sidebar-nav-icon" aria-hidden="true">⌾</span>
                   <span class="sidebar-nav-label">Revenue</span>
                 </button>
               </div>
               <div class="sidebar-nav-divider" aria-hidden="true"></div>
               <div class="sidebar-nav-items" role="presentation">
-                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="more" data-nav-cluster="tools" aria-selected="false" aria-controls="sidebarPanelMore" id="sidebarTabMore" title="More">
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="more" data-nav-cluster="tools" aria-selected="false" aria-controls="sidebarPanelMore" id="sidebarTabMore" title="More" data-cld-tip="More tools">
                   <span class="sidebar-nav-icon" aria-hidden="true">⋯</span>
                   <span class="sidebar-nav-label">More</span>
                 </button>
@@ -627,6 +627,10 @@
                         <p id="composerStatusLine" class="composer-status-line composer-inline-hint">Paste a ticket below to start.</p>
                       </div>
                     </div>
+                    <div class="composer-input-row composer-input-wrap composer-field">
+                      <textarea id="messageInput" placeholder="How can I help with this ticket?" autocomplete="off"></textarea>
+                      <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
+                    </div>
                     <div class="quick-actions">
                       <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
                       <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
@@ -641,10 +645,6 @@
                         <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
                       </div>
                     </details>
-                    <div class="composer-input-row composer-input-wrap composer-field">
-                      <textarea id="messageInput" placeholder="Paste a real support message (or pick an example chip)…" autocomplete="off"></textarea>
-                      <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
-                    </div>
                   </div>
                 </div>
                 </footer>
