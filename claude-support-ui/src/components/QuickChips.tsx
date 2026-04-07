@@ -17,7 +17,7 @@ export function QuickChips({ onChipClick }: QuickChipsProps) {
           key={label}
           type="button"
           onClick={() => onChipClick(label)}
-          className="cursor-pointer rounded-full border border-[#3a3530] bg-[#2a2520] px-[14px] py-[6px] text-[13px] font-normal text-[#9c9189] transition-colors hover:border-[#7c3aed] hover:text-[#e8e3dc]"
+          className="cursor-pointer rounded-full bg-white/[0.03] px-[14px] py-[6px] text-[13px] font-normal text-[#9c9189] ring-1 ring-white/10 transition-colors hover:bg-white/[0.06] hover:text-[#e8e3dc] hover:ring-[#7c3aed]/40"
         >
           {label}
         </button>

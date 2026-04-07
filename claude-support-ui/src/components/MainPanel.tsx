@@ -24,9 +24,9 @@ export function MainPanel({
   activeTicket,
 }: MainPanelProps) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#1a1814]">
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[680px] px-6 pb-8 pt-10">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-[740px] px-6 pb-10 pt-10">
           <header className="text-center">
             <h1 className="text-[28px] font-semibold leading-tight text-[#e8e3dc]">
               Paste a support ticket
@@ -40,31 +40,25 @@ export function MainPanel({
             </div>
           </header>
 
-          <div
-            className={
-              activeTicket
-                ? 'mt-10'
-                : 'mt-0 flex min-h-[calc(100vh-320px)] flex-col items-center justify-center text-center'
-            }
-          >
-            {!activeTicket ? (
-              <>
-                <p className="text-2xl font-normal text-[#e8e3dc]">
-                  {greetingPhrase()}
-                </p>
-                <p className="mt-2 text-base font-normal text-[#9c9189]">
-                  What ticket should we work through?
-                </p>
-                <p className="mt-4 text-[13px] font-normal text-[#6b6560]">
-                  Preview mode · 1 operator run remaining
-                </p>
-              </>
-            ) : (
+          {!activeTicket ? (
+            <section className="mt-14 flex min-h-[calc(100vh-360px)] flex-col items-center justify-center text-center">
+              <p className="text-2xl font-normal text-[#e8e3dc]">
+                {greetingPhrase()}
+              </p>
+              <p className="mt-2 text-base font-normal text-[#9c9189]">
+                What ticket should we work through?
+              </p>
+              <p className="mt-4 text-[13px] font-normal text-[#6b6560]">
+                Preview mode · 1 operator run remaining
+              </p>
+            </section>
+          ) : (
+            <section className="mt-8">
               <TicketCard responseText={activeTicket.response} />
-            )}
-          </div>
+            </section>
+          )}
         </div>
-      </div>
+      </main>
 
       <InputBar
         value={inputValue}

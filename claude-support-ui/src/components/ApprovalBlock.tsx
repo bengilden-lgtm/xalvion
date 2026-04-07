@@ -40,9 +40,9 @@ export function ApprovalBlock({ responseText }: ApprovalBlockProps) {
   }
 
   return (
-    <div className="mt-5 border-t border-[#3a3530] pt-5">
+    <div className="mt-6 pt-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#4c1d95] px-2.5 py-1 text-xs font-medium text-[#a78bfa]">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#4c1d95]/40 px-2.5 py-1 text-xs font-medium text-[#c4b5fd] ring-1 ring-[#a78bfa]/20">
           <span aria-hidden>⚡</span>
           Approval required
         </span>
@@ -52,26 +52,26 @@ export function ApprovalBlock({ responseText }: ApprovalBlockProps) {
               <button
                 type="button"
                 onClick={() => setAction('rejected')}
-                className="cursor-pointer rounded-lg border border-[#7f1d1d] bg-[#7f1d1d] px-3 py-1.5 text-sm font-medium text-[#fca5a5] transition-opacity hover:opacity-90"
+                className="cursor-pointer rounded-lg bg-[#7f1d1d]/50 px-3 py-1.5 text-sm font-medium text-[#fecaca] ring-1 ring-[#7f1d1d]/50 transition-colors hover:bg-[#7f1d1d]/65"
               >
                 Rejected
               </button>
               <button
                 type="button"
                 onClick={() => setAction('approved')}
-                className="cursor-pointer rounded-lg bg-[#7c3aed] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#6d28d9]"
+                className="cursor-pointer rounded-lg bg-[#7c3aed] px-3 py-1.5 text-sm font-medium text-white shadow-[0_10px_30px_rgba(124,58,237,0.18)] transition-colors hover:bg-[#6d28d9]"
               >
                 Approve
               </button>
             </>
           )}
           {action === 'rejected' && (
-            <span className="rounded-lg border border-[#7f1d1d] bg-[#7f1d1d] px-3 py-1.5 text-sm font-medium text-[#fca5a5]">
+            <span className="rounded-lg bg-[#7f1d1d]/55 px-3 py-1.5 text-sm font-medium text-[#fecaca] ring-1 ring-[#7f1d1d]/50">
               Rejected
             </span>
           )}
           {action === 'approved' && (
-            <span className="rounded-lg bg-[#7c3aed] px-3 py-1.5 text-sm font-medium text-white">
+            <span className="rounded-lg bg-[#7c3aed] px-3 py-1.5 text-sm font-medium text-white shadow-[0_10px_30px_rgba(124,58,237,0.16)]">
               Approved
             </span>
           )}
@@ -92,7 +92,7 @@ export function ApprovalBlock({ responseText }: ApprovalBlockProps) {
         <button
           type="button"
           onClick={copyResponse}
-          className="cursor-pointer rounded-md p-1.5 text-[#6b6560] transition-colors hover:bg-[#2d2820] hover:text-[#9c9189]"
+          className="cursor-pointer rounded-md p-1.5 text-[#6b6560] transition-colors hover:bg-white/[0.05] hover:text-[#9c9189]"
           aria-label="Copy response"
         >
           <CopyIcon />
@@ -104,10 +104,8 @@ export function ApprovalBlock({ responseText }: ApprovalBlockProps) {
           a supervisor must confirm before the customer sees this message.
         </p>
       )}
-      <p className="mt-6 text-[10px] font-medium uppercase tracking-wider text-[#6b6560]">
-        Details
-      </p>
-      <p className="mt-1 text-[13px] text-[#9c9189]">
+      <div className="mt-6 h-px w-full bg-white/5" aria-hidden />
+      <p className="mt-3 text-[12px] font-normal text-[#6b6560]">
         Ticket ID · preview run · no external sends
       </p>
     </div>

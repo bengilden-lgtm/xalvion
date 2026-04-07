@@ -34,7 +34,7 @@ export default function App() {
   }, [])
 
   return (
-    <div className="flex h-full min-h-0 flex-row bg-[#1a1814]">
+    <div className="flex h-full min-h-0 flex-row bg-gradient-to-b from-[#171613] via-[#141311] to-[#0f0e0c]">
       <Sidebar activeNav={activeNav} onNavChange={setActiveNav} />
       <MainPanel
         inputValue={inputValue}

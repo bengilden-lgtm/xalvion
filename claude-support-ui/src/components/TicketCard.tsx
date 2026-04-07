@@ -6,8 +6,8 @@ type TicketCardProps = {
 
 export function TicketCard({ responseText }: TicketCardProps) {
   return (
-    <div className="rounded-xl border border-[#3a3530] bg-[#252118] p-5">
-      <div className="text-[15px] font-normal leading-[1.6] text-[#d4cec7] whitespace-pre-wrap">
+    <div className="mt-10">
+      <div className="whitespace-pre-wrap text-[15px] font-normal leading-[1.7] text-[#d4cec7]">
         {responseText}
       </div>
       <ApprovalBlock responseText={responseText} />
