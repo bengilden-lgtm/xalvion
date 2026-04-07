@@ -722,6 +722,132 @@ body[data-ui="claude"] .composer-unified{
   max-width: var(--cld-thread-max) !important;
 }
 
+/* —— Claude shell · active thread: flat transcript (no nested ticket cards) ——
+   Aligns with prior pass: centered thread + minimal chrome; strips extra panels
+   around decision, details, trace, and composer. */
+body[data-ui="claude"] #workspaceRoot.workspace-active .main.main-canvas{
+  background: #14141a !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .main-canvas-inner.canvas-shell.main-stage{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .messages-shell,
+body[data-ui="claude"] #workspaceRoot.workspace-active .messages-shell::before,
+body[data-ui="claude"] #workspaceRoot.workspace-active .messages-shell::after{
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: min(42vh, 520px) !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .assistant-result-stack{
+  gap: 14px !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .msg-card.assistant .customer-message-block{
+  border-left: none !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .assistant-decision-slot .decision-panel,
+body[data-ui="claude"] #workspaceRoot.workspace-active .decision-panel{
+  margin: 0 !important;
+  padding: 12px 0 14px !important;
+  border: none !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .decision-panel:hover,
+body[data-ui="claude"] #workspaceRoot.workspace-active .decision-panel.decision-state-approved,
+body[data-ui="claude"] #workspaceRoot.workspace-active .decision-panel.decision-state-approved:hover,
+body[data-ui="claude"] #workspaceRoot.workspace-active .decision-panel.decision-state-rejected,
+body[data-ui="claude"] #workspaceRoot.workspace-active .decision-panel.decision-state-rejected:hover{
+  box-shadow: none !important;
+  transform: none !important;
+  animation: none !important;
+  filter: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .details-wrap,
+body[data-ui="claude"] #workspaceRoot.workspace-active .details-panel,
+body[data-ui="claude"] #workspaceRoot.workspace-active .operator-brief-details .details-panel{
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .details-panel,
+body[data-ui="claude"] #workspaceRoot.workspace-active .operator-brief-details .details-panel{
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  padding: 10px 0 6px !important;
+  margin-top: 0 !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .details-grid .details-box{
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 6px 0 !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .details-insight{
+  border: none !important;
+  background: transparent !important;
+  padding: 8px 0 !important;
+  border-radius: 0 !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .approval-banner{
+  border: none !important;
+  background: transparent !important;
+  padding: 6px 0 10px !important;
+  border-radius: 0 !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .stream-steps--premium{
+  border: none !important;
+  background: transparent !important;
+  padding: 0 0 8px !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .edit-mode-sheet{
+  border: none !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 12px 0 !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .original-response-block{
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+/* One input chrome: outer composer only; field is borderless inside */
+body[data-ui="claude"] #workspaceRoot.workspace-active .composer.composer-chat{
+  padding: 12px 14px 14px !important;
+  background: rgba(26, 27, 38, 0.78) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .composer-field{
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 4px 4px 4px 10px !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .composer-field:focus-within{
+  box-shadow: none !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .composer.composer-chat:focus-within{
+  border-color: rgba(124, 92, 252, 0.38) !important;
+  box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.09) !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .composer-chat .chip{
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
 /* Beat later #workspaceRoot textarea rules — single well stays borderless inside .composer-field */
 body[data-ui="claude"] #workspaceRoot .composer-field textarea,
 body[data-ui="claude"] #workspaceRoot #messageInput{
