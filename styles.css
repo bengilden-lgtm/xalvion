@@ -4437,7 +4437,8 @@ body{
   grid-template-columns:min(var(--sidebar-idle),var(--sidebar)) minmax(0,1fr) !important;
 }
 .workspace-active{
-  --main-max:min(1040px,94vw);
+  /* Claude-like reading measure: narrower, centered column (keep Xalvion depth) */
+  --main-max:min(820px,92vw);
 }
 .workspace-active .app.workspace-grid{
   grid-template-columns:var(--sidebar) minmax(0,1fr) !important;
@@ -7249,7 +7250,8 @@ body{
 
 #workspaceRoot .main-stage-header,
 #workspaceRoot .main-stage-body{
-  margin-left:0 !important;
+  /* Center the primary reading column (Claude-like) */
+  margin-left:auto !important;
   margin-right:auto !important;
 }
 
@@ -7934,7 +7936,8 @@ body{
 }
 
 #workspaceRoot .customer-message-block{
-  padding:14px 16px 14px !important;
+  /* Increase whitespace for readability while keeping depth */
+  padding:18px 20px 18px !important;
   border-radius:16px !important;
 }
 
@@ -7950,9 +7953,10 @@ body{
 
 #workspaceRoot .reply-text,
 #workspaceRoot .msg-card.assistant .reply-text{
-  font-size:14px !important;
-  line-height:1.58 !important;
-  max-width:none !important;
+  /* Claude-like readable body copy */
+  font-size:clamp(15.5px, 1.05vw, 17px) !important;
+  line-height:1.72 !important;
+  max-width:min(72ch, 100%) !important;
 }
 
 #workspaceRoot .assistant-meta{
@@ -8012,10 +8016,10 @@ body{
   }
   #workspaceRoot .reply-text,
   #workspaceRoot .msg-card.assistant .reply-text{
-    font-size:13.5px !important;
-    line-height:1.56 !important;
+    font-size:15px !important;
+    line-height:1.68 !important;
   }
   #workspaceRoot .customer-message-block{
-    padding:12px 12px 12px !important;
+    padding:16px 16px 16px !important;
   }
 }
