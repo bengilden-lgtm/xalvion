@@ -9296,3 +9296,37 @@ body[data-ui="claude"] #workspaceRoot .sidebar-nav-item:hover{
   background: rgba(255,255,255,0.035) !important;
   border-color: rgba(255,255,255,0.035) !important;
 }
+
+/* Ensure workspace-level composer card styles never win in Claude mode */
+body[data-ui="claude"] #workspaceRoot.workspace-active .composer.composer-chat,
+body[data-ui="claude"] #workspaceRoot.workspace-idle .composer.composer-chat,
+body[data-ui="claude"] #workspaceRoot.workspace-thinking .composer.composer-chat{
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-active .composer-wrap.composer-dock,
+body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-wrap.composer-dock{
+  background: transparent !important;
+  border-top: none !important;
+  box-shadow: none !important;
+}
+
+/* Empty thread: keep it editorial (not centered like a hero) */
+body[data-ui="claude"] #workspaceRoot.workspace-idle .messages-zone:not(:has(.limit-moment-card)){
+  margin: 0 0 14px !important;
+}
+body[data-ui="claude"] #workspaceRoot.workspace-idle #messages{
+  padding-top: 8px !important;
+}
+body[data-ui="claude"] #workspaceRoot .empty-state{
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+}
+body[data-ui="claude"] #workspaceRoot .empty-thread-open,
+body[data-ui="claude"] #workspaceRoot .empty-thread-line{
+  text-align: left !important;
+  align-self: flex-start !important;
+}
