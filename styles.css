@@ -410,17 +410,48 @@ body[data-ui="claude"] .msg-who{
 }
 
 body[data-ui="claude"] .msg-group.user .reply-text{
-  background: rgba(255,255,255,0.05) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  border-radius: 14px !important;
-  padding: 14px 16px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
   max-width: var(--cld-thread-max);
+  color: rgba(200, 210, 235, 0.82) !important;
 }
 
 body[data-ui="claude"] .msg-group.assistant .customer-message-block{
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
+}
+
+body[data-ui="claude"] .msg-group .reply-body{
+  position: relative;
+  padding-left: 14px;
+}
+
+body[data-ui="claude"] .msg-group .reply-body::before{
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.2em;
+  bottom: 0.2em;
+  width: 2px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.06);
+}
+
+body[data-ui="claude"] .msg-group.user .reply-body::before{
+  background: rgba(124, 92, 252, 0.22);
+}
+
+body[data-ui="claude"] .msg-group.assistant .reply-body::before{
+  background: rgba(255,255,255,0.06);
+}
+
+body[data-ui="claude"] .assistant-footer{
+  background: transparent !important;
+  border: none !important;
+  padding: 10px 0 0 !important;
 }
 
 body[data-ui="claude"] .reply-hero-label,

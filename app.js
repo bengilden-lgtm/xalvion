@@ -2348,16 +2348,20 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="assistant-decision-slot" data-slot="decision"></div>
           <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="customer-message-block">
-            <div class="assistant-context-line js-assistant-context" hidden></div>
-            <div class="customer-message-label reply-hero-label">Customer-ready reply</div>
-            <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared by Xalvion — ready to review</div>
-            <div class="reply-text js-reply-text">${bodyHtml}</div>
+            <div class="reply-body">
+              <div class="assistant-context-line js-assistant-context" hidden></div>
+              <div class="customer-message-label reply-hero-label">Customer-ready reply</div>
+              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared by Xalvion — ready to review</div>
+              <div class="reply-text js-reply-text">${bodyHtml}</div>
+            </div>
           </div>
           <div class="assistant-footer js-assistant-footer"></div>
         </div>
       </div>`
         : `<div class="msg-body">
-        <div class="reply-text js-reply-text">${bodyHtml}</div>
+        <div class="reply-body">
+          <div class="reply-text js-reply-text">${bodyHtml}</div>
+        </div>
       </div>`;
 
     card.innerHTML = `
