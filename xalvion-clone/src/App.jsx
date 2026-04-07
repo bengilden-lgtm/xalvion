@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 
-function LeftRail({ active = "chats" }) {
+function LeftRail({ active = "chats", onToggleSidebar }) {
   const items = useMemo(
     () => [
       { id: "new", label: "New", glyph: "+" },
@@ -14,6 +14,14 @@ function LeftRail({ active = "chats" }) {
 
   return (
     <div className="w-[56px] shrink-0 bg-[#171716] border-r border-[#232321] flex flex-col items-center py-[14px]">
+      <button
+        type="button"
+        onClick={onToggleSidebar}
+        className="w-[34px] h-[34px] rounded-[12px] border border-transparent text-[#b8b5ad] hover:bg-[#1c1c1a] hover:border-[#262624] flex items-center justify-center mb-[8px] transition-opacity"
+        aria-label="Toggle sidebar"
+      >
+        ≡
+      </button>
       <div className="w-[30px] h-[30px] rounded-full bg-[#7a5cff] opacity-80 mb-[16px]" />
       <div className="flex flex-col gap-[10px]">
         {items.map((it) => (
@@ -43,11 +51,17 @@ function LeftRail({ active = "chats" }) {
   );
 }
 
-function Sidebar({ chats, activeChatId, onSelectChat }) {
+function Sidebar({ chats, activeChatId, onSelectChat, collapsed }) {
   return (
-    <div className="w-[280px] shrink-0 bg-[#1a1a19] border-r border-[#232321] flex flex-col">
+    <div
+      className={[
+        "shrink-0 bg-[#1a1a19] border-r border-[#232321] flex flex-col",
+        collapsed ? "w-0 opacity-0 pointer-events-none" : "w-[280px] opacity-100",
+        "transition-opacity duration-150",
+      ].join(" ")}
+    >
       <div className="px-[14px] pt-[14px] pb-[10px]">
-        <div className="h-[36px] rounded-[12px] bg-[#20201e] border border-[#2c2c29] flex items-center px-[12px] text-[#c9c6bf] text-[13px]">
+        <div className="h-[36px] rounded-[12px] bg-[#1a1a19] border border-[#2c2c29] flex items-center px-[12px] text-[#c9c6bf] text-[13px]">
           <span className="opacity-70">Search</span>
         </div>
       </div>
@@ -67,10 +81,10 @@ function Sidebar({ chats, activeChatId, onSelectChat }) {
               type="button"
               onClick={() => onSelectChat(c.id)}
               className={[
-                "w-full text-left px-[10px] py-[10px] rounded-[12px] border mb-[6px]",
+                "w-full text-left px-[10px] py-[10px] rounded-[12px] mb-[6px]",
                 active
-                  ? "bg-[#20201e] border-[#2c2c29] text-[#e9e7e2]"
-                  : "bg-transparent border-transparent text-[#b8b5ad] hover:bg-[#1f1f1d] hover:border-[#272725] transition-opacity",
+                  ? "bg-[#20201e] text-[#e9e7e2]"
+                  : "bg-transparent text-[#b8b5ad] hover:bg-[#1f1f1d] transition-opacity",
               ].join(" ")}
             >
               <div className="text-[13px] leading-tight">{c.title}</div>
@@ -104,7 +118,7 @@ function ChatMain({ chat, onSend }) {
 
   return (
     <div className="flex-1 bg-[#1b1b1a] flex flex-col relative">
-      <div className="h-[54px] border-b border-[#232321] flex items-center px-[18px]">
+      <div className="h-[54px] flex items-center px-[18px]">
         <div className="flex items-center gap-[10px] text-[#cfccc4]">
           <span className="text-[13px] font-semibold">{chat.title}</span>
           <span className="text-[#8f8c85] text-[12px]">▾</span>
@@ -130,40 +144,16 @@ function ChatMain({ chat, onSend }) {
                 </h1>
               </div>
 
-              <div className="w-[640px] max-w-[calc(100vw-120px)] mx-auto">
-                <div className="rounded-[18px] bg-[#20201e] border border-[#2c2c29] px-[18px] py-[16px] text-left">
-                  <div className="text-[#9c9992] text-[14px] mb-[10px]">
-                    How can I help you today?
-                  </div>
-                  <div className="flex items-center justify-between text-[#8f8c85] text-[12px]">
-                    <div className="flex items-center gap-[10px]">
-                      <div className="w-[28px] h-[28px] rounded-[10px] border border-[#2c2c29] flex items-center justify-center">
-                        +
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-[10px]">
-                      <div className="flex items-center gap-[6px]">
-                        <span>Sonnet 4.6 Extended</span>
-                        <span>▾</span>
-                      </div>
-                      <div className="w-[28px] h-[28px] rounded-[10px] border border-[#2c2c29] flex items-center justify-center">
-                        〣
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-[10px] justify-center mt-[14px]">
-                  {quickPills.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      className="h-[28px] px-[12px] rounded-[999px] bg-[#1f1f1d] border border-[#2a2a28] text-[#bdbab2] text-[12px]"
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex gap-[10px] justify-center mt-[14px]">
+                {quickPills.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    className="h-[28px] px-[12px] rounded-[999px] bg-[#1f1f1d] border border-[#2a2a28] text-[#bdbab2] text-[12px]"
+                  >
+                    {p}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -180,10 +170,10 @@ function ChatMain({ chat, onSend }) {
                 >
                   <div
                     className={[
-                      "max-w-[520px] rounded-[18px] px-[14px] py-[10px] text-[14px] leading-[1.5] border",
+                      "max-w-[520px] rounded-[18px] px-[14px] py-[10px] text-[14px] leading-[1.55]",
                       m.role === "user"
-                        ? "bg-[#232321] border-[#2c2c29] text-[#e9e7e2]"
-                        : "bg-transparent border-[#2c2c29] text-[#d7d3cb]",
+                        ? "bg-[#232321] text-[#e9e7e2]"
+                        : "bg-transparent text-[#d7d3cb]",
                     ].join(" ")}
                   >
                     {m.text}
@@ -197,8 +187,8 @@ function ChatMain({ chat, onSend }) {
 
       <div className="sticky bottom-0 bg-[#1b1b1a] pb-[18px]">
         <div className="max-w-[920px] mx-auto px-[22px]">
-          <div className="rounded-[18px] bg-[#20201e] border border-[#2c2c29]">
-            <div className="flex items-center gap-[10px] px-[14px] py-[12px]">
+          <div className="rounded-[18px] bg-[#20201e] border border-[#2c2c29] px-[14px] py-[12px]">
+            <div className="flex items-center gap-[10px]">
               <button
                 type="button"
                 className="w-[34px] h-[34px] rounded-[12px] border border-[#2c2c29] text-[#cfccc4] flex items-center justify-center"
@@ -241,6 +231,7 @@ function ChatMain({ chat, onSend }) {
 }
 
 export default function App() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chats, setChats] = useState(() => [
     {
       id: "greeting",
@@ -285,11 +276,15 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <LeftRail active="chats" />
+      <LeftRail
+        active="chats"
+        onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
+      />
       <Sidebar
         chats={chats}
         activeChatId={activeChatId}
         onSelectChat={setActiveChatId}
+        collapsed={sidebarCollapsed}
       />
       <ChatMain chat={activeChat} onSend={handleSend} />
     </div>
