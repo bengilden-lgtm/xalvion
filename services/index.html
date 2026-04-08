@@ -115,7 +115,7 @@
         </div>
       </aside>
 
-      <main class="main main-canvas">
+      <main class="main main-canvas" id="mainCanvas" data-surface="workspace">
         <div class="main-canvas-inner canvas-shell main-stage">
           <div class="main-stage-ambient" aria-hidden="true">
             <div class="main-stage-ambient-glow"></div>
@@ -123,64 +123,273 @@
           </div>
 
           <div class="xv-stage-scaffold">
-            <header class="main-stage-header main-stage-hero main-stage-hero--bar is-collapsed" aria-hidden="true">
-              <div class="main-stage-identity">
-                <div class="main-stage-title-block">
-                  <h1 id="workspacePageTitle">Operator workspace</h1>
-                  <p id="workspaceSubcopy" class="workspace-subline">Customer-ready replies, approval-safe</p>
-                  <p id="workspaceSubcopyTier" class="workspace-subline workspace-subline--quiet">Sensitive actions stay gated for approval</p>
-                </div>
-              </div>
-            </header>
-
             <div class="main-stage-body xv-stage-body">
-              <div class="workspace-conversation-column" id="workspaceConversationColumn">
-                <div class="messages-zone" id="messagesZone">
-                  <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
-                    <div id="messages" class="messages scroll-area"></div>
+              <!-- SURFACE: WORKSPACE (conversation + operator workflow only) -->
+              <section class="xv-surface" data-surface-panel="workspace">
+                <div class="workspace-conversation-column" id="workspaceConversationColumn">
+                  <div class="messages-zone" id="messagesZone">
+                    <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
+                      <div id="messages" class="messages scroll-area"></div>
+                    </div>
                   </div>
-                </div>
 
-                <footer class="composer-wrap composer-dock xv-composer-foot" id="workspaceComposerDock">
-                <div id="inlineLimitBanner" class="inline-limit" hidden aria-live="polite"></div>
-                <div class="composer-unified">
-                  <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
-                    <div class="composer-hint-band composer-hint-band--integrated">
-                      <div class="composer-prelude">
-                        <div class="composer-status-cluster" role="status" aria-live="polite">
-                          <span class="composer-thinking-anchor" aria-hidden="true">
-                            <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm xv-spark-mark" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span>
-                          </span>
-                          <p id="composerStatusLine" class="composer-status-line">Add the issue when you're ready.</p>
+                  <footer class="composer-wrap composer-dock xv-composer-foot" id="workspaceComposerDock">
+                  <div id="inlineLimitBanner" class="inline-limit" hidden aria-live="polite"></div>
+                  <div class="composer-unified">
+                    <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
+                      <div class="composer-hint-band composer-hint-band--integrated">
+                        <div class="composer-prelude">
+                          <div class="composer-status-cluster" role="status" aria-live="polite">
+                            <span class="composer-thinking-anchor" aria-hidden="true">
+                              <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm xv-spark-mark" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span>
+                            </span>
+                            <p id="composerStatusLine" class="composer-status-line"></p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div class="composer-input-row composer-input-wrap composer-field">
-                      <div class="composer-input-shell">
-                        <div class="composer-field-inner">
-                          <textarea id="messageInput" placeholder="Describe the issue or paste the ticket…" autocomplete="off"></textarea>
-                          <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
+                      <div class="composer-input-row composer-input-wrap composer-field">
+                        <div class="composer-input-shell">
+                          <div class="composer-field-inner">
+                            <textarea id="messageInput" placeholder="Describe the issue or paste the ticket…" autocomplete="off"></textarea>
+                            <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div class="quick-actions">
-                      <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
-                      <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
-                      <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
-                      <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
-                    </div>
-                    <details class="composer-stripe-fold">
-                      <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
-                      <div class="stripe-context-row muted-copy composer-stripe-fields">
-                        <span class="stripe-context-hint">Attached to support requests when present.</span>
-                        <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
-                        <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+                      <div class="quick-actions">
+                        <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
+                        <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
+                        <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
+                        <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
                       </div>
-                    </details>
+                      <details class="composer-stripe-fold">
+                        <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
+                        <div class="stripe-context-row muted-copy composer-stripe-fields">
+                          <span class="stripe-context-hint">Attached to support requests when present.</span>
+                          <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
+                          <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                  </footer>
+                </div>
+              </section>
+
+              <!-- SURFACE: PLANS -->
+              <section class="xv-surface" data-surface-panel="plans" hidden>
+                <div class="empty-state">
+                  <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(840px, 100%);">
+                    <div class="cld-cap-pill" id="plansSurfaceStatusPill" translate="no">Plans</div>
+                    <h2 class="cld-welcome-headline" style="margin-top:10px;">Choose capacity that matches your workload.</h2>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Upgrade when you need saved threads, higher monthly runs, and live billing actions.</p>
+                    <div class="plans-stack" id="plansSurfaceGrid" style="margin-top:16px;">
+                      <article class="plan-offer plan-offer--pro" data-plan-tier="preview" id="planPreviewCard">
+                        <div class="plan-offer-header">
+                          <div class="plan-offer-title-row">
+                            <h3 class="plan-offer-name">Preview</h3>
+                            <span class="plan-offer-badge" data-plan-badge hidden>Current</span>
+                          </div>
+                          <p class="plan-offer-spec">3 runs · no account</p>
+                        </div>
+                        <ul class="plan-offer-features">
+                          <li>Try the operator workflow</li>
+                          <li>No saved threads</li>
+                          <li>Connect Stripe after signup</li>
+                        </ul>
+                        <button type="button" class="plan-cta plan-cta--secondary" data-open-access="signup"><span>Create free account</span></button>
+                      </article>
+
+                      <article class="plan-offer plan-offer--pro" data-plan-tier="free" id="planFreeCard">
+                        <div class="plan-offer-header">
+                          <div class="plan-offer-title-row">
+                            <h3 class="plan-offer-name">Free</h3>
+                            <span class="plan-offer-badge" data-plan-badge hidden>Current</span>
+                          </div>
+                          <p class="plan-offer-spec">12 runs / month</p>
+                        </div>
+                        <ul class="plan-offer-features">
+                          <li>Saved threads</li>
+                          <li>Operator approvals</li>
+                          <li>Integrations setup</li>
+                        </ul>
+                        <button type="button" class="plan-cta plan-cta--secondary" data-open-access="login"><span>Sign in</span></button>
+                      </article>
+
+                      <article class="plan-offer plan-offer--pro" data-plan-tier="pro" id="planProCard">
+                        <div class="plan-offer-header">
+                          <div class="plan-offer-title-row">
+                            <h3 class="plan-offer-name">Pro</h3>
+                            <span class="plan-offer-badge" data-plan-badge hidden>Current</span>
+                          </div>
+                          <p class="plan-offer-spec">500 runs / month</p>
+                        </div>
+                        <ul class="plan-offer-features">
+                          <li>Live Stripe refund execution (plan-gated)</li>
+                          <li>Higher limits + priority routing</li>
+                          <li>Built for daily operators</li>
+                        </ul>
+                        <button type="button" class="plan-cta plan-cta--primary" data-upgrade="pro"><span>Upgrade to Pro</span></button>
+                      </article>
+
+                      <article class="plan-offer plan-offer--elite" data-plan-tier="elite" id="planEliteCard">
+                        <div class="plan-offer-header">
+                          <div class="plan-offer-title-row">
+                            <h3 class="plan-offer-name">Elite</h3>
+                            <span class="plan-offer-badge" data-plan-badge hidden>Current</span>
+                          </div>
+                          <p class="plan-offer-spec">5,000 runs / month</p>
+                        </div>
+                        <ul class="plan-offer-features">
+                          <li>Everything in Pro</li>
+                          <li>Throughput headroom + team workflows</li>
+                          <li>Designed for high volume</li>
+                        </ul>
+                        <button type="button" class="plan-cta plan-cta--secondary" data-upgrade="elite"><span>Upgrade to Elite</span></button>
+                      </article>
+                    </div>
                   </div>
                 </div>
-                </footer>
-              </div>
+              </section>
+
+              <!-- SURFACE: INTEGRATIONS -->
+              <section class="xv-surface" data-surface-panel="integrations" hidden>
+                <div class="empty-state">
+                  <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(760px, 100%);">
+                    <div class="cld-cap-pill" translate="no">Integrations</div>
+                    <h2 class="cld-welcome-headline" style="margin-top:10px;">Connect tools once. Operate faster.</h2>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Stripe unlocks live billing actions from inside the workflow.</p>
+
+                    <div class="tier-card stripe-card" id="stripeCard" style="margin-top:16px;">
+                      <div class="stripe-card-head">
+                        <div class="stripe-card-title">
+                          <span class="stripe-brand">Stripe</span>
+                          <p id="stripeIntegrationCopy" class="stripe-card-desc">
+                            Connect Stripe to execute refunds instead of only preparing them.
+                          </p>
+                        </div>
+                        <span id="stripeStatus" class="stripe-status-pill" aria-live="polite">Loading…</span>
+                      </div>
+                      <details class="stripe-more">
+                        <summary class="stripe-more-summary">Connection details</summary>
+                        <div class="stripe-meta">
+                          <div class="usage-line stripe-meta-line">
+                            <span>Account</span>
+                            <span id="stripeAccountPill" class="stripe-meta-value">—</span>
+                          </div>
+                          <div class="usage-line stripe-meta-line">
+                            <span>Mode</span>
+                            <span id="stripeModePill" class="stripe-meta-value">—</span>
+                          </div>
+                        </div>
+                      </details>
+                      <div class="stripe-actions-col">
+                        <button id="stripeConnectBtn" class="upgrade-btn stripe-connect-btn" type="button">
+                          <span class="stripe-connect-label">Connect Stripe</span><span aria-hidden="true">→</span>
+                        </button>
+                        <button id="stripeDisconnectBtn" class="ghost-btn stripe-disconnect-full" type="button" hidden>
+                          Disconnect Stripe
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- SURFACE: CRM -->
+              <section class="xv-surface" data-surface-panel="crm" hidden>
+                <div class="empty-state">
+                  <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(900px, 100%);">
+                    <div class="cld-cap-pill" translate="no">CRM</div>
+                    <h2 class="cld-welcome-headline" style="margin-top:10px;">Pipeline, not noise.</h2>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Track leads, follow-ups, and conversion moments generated from real work.</p>
+
+                    <div class="rail-card" id="crmCard" style="margin-top:16px;">
+                      <div class="usage-line">
+                        <span id="crmSummary" class="muted-copy">Loading…</span>
+                        <span class="muted-copy"><span id="crmNewCount">—</span> new · <span id="crmDueCount">—</span> due</span>
+                      </div>
+                      <div class="btn-row" style="margin-top:10px;">
+                        <button id="refreshLeadsBtn" class="ghost-btn" type="button">Refresh</button>
+                        <button id="addLeadBtn" class="btn" type="button">Add lead</button>
+                      </div>
+                      <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:10px; margin-top:10px;">
+                        <input id="leadUsernameInput" class="input" type="text" placeholder="Name / org" />
+                        <input id="leadSourceInput" class="input" type="text" placeholder="Source" />
+                        <input id="leadTextInput" class="input" type="text" placeholder="Note" />
+                      </div>
+                      <div class="refund-list" style="margin-top:12px;">
+                        <div id="leadList" class="scroll-area"></div>
+                      </div>
+                      <div class="refund-list" style="margin-top:10px;">
+                        <div id="followupList" class="scroll-area"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- SURFACE: REVENUE -->
+              <section class="xv-surface" data-surface-panel="revenue" hidden>
+                <div class="empty-state">
+                  <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(900px, 100%);">
+                    <div class="cld-cap-pill" translate="no">Revenue</div>
+                    <h2 class="cld-welcome-headline" style="margin-top:10px;">Value, captured.</h2>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">A compact readout of operator impact, billing motion, and pipeline value.</p>
+
+                    <div class="rail-card" id="revenueCard" style="margin-top:16px;">
+                      <div class="usage-line">
+                        <span id="revenueSummary" class="muted-copy">Loading…</span>
+                        <span class="muted-copy">Pipeline: <span id="revenueTotalValue">—</span></span>
+                      </div>
+                      <div class="value-gen-grid" style="margin-top:12px;">
+                        <div class="tier-card">
+                          <div class="value-gen-label">Leads</div>
+                          <div id="revenueLeadsCount" class="value-gen-num">—</div>
+                        </div>
+                        <div class="tier-card">
+                          <div class="value-gen-label">Win rate</div>
+                          <div id="revenueWinRate" class="value-gen-num">—</div>
+                        </div>
+                        <div class="tier-card">
+                          <div class="value-gen-label">Reply rate</div>
+                          <div id="revenueReplyRate" class="value-gen-num">—</div>
+                        </div>
+                        <div class="tier-card">
+                          <div class="value-gen-label">Closing rate</div>
+                          <div id="revenueClosingRate" class="value-gen-num">—</div>
+                        </div>
+                      </div>
+                      <div class="refund-list" style="margin-top:12px;">
+                        <div id="sourceList" class="scroll-area"></div>
+                      </div>
+                      <div class="refund-list" style="margin-top:10px;">
+                        <div id="forecastStageList" class="scroll-area"></div>
+                      </div>
+                      <div class="refund-list" style="margin-top:10px;">
+                        <div id="forecastDealList" class="scroll-area"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- SURFACE: MORE -->
+              <section class="xv-surface" data-surface-panel="more" hidden>
+                <div class="empty-state">
+                  <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(760px, 100%);">
+                    <div class="cld-cap-pill" translate="no">More</div>
+                    <h2 class="cld-welcome-headline" style="margin-top:10px;">Utilities.</h2>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Secondary tools only. Essentials live in their own surfaces.</p>
+                    <div class="rail-card" style="margin-top:16px;">
+                      <div class="usage-line">
+                        <span class="muted-copy">Refund UI</span>
+                        <button id="openRefundModalBtn" class="ghost-btn" type="button">Open</button>
+                      </div>
+                      <p class="muted-copy" style="margin:10px 0 0 0;">Refund execution depends on your plan and Stripe connection.</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
         </div>
@@ -221,7 +430,7 @@
                 <span id="accessRemainingValue" class="access-metric-v">—</span>
               </div>
             </div>
-            <button id="accessPlansLink" class="access-link-inline" type="button">View plans &amp; limits</button>
+            <button id="accessPlansLink" class="access-link-inline" type="button">View plans</button>
           </div>
 
           <div class="auth-card auth-card-refined" id="authAccessCard">
@@ -243,81 +452,6 @@
             <div class="btn-row access-links-row">
               <button id="devBtn" class="access-link-btn" type="button">Refresh guided tries</button>
               <button id="logoutBtn" class="access-link-btn" type="button">Logout</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="access-drawer-section" id="accessDrawerSectionPlans">
-          <div class="section-label section-label-tight">Plans &amp; capacity</div>
-          <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
-          <p id="plansAuthHint" class="plans-auth-hint" hidden>Sign in under <strong>Access</strong> to change billing. You can still explore the workspace as a guest.</p>
-          <div class="plans-stack" id="plansStack">
-            <article class="plan-offer plan-offer--pro" data-plan-tier="pro">
-              <div class="plan-offer-header">
-                <div class="plan-offer-title-row">
-                  <h3 class="plan-offer-name">Pro</h3>
-                  <span class="plan-offer-badge" data-plan-badge hidden>Current plan</span>
-                </div>
-                <p class="plan-offer-spec">500 runs / month</p>
-              </div>
-              <ul class="plan-offer-features">
-                <li>Live Stripe refund execution from the workspace</li>
-                <li>Full approval workflow, saved threads, higher limits</li>
-                <li>Priority routing when ticket volume spikes</li>
-              </ul>
-              <button type="button" class="plan-cta plan-cta--primary" data-upgrade="pro"><span>Upgrade to Pro</span></button>
-            </article>
-            <article class="plan-offer plan-offer--elite" data-plan-tier="elite">
-              <div class="plan-offer-header">
-                <div class="plan-offer-title-row">
-                  <h3 class="plan-offer-name">Elite</h3>
-                  <span class="plan-offer-badge" data-plan-badge hidden>Current plan</span>
-                </div>
-                <p class="plan-offer-spec">5,000 runs / month</p>
-              </div>
-              <ul class="plan-offer-features">
-                <li>Everything in Pro, with scale headroom</li>
-                <li>Deeper throughput and operator analytics</li>
-                <li>Built for teams clearing very high volume</li>
-              </ul>
-              <button type="button" class="plan-cta plan-cta--secondary" data-upgrade="elite"><span>Upgrade to Elite</span></button>
-            </article>
-          </div>
-          <p id="plansEliteNote" class="plans-tier-note" hidden>You are on the top workspace tier for this product.</p>
-        </section>
-
-        <section class="access-drawer-section" id="accessDrawerSectionIntegrations">
-          <div class="section-label section-label-tight">Integrations</div>
-          <div class="tier-card stripe-card" id="stripeCard">
-            <div class="stripe-card-head">
-              <div class="stripe-card-title">
-                <span class="stripe-brand">Stripe</span>
-                <p id="stripeIntegrationCopy" class="stripe-card-desc">
-                  Connect Stripe to execute refunds instead of only preparing them.
-                </p>
-              </div>
-              <span id="stripeStatus" class="stripe-status-pill" aria-live="polite">Not connected</span>
-            </div>
-            <details class="stripe-more">
-              <summary class="stripe-more-summary">Connection details</summary>
-              <div class="stripe-meta">
-                <div class="usage-line stripe-meta-line">
-                  <span>Account</span>
-                  <span id="stripeAccountPill" class="stripe-meta-value">No account linked</span>
-                </div>
-                <div class="usage-line stripe-meta-line">
-                  <span>Mode</span>
-                  <span id="stripeModePill" class="stripe-meta-value">Awaiting connection</span>
-                </div>
-              </div>
-            </details>
-            <div class="stripe-actions-col">
-              <button id="stripeConnectBtn" class="upgrade-btn stripe-connect-btn" type="button">
-                <span class="stripe-connect-label">Connect Stripe</span><span aria-hidden="true">→</span>
-              </button>
-              <button id="stripeDisconnectBtn" class="ghost-btn stripe-disconnect-full" type="button" hidden>
-                Disconnect Stripe
-              </button>
             </div>
           </div>
         </section>

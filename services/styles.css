@@ -841,6 +841,20 @@ select.refund-select{ padding-right: 34px; }
   flex-direction: column;
   overflow: hidden;
 }
+
+/* Surfaces: one active at a time via [hidden] */
+.xv-surface{
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.xv-surface:not([data-surface-panel="workspace"]){
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 10px;
+}
 .workspace-conversation-column{
   flex: 1;
   min-width: 0;
@@ -2465,9 +2479,12 @@ details > summary{ user-select:none; }
 }
 
 .plans-stack{
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 720px){
+  .plans-stack{ grid-template-columns: 1fr; }
 }
 .plan-offer{
   border-radius: var(--r-md);
@@ -2475,6 +2492,13 @@ details > summary{ user-select:none; }
   background: color-mix(in oklab, var(--surface-soft) 12%, transparent);
   padding: 12px 12px 14px 12px;
   transition: border-color var(--t-med) var(--ease), background var(--t-med) var(--ease);
+}
+.plan-offer--elite{
+  border-color: color-mix(in oklab, var(--accent) 18%, var(--line));
+  background: color-mix(in oklab, var(--accent) 4%, var(--surface-soft));
+}
+.plan-offer--pro{
+  background: color-mix(in oklab, var(--surface-soft) 14%, transparent);
 }
 .plan-offer.is-current{
   border-color: color-mix(in oklab, var(--success) 22%, var(--line));

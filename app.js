@@ -2032,22 +2032,17 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   }
 
   function syncPlansPanelChrome() {
-    const authHint = document.getElementById("plansAuthHint");
-    const eliteNote = document.getElementById("plansEliteNote");
-    const stack = document.getElementById("plansStack");
+    const stack = document.getElementById("plansSurfaceGrid") || document.getElementById("plansStack");
     if (!stack) return;
     const authed = isAuthenticated();
     const tier = String(state.tier || "free").toLowerCase();
     const topTier = tier === "elite" || tier === "dev";
 
-    if (authHint) authHint.hidden = authed;
-    if (eliteNote) eliteNote.hidden = !topTier;
-
     stack.querySelectorAll(".plan-offer").forEach((el) => {
       const offerTier = String(el.dataset.planTier || "").toLowerCase();
-      const onThisPlan = authed && offerTier === tier && tier !== "free";
+      const onThisPlan = authed && offerTier === tier;
       el.classList.toggle("is-current", Boolean(onThisPlan));
-      el.classList.toggle("is-locked-preview", !authed);
+      el.classList.toggle("is-locked-preview", !authed && offerTier !== "preview");
       const badge = el.querySelector("[data-plan-badge]");
       if (badge) badge.hidden = !onThisPlan;
     });
@@ -2103,7 +2098,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
 
   function applyComposerInteractiveLock() {
     const guest = !isAuthenticated();
-    const locked = guest && getGuestUsage() >= GUEST_USAGE_LIMIT;
+    const locked = guest && state.remaining <= 0;
     const dock = document.getElementById("workspaceComposerDock");
     if (dock) dock.classList.toggle("composer-dock--locked-preview", locked);
     const input = els.messageInput;
@@ -2754,13 +2749,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!drawer) return;
     drawer.classList.add("open");
     drawer.setAttribute("aria-hidden", "false");
-
-    const map = {
-      account: "accessDrawerSectionAccount",
-      plans: "accessDrawerSectionPlans",
-      integrations: "accessDrawerSectionIntegrations"
-    };
-    const id = map[target] || map.account;
+    const id = "accessDrawerSectionAccount";
     window.setTimeout(() => {
       document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
       if (target === "account") window.setTimeout(() => els.usernameInput?.focus?.(), 80);
@@ -2779,7 +2768,34 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   }
 
   function focusPlansPanel() {
-    openAccessDrawer("plans");
+    setSurface("plans");
+  }
+
+  function setSurface(key) {
+    const surface = String(key || "workspace").toLowerCase();
+    const main = document.getElementById("mainCanvas");
+    if (main) main.dataset.surface = surface;
+    document.querySelectorAll("[data-surface-panel]").forEach((panel) => {
+      const on = String(panel.getAttribute("data-surface-panel") || "").toLowerCase() === surface;
+      if (on) panel.removeAttribute("hidden");
+      else panel.setAttribute("hidden", "");
+    });
+    const shell = els.sidebarShell;
+    if (shell) shell.dataset.sidebarActive = surface;
+    if (surface === "integrations") {
+      refreshIntegrationsStatus().catch(() => {});
+    }
+    if (surface === "crm") {
+      refreshLeads().catch(() => {});
+      refreshFollowups().catch(() => {});
+      refreshCrmDailySummary().catch(() => {});
+    }
+    if (surface === "revenue") {
+      refreshRevenue().catch(() => {});
+    }
+    try {
+      sessionStorage.setItem("xalvion-surface", surface);
+    } catch {}
   }
 
   function bindEmptyStateActions(empty) {
@@ -5005,6 +5021,31 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     initSidebarNav();
     initRailBriefToggles();
     initAccessDrawer();
+    els.commandAuthChip?.addEventListener("click", () => openAccessDrawer("account"));
+    els.accessPlansLink?.addEventListener("click", () => {
+      closeAccessDrawer();
+      setSurface("plans");
+      const tab = document.getElementById("sidebarTabPlans");
+      tab?.click?.();
+    });
+
+    if (!document.documentElement.dataset.xvAccessButtonsBound) {
+      document.documentElement.dataset.xvAccessButtonsBound = "1";
+      document.addEventListener("click", (e) => {
+        const t = e.target;
+        if (!(t instanceof Element)) return;
+        const btn = t.closest("[data-open-access]");
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const mode = String(btn.getAttribute("data-open-access") || "account").toLowerCase();
+        openAccessDrawer(mode === "login" ? "account" : "account");
+        window.setTimeout(() => {
+          if (mode === "login") els.usernameInput?.focus?.();
+          else els.usernameInput?.focus?.();
+        }, 90);
+      }, true);
+    }
   }
 
   function initAccessDrawer() {
@@ -5084,27 +5125,13 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     };
 
     const applyTab = (key) => {
-      const panels = shell.querySelectorAll("[data-sidebar-panel]");
+      const normalized = String(key || "workspace").toLowerCase();
       tabs.forEach((btn) => {
-        const on = btn.getAttribute("data-sidebar-tab") === key;
+        const on = String(btn.getAttribute("data-sidebar-tab") || "").toLowerCase() === normalized;
         btn.classList.toggle("is-active", on);
         btn.setAttribute("aria-selected", on ? "true" : "false");
       });
-      panels.forEach((panel) => {
-        const on = panel.getAttribute("data-sidebar-panel") === key;
-        panel.classList.toggle("is-active", on);
-        if (on) {
-          panel.removeAttribute("hidden");
-          panel.setAttribute("aria-hidden", "false");
-        } else {
-          panel.setAttribute("hidden", "");
-          panel.setAttribute("aria-hidden", "true");
-        }
-      });
-      shell.dataset.sidebarActive = key;
-      try {
-        sessionStorage.setItem("xalvion-sidebar-tab", key);
-      } catch {}
+      shell.dataset.sidebarActive = normalized;
     };
 
     tabs.forEach((btn) => {
@@ -5117,28 +5144,20 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           openAccessDrawer("account");
           return;
         }
-        if (key === "plans") {
-          e.preventDefault();
-          e.stopPropagation();
-          openAccessDrawer("plans");
-          return;
-        }
-        if (key === "integrations") {
-          e.preventDefault();
-          e.stopPropagation();
-          openAccessDrawer("integrations");
-          return;
-        }
+        e.preventDefault();
+        e.stopPropagation();
         applyTab(key);
+        setSurface(key);
       });
     });
 
     let initial = "workspace";
     try {
-      const saved = sessionStorage.getItem("xalvion-sidebar-tab");
-      if (saved && shell.querySelector(`[data-sidebar-panel="${saved}"]`)) initial = saved;
+      const saved = sessionStorage.getItem("xalvion-surface");
+      if (saved) initial = saved;
     } catch {}
     applyTab(initial);
+    setSurface(initial);
 
     els.sidebarJumpCrmBtn?.addEventListener("click", () => {
       els.crmCard?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -5783,6 +5802,20 @@ function bindEvents() {
     ensureOpsCard();
     bindEvents();
     initWorkspaceChromeShell();
+    try {
+      const url = new URL(window.location.href);
+      const surface = String(url.searchParams.get("surface") || "").toLowerCase();
+      if (surface && ["workspace", "plans", "integrations", "crm", "revenue", "more"].includes(surface)) {
+        setSurface(surface);
+        document.getElementById(`sidebarTab${surface.charAt(0).toUpperCase()}${surface.slice(1)}`)?.click?.();
+        url.searchParams.delete("surface");
+        window.history.replaceState(
+          {},
+          document.title,
+          url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : "") + url.hash
+        );
+      }
+    } catch {}
 
     if (isClaudeShell()) {
       if (els.composerStatusLine) els.composerStatusLine.textContent = "";
