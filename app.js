@@ -323,7 +323,7 @@ if (typeof window.pulseRail !== "function") {
           const claudeStyle = document.createElement("style");
           claudeStyle.id = "xalvion-claude-tweaks";
           claudeStyle.textContent = `
-            /* Xalvion surgical merge: Claude-style rhythm refinements (no logic changes) */
+            /* Xalvion surgical merge: Claude-style rhythm refinements — keep sidebar metrics in styles.css */
             body[data-ui="claude"]{
               --cld-sidebar-expanded: 248px;
               --cld-sidebar-collapsed: 52px;
@@ -331,14 +331,9 @@ if (typeof window.pulseRail !== "function") {
               --cld-open-composer: min(720px, 92vw);
             }
 
-            /* Thinner, calmer left rail with tighter icon rhythm */
             body[data-ui="claude"] #sidebarShell{
-              padding: 8px 8px 12px !important;
               background: var(--surface) !important;
               border-right-color: var(--border) !important;
-            }
-            body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"]{
-              padding: 10px 5px 12px !important;
             }
             body[data-ui="claude"] .sidebar-collapse-btn{
               width: 38px !important;
@@ -346,22 +341,6 @@ if (typeof window.pulseRail !== "function") {
               border-radius: 12px !important;
               background: rgba(255,255,255,0.035) !important;
               border-color: rgba(255,255,255,0.075) !important;
-            }
-            body[data-ui="claude"] .sidebar-nav-item{
-              min-height: 38px !important;
-              border-radius: 10px !important;
-              gap: 8px !important;
-              padding: 0 10px !important;
-            }
-            body[data-ui="claude"] .sidebar-nav-item:hover{
-              background: rgba(255,255,255,0.04) !important;
-              border-color: rgba(255,255,255,0.04) !important;
-            }
-            body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-item{
-              width: 42px !important;
-              height: 42px !important;
-              min-height: 42px !important;
-              margin: 0 auto 6px !important;
             }
             body[data-ui="claude"] .sidebar-nav-icon{
               width: 18px !important;
@@ -372,10 +351,10 @@ if (typeof window.pulseRail !== "function") {
 
             /* Cleaner workspace shell: slightly more editorial center column */
             body[data-ui="claude"] .main-canvas-inner.main-stage{
-              padding: clamp(10px, 2vh, 20px) clamp(12px, 2.5vw, 22px) 10px !important;
+              padding: clamp(10px, 2vh, 18px) clamp(12px, 2.5vw, 22px) 8px !important;
             }
             body[data-ui="claude"] #messages{
-              padding: 6px 0 96px !important;
+              padding: 6px 0 56px !important;
               gap: 12px !important;
             }
 
@@ -2059,8 +2038,8 @@ The workspace already showed you real routing and approval discipline. Pro keeps
         const runWord = rem === 1 ? "run" : "runs";
         el.textContent =
           rem <= 0
-            ? "Preview complete • unlock full access"
-            : `Preview mode • ${rem} ${runWord} remaining`;
+            ? "Preview complete — open Access to continue"
+            : `Preview · ${rem} ${runWord} left`;
         if (state.remaining <= 0) el.classList.add("is-limit");
         else if (pct >= 0.75) el.classList.add("is-warning");
       } else if (state.atLimit) {
@@ -2703,12 +2682,16 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       ? `Preview mode · ${previewLeft} operator ${previewRunsWord} remaining`
       : `${formatTier(state.tier)} · ${state.remaining} operator runs this period`;
 
+    const capPillText = guest
+      ? `Preview · ${previewLeft} ${previewRunsWord} left`
+      : `${formatTier(state.tier)} · ${state.remaining} of ${state.limit} this month`;
+
     if (isClaudeShell()) {
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-thread-open" role="status">
-        <h2 class="cld-welcome-headline">How can I help with this ticket?</h2>
-        <p class="cld-welcome-prompt">Paste a customer issue below or start with one of the suggested prompts.</p>
-        <p class="cld-welcome-support empty-launch-plan-hint empty-launch-plan-hint--quiet">${chipHintGuest}</p>
+        <h2 class="cld-welcome-headline">What should we handle?</h2>
+        <p class="cld-welcome-prompt">Paste the issue or use a starter below.</p>
+        <div class="cld-welcome-meta"><span class="cld-cap-pill">${escapeHtml(capPillText)}</span></div>
       </div>`;
     }
 
@@ -3780,8 +3763,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const hasThread = Boolean(els.messages?.querySelector(".msg-group"));
     if (!hasThread) {
       els.composerStatusLine.textContent = isAuthenticated()
-        ? "Paste a ticket below to start."
-        : "Paste below — preview mode includes a few full runs.";
+        ? "Describe the case below."
+        : "A few full runs available—no account needed.";
       return;
     }
     if (!isAuthenticated()) {
@@ -3789,11 +3772,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const rw = left === 1 ? "run" : "runs";
       els.composerStatusLine.textContent =
         left > 0
-          ? `Review the draft above, then try another case · ${left} preview ${rw} left`
-          : "Continue with full access — sign up under Access to keep threads and monthly runs.";
+          ? `Review the draft, then send another · ${left} preview ${rw} left`
+          : "Preview finished — sign in under Access to continue.";
       return;
     }
-    els.composerStatusLine.textContent = "Paste the next ticket, or refine this thread.";
+    els.composerStatusLine.textContent = "Next ticket, or refine this thread.";
   }
 
   function setSending(value) {
