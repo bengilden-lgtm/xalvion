@@ -966,3 +966,64 @@ textarea{ resize:vertical; }
   font-size:12px;
   font-weight:600;
 }
+
+/* Governor visibility (fallback stylesheet only) */
+.signal-blocked{
+  border-color: rgba(210,133,133,0.26) !important;
+  background: rgba(210,133,133,0.10) !important;
+  color: rgba(246,242,235,0.90) !important;
+}
+.governor-summary{
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+.governor-risk-chip{
+  display:inline-flex;
+  align-items:center;
+  min-height:26px;
+  padding:0 10px;
+  border-radius:999px;
+  border:1px solid var(--line-soft);
+  background:rgba(255,255,255,0.02);
+  color:rgba(246,242,235,0.84);
+  font-size:12px;
+  font-weight:650;
+}
+.governor-next-step{
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+.governor-factors,
+.governor-violations{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+.governor-violations{ border-top-color: rgba(210,133,133,0.18); }
+.governor-factors-label,
+.governor-violations-label{
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: rgba(246,242,235,0.86);
+  margin-bottom: 6px;
+}
+.governor-factor,
+.governor-violation{
+  font-size: 12.5px;
+  color: var(--text-soft);
+  line-height: 1.45;
+  padding-left: 12px;
+  position: relative;
+}
+.governor-factor::before,
+.governor-violation::before{
+  content: "•";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: rgba(224,217,206,0.58);
+}

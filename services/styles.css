@@ -1502,6 +1502,11 @@ select.refund-select{ padding-right: 34px; }
   background: color-mix(in oklab, var(--accent) 8%, transparent);
   color: color-mix(in oklab, var(--accent) 82%, var(--text-2));
 }
+.consequence-signal.signal-blocked{
+  border-color: color-mix(in oklab, var(--danger) 26%, var(--line));
+  background: color-mix(in oklab, var(--danger) 7%, transparent);
+  color: color-mix(in oklab, var(--danger) 82%, var(--text-2));
+}
 
 /* Operator review actions — icon + label, clear hierarchy */
 .op-action{
@@ -1593,6 +1598,66 @@ select.refund-select{ padding-right: 34px; }
   font-size: 12.5px;
   color: var(--text-muted);
   line-height: 1.45;
+}
+.governor-block{ margin-top: 6px; }
+.governor-summary{
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.governor-risk-row{ margin-top: 8px; }
+.governor-risk-chip{
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 24%, transparent);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 650;
+}
+.governor-next-step{
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.governor-factors,
+.governor-violations{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+}
+.governor-factors-label,
+.governor-violations-label{
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.governor-factor,
+.governor-violation{
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.45;
+  padding-left: 12px;
+  position: relative;
+}
+.governor-factor::before,
+.governor-violation::before{
+  content: "•";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: color-mix(in oklab, var(--text-4) 70%, transparent);
+}
+.governor-violations{
+  border-top-color: color-mix(in oklab, var(--danger) 14%, var(--border));
+}
+.governor-violations-label{
+  color: color-mix(in oklab, var(--danger) 62%, var(--text-2));
 }
 .decision-panel-note[data-tone="success"]{
   color: color-mix(in oklab, var(--success) 75%, var(--text-2));

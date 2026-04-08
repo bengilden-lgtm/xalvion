@@ -161,6 +161,193 @@
         }
         return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
       },
+      normalizeGovernorFactors(value) {
+        if (!value) return [];
+        if (Array.isArray(value)) {
+          return value
+            .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
+            .filter(Boolean);
+        }
+        if (typeof value === "string") {
+          const t = value.trim();
+          if (!t) return [];
+          const parts = t.includes("\n") ? t.split("\n") : t.split(/[;•]/g);
+          return parts.map((x) => String(x || "").trim()).filter(Boolean);
+        }
+        if (typeof value === "object") {
+          const v = value;
+          const candidates = [];
+          if (Array.isArray(v.factors)) candidates.push(...v.factors);
+          if (Array.isArray(v.items)) candidates.push(...v.items);
+          if (Array.isArray(v.signals)) candidates.push(...v.signals);
+          if (candidates.length) {
+            return candidates
+              .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
+              .filter(Boolean);
+          }
+          try {
+            return [JSON.stringify(v)].map((x) => String(x || "").trim()).filter(Boolean);
+          } catch {
+            return [String(v)].map((x) => String(x || "").trim()).filter(Boolean);
+          }
+        }
+        return [String(value)].map((x) => String(x || "").trim()).filter(Boolean);
+      },
+      normalizeViolations(value) {
+        if (!value) return [];
+        if (Array.isArray(value)) {
+          return value
+            .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
+            .filter(Boolean);
+        }
+        if (typeof value === "string") {
+          const t = value.trim();
+          if (!t) return [];
+          const parts = t.includes("\n") ? t.split("\n") : t.split(/[;•]/g);
+          return parts.map((x) => String(x || "").trim()).filter(Boolean);
+        }
+        if (typeof value === "object") {
+          const v = value;
+          const candidates = [];
+          if (Array.isArray(v.violations)) candidates.push(...v.violations);
+          if (Array.isArray(v.items)) candidates.push(...v.items);
+          if (Array.isArray(v.errors)) candidates.push(...v.errors);
+          if (candidates.length) {
+            return candidates
+              .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
+              .filter(Boolean);
+          }
+          try {
+            return [JSON.stringify(v)].map((x) => String(x || "").trim()).filter(Boolean);
+          } catch {
+            return [String(v)].map((x) => String(x || "").trim()).filter(Boolean);
+          }
+        }
+        return [String(value)].map((x) => String(x || "").trim()).filter(Boolean);
+      },
+      formatGovernorRisk(governor_risk_level, governor_risk_score) {
+        const level = String(governor_risk_level || "").toLowerCase();
+        const levelLabel =
+          level === "low" ? "Low risk" : level === "medium" ? "Medium risk" : level === "high" ? "High risk" : "";
+        if (!levelLabel) return "";
+        const score = Number(governor_risk_score);
+        if (Number.isFinite(score)) {
+          const s = Math.max(0, Math.min(5, Math.round(score)));
+          return `${levelLabel} · ${s}/5`;
+        }
+        return levelLabel;
+      },
+      deriveGovernorPresentation(data) {
+        const d = data && typeof data === "object" ? data : {};
+        const dec = d.sovereign_decision && typeof d.sovereign_decision === "object" ? d.sovereign_decision : d.decision || {};
+        const triage =
+          d.triage_metadata && typeof d.triage_metadata === "object"
+            ? d.triage_metadata
+            : d.triage || {};
+
+        const execModeRaw = d.execution_mode ?? dec.execution_mode;
+        const execMode = String(execModeRaw || "").toLowerCase();
+        const hasGov =
+          execMode === "auto" ||
+          execMode === "review" ||
+          execMode === "blocked" ||
+          d.governor_reason != null ||
+          dec.governor_reason != null ||
+          d.governor_risk_level != null ||
+          dec.governor_risk_level != null ||
+          d.governor_risk_score != null ||
+          dec.governor_risk_score != null ||
+          d.governor_factors != null ||
+          dec.governor_factors != null ||
+          d.violations != null ||
+          dec.violations != null ||
+          d.approved != null ||
+          dec.approved != null;
+
+        const govReason = String(d.governor_reason || dec.governor_reason || "").trim();
+        const govRiskLevel = String(d.governor_risk_level || dec.governor_risk_level || "").toLowerCase();
+        const govRiskScore = d.governor_risk_score ?? dec.governor_risk_score;
+        const factors = format.normalizeGovernorFactors(d.governor_factors ?? dec.governor_factors).slice(0, 12);
+        const violations = format.normalizeViolations(d.violations ?? dec.violations).slice(0, 12);
+        const riskChip = format.formatGovernorRisk(govRiskLevel, govRiskScore);
+
+        const nextStep =
+          execMode === "blocked"
+            ? "Edit or escalate before execution."
+            : execMode === "review"
+              ? "Review and approve before execution."
+              : execMode === "auto"
+                ? "Action can proceed without operator intervention."
+                : "";
+
+        // Determine mode + top label/cls. Governor is source of truth only when governor fields are present.
+        let mode = hasGov ? (execMode || "unknown") : "unknown";
+
+        // Never imply safe if violations exist or risk is high, even if execMode is "auto".
+        if (hasGov && mode === "auto" && (violations.length > 0 || govRiskLevel === "high")) {
+          mode = "review";
+        }
+
+        let label = "";
+        let cls = "";
+        let title = "";
+
+        if (mode === "blocked") {
+          label = "Blocked by policy";
+          cls = "signal-high-risk signal-blocked";
+          title = govReason || "Blocked by governor policy";
+        } else if (mode === "review") {
+          label = "Approval required";
+          cls = "signal-approval";
+          title = govReason || "Review required under governor policy";
+        } else if (mode === "auto") {
+          label = "Safe to automate";
+          cls = "signal-safe";
+          title = govReason || "Meets automation safety criteria";
+        }
+
+        // Backwards-compatible fallback when no governor fields exist at all.
+        if (!hasGov) {
+          const legacy = format.deriveConsequencePresentation(d);
+          const legacyLabel = legacy?.text || "○ Manual review";
+          const legacyCls = legacy?.cls || "signal-review";
+          return {
+            label: legacyLabel.replace(/^✓\s*/g, "").replace(/^⚡\s*/g, "").replace(/^⚠\s*/g, "").replace(/^○\s*/g, "").replace(/^⛔\s*/g, ""),
+            cls: legacyCls,
+            title: legacy?.title || "",
+            summary: "",
+            nextStep: "",
+            riskLabel: "",
+            riskScoreLabel: "",
+            factors: [],
+            violations: [],
+            mode: "unknown",
+          };
+        }
+
+        const summary = govReason
+          ? govReason
+          : mode === "blocked"
+            ? "Blocked by policy."
+            : mode === "review"
+              ? "Approval required under policy."
+              : mode === "auto"
+                ? "Low-risk action with no policy violations."
+                : "";
+
+        return {
+          label,
+          cls,
+          title,
+          summary,
+          nextStep,
+          riskLabel: govRiskLevel ? (govRiskLevel === "low" ? "Low risk" : govRiskLevel === "medium" ? "Medium risk" : govRiskLevel === "high" ? "High risk" : "") : "",
+          riskScoreLabel: riskChip,
+          factors,
+          violations,
+          mode: mode === "auto" || mode === "review" || mode === "blocked" ? mode : "unknown",
+        };
+      },
       formatValueSummary(metrics) {
         const m = metrics && typeof metrics === "object" ? metrics : {};
         return {

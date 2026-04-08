@@ -304,34 +304,204 @@ async function ensureUsageReady() {
   await usageReady;
 }
 
+function normalizeGovernorFactors(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const t = value.trim();
+    if (!t) return [];
+    const parts = t.includes("\n") ? t.split("\n") : t.split(/[;•]/g);
+    return parts.map((x) => String(x || "").trim()).filter(Boolean);
+  }
+  if (typeof value === "object") {
+    const v = value;
+    const candidates = [];
+    if (Array.isArray(v.factors)) candidates.push(...v.factors);
+    if (Array.isArray(v.items)) candidates.push(...v.items);
+    if (Array.isArray(v.signals)) candidates.push(...v.signals);
+    if (candidates.length) {
+      return candidates
+        .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
+        .filter(Boolean);
+    }
+    try {
+      return [JSON.stringify(v)].map((x) => String(x || "").trim()).filter(Boolean);
+    } catch {
+      return [String(v)].map((x) => String(x || "").trim()).filter(Boolean);
+    }
+  }
+  return [String(value)].map((x) => String(x || "").trim()).filter(Boolean);
+}
+
+function normalizeViolations(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const t = value.trim();
+    if (!t) return [];
+    const parts = t.includes("\n") ? t.split("\n") : t.split(/[;•]/g);
+    return parts.map((x) => String(x || "").trim()).filter(Boolean);
+  }
+  if (typeof value === "object") {
+    const v = value;
+    const candidates = [];
+    if (Array.isArray(v.violations)) candidates.push(...v.violations);
+    if (Array.isArray(v.items)) candidates.push(...v.items);
+    if (Array.isArray(v.errors)) candidates.push(...v.errors);
+    if (candidates.length) {
+      return candidates
+        .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
+        .filter(Boolean);
+    }
+    try {
+      return [JSON.stringify(v)].map((x) => String(x || "").trim()).filter(Boolean);
+    } catch {
+      return [String(v)].map((x) => String(x || "").trim()).filter(Boolean);
+    }
+  }
+  return [String(value)].map((x) => String(x || "").trim()).filter(Boolean);
+}
+
+function formatGovernorRisk(governor_risk_level, governor_risk_score) {
+  const level = String(governor_risk_level || "").toLowerCase();
+  const levelLabel =
+    level === "low" ? "Low risk" : level === "medium" ? "Medium risk" : level === "high" ? "High risk" : "";
+  if (!levelLabel) return "";
+  const score = Number(governor_risk_score);
+  if (Number.isFinite(score)) {
+    const s = Math.max(0, Math.min(5, Math.round(score)));
+    return `${levelLabel} · ${s}/5`;
+  }
+  return levelLabel;
+}
+
+function deriveGovernorPresentation(data) {
+  const d = data && typeof data === "object" ? data : {};
+  const dec = getDecisionData(d) || {};
+  const execModeRaw = d.execution_mode ?? dec.execution_mode;
+  const execMode = String(execModeRaw || "").toLowerCase();
+  const hasGov =
+    execMode === "auto" ||
+    execMode === "review" ||
+    execMode === "blocked" ||
+    d.governor_reason != null ||
+    dec.governor_reason != null ||
+    d.governor_risk_level != null ||
+    dec.governor_risk_level != null ||
+    d.governor_risk_score != null ||
+    dec.governor_risk_score != null ||
+    d.governor_factors != null ||
+    dec.governor_factors != null ||
+    d.violations != null ||
+    dec.violations != null ||
+    d.approved != null ||
+    dec.approved != null;
+
+  if (!hasGov) {
+    return {
+      label: "",
+      cls: "",
+      title: "",
+      summary: "",
+      nextStep: "",
+      riskLabel: "",
+      riskScoreLabel: "",
+      factors: [],
+      violations: [],
+      mode: "unknown",
+    };
+  }
+
+  const govReason = String(d.governor_reason || dec.governor_reason || "").trim();
+  const govRiskLevel = String(d.governor_risk_level || dec.governor_risk_level || "").toLowerCase();
+  const govRiskScore = d.governor_risk_score ?? dec.governor_risk_score;
+  const factors = normalizeGovernorFactors(d.governor_factors ?? dec.governor_factors).slice(0, 12);
+  const violations = normalizeViolations(d.violations ?? dec.violations).slice(0, 12);
+  const riskChip = formatGovernorRisk(govRiskLevel, govRiskScore);
+
+  const nextStep =
+    execMode === "blocked"
+      ? "Edit or escalate before execution."
+      : execMode === "review"
+        ? "Review and approve before execution."
+        : execMode === "auto"
+          ? "Action can proceed without operator intervention."
+          : "";
+
+  let mode = execMode || "unknown";
+  if (mode === "auto" && (violations.length > 0 || govRiskLevel === "high")) {
+    mode = "review";
+  }
+
+  let label = "";
+  let cls = "";
+  let title = "";
+
+  if (mode === "blocked") {
+    label = "Blocked by policy";
+    cls = "signal-high-risk signal-blocked";
+    title = govReason || "Blocked by governor policy";
+  } else if (mode === "review") {
+    label = "Approval required";
+    cls = "signal-approval";
+    title = govReason || "Review required under governor policy";
+  } else if (mode === "auto") {
+    label = "Safe to automate";
+    cls = "signal-safe";
+    title = govReason || "Meets automation safety criteria";
+  }
+
+  const summary = govReason
+    ? govReason
+    : mode === "blocked"
+      ? "Blocked by policy."
+      : mode === "review"
+        ? "Approval required under policy."
+        : mode === "auto"
+          ? "Low-risk action with no policy violations."
+          : "";
+
+  return {
+    label,
+    cls,
+    title,
+    summary,
+    nextStep,
+    riskLabel: govRiskLevel ? (govRiskLevel === "low" ? "Low risk" : govRiskLevel === "medium" ? "Medium risk" : govRiskLevel === "high" ? "High risk" : "") : "",
+    riskScoreLabel: riskChip,
+    factors,
+    violations,
+    mode: mode === "auto" || mode === "review" || mode === "blocked" ? mode : "unknown",
+  };
+}
+
 function renderConsequenceBar(data) {
   if (!consequenceSignal) return;
   // File: xalvion-extension/sidepanel.js
   // Governor trust signal parity: when governor fields are present, they become source-of-truth.
-  const dec = getDecisionData(data);
-  const execMode = String(data?.execution_mode || dec?.execution_mode || "").toLowerCase();
-  const govRisk = String(data?.governor_risk_level || dec?.governor_risk_level || "").toLowerCase();
-  const govReason = String(data?.governor_reason || dec?.governor_reason || "").trim();
-  let pres = deriveConsequencePresentation(data);
-  if (execMode === "blocked") {
-    pres = {
-      cls: "signal-high-risk",
-      text: "⛔ Blocked",
-      title: govReason || "Blocked by governor policy",
-    };
-  } else if (govRisk === "high" && pres?.cls !== "signal-high-risk") {
-    pres = {
-      cls: "signal-high-risk",
-      text: "⚠ High risk",
-      title: govReason || "Elevated risk — review before customer send",
-    };
-  } else if (execMode === "review" && pres?.cls === "signal-safe") {
-    pres = {
-      cls: "signal-approval",
-      text: "⚡ Approval required",
-      title: govReason || "Review required under governor policy",
-    };
-  }
+  const pres = (() => {
+    const gov = deriveGovernorPresentation(data);
+    if (gov && gov.mode && gov.mode !== "unknown") {
+      const text =
+        gov.mode === "blocked"
+          ? "⛔ Blocked by policy"
+          : gov.mode === "review"
+            ? "⚡ Approval required"
+            : gov.mode === "auto"
+              ? "✓ Safe to automate"
+              : "○ Manual review";
+      return { cls: gov.cls || "signal-review", text, title: gov.summary || gov.title || "" };
+    }
+    return deriveConsequencePresentation(data);
+  })();
   consequenceSignal.textContent = pres.text;
   consequenceSignal.className = `consequence-signal ${pres.cls}`;
   if (pres.title) consequenceSignal.setAttribute("title", pres.title);
@@ -356,9 +526,12 @@ function renderApprovalCompact(data, reply) {
 function addBriefLine(container, label, value) {
   const row = document.createElement("div");
   row.className = "operator-brief-line";
-  const strong = document.createElement("strong");
-  strong.textContent = `${label} `;
-  row.appendChild(strong);
+  const k = String(label || "").trim();
+  if (k) {
+    const strong = document.createElement("strong");
+    strong.textContent = `${k} `;
+    row.appendChild(strong);
+  }
   row.appendChild(document.createTextNode(value || "—"));
   container.appendChild(row);
 }
@@ -370,6 +543,27 @@ function renderOperatorBrief(data) {
   for (const line of lines) {
     addBriefLine(operatorBriefBody, line.label, line.value);
   }
+
+  // Governor visibility (optional): concise reason + factors + next step.
+  try {
+    const gov = deriveGovernorPresentation(data);
+    if (gov && gov.mode && gov.mode !== "unknown") {
+      if (gov.summary) addBriefLine(operatorBriefBody, "Governor", gov.summary);
+      if (gov.nextStep) addBriefLine(operatorBriefBody, "Next step", gov.nextStep);
+      const riskText = String(gov.riskScoreLabel || gov.riskLabel || "").trim();
+      if (riskText) addBriefLine(operatorBriefBody, "Risk", riskText);
+      const factors = Array.isArray(gov.factors) ? gov.factors.slice(0, 3) : [];
+      if (factors.length) {
+        addBriefLine(operatorBriefBody, "Governor factors", factors[0]);
+        for (const f of factors.slice(1)) addBriefLine(operatorBriefBody, "", f);
+      }
+      const violations = Array.isArray(gov.violations) ? gov.violations.slice(0, 3) : [];
+      if (violations.length) {
+        addBriefLine(operatorBriefBody, "Policy checks", violations[0]);
+        for (const v of violations.slice(1)) addBriefLine(operatorBriefBody, "", v);
+      }
+    }
+  } catch {}
   if (operatorBriefEl && !operatorBriefEl.open) {
     /* default collapsed for compact extension chrome */
   }
@@ -856,7 +1050,10 @@ function render(data) {
   }
 
   hideInboxSummary();
-  showHeaderInsight(buildHeaderInsight({ ...data, status, action, confidence, issue_type: issueType }));
+  {
+    const govReason = String(data?.governor_reason || decision?.governor_reason || "").trim();
+    showHeaderInsight(govReason || buildHeaderInsight({ ...data, status, action, confidence, issue_type: issueType }));
+  }
   hideThinkingPanel();
   showPanel();
 

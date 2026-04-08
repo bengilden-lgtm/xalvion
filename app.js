@@ -3223,6 +3223,22 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       })
     );
 
+    // Governor risk chip (only when governor fields are present).
+    try {
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
+      const riskChipText = String(gov?.riskScoreLabel || gov?.riskLabel || "").trim();
+      if (gov && gov.mode && gov.mode !== "unknown" && riskChipText) {
+        meta.appendChild(
+          createMetaChip({
+            icon: ICONS.warn,
+            text: riskChipText,
+            tone: "risk governor-risk-chip",
+          })
+        );
+      }
+    } catch {}
+
     return meta;
   }
 
@@ -3285,6 +3301,15 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   }
 
   function operatorPostureLabel(data = {}) {
+    try {
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
+      if (gov && gov.mode && gov.mode !== "unknown") {
+        if (gov.mode === "blocked") return "Blocked by policy";
+        if (gov.mode === "review") return "Approval required";
+        if (gov.mode === "auto") return "Safe to automate";
+      }
+    } catch {}
     const approval = getApprovalContext(data);
     if (approval.requiresApproval && !approval.approved) return "Approval gate";
     const action = String(data.action || data.decision?.action || "none").toLowerCase();
@@ -3349,6 +3374,15 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   }
 
   function safetyVerdictLine(data = {}) {
+    try {
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
+      if (gov && gov.mode && gov.mode !== "unknown") {
+        if (gov.mode === "blocked") return "Blocked by policy — do not execute as proposed.";
+        if (gov.mode === "review") return "Approval required under policy — verify factors, then approve.";
+        if (gov.mode === "auto") return "Governor indicates the action is safe to automate.";
+      }
+    } catch {}
     const approval = getApprovalContext(data);
     const c = Number(data.confidence || 0);
     const tone = confidenceTone(c);
@@ -3361,6 +3395,13 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   }
 
   function nextOperatorStepLine(data = {}) {
+    try {
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
+      if (gov && gov.mode && gov.mode !== "unknown" && gov.nextStep) {
+        return gov.nextStep;
+      }
+    } catch {}
     const approval = getApprovalContext(data);
     if (approval.requiresApproval && !approval.approved && approval.canApprove) {
       return "Refine the reply if needed, then approve or reject the prepared action.";
@@ -3476,14 +3517,40 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const dec = data.decision || data.sovereign_decision || {};
     // File: app.js
     // Governor fields (when present) are the final authority trust signal.
+    try {
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
+      if (gov && gov.mode && gov.mode !== "unknown") {
+        const text =
+          gov.mode === "blocked"
+            ? "⛔ Blocked by policy"
+            : gov.mode === "review"
+              ? "⚡ Approval required"
+              : gov.mode === "auto"
+                ? "✓ Safe to automate"
+                : "○ Manual review";
+        return {
+          cls: gov.cls || "signal-review",
+          text,
+          title: String(gov.summary || gov.title || ""),
+        };
+      }
+    } catch {}
     const govRisk = String(data.governor_risk_level || dec.governor_risk_level || "").toLowerCase();
     const risk = String(govRisk || dec.risk_level || data.triage?.risk_level || "").toLowerCase();
     const execMode = String(data.execution_mode || dec.execution_mode || "").toLowerCase();
     if (execMode === "blocked") {
       return {
-        cls: "signal-high-risk",
-        text: "⛔ Blocked",
+        cls: "signal-high-risk signal-blocked",
+        text: "⛔ Blocked by policy",
         title: String(data.governor_reason || dec.governor_reason || "Blocked by governor policy"),
+      };
+    }
+    if (execMode === "review") {
+      return {
+        cls: "signal-approval",
+        text: "⚡ Approval required",
+        title: String(data.governor_reason || dec.governor_reason || "Review required under governor policy"),
       };
     }
     if (risk === "high") {
@@ -3564,32 +3631,50 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (cons && sig.title) cons.setAttribute("title", sig.title);
 
     const controls = panel.querySelector("[data-role='controls']");
+    const trustEl = panel.querySelector("[data-role='trust']");
     const noteEl = panel.querySelector("[data-role='note']");
     const errEl = panel.querySelector("[data-role='err']");
     const editWrap = panel.querySelector("[data-role='edit']");
     const nextWrap = panel.querySelector("[data-role='next']");
 
     // File: app.js
-    // Governor trust signal (optional): surface reason/violations without changing layout structure.
+    // Governor visibility pass (optional): surface reason/factors/violations/next-step without changing layout structure.
     try {
-      const govReason = String(data.governor_reason || dec.governor_reason || "").trim();
-      const govScore = data.governor_risk_score ?? dec.governor_risk_score;
-      const violations = Array.isArray(data.violations || dec.violations) ? (data.violations || dec.violations) : [];
-      if (noteEl && (govReason || violations.length)) {
-        const parts = [];
-        if (govReason) parts.push(govReason);
-        if (govScore !== undefined && govScore !== null && String(govScore).trim() !== "") {
-          parts.push(`Risk: ${String(govScore)}/5`);
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
+      if (gov && gov.mode && gov.mode !== "unknown") {
+        if (trustEl && gov.summary) trustEl.textContent = gov.summary;
+        const riskText = String(gov.riskScoreLabel || gov.riskLabel || "").trim();
+        const factors = Array.isArray(gov.factors) ? gov.factors.slice(0, 3) : [];
+        const violations = Array.isArray(gov.violations) ? gov.violations.slice(0, 3) : [];
+        const next = String(gov.nextStep || "").trim();
+        const blocks = [];
+        if (riskText) {
+          blocks.push(`<div class="governor-risk-row"><span class="governor-risk-chip">${escapeHtml(riskText)}</span></div>`);
+        }
+        if (next) {
+          blocks.push(`<div class="governor-next-step">${escapeHtml(next)}</div>`);
+        }
+        if (factors.length) {
+          blocks.push(
+            `<div class="governor-factors"><div class="governor-factors-label">Governor factors</div>${factors
+              .map((f) => `<div class="governor-factor">${escapeHtml(f)}</div>`)
+              .join("")}</div>`
+          );
         }
         if (violations.length) {
-          parts.push(`Violations: ${violations.slice(0, 3).join("; ")}`);
+          blocks.push(
+            `<div class="governor-violations"><div class="governor-violations-label">Policy checks</div>${violations
+              .map((v) => `<div class="governor-violation">${escapeHtml(v)}</div>`)
+              .join("")}</div>`
+          );
         }
-        noteEl.textContent = parts.join(" · ");
-        noteEl.style.display = "block";
+        if (noteEl && blocks.length) {
+          noteEl.innerHTML = blocks.join("");
+          noteEl.style.display = "block";
+        }
       }
-    } catch {
-      /* no-op */
-    }
+    } catch {}
 
     const showErr = (t) => {
       errEl.textContent = t || "";
@@ -4065,6 +4150,40 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const trace = thinkingTraceSnippet(data, 5);
     const execDetail = String(data.execution?.detail || data.tool_result?.message || "").trim();
 
+    let governorBlock = "";
+    try {
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
+      if (gov && gov.mode && gov.mode !== "unknown") {
+        const factors = Array.isArray(gov.factors) ? gov.factors.slice(0, 3) : [];
+        const violations = Array.isArray(gov.violations) ? gov.violations.slice(0, 3) : [];
+        const riskText = String(gov.riskScoreLabel || gov.riskLabel || "").trim();
+        const next = String(gov.nextStep || "").trim();
+        const reason = String(gov.summary || "").trim();
+        governorBlock = `
+          <div class="governor-block">
+            ${reason ? `<div class="governor-summary">${escapeHtml(reason)}</div>` : ""}
+            ${riskText ? `<div class="governor-risk-row"><span class="governor-risk-chip">${escapeHtml(riskText)}</span></div>` : ""}
+            ${next ? `<div class="governor-next-step">${escapeHtml(next)}</div>` : ""}
+            ${
+              factors.length
+                ? `<div class="governor-factors"><div class="governor-factors-label">Governor factors</div>${factors
+                    .map((f) => `<div class="governor-factor">${escapeHtml(f)}</div>`)
+                    .join("")}</div>`
+                : ""
+            }
+            ${
+              violations.length
+                ? `<div class="governor-violations"><div class="governor-violations-label">Policy checks</div>${violations
+                    .map((v) => `<div class="governor-violation">${escapeHtml(v)}</div>`)
+                    .join("")}</div>`
+                : ""
+            }
+          </div>
+        `;
+      }
+    } catch {}
+
     const explainabilityBrief = buildExplainabilityBriefHtml(data.decision_explainability);
     const explanationInsightsHtml = explainabilityBrief
       ? ""
@@ -4072,6 +4191,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
     const insightBlock = `
       <div class="details-insight-stack">
+        ${governorBlock}
         ${explainabilityBrief}
         ${explanationInsightsHtml}
         <div class="details-insight">
@@ -4752,6 +4872,20 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       };
       chip(approval.canApprove ? "You can approve from the canvas" : "Sign in as ticket owner to approve", approval.canApprove);
       chip(approval.ticketId ? `Ticket #${approval.ticketId}` : "No ticket id on this run", Boolean(approval.ticketId));
+
+      // Governor visibility (additive): show reason, risk chip, and next step when present.
+      try {
+        const fmt = globalThis.__XALVION_FORMAT__;
+        const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(target) : null;
+        if (gov && gov.mode && gov.mode !== "unknown") {
+          const riskText = String(gov.riskScoreLabel || gov.riskLabel || "").trim();
+          const reason = String(gov.summary || "").trim();
+          const next = String(gov.nextStep || "").trim();
+          if (riskText) chip(riskText, false);
+          if (reason) chip(reason.length > 90 ? `${reason.slice(0, 90)}…` : reason, false);
+          if (next) chip(next, false);
+        }
+      } catch {}
     }
   }
 
