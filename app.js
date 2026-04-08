@@ -5309,6 +5309,50 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     }
   }
 
+  function setCtaLoading(btn, loading, loadingLabel) {
+    if (!(btn instanceof HTMLButtonElement)) return;
+    const labelEl = btn.querySelector("span") || btn;
+    if (loading) {
+      if (!btn.dataset.ctaOriginalLabel) btn.dataset.ctaOriginalLabel = labelEl.textContent || "";
+      btn.disabled = true;
+      if (loadingLabel) labelEl.textContent = loadingLabel;
+      btn.setAttribute("aria-busy", "true");
+      return;
+    }
+    const original = btn.dataset.ctaOriginalLabel;
+    if (typeof original === "string" && original.length) labelEl.textContent = original;
+    btn.disabled = false;
+    btn.removeAttribute("aria-busy");
+    delete btn.dataset.ctaOriginalLabel;
+  }
+
+  function setAccessMode(mode) {
+    const m = String(mode || "account").toLowerCase();
+    const card = document.getElementById("authAccessCard");
+    if (card) card.dataset.authMode = m;
+    if (m === "signup") {
+      setNotice("info", "Create your account", "Choose a username + password to save your workspace and continue on Free.");
+    } else if (m === "login") {
+      setNotice("info", "Log in", "Enter your existing account credentials to continue.");
+    }
+  }
+
+  async function startUpgradeFromButton(btn, tier) {
+    if (!(btn instanceof HTMLButtonElement)) return;
+    const desired = String(tier || "").toLowerCase();
+    if (!desired) return;
+    if (btn.disabled || btn.hidden) return;
+
+    setCtaLoading(btn, true, "Opening checkout…");
+    try {
+      await upgradePlan(desired);
+    } catch (err) {
+      setNotice("error", "Upgrade failed", err?.message || "Could not open checkout.");
+    } finally {
+      setCtaLoading(btn, false);
+    }
+  }
+
   async function healthCheck() {
     try {
       const res = await fetch(`${API}/health`, { headers: headers(false) });
@@ -5521,12 +5565,12 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         const btn = t.closest("[data-open-access]");
         if (!btn) return;
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         const mode = String(btn.getAttribute("data-open-access") || "account").toLowerCase();
-        openAccessDrawer(mode === "login" ? "account" : "account");
+        openAccessDrawer("account");
+        setAccessMode(mode);
         window.setTimeout(() => {
-          if (mode === "login") els.usernameInput?.focus?.();
-          else els.usernameInput?.focus?.();
+          els.usernameInput?.focus?.();
         }, 90);
       }, true);
     }
@@ -6102,6 +6146,26 @@ function bindEvents() {
       refreshUpgradeValueSummary();
       upgradePlan(btn.dataset.upgrade || "");
     });
+
+    // Plans surface CTAs live outside the sidebar; wire them globally.
+    if (!document.documentElement.dataset.xvPlansUpgradeBound) {
+      document.documentElement.dataset.xvPlansUpgradeBound = "1";
+      document.addEventListener(
+        "click",
+        (e) => {
+          const t = e.target;
+          if (!(t instanceof Element)) return;
+          const btn = t.closest("[data-upgrade]");
+          if (!(btn instanceof HTMLButtonElement)) return;
+          if (btn.hidden || btn.disabled) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          refreshUpgradeValueSummary();
+          startUpgradeFromButton(btn, btn.dataset.upgrade || "");
+        },
+        true
+      );
+    }
 
     els.stripeConnectBtn?.addEventListener("click", connectStripe);
     els.stripeDisconnectBtn?.addEventListener("click", disconnectStripe);
