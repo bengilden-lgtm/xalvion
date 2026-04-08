@@ -517,6 +517,257 @@
       },
     };
 
+    /**
+     * Conversion layer helpers (pure, DOM-free).
+     * Safe to call from app.js and extension bundles. Keep outputs concise + premium.
+     */
+    const conversion = (() => {
+      const normTier = (t) => {
+        const v = String(t || "free").toLowerCase();
+        if (v === "guest" || v === "anon" || v === "unauthenticated") return "guest";
+        if (v === "free" || v === "pro" || v === "elite" || v === "dev") return v;
+        return "free";
+      };
+
+      const clampInt = (v) => {
+        const n = Math.floor(Number(v || 0));
+        return Number.isFinite(n) && n > 0 ? n : 0;
+      };
+
+      const clampNum = (v) => {
+        const n = Number(v || 0);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+      };
+
+      const outcomeTone = (latestOutcomeTier) => {
+        const t = String(latestOutcomeTier || "").toLowerCase();
+        if (t === "excellent") return "premium";
+        if (t === "good") return "value";
+        if (t === "neutral") return "neutral";
+        if (t === "bad") return "urgency";
+        return "neutral";
+      };
+
+      function buildPlanComparisonHint(tier) {
+        const t = normTier(tier);
+        if (t === "guest") return "Create a free account to save threads, keep continuity, and expand capacity.";
+        if (t === "free") return "Pro unlocks live Stripe execution, higher capacity, and stronger governance surfaces.";
+        if (t === "pro") return "Elite adds higher-volume operating capacity, deeper outcome visibility, and team-level controls.";
+        return "";
+      }
+
+      function buildLockedFeatureNarrative(feature, ctx = {}) {
+        const t = normTier(ctx.tier);
+        const next = t === "pro" ? "elite" : "pro";
+        const nextLabel = next === "elite" ? "View Elite" : "View Pro";
+        const stripeConnected = Boolean(ctx.stripeConnected);
+
+        const base = {
+          primary: "",
+          secondary: "",
+          cta: nextLabel,
+          tone: "premium",
+        };
+
+        switch (String(feature || "").toLowerCase()) {
+          case "refund_execution":
+            return {
+              ...base,
+              primary: "Live refund execution is gated on Pro.",
+              secondary: stripeConnected
+                ? "Pro turns prepared refund decisions into audited Stripe execution — without leaving the operator workspace."
+                : "Connect Stripe, then Pro turns prepared refund decisions into audited execution.",
+              cta: "Unlock live execution",
+              tone: "premium",
+            };
+          case "advanced_analytics":
+            return {
+              ...base,
+              primary: "Advanced analytics are a higher-tier surface.",
+              secondary: "Upgrade to see outcome mix, risk holds, and billing value surfaced — tied back to operator decisions.",
+              cta: t === "free" ? "Unlock Pro analytics" : "Unlock Elite analytics",
+              tone: "value",
+            };
+          case "high_capacity":
+            return {
+              ...base,
+              primary: "Higher-volume operating capacity is locked.",
+              secondary: "Upgrade for more monthly runs and fewer mid-shift ceilings — keep approvals and routing continuous.",
+              cta: "Add headroom",
+              tone: "urgency",
+            };
+          case "team_ops":
+            return {
+              ...base,
+              primary: "Team-level operating controls are locked.",
+              secondary: "Upgrade to scale governed support execution across seats with clearer accountability surfaces.",
+              cta: "View team tiers",
+              tone: "premium",
+            };
+          case "outcome_intelligence":
+            return {
+              ...base,
+              primary: "Outcome intelligence deepens on higher tiers.",
+              secondary: "Upgrade for stronger outcome visibility and tighter feedback loops — so the operator layer gets measurably better over time.",
+              cta: "Unlock outcome intelligence",
+              tone: "value",
+            };
+          default:
+            return {
+              ...base,
+              primary: "This surface is available on a higher tier.",
+              secondary: buildPlanComparisonHint(t),
+              cta: t === "pro" ? "View Elite" : "View Pro",
+              tone: "premium",
+            };
+        }
+      }
+
+      function buildUsagePressureNarrative(ctx = {}) {
+        const t = normTier(ctx.tier);
+        const atLimit = Boolean(ctx.atLimit);
+        const approaching = Boolean(ctx.approachingLimit) && !atLimit;
+        const guest = t === "guest";
+        const tickets = clampInt(ctx.tickets);
+        const money = clampNum(ctx.money);
+        const minutes = clampInt(ctx.minutes);
+
+        if (!approaching && !atLimit) return null;
+
+        if (guest && atLimit) {
+          return {
+            primary: "Guest preview is at capacity.",
+            secondary: "Create a free account to keep continuity, save threads, and expand operating runs.",
+            cta: "Create free account",
+            tone: "urgency",
+          };
+        }
+
+        if (atLimit) {
+          return {
+            primary: "This plan is at capacity for the current window.",
+            secondary:
+              tickets || money || minutes
+                ? `You’ve already generated value here — ${tickets ? `${tickets} tickets` : "tickets"}${money ? ` · ${format.formatMoney(money)} surfaced` : ""}${minutes ? ` · ~${minutes} min saved` : ""}. Add headroom to keep execution continuous.`
+                : "Add headroom so approvals, routing, and execution don’t stall mid-shift.",
+            cta: t === "pro" ? "Add Elite headroom" : "Unlock Pro capacity",
+            tone: "urgency",
+          };
+        }
+
+        return {
+          primary: "Approaching this plan’s operating ceiling.",
+          secondary:
+            tickets || money || minutes
+              ? `You’re using real capacity — ${tickets ? `${tickets} tickets` : "tickets"}${money ? ` · ${format.formatMoney(money)} in billing motions` : ""}${minutes ? ` · ~${minutes} min back` : ""}.`
+              : "Upgrade before the ceiling so workflows stay uninterrupted.",
+          cta: t === "pro" ? "Plan ahead with Elite" : "Upgrade for continuity",
+          tone: "neutral",
+        };
+      }
+
+      function buildPostValueUpgradeNudge(ctx = {}) {
+        const t = normTier(ctx.tier);
+        if (t !== "free" && t !== "pro") return null;
+        const tickets = clampInt(ctx.tickets);
+        const money = clampNum(ctx.money);
+        const minutes = clampInt(ctx.minutes);
+        const actions = clampInt(ctx.actions);
+        const outcomeTier = String(ctx.latestOutcomeTier || "").toLowerCase();
+
+        const hasEvidence = tickets >= 4 || actions >= 3 || minutes >= 20 || money >= 75 || outcomeTier === "good" || outcomeTier === "excellent";
+        if (!hasEvidence) return null;
+
+        if (t === "free") {
+          return {
+            primary: "You’re already using Xalvion like an operations layer.",
+            secondary: "Pro turns prepared decisions into live execution and gives you uninterrupted capacity.",
+            cta: "Unlock Pro",
+            tone: "premium",
+          };
+        }
+
+        return {
+          primary: "This workspace is generating measurable value.",
+          secondary: "Elite adds higher-volume operating capacity and deeper outcome visibility for serious support teams.",
+          cta: "View Elite",
+          tone: "premium",
+        };
+      }
+
+      function buildTierValueNarrative(ctx = {}) {
+        const t = normTier(ctx.tier);
+        const tickets = clampInt(ctx.tickets);
+        const actions = clampInt(ctx.actions);
+        const minutes = clampInt(ctx.minutes);
+        const money = clampNum(ctx.money);
+        const stripeConnected = Boolean(ctx.stripeConnected);
+        const refundCenterAllowed = Boolean(ctx.refundCenterAllowed);
+        const latestOutcomeTier = String(ctx.latestOutcomeTier || "").toLowerCase();
+
+        const proofBits = [];
+        if (tickets) proofBits.push(`${tickets} tickets`);
+        if (money) proofBits.push(`${format.formatMoney(money)} surfaced`);
+        if (actions) proofBits.push(`${actions} billing motions`);
+        if (minutes) proofBits.push(`~${minutes} min saved`);
+
+        const proof = proofBits.length ? proofBits.join(" · ") : "";
+        const outcomeLine = latestOutcomeTier && latestOutcomeTier !== "unknown"
+          ? `Most recent outcome: ${format.formatOutcomeTier ? format.formatOutcomeTier(latestOutcomeTier) : latestOutcomeTier}.`
+          : "";
+
+        if (t === "guest") {
+          return {
+            primary: proof ? `Workspace value so far: ${proof}.` : "Preview the operator workflow with real controls.",
+            secondary: proof
+              ? "Create a free account to save threads, keep operator continuity, and expand runs."
+              : "Create a free account to save threads and keep operator continuity across runs.",
+            cta: "Create free account",
+            tone: proof ? "value" : "neutral",
+          };
+        }
+
+        if (t === "free") {
+          const secondary =
+            refundCenterAllowed
+              ? "Pro unlocks higher capacity and uninterrupted execution."
+              : stripeConnected
+                ? "Pro turns prepared billing decisions into live Stripe execution — with governance and auditability."
+                : "Connect Stripe, then Pro unlocks live execution with governance and auditability.";
+          return {
+            primary: proof ? `Workspace value so far: ${proof}.` : "Run governed support decisioning with visible risk and approvals.",
+            secondary: [outcomeLine, secondary].filter(Boolean).join(" "),
+            cta: "Unlock Pro",
+            tone: proof ? "value" : outcomeTone(latestOutcomeTier),
+          };
+        }
+
+        if (t === "pro") {
+          return {
+            primary: proof ? `Workspace value so far: ${proof}.` : "Live operating tier: governed decisions with execution-ready workflow.",
+            secondary: [outcomeLine, "Elite adds higher-volume operating capacity and deeper outcome visibility for serious support orgs."].filter(Boolean).join(" "),
+            cta: "View Elite",
+            tone: proof ? "premium" : outcomeTone(latestOutcomeTier),
+          };
+        }
+
+        return {
+          primary: proof ? `Workspace value so far: ${proof}.` : "Maximum capacity and premium control surfaces.",
+          secondary: outcomeLine,
+          cta: "",
+          tone: "premium",
+        };
+      }
+
+      return {
+        buildTierValueNarrative,
+        buildUsagePressureNarrative,
+        buildLockedFeatureNarrative,
+        buildPostValueUpgradeNudge,
+        buildPlanComparisonHint,
+      };
+    })();
+
     async function parseResponse(res) {
       return res.json().catch(() => ({}));
     }
@@ -554,7 +805,7 @@
       },
     };
 
-    return { format, store, api };
+    return { format, store, api, conversion };
   }
 
   /**

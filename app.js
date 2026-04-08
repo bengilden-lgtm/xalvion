@@ -294,6 +294,10 @@ if (typeof window.pulseRail !== "function") {
     return typeof globalThis !== "undefined" ? globalThis.__XALVION_PHASE2__ : null;
   }
 
+  function getPhase2Core() {
+    return typeof globalThis !== "undefined" ? globalThis.__XALVION_PHASE2_CORE__ : null;
+  }
+
   function phase2WorkspaceReady() {
     const p2 = getPhase2();
     return Boolean(p2 && p2.sessionStore && p2.agentStore && p2.ready !== false);
@@ -1531,7 +1535,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
       if (els.openRefundModalBtn) {
         els.openRefundModalBtn.disabled = !allowed;
-        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Upgrade to unlock";
+        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Unlock live execution";
       }
 
       if (els.executeRefundBtn) {
@@ -1541,13 +1545,13 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       if (els.refundModalNote) {
         els.refundModalNote.textContent = allowed
           ? "Live refund execution is available on this plan. Use a PaymentIntent or Charge ID from Stripe."
-          : "Refund execution is locked until your plan allows live billing actions.";
+          : "Prepared refund decisions stay visible on this plan. Pro unlocks audited Stripe execution.";
       }
 
       if (els.refundCenterCopy) {
         els.refundCenterCopy.textContent = allowed
           ? "Open the refund UI, paste a PaymentIntent or Charge ID, and run a refund from the workspace."
-          : "You’re seeing decisions and approvals on Free — Pro unlocks one-click refund execution against Stripe without leaving this surface.";
+          : "Pro turns this from prepared decisions into live Stripe execution — with approvals, auditability, and no context switch.";
       }
       if (els.refundUpgradeTease) {
         const d = state.dashboardStats || {};
@@ -1569,10 +1573,19 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
   function openRefundModal() {
     updateRefundUI();
     if (!canUseRefundCenter()) {
+      const conv = getPhase2Core()?.conversion || null;
+      const locked = conv?.buildLockedFeatureNarrative
+        ? conv.buildLockedFeatureNarrative("refund_execution", {
+            tier: state.tier,
+            stripeConnected: Boolean(state.stripeConnected),
+            refundCenterAllowed: false,
+          })
+        : null;
       setNotice(
         "warning",
-        "Refund center is a Pro unlock",
-        "You’re already using the operator canvas on Free — upgrade to run refunds against Stripe without leaving the workspace."
+        locked?.primary || "Refund execution is gated on Pro",
+        locked?.secondary ||
+          "Pro turns prepared refund decisions into audited Stripe execution — without leaving the operator workspace."
       );
       return;
     }
@@ -1649,10 +1662,19 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     }
 
     if (!canUseRefundCenter()) {
+      const conv = getPhase2Core()?.conversion || null;
+      const locked = conv?.buildLockedFeatureNarrative
+        ? conv.buildLockedFeatureNarrative("refund_execution", {
+            tier: state.tier,
+            stripeConnected: Boolean(state.stripeConnected),
+            refundCenterAllowed: false,
+          })
+        : null;
       setNotice(
         "warning",
-        "Refund center is a Pro unlock",
-        "You’re already using the operator canvas on Free — upgrade to run refunds against Stripe without leaving the workspace."
+        locked?.primary || "Refund execution is gated on Pro",
+        locked?.secondary ||
+          "Pro turns prepared refund decisions into audited Stripe execution — without leaving the operator workspace."
       );
       return;
     }
@@ -2305,6 +2327,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const el = els.upgradeValueSummary;
     if (!el) return;
     const p2 = getPhase2();
+    const conv = getPhase2Core()?.conversion || null;
     if (phase2WorkspaceReady() && p2?.analyticsEngine?.refreshUpgradeValueSummary) {
       try {
         p2.analyticsEngine.refreshUpgradeValueSummary(
@@ -2329,17 +2352,43 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const actions = Number((vg && vg.actions_taken) ?? d.actions ?? state.actionsCount ?? 0);
     const mins = Number((vg && vg.time_saved_minutes) ?? estimateAgentMinutesSavedFromDashboard(d));
     const tier = String(state.tier || "free").toLowerCase();
-    const upgradeHint =
-      tier === "free"
-        ? " Pro adds 500 runs/month + live refunds."
-        : tier === "pro"
-          ? " Elite adds 5k runs/month + advanced analytics."
-          : "";
-    el.textContent =
-      tickets > 0 || money > 0 || actions > 0 || mins > 0
-        ? `Workspace value so far: ${tickets} tickets · ${formatMoney(money)} through billing actions (${actions} motions) · ~${mins} min saved.${upgradeHint}`
+
+    // Outcome-aware + tier-aware narrative (pure helper when available).
+    const rawOi = d.outcome_intelligence && typeof d.outcome_intelligence === "object" ? d.outcome_intelligence : null;
+    const fmt = globalThis.__XALVION_FORMAT__;
+    const normOi =
+      rawOi && fmt?.normalizeOutcomeIntelligence ? fmt.normalizeOutcomeIntelligence(rawOi) : { latest: null, summary: {}, insights: [], bestPattern: null };
+    const latestOutcomeTier = String(normOi?.latest?.tier || "unknown").toLowerCase();
+    const outcomeMixLine = fmt?.formatOutcomeSummaryLine ? fmt.formatOutcomeSummaryLine(normOi) : "";
+
+    const narrative = conv?.buildTierValueNarrative
+      ? conv.buildTierValueNarrative({
+          tier,
+          tickets,
+          money,
+          minutes: mins,
+          actions,
+          latestOutcomeTier,
+          stripeConnected: Boolean(state.stripeConnected),
+          refundCenterAllowed: Boolean(state.stripeConnected && (tier === "pro" || tier === "elite")),
+          atLimit: Boolean(state.atLimit),
+          approachingLimit: Boolean(state.approachingLimit),
+        })
+      : null;
+
+    const hasValue = tickets > 0 || money > 0 || actions > 0 || mins > 0;
+    const primaryLine = narrative?.primary
+      ? narrative.primary
+      : hasValue
+        ? `Workspace value so far: ${tickets} tickets · ${formatMoney(money)} across billing motions · ~${mins} min saved.`
         : "";
-    el.style.display = tickets > 0 || money > 0 || actions > 0 || mins > 0 ? "block" : "none";
+
+    const secondaryLine = narrative?.secondary ? narrative.secondary : "";
+    const combinedSecondary = [outcomeMixLine, secondaryLine].filter(Boolean).join(" ");
+
+    const text = [primaryLine, combinedSecondary].filter(Boolean).join(" ");
+    el.textContent = text;
+    el.style.display = text ? "block" : "none";
   }
 
   function ensureUsageApproachNoticeEl() {
@@ -2378,16 +2427,38 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const unlock = String(vs.upgrade_unlocks || "").trim();
     const capLine = String(vs.capacity_message || "").trim();
     const ctaTier = tier === "pro" ? "elite" : "pro";
-    const ctaLabel = tier === "pro" ? "Add Elite headroom before the next ceiling →" : "Upgrade for continuous coverage →";
-    const story =
-      th > 0 || Number(vs.money_moved ?? 0) > 0
+
+    const conv = getPhase2Core()?.conversion || null;
+    const pressure = conv?.buildUsagePressureNarrative
+      ? conv.buildUsagePressureNarrative({
+          tier,
+          tickets: th,
+          money: Number(vs.money_moved ?? 0),
+          minutes: tm,
+          approachingLimit: true,
+          atLimit: false,
+        })
+      : null;
+
+    const story = pressure?.secondary
+      ? pressure.secondary
+      : th > 0 || Number(vs.money_moved ?? 0) > 0
         ? `You’re using real capacity — ${th} tickets this cycle · ${money} in billing motions · ~${tm} min of operator time back.`
         : "You’re approaching this plan’s monthly ceiling — add headroom so approvals and routing don’t stall mid-shift.";
+
+    const ctaLabel = pressure?.cta
+      ? `${pressure.cta} →`
+      : tier === "pro"
+        ? "Add Elite headroom →"
+        : "Upgrade for continuity →";
+
     el.style.display = "block";
-    el.innerHTML = `<div>${escapeHtml(story)}</div>
-${capLine ? `<div class="muted-copy" style="margin-top:4px">${escapeHtml(capLine)}</div>` : ""}
-${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
-<button type="button" class="ghost-btn" style="margin-top:6px;padding:6px 10px;font-size:12px">${escapeHtml(ctaLabel)}</button>`;
+    el.innerHTML = `<div class="conversion-context conversion-context--${escapeHtml(String(pressure?.tone || "neutral"))}">
+  <div class="value-proof-line">${escapeHtml(story)}</div>
+  ${capLine ? `<div class="plan-hint" style="margin-top:6px">${escapeHtml(capLine)}</div>` : ""}
+  ${unlock ? `<div class="plan-hint" style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
+  <button type="button" class="ghost-btn conversion-cta" style="margin-top:8px;padding:6px 10px;font-size:12px">${escapeHtml(ctaLabel)}</button>
+</div>`;
     const btn = el.querySelector("button");
     if (btn) {
       btn.onclick = () => upgradePlan(ctaTier);
@@ -3712,8 +3783,20 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const mins = estimateTimeSavedMinutes();
       const momentum = momentumLine();
       const integrationHint = n >= 2 ? "Connect your system to auto-fill tracking, refunds, and orders" : "";
-      const volumeHint = n >= 5 ? "Handling more tickets? Upgrade for higher limits" : "";
       const tierLc = String(state.tier || "free").toLowerCase();
+      const conv = getPhase2Core()?.conversion || null;
+      const postValueNudge = conv?.buildPostValueUpgradeNudge
+        ? conv.buildPostValueUpgradeNudge({
+            tier: tierLc,
+            tickets: n,
+            minutes: mins,
+            actions: Number(state.actionsCount || 0),
+            money: Number(state.dashboardStats?.money_saved || state.dashboardStats?.value_generated?.money_saved || 0),
+            latestOutcomeTier: String(state.dashboardStats?.outcome_intelligence?.latest?.tier || "unknown"),
+            stripeConnected: Boolean(state.stripeConnected),
+          })
+        : null;
+      const volumeHint = !postValueNudge && n >= 5 ? "You’re handling more tickets — add headroom so execution doesn’t stall mid-shift" : "";
       const canShowAutomation = !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev";
       const automationBlock = canShowAutomation
         ? `<div class="xv-next-nudge">
@@ -3733,6 +3816,12 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
             <button type="button" class="xv-next-nudge-cta" data-act="upgrade">View plans</button>
           </div>`
         : "";
+      const postValueBlock = postValueNudge
+        ? `<div class="xv-next-nudge xv-next-nudge--subtle">
+            <div class="xv-next-nudge-copy">${escapeHtml(postValueNudge.primary)} ${escapeHtml(postValueNudge.secondary)}</div>
+            <button type="button" class="xv-next-nudge-cta" data-act="upgrade">${escapeHtml(postValueNudge.cta || "View plans")}</button>
+          </div>`
+        : "";
 
       return `
         <div class="xv-next-success" role="status" aria-live="polite">
@@ -3749,12 +3838,13 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="xv-next-meta">
             ${momentum ? `<span class="xv-next-meta-chip">${escapeHtml(momentum)}</span>` : ""}
             ${mins > 0 ? `<span class="xv-next-meta-chip">Estimated time saved: ${escapeHtml(String(mins))} min</span>` : ""}
-            <span class="xv-next-meta-chip">For teams handling higher volume, Xalvion scales with your workflow</span>
+            <span class="xv-next-meta-chip">Governed operator workflow — approvals stay visible, outcomes stay measurable</span>
           </div>
         </div>
 
         ${automationBlock}
         ${integrationBlock}
+        ${postValueBlock}
         ${volumeBlock}
       `;
     }
