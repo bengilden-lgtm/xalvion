@@ -2089,7 +2089,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       els.commandAuthChip.title = "";
     } else {
       els.commandAuthChip.textContent = "Preview";
-      els.commandAuthChip.title = "Try a few full runs without signing in.";
+      els.commandAuthChip.title = "";
     }
   }
 
@@ -2576,7 +2576,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="customer-message-block">
             <div class="reply-body">
               <div class="assistant-context-line js-assistant-context" hidden></div>
-              <div class="customer-message-label reply-hero-label">Customer-ready reply</div>
+              <div class="customer-message-label reply-hero-label">Suggested reply</div>
               <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared by Xalvion — ready to review</div>
               <div class="reply-text js-reply-text">${bodyHtml}</div>
             </div>
@@ -2681,8 +2681,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (isClaudeShell()) {
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-thread-open" role="status">
-        <h2 class="cld-welcome-headline">What needs attention?</h2>
-        <p class="cld-welcome-prompt">Share a case or pick a starter.</p>
+        <h2 class="cld-welcome-headline">What needs handling?</h2>
       </div>`;
     }
 
@@ -3750,7 +3749,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function autoResizeTextarea() {
     if (!els.messageInput) return;
     els.messageInput.style.height = "auto";
-    els.messageInput.style.height = `${Math.min(220, Math.max(38, els.messageInput.scrollHeight))}px`;
+    const minH = isClaudeShell() ? 34 : 38;
+    els.messageInput.style.height = `${Math.min(220, Math.max(minH, els.messageInput.scrollHeight))}px`;
   }
 
   function syncComposerDraftClass() {
@@ -3761,17 +3761,33 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     composer.classList.toggle("composer-has-draft", hasDraft);
   }
 
+  function syncComposerAriaDescribedBy() {
+    const surface = document.getElementById("composerSurface");
+    const line = els.composerStatusLine;
+    if (!surface || !line) return;
+    const hasDesc = Boolean(String(line.textContent || "").trim());
+    if (hasDesc) surface.setAttribute("aria-describedby", "composerStatusLine");
+    else surface.removeAttribute("aria-describedby");
+  }
+
   function refreshComposerIdleHint() {
     if (!els.composerStatusLine || state.sending) return;
     const hasThread = Boolean(els.messages?.querySelector(".msg-group"));
     if (isClaudeShell() && hasThread) {
       els.composerStatusLine.textContent = "";
+      syncComposerAriaDescribedBy();
+      return;
+    }
+    if (isClaudeShell() && !hasThread) {
+      els.composerStatusLine.textContent = "";
+      syncComposerAriaDescribedBy();
       return;
     }
     if (!hasThread) {
       els.composerStatusLine.textContent = isAuthenticated()
         ? "Describe the case below."
         : "A few full runs available—no account needed.";
+      syncComposerAriaDescribedBy();
       return;
     }
     if (!isAuthenticated()) {
@@ -3781,9 +3797,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         left > 0
           ? `Review the draft, then send another · ${left} preview ${rw} left`
           : "Preview finished — sign in under Access to continue.";
+      syncComposerAriaDescribedBy();
       return;
     }
     els.composerStatusLine.textContent = "Next ticket, or refine this thread.";
+    syncComposerAriaDescribedBy();
   }
 
   function setSending(value) {
@@ -3795,10 +3813,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (els.composerStatusLine) {
       els.composerStatusLine.textContent = state.sending
         ? isClaudeShell()
-          ? "Drafting a reply…"
+          ? "Drafting…"
           : "Working on a reply…"
         : "";
       if (!state.sending) refreshComposerIdleHint();
+      else syncComposerAriaDescribedBy();
       els.composerStatusLine.classList.toggle("composer-status-live", state.sending);
     }
 
@@ -5667,6 +5686,12 @@ function bindEvents() {
     ensureOpsCard();
     bindEvents();
     initWorkspaceChromeShell();
+
+    if (isClaudeShell()) {
+      if (els.composerStatusLine) els.composerStatusLine.textContent = "";
+      if (els.messageInput) els.messageInput.placeholder = "Paste a ticket or describe the issue…";
+      syncComposerAriaDescribedBy();
+    }
 
     const draft = loadDraft();
     if (els.messageInput && draft) {
