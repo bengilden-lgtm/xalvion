@@ -33,12 +33,12 @@
   --warning: hsl(42 80% 62%);
   --danger: hsl(0 70% 62%);
 
-  /* Borders & shadows (subtle) */
-  --line: color-mix(in oklab, white 9%, transparent);
-  --line-2: color-mix(in oklab, white 14%, transparent);
-  --line-3: color-mix(in oklab, white 18%, transparent);
-  --shadow-1: 0 1px 0 rgba(0,0,0,.30), 0 8px 20px rgba(0,0,0,.22);
-  --shadow-2: 0 1px 0 rgba(0,0,0,.34), 0 12px 34px rgba(0,0,0,.28);
+  /* Borders & shadows (subtle, low-friction) */
+  --line: color-mix(in oklab, white 7%, transparent);
+  --line-2: color-mix(in oklab, white 11%, transparent);
+  --line-3: color-mix(in oklab, white 15%, transparent);
+  --shadow-1: 0 1px 0 rgba(0,0,0,.26), 0 10px 26px rgba(0,0,0,.20);
+  --shadow-2: 0 1px 0 rgba(0,0,0,.30), 0 16px 46px rgba(0,0,0,.26);
 
   /* Radius */
   --r-xs: 8px;
@@ -62,7 +62,7 @@
   --sidebar-expanded: 292px;
   --sidebar-collapsed: 56px;
   --thread-max: 860px;
-  --stage-pad: 20px;
+  --stage-pad: 22px;
 
   /* Motion */
   --ease: cubic-bezier(.16,1,.3,1);
@@ -75,7 +75,7 @@
   --fade-bottom: 76px;
 
   /* Focus */
-  --ring: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+  --ring: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent);
 }
 
 *,
@@ -90,7 +90,10 @@ body{
   font-size: 15px;
   line-height: 1.45;
   color: var(--text);
-  background: radial-gradient(1200px 700px at 50% -220px, color-mix(in oklab, white 7%, transparent), transparent 64%), var(--bg0);
+  background:
+    radial-gradient(1200px 700px at 50% -260px, color-mix(in oklab, white 6%, transparent), transparent 64%),
+    radial-gradient(900px 540px at 18% -220px, color-mix(in oklab, var(--accent) 5%, transparent), transparent 70%),
+    var(--bg0);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -138,7 +141,7 @@ code, pre{ font-family: var(--font-mono); }
   inset: 0;
 }
 .workspace-atmosphere-glow{
-  opacity: .10;
+  opacity: .085;
   background:
     radial-gradient(900px 520px at 50% 0%, rgba(240, 224, 190, .10), transparent 68%),
     radial-gradient(700px 520px at 10% 20%, rgba(180, 170, 150, .06), transparent 62%),
@@ -146,15 +149,15 @@ code, pre{ font-family: var(--font-mono); }
   filter: blur(14px);
 }
 .workspace-atmosphere-falloff{
-  opacity: .55;
+  opacity: .52;
   background: radial-gradient(1100px 900px at 50% -140px, transparent 20%, rgba(0,0,0,.28) 70%, rgba(0,0,0,.40) 100%);
 }
 .workspace-atmosphere-vignette{
-  opacity: .55;
+  opacity: .50;
   background: radial-gradient(1200px 900px at 50% 30%, transparent 45%, rgba(0,0,0,.55) 100%);
 }
 .workspace-atmosphere-grain{
-  opacity: .045;
+  opacity: .04;
   background-image:
     repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 1px, transparent 1px 4px);
@@ -184,8 +187,8 @@ code, pre{ font-family: var(--font-mono); }
   align-items: center;
   gap: var(--s-4);
   padding: 10px 14px;
-  background: color-mix(in oklab, var(--bg1) 88%, transparent);
-  border-bottom: 1px solid var(--line);
+  background: color-mix(in oklab, var(--bg1) 82%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -224,9 +227,9 @@ code, pre{ font-family: var(--font-mono); }
   font-size: 12.5px;
   color: var(--text-3);
   padding: 6px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
   border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--bg2) 70%, transparent);
+  background: color-mix(in oklab, var(--bg2) 58%, transparent);
 }
 
 .command-status-chip{
@@ -234,9 +237,9 @@ code, pre{ font-family: var(--font-mono); }
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
   border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--bg2) 70%, transparent);
+  background: color-mix(in oklab, var(--bg2) 58%, transparent);
   min-width: 0;
 }
 .command-status-dot{
@@ -258,9 +261,9 @@ code, pre{ font-family: var(--font-mono); }
   font-size: 12.5px;
   color: var(--text-3);
   padding: 6px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
   border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--bg2) 70%, transparent);
+  background: color-mix(in oklab, var(--bg2) 58%, transparent);
 }
 .command-auth-chip.is-guest-chip{
   color: color-mix(in oklab, var(--warning) 72%, var(--text-2));
@@ -273,8 +276,8 @@ code, pre{ font-family: var(--font-mono); }
   width: 34px;
   height: 34px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg2) 70%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  background: color-mix(in oklab, var(--bg2) 58%, transparent);
   color: var(--text-2);
   display:inline-flex;
   align-items: center;
@@ -282,7 +285,7 @@ code, pre{ font-family: var(--font-mono); }
   transition: background var(--t-med) var(--ease), border-color var(--t-med) var(--ease), transform var(--t-fast) var(--ease);
 }
 .icon-btn:hover{
-  background: color-mix(in oklab, white 6%, var(--bg2));
+  background: color-mix(in oklab, white 5%, var(--bg2));
   border-color: var(--line-2);
 }
 .icon-btn:active{ transform: translateY(1px); }
@@ -297,8 +300,8 @@ code, pre{ font-family: var(--font-mono); }
 .refund-link-refresh,
 .sidebar-jump-btn{
   border-radius: var(--r-sm);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg2) 70%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  background: color-mix(in oklab, var(--bg2) 58%, transparent);
   color: var(--text);
   padding: 9px 12px;
   transition: background var(--t-med) var(--ease), border-color var(--t-med) var(--ease), transform var(--t-fast) var(--ease);
@@ -311,7 +314,7 @@ code, pre{ font-family: var(--font-mono); }
 .limit-secondary-link:hover,
 .refund-link-refresh:hover,
 .sidebar-jump-btn:hover{
-  background: color-mix(in oklab, white 6%, var(--bg2));
+  background: color-mix(in oklab, white 5%, var(--bg2));
   border-color: var(--line-2);
 }
 .btn:active,
@@ -333,8 +336,8 @@ code, pre{ font-family: var(--font-mono); }
 }
 
 .btn{
-  background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 65%, var(--bg3)), color-mix(in oklab, var(--accent-2) 46%, var(--bg3)));
-  border-color: color-mix(in oklab, var(--accent) 26%, var(--line-2));
+  background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 56%, var(--bg3)), color-mix(in oklab, var(--accent-2) 40%, var(--bg3)));
+  border-color: color-mix(in oklab, var(--accent) 22%, var(--line-2));
   color: hsl(35 28% 10%);
   font-weight: 600;
 }
@@ -367,8 +370,8 @@ input[type="number"],
 select,
 textarea{
   border-radius: var(--r-sm);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg2) 84%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
+  background: color-mix(in oklab, var(--bg2) 78%, transparent);
   color: var(--text);
   padding: 10px 12px;
   outline: none;
@@ -382,7 +385,7 @@ select:focus,
 textarea:focus{
   border-color: color-mix(in oklab, var(--accent) 24%, var(--line-2));
   box-shadow: var(--ring);
-  background: color-mix(in oklab, white 4%, var(--bg2));
+  background: color-mix(in oklab, white 3.5%, var(--bg2));
 }
 select.refund-select{ padding-right: 34px; }
 
@@ -402,8 +405,8 @@ select.refund-select{ padding-right: 34px; }
   display:flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg1) 88%, transparent);
+  border-right: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--bg1) 78%, transparent);
   transition: width var(--t-slow) var(--ease);
   width: var(--sidebar-collapsed);
 }
@@ -412,8 +415,8 @@ select.refund-select{ padding-right: 34px; }
 }
 
 .sidebar-chrome{
-  padding: 10px 10px 6px 10px;
-  border-bottom: 1px solid var(--line);
+  padding: 12px 10px 8px 10px;
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
 }
 .sidebar-topbar{
   display:flex;
@@ -461,8 +464,8 @@ select.refund-select{ padding-right: 34px; }
 .sidebar-nav-items{ display:flex; flex-direction: column; gap: 6px; }
 .sidebar-nav-divider{
   height: 1px;
-  background: var(--line);
-  margin: 10px 8px;
+  background: color-mix(in oklab, var(--line) 70%, transparent);
+  margin: 12px 10px;
 }
 
 .sidebar-nav-item{
@@ -470,7 +473,7 @@ select.refund-select{ padding-right: 34px; }
   display:flex;
   align-items:center;
   gap: 10px;
-  padding: 10px 10px;
+  padding: 9px 10px;
   border-radius: var(--r-sm);
   border: 1px solid transparent;
   background: transparent;
@@ -478,13 +481,13 @@ select.refund-select{ padding-right: 34px; }
   transition: background var(--t-med) var(--ease), border-color var(--t-med) var(--ease), color var(--t-med) var(--ease);
 }
 .sidebar-nav-item:hover{
-  background: color-mix(in oklab, white 5%, transparent);
+  background: color-mix(in oklab, white 4.5%, transparent);
 }
 .sidebar-nav-item.is-active,
 .sidebar-nav-item[aria-selected="true"]{
-  background: color-mix(in oklab, white 6%, var(--bg2));
-  border-color: var(--line);
-  color: var(--text);
+  background: color-mix(in oklab, white 5%, transparent);
+  border-color: color-mix(in oklab, var(--line) 70%, transparent);
+  color: color-mix(in oklab, var(--text) 92%, var(--text-2));
 }
 .sidebar-nav-icon{
   width: 24px;
@@ -499,6 +502,7 @@ select.refund-select{ padding-right: 34px; }
   white-space: nowrap;
   overflow:hidden;
   text-overflow: ellipsis;
+  font-weight: 520;
 }
 
 /* Collapsed rail behavior */
@@ -521,8 +525,8 @@ select.refund-select{ padding-right: 34px; }
   transform: translateY(-50%);
   padding: 8px 10px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg2) 92%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  background: color-mix(in oklab, var(--bg2) 86%, transparent);
   color: var(--text-2);
   font-size: 12.5px;
   white-space: nowrap;
@@ -539,7 +543,7 @@ select.refund-select{ padding-right: 34px; }
 .sidebar-scroll{
   height: 100%;
   overflow:auto;
-  padding: 12px 10px 14px 10px;
+  padding: 12px 10px 16px 10px;
 }
 
 .sidebar-panel{
@@ -552,7 +556,7 @@ select.refund-select{ padding-right: 34px; }
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--text-4);
-  margin: 4px 6px 10px 6px;
+  margin: 6px 6px 10px 6px;
 }
 .section-label-tight{ margin-top: 2px; }
 .muted-copy{
@@ -567,8 +571,8 @@ select.refund-select{ padding-right: 34px; }
 .rail-card,
 .rail-surface,
 .refund-card{
-  background: color-mix(in oklab, var(--bg2) 78%, transparent);
-  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--bg2) 56%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   border-radius: var(--r-md);
   padding: 12px;
 }
@@ -579,23 +583,23 @@ select.refund-select{ padding-right: 34px; }
 
 .sidebar-more{
   margin-top: 12px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   border-radius: var(--r-md);
   padding: 10px 12px;
-  background: color-mix(in oklab, var(--bg2) 70%, transparent);
+  background: color-mix(in oklab, var(--bg2) 52%, transparent);
 }
 .sidebar-more-summary{
   cursor:pointer;
   color: var(--text-2);
-  font-weight: 550;
+  font-weight: 540;
 }
 .sidebar-panel-hint{ margin: 10px 0 0 0; }
 
 /* Notice */
 .notice{
   border-radius: var(--r-md);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg2) 78%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  background: color-mix(in oklab, var(--bg2) 56%, transparent);
   padding: 12px;
 }
 .notice.notice-dense{ padding: 10px 12px; }
@@ -659,7 +663,7 @@ select.refund-select{ padding-right: 34px; }
   min-height: 0;
   display:flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 /* Messages zone */
@@ -673,17 +677,17 @@ select.refund-select{ padding-right: 34px; }
   flex: 1;
   min-height: 0;
   border-radius: var(--r-lg);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg1) 66%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 55%, transparent);
+  background: color-mix(in oklab, var(--bg1) 48%, transparent);
   overflow: hidden;
 }
 .messages-shell.shell-live{
-  border-color: color-mix(in oklab, var(--line-2) 70%, var(--line));
+  border-color: color-mix(in oklab, var(--line-2) 55%, transparent);
 }
 .messages{
   height: 100%;
   overflow:auto;
-  padding: 18px 18px 12px 18px;
+  padding: 20px 18px 14px 18px;
   display:flex;
   flex-direction: column;
   gap: 14px;
@@ -741,15 +745,15 @@ select.refund-select{ padding-right: 34px; }
 .msg-card{
   width: 100%;
   border-radius: var(--r-lg);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg2) 74%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 62%, transparent);
+  background: color-mix(in oklab, var(--bg2) 58%, transparent);
   padding: 14px 14px 12px 14px;
 }
 .msg-card.user{
-  background: color-mix(in oklab, var(--bg2) 66%, transparent);
+  background: color-mix(in oklab, var(--bg2) 54%, transparent);
 }
 .msg-card.assistant{
-  background: color-mix(in oklab, var(--bg2) 80%, transparent);
+  background: color-mix(in oklab, var(--bg2) 60%, transparent);
 }
 .msg-head{
   display:flex;
@@ -772,7 +776,7 @@ select.refund-select{ padding-right: 34px; }
   align-items:center;
   justify-content:center;
   background: color-mix(in oklab, white 5%, transparent);
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   color: var(--text-2);
 }
 .msg-time{
@@ -799,8 +803,8 @@ select.refund-select{ padding-right: 34px; }
 .reply-text code{
   padding: 1px 6px;
   border-radius: 8px;
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg1) 76%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--bg1) 62%, transparent);
   color: var(--text-2);
 }
 
@@ -845,17 +849,17 @@ select.refund-select{ padding-right: 34px; }
   width: 18px;
   height: 18px;
   border-radius: 8px;
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg1) 75%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--bg1) 62%, transparent);
 }
 .xv-signal-rays,
 .xv-spark-orbit{ display:none; }
 
 /* Assistant meta (details fold) */
 .assistant-meta-fold{
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--bg1) 70%, transparent);
+  background: color-mix(in oklab, var(--bg1) 56%, transparent);
   overflow:hidden;
 }
 .assistant-meta-fold-summary{
@@ -867,7 +871,7 @@ select.refund-select{ padding-right: 34px; }
 }
 .assistant-meta-fold-summary::-webkit-details-marker{ display:none; }
 .assistant-meta-fold-body{
-  border-top: 1px solid var(--line);
+  border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   padding: 10px 12px 12px 12px;
 }
 .assistant-meta{
@@ -881,8 +885,8 @@ select.refund-select{ padding-right: 34px; }
   gap: 8px;
   padding: 6px 10px;
   border-radius: var(--r-pill);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg2) 70%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  background: color-mix(in oklab, var(--bg2) 52%, transparent);
   color: var(--text-2);
   font-size: 12.5px;
 }
@@ -894,9 +898,9 @@ select.refund-select{ padding-right: 34px; }
 /* Decision + details panels (quiet utility) */
 .decision-panel,
 .details-wrap{
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--bg1) 72%, transparent);
+  background: color-mix(in oklab, var(--bg1) 56%, transparent);
   padding: 12px;
 }
 .decision-panel.decision-state-approved{
@@ -921,14 +925,14 @@ select.refund-select{ padding-right: 34px; }
   display:flex;
   align-items: center;
   justify-content: center;
-  padding: 20px 0 26px 0;
+  padding: 28px 0 34px 0;
 }
 .empty-card{
   width: min(720px, 92vw);
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg2) 76%, transparent);
-  padding: 26px 22px;
+  border-radius: 22px;
+  border: 1px solid color-mix(in oklab, var(--line) 55%, transparent);
+  background: color-mix(in oklab, var(--bg2) 46%, transparent);
+  padding: 28px 24px;
 }
 .empty-card h2{ margin: 0 0 10px 0; font-size: 20px; letter-spacing: .2px; }
 .empty-card p{ margin: 0; color: var(--text-2); }
@@ -960,30 +964,36 @@ select.refund-select{ padding-right: 34px; }
 }
 .limit-moment-card__title{
   margin: 0 0 10px 0;
-  font-size: 20px;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -.2px;
   color: var(--text);
 }
-.limit-moment-card__lead{ margin: 0 0 8px 0; color: var(--text-2); }
-.limit-moment-card__body{ margin: 0 0 16px 0; color: var(--text-3); }
-.limit-cta{ margin-top: 4px; }
+.limit-moment-card__lead{ margin: 0 0 10px 0; color: var(--text-2); line-height: 1.55; }
+.limit-moment-card__body{ margin: 0 0 18px 0; color: var(--text-3); line-height: 1.55; }
+.limit-cta{ margin-top: 2px; }
 .limit-secondary-link{
   margin-top: 10px;
   width: 100%;
   background: transparent;
   color: var(--text-3);
+  border-color: transparent;
+  padding: 9px 10px;
+  text-align: center;
 }
 .empty-flow-strip{
   display:flex;
   gap: 10px;
-  margin: 14px 0 14px 0;
+  margin: 16px 0 18px 0;
   color: var(--text-4);
   font-size: 12.5px;
+  flex-wrap: wrap;
 }
 .empty-flow-strip span{
   padding: 6px 10px;
   border-radius: var(--r-pill);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg1) 70%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+  background: color-mix(in oklab, var(--bg1) 52%, transparent);
 }
 .empty-actions{ display:flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .empty-chip-hint{ color: var(--text-4); font-size: 12.5px; }
@@ -992,7 +1002,7 @@ select.refund-select{ padding-right: 34px; }
 .composer-wrap{
   position: sticky;
   bottom: 0;
-  padding-top: 10px;
+  padding-top: 14px;
 }
 .composer-unified{
   width: 100%;
@@ -1002,18 +1012,20 @@ select.refund-select{ padding-right: 34px; }
 
 .composer{
   width: min(720px, 96vw);
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg1) 70%, transparent);
-  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  border-radius: 20px;
+  border: 1px solid color-mix(in oklab, var(--line) 52%, transparent);
+  background: color-mix(in oklab, var(--bg1) 46%, transparent);
+  box-shadow: 0 18px 46px rgba(0,0,0,.22);
   overflow:hidden;
 }
 .composer-hint-band{
   padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg1) 82%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--bg1) 58%, transparent), color-mix(in oklab, var(--bg1) 46%, transparent));
 }
-.composer-hint-band--integrated{ background: color-mix(in oklab, var(--bg1) 82%, transparent); }
+.composer-hint-band--integrated{
+  background: linear-gradient(180deg, color-mix(in oklab, var(--bg1) 58%, transparent), color-mix(in oklab, var(--bg1) 46%, transparent));
+}
 .composer-status-cluster{ display:flex; align-items:center; gap: 10px; }
 .composer-thinking-anchor{ opacity: .6; }
 .composer-status-line{
@@ -1039,8 +1051,8 @@ select.refund-select{ padding-right: 34px; }
   resize: none;
   padding: 12px 12px;
   line-height: 1.45;
-  background: color-mix(in oklab, var(--bg2) 86%, transparent);
-  border-color: var(--line);
+  background: color-mix(in oklab, var(--bg2) 66%, transparent);
+  border-color: color-mix(in oklab, var(--line) 65%, transparent);
 }
 
 .send-btn,
@@ -1048,8 +1060,8 @@ select.refund-select{ padding-right: 34px; }
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  border: 1px solid color-mix(in oklab, var(--accent) 20%, var(--line));
-  background: color-mix(in oklab, var(--accent) 18%, var(--bg2));
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--line));
+  background: color-mix(in oklab, var(--accent) 15%, var(--bg2));
   color: var(--accent-ink);
   position: relative;
   transition: transform var(--t-fast) var(--ease), background var(--t-med) var(--ease), border-color var(--t-med) var(--ease);
@@ -1070,8 +1082,8 @@ select.refund-select{ padding-right: 34px; }
 }
 .send-btn:hover,
 #sendBtn:hover{
-  background: color-mix(in oklab, var(--accent) 24%, var(--bg2));
-  border-color: color-mix(in oklab, var(--accent) 28%, var(--line-2));
+  background: color-mix(in oklab, var(--accent) 19%, var(--bg2));
+  border-color: color-mix(in oklab, var(--accent) 24%, var(--line-2));
 }
 .send-btn:active,
 #sendBtn:active{
@@ -1091,24 +1103,24 @@ select.refund-select{ padding-right: 34px; }
 }
 .chip{
   border-radius: var(--r-pill);
-  border: 1px solid var(--line);
-  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+  background: color-mix(in oklab, var(--bg1) 40%, transparent);
   color: var(--text-3);
   padding: 7px 10px;
   font-size: 13px;
   transition: background var(--t-med) var(--ease), border-color var(--t-med) var(--ease), color var(--t-med) var(--ease);
 }
 .chip:hover{
-  background: color-mix(in oklab, white 5%, transparent);
-  border-color: var(--line-2);
+  background: color-mix(in oklab, white 4.5%, transparent);
+  border-color: color-mix(in oklab, var(--line-2) 80%, transparent);
   color: var(--text-2);
 }
 .chip:focus-visible{ outline:none; box-shadow: var(--ring); }
 
 /* Optional Stripe fold in composer */
 .composer-stripe-fold{
-  border-top: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg1) 74%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--line) 55%, transparent);
+  background: color-mix(in oklab, var(--bg1) 44%, transparent);
 }
 .composer-stripe-fold-summary{
   padding: 12px 14px;
@@ -1145,7 +1157,7 @@ select.refund-select{ padding-right: 34px; }
   width: 100%;
   text-align:left;
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   border-radius: var(--r-md);
   padding: 10px 12px;
   color: var(--text-2);
@@ -1218,8 +1230,8 @@ select.refund-select{ padding-right: 34px; }
 .usage-bar{
   height: 8px;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg1) 70%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--bg1) 52%, transparent);
   overflow:hidden;
   margin-top: 8px;
 }
@@ -1234,9 +1246,9 @@ select.refund-select{ padding-right: 34px; }
 /* Refund center lists */
 .refund-list{
   margin-top: 10px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--bg1) 70%, transparent);
+  background: color-mix(in oklab, var(--bg1) 54%, transparent);
   padding: 10px;
 }
 .refund-empty{ color: var(--text-4); font-size: 13px; padding: 8px; }
@@ -1262,9 +1274,9 @@ select.refund-select{ padding-right: 34px; }
   font-size: 12.5px;
   padding: 6px 10px;
   border-radius: var(--r-pill);
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
   color: var(--text-3);
-  background: color-mix(in oklab, var(--bg1) 70%, transparent);
+  background: color-mix(in oklab, var(--bg1) 52%, transparent);
 }
 .stripe-status-pill.is-connected{
   color: color-mix(in oklab, var(--success) 70%, var(--text-2));
@@ -1355,7 +1367,7 @@ select.refund-select{ padding-right: 34px; }
   .workspace-grid{ grid-template-columns: 1fr; }
   #sidebarShell{ display:none; }
   body.mobile-scroll-mode #sidebarShell{ display:none; }
-  .messages{ padding: 14px 12px 10px 12px; }
+  .messages{ padding: 16px 12px 12px 12px; }
   .composer{ width: min(720px, 96vw); }
   .refund-form-grid{ grid-template-columns: 1fr; }
 }
@@ -1363,4 +1375,26 @@ select.refund-select{ padding-right: 34px; }
 /* Small quality-of-life tweaks */
 [hidden]{ display:none !important; }
 details > summary{ user-select:none; }
+
+/* Conversation-first refinements: reduce nested framing where possible */
+.messages-shell{
+  box-shadow: none;
+}
+.empty-card{
+  box-shadow: none;
+}
+.limit-secondary-link:hover{
+  background: color-mix(in oklab, white 4.5%, transparent);
+  border-color: transparent;
+}
+.composer{
+  outline: 1px solid color-mix(in oklab, var(--line) 35%, transparent);
+  outline-offset: -1px;
+}
+.composer:hover{
+  outline-color: color-mix(in oklab, var(--line) 46%, transparent);
+}
+.composer:focus-within{
+  outline-color: color-mix(in oklab, var(--accent) 20%, var(--line));
+}
 
