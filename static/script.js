@@ -1,3 +1,6 @@
+/* LEGACY / ALTERNATE FRONTEND
+   This script powers the minimal static chat UI (expects `#input`, `#send`, `#messages`).
+   The live operator workspace served at `/` uses `app.js` + `workspace_modules.js` + `workspace-client/*` from `services/index.html` (see `app.py`). */
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
 const messages = document.getElementById("messages");

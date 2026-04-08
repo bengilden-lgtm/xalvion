@@ -1,3 +1,6 @@
+/* LEGACY / FALLBACK STYLESHEET
+   `GET /styles.css` resolves to `services/styles.css` when present (see `app.py` -> `STYLES_CSS_PATH`).
+   This file is only used if `services/styles.css` is missing. */
 :root{
   --bg: #2b2723;
   --bg-soft: #312d28;

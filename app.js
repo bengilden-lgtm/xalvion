@@ -1,3 +1,4 @@
+/* LIVE FRONTEND (workspace): loaded by `services/index.html` as `/app.js` (served by FastAPI in `app.py`). */
 (() => {
   "use strict";
 

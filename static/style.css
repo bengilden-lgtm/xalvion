@@ -1,3 +1,6 @@
+/* LEGACY / ALTERNATE FRONTEND
+   This CSS pairs with `static/script.js` for a minimal chat page.
+   The live operator workspace served at `/` uses `/styles.css` -> `services/styles.css` and `services/index.html` (see `app.py`). */
 :root {
   --bg: #1f1d1a;
   --bg-elevated: #26231f;
