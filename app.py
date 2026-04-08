@@ -2780,20 +2780,40 @@ def analyze_extension_ticket(
         decision = dict(result.get("sovereign_decision") or {})
         action = str(decision.get("action", "none") or "none").strip().lower()
         amount = round(float(decision.get("amount", 0) or 0), 2)
+        # File: app.py
+        # Governor is final authority when present. Preserve legacy approval hold messaging as a fallback.
+        governor_present = bool(decision.get("governor_reason") or decision.get("execution_mode"))
         if check_requires_approval(action, amount):
-            hold_message = build_approval_hold_message(action, amount)
             decision.update({
                 "requires_approval": True,
-                "status": "waiting",
+                "status": decision.get("status") or "waiting",
                 "queue": decision.get("queue") or ("refund_risk" if action == "refund" else "waiting"),
                 "priority": decision.get("priority") or ("high" if action in {"refund", "charge"} else "medium"),
                 "risk_level": decision.get("risk_level") or ("high" if action in {"refund", "charge"} else "medium"),
-                "tool_status": "pending_approval",
+                "tool_status": decision.get("tool_status") or "pending_approval",
             })
-            result["reply"] = hold_message
-            result["response"] = hold_message
-            result["final"] = hold_message
+            # Only overwrite customer-facing reply when we have no governor context,
+            # so existing UX remains and governor does not get masked.
+            if not governor_present:
+                hold_message = build_approval_hold_message(action, amount)
+                result["reply"] = hold_message
+                result["response"] = hold_message
+                result["final"] = hold_message
             result["sovereign_decision"] = decision
+
+        # Optional governor fields at top-level (safe if absent)
+        if decision.get("execution_mode") and not result.get("execution_mode"):
+            result["execution_mode"] = decision.get("execution_mode")
+        for k in (
+            "governor_reason",
+            "governor_risk_score",
+            "governor_risk_level",
+            "governor_factors",
+            "approved",
+            "violations",
+        ):
+            if decision.get(k) is not None and result.get(k) is None:
+                result[k] = decision.get(k)
         
     except Exception:
         pass

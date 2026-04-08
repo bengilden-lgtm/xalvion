@@ -86,6 +86,80 @@ from agent.response_builder import (
     rewrite_output_for_issue,
 )
 
+# governor.py (final authority layer) is optional; failures degrade to review, never crash.
+try:
+    from governor import gate_execution as _governor_gate_execution
+except Exception as _gov_imp_err:
+    logger.warning("governor.gate_execution unavailable; degrading to review", exc_info=True)
+
+    def _governor_gate_execution(ticket, decision, memory=None):
+        return {
+            "execution_mode": "review",
+            "requires_approval": True,
+            "governor_reason": "Governor unavailable (soft-fail) — review required",
+            "governor_risk_level": "high",
+            "governor_risk_score": 5,
+            "governor_factors": ["governor_import_failed"],
+            "approved": False,
+            "violations": ["governor_import_failed"],
+        }
+
+
+def _upgrade_risk_level(existing: str, incoming: str) -> str:
+    """
+    governor can only upgrade (tighten) risk, never downgrade.
+    """
+    order = {"low": 0, "medium": 1, "high": 2}
+    a = str(existing or "").strip().lower()
+    b = str(incoming or "").strip().lower()
+    if a not in order:
+        a = "medium"
+    if b not in order:
+        b = "medium"
+    return b if order[b] > order[a] else a
+
+
+def _apply_governor_overrides(*, ticket: Dict[str, Any], final_action: Dict[str, Any], memory: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    File: agent/orchestrator.py
+    Apply governor gating between decisioning and execution.
+    Conservative: any governor failure becomes review (requires_approval=True).
+    """
+    try:
+        g = _governor_gate_execution(ticket, final_action, memory)
+        if not isinstance(g, dict):
+            raise TypeError("governor returned non-dict")
+    except Exception:
+        g = {
+            "execution_mode": "review",
+            "requires_approval": True,
+            "governor_reason": "Governor error (soft-fail) — review required",
+            "governor_risk_level": "high",
+            "governor_risk_score": 5,
+            "governor_factors": ["governor_call_failed"],
+            "approved": False,
+            "violations": ["governor_call_failed"],
+        }
+
+    # Governor is final authority over requires_approval and execution_mode.
+    # (Additive fields are safe if absent on older clients.)
+    next_action = dict(final_action or {})
+    next_action["execution_mode"] = str(g.get("execution_mode", next_action.get("execution_mode", "")) or "")
+    next_action["requires_approval"] = bool(g.get("requires_approval", True))
+
+    # Upgrade risk if governor is stricter.
+    next_action["risk_level"] = _upgrade_risk_level(next_action.get("risk_level", "medium"), g.get("governor_risk_level", "medium"))
+
+    # Preserve governor audit fields on the decision payload.
+    next_action["governor_reason"] = str(g.get("governor_reason", "") or "")
+    next_action["governor_risk_score"] = int(g.get("governor_risk_score", 0) or 0)
+    next_action["governor_risk_level"] = str(g.get("governor_risk_level", "") or "")
+    next_action["governor_factors"] = list(g.get("governor_factors") or [])
+    next_action["approved"] = bool(g.get("approved", False))
+    next_action["violations"] = list(g.get("violations") or [])
+
+    return next_action
+
 
 def run_agent(
     message: str,
@@ -246,8 +320,37 @@ def run_agent(
     if execution_requires_operator_gate(final_action.get("action", "none"), final_action.get("amount", 0)):
         final_action = {**final_action, "requires_approval": True}
 
-    executed = execute_action(ticket, final_action)
-    thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
+    # --- governor.py final authority layer (between decisioning and execution) ---
+    # File: agent/orchestrator.py
+    # Enforces a no-downgrade posture: governor can only add gates / tighten risk.
+    final_action = _apply_governor_overrides(ticket=ticket, final_action=final_action, memory=user_memory or {})
+
+    _gov_mode = str(final_action.get("execution_mode", "") or "").strip().lower()
+    if _gov_mode == "blocked":
+        # Blocked: do NOT execute live financial actions. Route to review safely.
+        executed = {
+            "action": "review",
+            "amount": 0,
+            "tool_result": {
+                "status": "manual_review",
+                "type": "governor_block",
+                "message": str(final_action.get("governor_reason") or "Blocked by governor policy"),
+                "violations": list(final_action.get("violations") or []),
+            },
+            "tool_status": "manual_review",
+        }
+        thinking_trace.append(_trace("governor_gate", "done", "blocked"))
+    elif _gov_mode == "review":
+        # Review: keep reply generation, but hold any tool execution behind approval gate.
+        final_action = {**final_action, "requires_approval": True}
+        executed = execute_action(ticket, final_action)
+        thinking_trace.append(_trace("governor_gate", "done", "review"))
+        thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
+    else:
+        # Auto: preserve existing behavior.
+        executed = execute_action(ticket, final_action)
+        thinking_trace.append(_trace("governor_gate", "done", "auto"))
+        thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
     quality = compute_quality(confidence, triage, executed, user_memory, llm_used)
 
     # Log the real outcome — this feeds the learning loop with verified API results

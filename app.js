@@ -3474,7 +3474,18 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function deriveConsequenceSignal(data = {}) {
     const dec = data.decision || data.sovereign_decision || {};
-    const risk = String(dec.risk_level || data.triage?.risk_level || "").toLowerCase();
+    // File: app.js
+    // Governor fields (when present) are the final authority trust signal.
+    const govRisk = String(data.governor_risk_level || dec.governor_risk_level || "").toLowerCase();
+    const risk = String(govRisk || dec.risk_level || data.triage?.risk_level || "").toLowerCase();
+    const execMode = String(data.execution_mode || dec.execution_mode || "").toLowerCase();
+    if (execMode === "blocked") {
+      return {
+        cls: "signal-high-risk",
+        text: "⛔ Blocked",
+        title: String(data.governor_reason || dec.governor_reason || "Blocked by governor policy"),
+      };
+    }
     if (risk === "high") {
       return {
         cls: "signal-high-risk",
@@ -3501,7 +3512,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       return {
         cls: "signal-approval",
         text: "⚡ Approval required",
-        title: "Awaiting operator approval"
+        title: String(data.governor_reason || dec.governor_reason || "Awaiting operator approval")
       };
     }
 
@@ -3557,6 +3568,28 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const errEl = panel.querySelector("[data-role='err']");
     const editWrap = panel.querySelector("[data-role='edit']");
     const nextWrap = panel.querySelector("[data-role='next']");
+
+    // File: app.js
+    // Governor trust signal (optional): surface reason/violations without changing layout structure.
+    try {
+      const govReason = String(data.governor_reason || dec.governor_reason || "").trim();
+      const govScore = data.governor_risk_score ?? dec.governor_risk_score;
+      const violations = Array.isArray(data.violations || dec.violations) ? (data.violations || dec.violations) : [];
+      if (noteEl && (govReason || violations.length)) {
+        const parts = [];
+        if (govReason) parts.push(govReason);
+        if (govScore !== undefined && govScore !== null && String(govScore).trim() !== "") {
+          parts.push(`Risk: ${String(govScore)}/5`);
+        }
+        if (violations.length) {
+          parts.push(`Violations: ${violations.slice(0, 3).join("; ")}`);
+        }
+        noteEl.textContent = parts.join(" · ");
+        noteEl.style.display = "block";
+      }
+    } catch {
+      /* no-op */
+    }
 
     const showErr = (t) => {
       errEl.textContent = t || "";

@@ -108,7 +108,18 @@
           d.triage_metadata && typeof d.triage_metadata === "object"
             ? d.triage_metadata
             : d.triage || {};
-        const risk = String(dec.risk_level || triage.risk_level || d.risk_level || "").toLowerCase();
+        // File: workspace_modules.js
+        // Governor fields (when present) become source-of-truth for trust signaling.
+        const govRisk = String(d.governor_risk_level || dec.governor_risk_level || "").toLowerCase();
+        const risk = String(govRisk || dec.risk_level || triage.risk_level || d.risk_level || "").toLowerCase();
+        const execMode = String(d.execution_mode || dec.execution_mode || "").toLowerCase();
+        if (execMode === "blocked") {
+          return {
+            cls: "signal-high-risk",
+            text: "⛔ Blocked",
+            title: String(d.governor_reason || dec.governor_reason || "Blocked by governor policy"),
+          };
+        }
         if (risk === "high") {
           return {
             cls: "signal-high-risk",
@@ -135,7 +146,7 @@
           return {
             cls: "signal-approval",
             text: "⚡ Approval required",
-            title: "Awaiting operator approval",
+            title: String(d.governor_reason || dec.governor_reason || "Awaiting operator approval"),
           };
         }
         const action = String(d.action || dec.action || "none").toLowerCase();

@@ -74,6 +74,14 @@ class SovereignDecision(BaseModel):
     risk_level: Literal["low", "medium", "high"] = "low"
     requires_approval: bool = False
     tool_status: str = "no_action"
+    # governor.py (final authority layer) - optional, additive, safe if absent
+    execution_mode: Literal["auto", "review", "blocked"] | None = None
+    governor_reason: str | None = None
+    governor_risk_level: Literal["low", "medium", "high"] | None = None
+    governor_risk_score: int | None = None
+    governor_factors: list[str] | None = None
+    approved: bool | None = None
+    violations: list[str] | None = None
 
 
 class ImpactProjections(BaseModel):
@@ -141,6 +149,14 @@ class CanonicalAgentResponse(BaseModel):
     decision_explanation: dict[str, Any] | None = None
     decision_explainability: dict[str, Any] | None = None
     execution_tier: str = "approval_required"
+    # governor.py (final authority layer) - optional, additive, safe if absent
+    execution_mode: Literal["auto", "review", "blocked"] | None = None
+    governor_reason: str | None = None
+    governor_risk_score: int | None = None
+    governor_risk_level: Literal["low", "medium", "high"] | None = None
+    governor_factors: list[str] | None = None
+    approved: bool | None = None
+    violations: list[str] | None = None
     # Enterprise trust / audit (additive; safe for clients — no secrets or raw tool payloads)
     outcome_key: str | None = None
     audit_summary: dict[str, Any] | None = None

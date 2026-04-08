@@ -306,7 +306,32 @@ async function ensureUsageReady() {
 
 function renderConsequenceBar(data) {
   if (!consequenceSignal) return;
-  const pres = deriveConsequencePresentation(data);
+  // File: xalvion-extension/sidepanel.js
+  // Governor trust signal parity: when governor fields are present, they become source-of-truth.
+  const dec = getDecisionData(data);
+  const execMode = String(data?.execution_mode || dec?.execution_mode || "").toLowerCase();
+  const govRisk = String(data?.governor_risk_level || dec?.governor_risk_level || "").toLowerCase();
+  const govReason = String(data?.governor_reason || dec?.governor_reason || "").trim();
+  let pres = deriveConsequencePresentation(data);
+  if (execMode === "blocked") {
+    pres = {
+      cls: "signal-high-risk",
+      text: "⛔ Blocked",
+      title: govReason || "Blocked by governor policy",
+    };
+  } else if (govRisk === "high" && pres?.cls !== "signal-high-risk") {
+    pres = {
+      cls: "signal-high-risk",
+      text: "⚠ High risk",
+      title: govReason || "Elevated risk — review before customer send",
+    };
+  } else if (execMode === "review" && pres?.cls === "signal-safe") {
+    pres = {
+      cls: "signal-approval",
+      text: "⚡ Approval required",
+      title: govReason || "Review required under governor policy",
+    };
+  }
   consequenceSignal.textContent = pres.text;
   consequenceSignal.className = `consequence-signal ${pres.cls}`;
   if (pres.title) consequenceSignal.setAttribute("title", pres.title);
