@@ -1470,6 +1470,107 @@ select.refund-select{ padding-right: 34px; }
   opacity: .96;
 }
 
+/* Session loop continuation (post-approval) */
+.xv-next-action{
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  display: grid;
+  gap: 10px;
+}
+.xv-next-success{
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--success) 22%, var(--line));
+  background: color-mix(in oklab, var(--success) 6%, transparent);
+  padding: 10px 12px;
+}
+.xv-next-success-title{
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: color-mix(in oklab, var(--success) 82%, var(--text));
+}
+.xv-next-success-sub{
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.xv-next-prompt-title{
+  font-weight: 600;
+  color: var(--text);
+  font-size: 13px;
+}
+.xv-next-actions{
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.xv-next-btn{
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 30%, transparent);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--text-2);
+  transition: background var(--t-med) var(--ease), border-color var(--t-med) var(--ease), transform var(--t-fast) var(--ease);
+}
+.xv-next-btn:hover{
+  background: color-mix(in oklab, white 5%, var(--surface-soft));
+  border-color: var(--line-2);
+}
+.xv-next-btn:active{ transform: translateY(1px); }
+.xv-next-btn:focus-visible{ outline: none; box-shadow: var(--ring); }
+.xv-next-btn--ghost{
+  background: transparent;
+  color: var(--text-3);
+}
+.xv-next-meta{
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.xv-next-meta-chip{
+  font-size: 12px;
+  color: var(--text-4);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--bg2) 52%, transparent);
+  border-radius: var(--r-pill);
+  padding: 5px 10px;
+}
+.xv-next-nudge{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--accent) 16%, var(--border));
+  background: color-mix(in oklab, var(--accent) 5%, transparent);
+}
+.xv-next-nudge--subtle{
+  border-color: color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 16%, transparent);
+}
+.xv-next-nudge-copy{
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.xv-next-nudge-cta{
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--accent) 26%, var(--line));
+  background: linear-gradient(165deg, color-mix(in oklab, var(--accent) 52%, var(--bg3)), color-mix(in oklab, var(--accent-2) 40%, var(--bg3)));
+  color: var(--accent-ink);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 650;
+  transition: filter var(--t-med) var(--ease);
+}
+.xv-next-nudge-cta:hover{ filter: brightness(1.05); }
+.xv-next-nudge-cta:focus-visible{ outline: none; box-shadow: var(--ring); }
+
 /* Edit reply sheet */
 .edit-mode-container{
   margin-top: 12px;
@@ -2741,6 +2842,91 @@ details > summary{ user-select:none; }
   line-height: 1.55;
   color: color-mix(in oklab, var(--text-2) 60%, var(--text-4));
   filter: saturate(0.92);
+}
+
+/* Return triggers + momentum (empty state) */
+.xv-momentum-line{
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.xv-momentum-sub{
+  color: var(--text-4);
+}
+.xv-recent-block{
+  margin-top: 14px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 16%, transparent);
+  padding: 12px;
+}
+.xv-recent-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.xv-recent-title{
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.xv-recent-cta{
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  background: transparent;
+  color: var(--text-3);
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+.xv-recent-cta:hover{
+  background: color-mix(in oklab, white 4.5%, transparent);
+  border-color: var(--line-2);
+  color: var(--text-2);
+}
+.xv-recent-cta:focus-visible{ outline: none; box-shadow: var(--ring); }
+.xv-recent-list{
+  display: grid;
+  gap: 8px;
+}
+.xv-recent-item{
+  text-align: left;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--bg2) 48%, transparent);
+  padding: 10px 10px;
+  transition: background var(--t-med) var(--ease), border-color var(--t-med) var(--ease), transform var(--t-fast) var(--ease);
+}
+.xv-recent-item:hover{
+  background: color-mix(in oklab, white 4.5%, var(--bg2));
+  border-color: var(--line-2);
+  transform: translateY(-1px);
+}
+.xv-recent-item:active{ transform: translateY(0); }
+.xv-recent-item:focus-visible{ outline: none; box-shadow: var(--ring); }
+.xv-recent-item-top{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.xv-recent-item-id{
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-4);
+}
+.xv-recent-item-meta{
+  font-size: 12px;
+  color: var(--text-4);
+}
+.xv-recent-item-preview{
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.4;
 }
 
 /* Trust footer (subtle, not sticky) */
