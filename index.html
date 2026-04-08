@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><text x='32' y='48' font-family='Georgia,serif' font-size='48' font-weight='700' fill='%23ffffff' text-anchor='middle'>X</text></svg>" />
-  <link rel="stylesheet" href="/styles.css?v=claude-thread-8" />
+  <link rel="stylesheet" href="/styles.css?v=claude-workspace-9" />
 </head>
 <body data-ui="claude">
   <div class="workspace-atmosphere" aria-hidden="true">
@@ -617,7 +617,7 @@
                 </div>
 
                 <footer class="composer-wrap composer-dock xv-composer-foot" id="workspaceComposerDock">
-                <div class="composer-unified">
+                <div class="composer-unified composer-module">
                   <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
                     <div class="composer-hint-band composer-hint-band--integrated">
                       <div class="composer-status-cluster" role="status" aria-live="polite">
@@ -628,7 +628,7 @@
                       </div>
                     </div>
                     <div class="composer-input-row composer-input-wrap composer-field">
-                      <textarea id="messageInput" placeholder="How can I help with this ticket?" autocomplete="off"></textarea>
+                      <textarea id="messageInput" placeholder="Paste a ticket or describe the customer issue…" autocomplete="off"></textarea>
                       <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                     </div>
                     <div class="quick-actions">
@@ -747,7 +747,7 @@
 
   <script type="module" src="/workspace-client/boot.js"></script>
   <script src="/workspace_modules.js"></script>
-  <script src="/app.js?v=claude-flat-3"></script>
+  <script src="/app.js?v=claude-workspace-9"></script>
   <script>
     (() => {
       function bindMoreJumpers() {

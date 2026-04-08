@@ -323,17 +323,17 @@ if (typeof window.pulseRail !== "function") {
           claudeStyle.textContent = `
             /* Xalvion surgical merge: Claude-style rhythm refinements (no logic changes) */
             body[data-ui="claude"]{
-              --cld-sidebar-expanded: 276px;
-              --cld-sidebar-collapsed: 52px;
-              --cld-thread-max: min(720px, 94vw);
-              --cld-open-composer: min(720px, 92vw);
+              --cld-sidebar-expanded: 200px;
+              --cld-sidebar-collapsed: 48px;
+              --cld-thread-max: min(880px, 92vw);
+              --cld-open-composer: min(880px, 92vw);
             }
 
             /* Thinner, calmer left rail with tighter icon rhythm */
             body[data-ui="claude"] #sidebarShell{
-              padding: 8px 7px 12px !important;
-              background: rgba(16, 16, 20, 0.94) !important;
-              border-right-color: rgba(255,255,255,0.045) !important;
+              padding: 8px 8px 12px !important;
+              background: rgba(14, 14, 18, 0.97) !important;
+              border-right-color: rgba(255,255,255,0.04) !important;
             }
             body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"]{
               padding: 10px 5px 12px !important;
@@ -370,11 +370,11 @@ if (typeof window.pulseRail !== "function") {
 
             /* Cleaner workspace shell: slightly more editorial center column */
             body[data-ui="claude"] .main-canvas-inner.main-stage{
-              padding: 20px 18px 16px !important;
+              padding: clamp(12px, 2.5vh, 24px) clamp(16px, 3vw, 28px) 14px !important;
             }
             body[data-ui="claude"] #messages{
-              padding: 18px 0 154px !important;
-              gap: 16px !important;
+              padding: 12px 0 120px !important;
+              gap: 14px !important;
             }
 
             /* Flatter conversation flow; reduce visual “card” energy */
@@ -2562,8 +2562,9 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const headline = nick ? `${greet}, ${nick}` : greet;
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-thread-open" role="status">
-        <p class="empty-thread-line"><span class="empty-thread-greet">${headline}</span><span class="empty-thread-sep"> · </span>What ticket should we work through?</p>
-        <p class="empty-launch-plan-hint empty-launch-plan-hint--quiet">${chipHintGuest}</p>
+        <h2 class="cld-welcome-headline">${headline}</h2>
+        <p class="cld-welcome-prompt">What ticket should we work through?</p>
+        <p class="cld-welcome-support empty-launch-plan-hint empty-launch-plan-hint--quiet">${chipHintGuest}</p>
       </div>`;
     }
 
