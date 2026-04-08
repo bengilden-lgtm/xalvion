@@ -1077,6 +1077,24 @@ select.refund-select{ padding-right: 34px; }
   color: var(--text-3);
 }
 
+.reply-prep-meta{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  margin-bottom: 6px;
+}
+.reply-prep-time{
+  display:inline-flex;
+  align-items:center;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--bg2) 50%, transparent);
+  color: var(--text-4);
+  font-size: 12px;
+  font-weight: 550;
+}
+
 .assistant-footer{
   margin-top: 6px;
   display:flex;
@@ -1084,6 +1102,40 @@ select.refund-select{ padding-right: 34px; }
   gap: 8px;
   align-items: center;
 }
+
+.automation-upsell{
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--accent) 16%, var(--border));
+  background: color-mix(in oklab, var(--accent) 5%, transparent);
+  display:flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.automation-upsell-copy{
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.automation-upsell-cta{
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--accent) 26%, var(--line));
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklab, var(--accent) 52%, var(--bg3)),
+    color-mix(in oklab, var(--accent-2) 40%, var(--bg3))
+  );
+  color: var(--accent-ink);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 650;
+  transition: filter var(--t-med) var(--ease);
+}
+.automation-upsell-cta:hover{ filter: brightness(1.05); }
+.automation-upsell-cta:focus-visible{ outline: none; box-shadow: var(--ring); }
 
 /* Copy control — quiet utility */
 .assistant-tools{
@@ -2542,6 +2594,11 @@ details > summary{ user-select:none; }
   border-radius: var(--r-pill);
   padding: 3px 8px;
 }
+.plan-offer-badge--popular{
+  color: color-mix(in oklab, var(--accent) 78%, var(--text-2));
+  border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
+  background: color-mix(in oklab, var(--accent) 7%, transparent);
+}
 .plan-offer-features{
   margin: 0 0 12px 0;
   padding: 0 0 0 18px;
@@ -2649,5 +2706,54 @@ details > summary{ user-select:none; }
   color: var(--text-muted);
   margin-bottom: 10px;
   padding: 0 2px;
+}
+
+/* Workspace onboarding (guest first impression) */
+.empty-card.empty-card-onboarding{
+  width: 100%;
+  max-width: min(640px, 100%);
+  text-align: left;
+  padding: 0 8px;
+}
+.onboarding-subline{
+  margin-top: 8px;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+.onboarding-example{
+  margin-top: 14px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 16%, transparent);
+  padding: 12px 14px;
+}
+.onboarding-example-label{
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.onboarding-example-text{
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: color-mix(in oklab, var(--text-2) 60%, var(--text-4));
+  filter: saturate(0.92);
+}
+
+/* Trust footer (subtle, not sticky) */
+.workspace-trust-footer{
+  width: min(var(--thread-max), 96vw);
+  margin: 10px auto 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-4);
+}
+
+.stripe-trust-line{
+  margin-top: 12px;
+  text-align: left;
 }
 

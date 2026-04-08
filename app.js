@@ -196,7 +196,8 @@ if (typeof window.pulseRail !== "function") {
     approachingLimit: false,
     atLimit: false,
     valueSignals: null,
-    dashboardStats: null
+    dashboardStats: null,
+    automationUpsellShown: false
   };
 
   function getPhase2() {
@@ -2066,24 +2067,12 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     if (el) {
       el.classList.remove("is-warning", "is-limit");
       const pct = state.limit > 0 ? state.usage / state.limit : 0;
-      if (!isAuthenticated()) {
-        const rem = state.remaining;
-        const runWord = rem === 1 ? "run" : "runs";
-        el.textContent =
-          rem <= 0
-            ? "Preview complete — open Access to continue"
-            : `Preview · ${rem} ${runWord} left`;
-        if (state.remaining <= 0) el.classList.add("is-limit");
-        else if (pct >= 0.75) el.classList.add("is-warning");
-      } else if (state.atLimit) {
-        el.classList.add("is-limit");
-        el.textContent = `${state.usage} of ${state.limit} runs used · 0 remaining this month`;
-      } else if (state.approachingLimit || pct >= 0.75) {
-        el.classList.add("is-warning");
-        el.textContent = `${state.usage} of ${state.limit} runs this month · ${state.remaining} left`;
-      } else {
-        el.textContent = `${formatTier(state.tier)} · ${state.remaining} of ${state.limit} runs left this month`;
-      }
+      const tierLabel = isAuthenticated() ? formatTier(state.tier) : "Free";
+      const rem = Math.max(0, Number(state.remaining || 0) || 0);
+      const runWord = rem === 1 ? "run" : "runs";
+      el.textContent = `${tierLabel}: ${rem} ${runWord} left`;
+      if (rem <= 0) el.classList.add("is-limit");
+      else if (pct >= 0.75) el.classList.add("is-warning");
     }
     syncMonetizationChrome();
     syncComposerPreviewChrome();
@@ -2609,8 +2598,9 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           <div class="customer-message-block">
             <div class="reply-body">
               <div class="assistant-context-line js-assistant-context" hidden></div>
+              <div class="reply-prep-meta"><span class="reply-prep-time js-prepared-time" hidden></span></div>
               <div class="customer-message-label reply-hero-label">Suggested reply</div>
-              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared by Xalvion — ready to review</div>
+              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>AI prepared this based on context, policy, and past outcomes</div>
               <div class="reply-text js-reply-text">${bodyHtml}</div>
             </div>
           </div>
@@ -2662,59 +2652,38 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const previewRunsWord = previewLeft === 1 ? "run" : "runs";
 
     if (atCap) {
-      const n = guest ? getGuestUsage() : state.usage;
-      const capEyebrow = guest ? "Preview" : tierLc === "pro" ? "Pro capacity" : "Capacity";
-      const capTitle = guest
-        ? "Preview limit reached"
-        : tierLc === "pro"
-          ? "Pro capacity reached"
-          : tierLc === "elite"
-            ? "Plan capacity reached"
-            : "Free plan capacity reached";
-      const capLead = guest
-        ? "Create a free account for more monthly runs and the same approval-safe flow."
-        : `You ran <strong>${n}</strong> full operator ${n === 1 ? "run" : "runs"} this cycle.`;
-      const capBody = guest
-        ? `${FREE_USAGE_LIMIT} runs/month, saved threads, and continued access before the next gated action.`
-        : tierLc === "pro"
-          ? "Elite adds 5,000 tickets/month and deeper execution headroom."
-          : "Pro unlocks 500 runs/month, live refunds, and priority routing.";
-      const ctaLabel = guest
-        ? "Continue with free account"
-        : tierLc === "pro"
-          ? "Upgrade to Elite"
-          : "Upgrade to Pro";
       if (isClaudeShell()) {
         return `
       <div class="empty-card limit-moment-card limit-moment-card--claude">
-        <p class="limit-moment-card__eyebrow">${capEyebrow}</p>
-        <h2 class="limit-moment-card__title">${capTitle}</h2>
-        <p class="limit-moment-card__lead">${capLead}</p>
-        <p class="limit-moment-card__body">${capBody}</p>
-        <button type="button" class="limit-cta limit-cta--claude" id="emptySignupCta">${ctaLabel}</button>
-        ${guest ? `<button type="button" class="limit-secondary-link limit-secondary-link--claude" id="emptyLoginLink">Log in instead</button>` : ""}
+        <h2 class="limit-moment-card__title">You’ve used your free runs</h2>
+        <p class="limit-moment-card__lead">Upgrade to keep resolving tickets with approval-safe AI.</p>
+        <button type="button" class="limit-cta limit-cta--claude" id="emptyUpgradeCta">Upgrade now</button>
+        <button type="button" class="limit-secondary-link limit-secondary-link--claude" id="emptyFreeAccountCta">Create free account</button>
       </div>`;
       }
       return `
       <div class="empty-card limit-moment-card empty-card-premium empty-card-conversion">
-        <div class="empty-cap-eyebrow">${capEyebrow}</div>
-        <h2>${capTitle}</h2>
-        <p class="limit-moment-lead">${capLead}</p>
-        <p>${capBody}</p>
+        <h2>You’ve used your free runs</h2>
+        <p class="limit-moment-lead">Upgrade to keep resolving tickets with approval-safe AI.</p>
         <div class="empty-flow-strip empty-flow-strip-compact" aria-hidden="true">
           <span>Prepare</span>
           <span>Approve</span>
           <span>Execute</span>
         </div>
-        <button type="button" class="limit-cta" id="emptySignupCta">${ctaLabel}</button>
-        ${guest ? `<button type="button" class="limit-secondary-link" id="emptyLoginLink">Already have an account? Log in</button>` : ""}
+        <button type="button" class="limit-cta" id="emptyUpgradeCta">Upgrade now</button>
+        <button type="button" class="limit-secondary-link" id="emptyFreeAccountCta">Create free account</button>
       </div>`;
     }
 
     if (isClaudeShell()) {
       return `
-      <div class="empty-card empty-card-launch empty-card-launch--claude empty-thread-open" role="status">
-        <h2 class="cld-welcome-headline">What needs handling?</h2>
+      <div class="empty-card empty-card-launch empty-card-launch--claude empty-card-onboarding" role="status">
+        <h2 class="cld-welcome-headline">Resolve customer issues instantly — before you reply</h2>
+        <p class="cld-welcome-prompt onboarding-subline">Paste a support ticket and let Xalvion prepare the best response and actions.</p>
+        <div class="onboarding-example" aria-hidden="true">
+          <div class="onboarding-example-label">Example</div>
+          <div class="onboarding-example-text">Customer says: My order hasn’t arrived and I’m frustrated</div>
+        </div>
       </div>`;
     }
 
@@ -2800,16 +2769,16 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function bindEmptyStateActions(empty) {
     if (!empty) return;
-    empty.querySelector("#emptySignupCta")?.addEventListener("click", () => {
+    empty.querySelector("#emptyUpgradeCta")?.addEventListener("click", () => {
       if (!isAuthenticated()) {
-        focusAccessPanel();
+        focusPlansPanel();
         return;
       }
       const t = String(state.tier || "free").toLowerCase();
       if (t === "pro") upgradePlan("elite");
       else upgradePlan("pro");
     });
-    empty.querySelector("#emptyLoginLink")?.addEventListener("click", () => {
+    empty.querySelector("#emptyFreeAccountCta")?.addEventListener("click", () => {
       focusAccessPanel();
     });
   }
@@ -2896,6 +2865,50 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const typing = node?.querySelector?.(".xalvion-typing-sovereign, .xv-thinking-block");
     const looksLikeError = /something went wrong|request failed|no response returned|plan limit reached/i.test(txt);
     rein.hidden = !txt || Boolean(typing) || card?.dataset.placeholder === "true" || looksLikeError;
+  }
+
+  function setPreparedMeta(row, seconds) {
+    const el = row?.querySelector?.(".js-prepared-time");
+    if (!el) return;
+    const s = Number(seconds);
+    if (!Number.isFinite(s) || s <= 0) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    const fixed = Math.max(0.1, Math.round(s * 10) / 10).toFixed(1);
+    el.textContent = `Prepared in ${fixed}s`;
+    el.hidden = false;
+  }
+
+  function maybeMountAutomationUpsell(row, replyText = "") {
+    if (state.automationUpsellShown) return;
+    const tier = String(state.tier || "free").toLowerCase();
+    if (tier === "elite" || tier === "dev") return;
+    const txt = String(replyText || "").trim();
+    if (txt.length < 40) return;
+    if (/something went wrong|request failed|no response returned|plan limit reached/i.test(txt)) return;
+
+    const footer = getAssistantFooterNode(row);
+    if (!footer) return;
+
+    const upsell = document.createElement("div");
+    upsell.className = "automation-upsell";
+    upsell.innerHTML = `
+      <div class="automation-upsell-copy">Want Xalvion to handle refunds, tracking, and actions automatically?</div>
+      <button type="button" class="automation-upsell-cta">Unlock automation</button>
+    `;
+    const btn = upsell.querySelector("button");
+    btn?.addEventListener("click", () => {
+      state.automationUpsellShown = true;
+      focusPlansPanel();
+      window.setTimeout(() => {
+        document.getElementById("planEliteCard")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      }, 120);
+    });
+
+    footer.appendChild(upsell);
+    state.automationUpsellShown = true;
   }
 
   function getAssistantFooterNode(row) {
@@ -3282,6 +3295,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         <span class="consequence-signal ${sig.cls}" data-role="consequence">${escapeHtml(sig.text)}</span>
         <div class="decision-controls" data-role="controls"></div>
       </div>
+      <div class="decision-panel-note" data-role="trust">Nothing is sent without your approval</div>
       <div class="decision-panel-note" data-role="note" style="display:none"></div>
       <div class="decision-panel-error" data-role="err" style="display:none"></div>
       <div class="edit-mode-container" data-role="edit" style="display:none"></div>
@@ -4426,6 +4440,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!payload.message || state.sending) return;
 
     if (!enforceWorkspaceLimit()) return;
+    const startedAt =
+      globalThis.performance && typeof globalThis.performance.now === "function" ? globalThis.performance.now() : Date.now();
 
     ensureInjectedStyles();
     clearEmptyState();
@@ -4523,6 +4539,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
       const replyText = data.reply || data.response || data.final || "No response returned.";
       setAssistantCopy(row, replyText);
+      const elapsedMs =
+        (globalThis.performance && typeof globalThis.performance.now === "function" ? globalThis.performance.now() : Date.now()) -
+        startedAt;
+      setPreparedMeta(row, elapsedMs / 1000);
 
       const footer = getAssistantFooterNode(row);
       const briefSlot = row.querySelector("[data-slot='brief']");
@@ -4532,6 +4552,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         addCopyControl(toolsWrap, replyText, row);
         footer.appendChild(toolsWrap);
         footer.appendChild(wrapAssistantMetaFold(createMetaRow(data)));
+        maybeMountAutomationUpsell(row, replyText);
 
         if (briefSlot) {
           briefSlot.innerHTML = "";

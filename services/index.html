@@ -150,7 +150,7 @@
                       <div class="composer-input-row composer-input-wrap composer-field">
                         <div class="composer-input-shell">
                           <div class="composer-field-inner">
-                            <textarea id="messageInput" placeholder="Describe the issue or paste the ticket…" autocomplete="off"></textarea>
+                            <textarea id="messageInput" placeholder="Paste a ticket or describe the issue…" autocomplete="off"></textarea>
                             <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                           </div>
                         </div>
@@ -171,6 +171,7 @@
                       </details>
                     </div>
                   </div>
+                  <div class="workspace-trust-footer" aria-hidden="true">Used by support teams to reduce response time and errors</div>
                   </footer>
                 </div>
               </section>
@@ -181,7 +182,7 @@
                   <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(840px, 100%);">
                     <div class="cld-cap-pill" id="plansSurfaceStatusPill" translate="no">Plans</div>
                     <h2 class="cld-welcome-headline" style="margin-top:10px;">Choose capacity that matches your workload.</h2>
-                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Upgrade when you need saved threads, higher monthly runs, and live billing actions.</p>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Free runs reset monthly. Upgrade when you need automation, integrations, and higher limits.</p>
                     <div class="plans-stack" id="plansSurfaceGrid" style="margin-top:16px;">
                       <article class="plan-offer plan-offer--pro" data-plan-tier="preview" id="planPreviewCard">
                         <div class="plan-offer-header">
@@ -192,9 +193,9 @@
                           <p class="plan-offer-spec">3 runs · no account</p>
                         </div>
                         <ul class="plan-offer-features">
-                          <li>Try the operator workflow</li>
+                          <li>Try the approval-safe workflow</li>
                           <li>No saved threads</li>
-                          <li>Connect Stripe after signup</li>
+                          <li>No automation</li>
                         </ul>
                         <button type="button" class="plan-cta plan-cta--secondary" data-open-access="signup"><span>Create free account</span></button>
                       </article>
@@ -209,10 +210,10 @@
                         </div>
                         <ul class="plan-offer-features">
                           <li>Saved threads</li>
-                          <li>Operator approvals</li>
-                          <li>Integrations setup</li>
+                          <li>Approval-safe replies</li>
+                          <li>No automation</li>
                         </ul>
-                        <button type="button" class="plan-cta plan-cta--secondary" data-open-access="login"><span>Sign in</span></button>
+                        <button type="button" class="plan-cta plan-cta--secondary" data-open-access="login"><span>Already have an account?</span></button>
                       </article>
 
                       <article class="plan-offer plan-offer--pro" data-plan-tier="pro" id="planProCard">
@@ -224,9 +225,9 @@
                           <p class="plan-offer-spec">500 runs / month</p>
                         </div>
                         <ul class="plan-offer-features">
-                          <li>Live Stripe refund execution (plan-gated)</li>
-                          <li>Higher limits + priority routing</li>
-                          <li>Built for daily operators</li>
+                          <li>More runs + faster responses</li>
+                          <li>Basic integrations</li>
+                          <li>Live Stripe refund execution</li>
                         </ul>
                         <button type="button" class="plan-cta plan-cta--primary" data-upgrade="pro"><span>Upgrade to Pro</span></button>
                       </article>
@@ -235,14 +236,15 @@
                         <div class="plan-offer-header">
                           <div class="plan-offer-title-row">
                             <h3 class="plan-offer-name">Elite</h3>
+                            <span class="plan-offer-badge plan-offer-badge--popular">Most popular</span>
                             <span class="plan-offer-badge" data-plan-badge hidden>Current</span>
                           </div>
                           <p class="plan-offer-spec">5,000 runs / month</p>
                         </div>
                         <ul class="plan-offer-features">
-                          <li>Everything in Pro</li>
-                          <li>Throughput headroom + team workflows</li>
-                          <li>Designed for high volume</li>
+                          <li>Automation (refunds, tracking, actions)</li>
+                          <li>Integrations + priority</li>
+                          <li>High-volume capacity</li>
                         </ul>
                         <button type="button" class="plan-cta plan-cta--secondary" data-upgrade="elite"><span>Upgrade to Elite</span></button>
                       </article>
@@ -290,6 +292,7 @@
                           Disconnect Stripe
                         </button>
                       </div>
+                      <div class="muted-copy stripe-trust-line">Secure billing powered by Stripe</div>
                     </div>
                   </div>
                 </div>
@@ -439,8 +442,8 @@
               <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
             </div>
             <div class="btn-row auth-cta-row">
-              <button id="signupBtn" class="btn" type="button">Create account</button>
-              <button id="loginBtn" class="ghost-btn" type="button">Log in</button>
+              <button id="signupBtn" class="btn" type="button">Save your work and continue</button>
+              <button id="loginBtn" class="ghost-btn" type="button">Already have an account?</button>
             </div>
             <details class="auth-hints-fold" id="authHintsFold">
               <summary class="auth-hints-summary">Credentials requirements</summary>
