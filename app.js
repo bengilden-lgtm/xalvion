@@ -1010,37 +1010,47 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     if (!isAuthenticated()) setNotice("info", title, detail, { continuation: true });
     else setNotice("warning", title, detail);
 
-    if (!els.messages) return;
+    const banner = document.getElementById("inlineLimitBanner");
+    if (banner) {
+      const usageLine = `${getEffectiveUsage(state.usage)} / ${getEffectiveLimit(state.tier, state.limit)} used`;
+      const primaryLabel = isAuthenticated() ? "Upgrade" : "Create free account";
+      const secondaryLabel = isAuthenticated() ? "See plans" : "Log in";
+      banner.innerHTML = `
+        <div class="inline-limit-eyebrow">Preview</div>
+        <div class="inline-limit-title">${escapeHtml(title)}</div>
+        <div class="inline-limit-detail">${escapeHtml(detail)}</div>
+        <div class="inline-limit-actions">
+          <button type="button" class="btn inline-limit-primary" id="inlineLimitPrimary">${escapeHtml(primaryLabel)}</button>
+          <button type="button" class="ghost-btn inline-limit-secondary" id="inlineLimitSecondary">${escapeHtml(secondaryLabel)}</button>
+          <span class="muted-copy" style="margin-left:auto;align-self:center">${escapeHtml(usageLine)}</span>
+        </div>
+      `;
+      banner.hidden = false;
 
-    clearEmptyState();
-    const row = addAssistantMessage(body);
-    row.classList.add("msg-group--limit-cta");
-    const footer = getAssistantFooterNode(row);
-    if (footer) {
-      footer.innerHTML = "";
-      const meta = document.createElement("div");
-      meta.className = "assistant-meta";
-      meta.appendChild(
-        createMetaChip({
-          icon: ICONS.warn,
-          text: isAuthenticated() ? "Upgrade required" : "Sign up — full access",
-          tone: "review"
-        })
+      const primary = document.getElementById("inlineLimitPrimary");
+      const secondary = document.getElementById("inlineLimitSecondary");
+      primary?.addEventListener(
+        "click",
+        () => {
+          if (!isAuthenticated()) {
+            focusAccessPanel();
+            return;
+          }
+          const t = String(state.tier || "free").toLowerCase();
+          if (t === "pro") upgradePlan("elite");
+          else upgradePlan("pro");
+        },
+        { once: true }
       );
-      meta.appendChild(
-        createMetaChip({
-          icon: ICONS.ticket,
-          text: `${getEffectiveUsage(state.usage)} / ${getEffectiveLimit(state.tier, state.limit)} used`
-        })
+      secondary?.addEventListener(
+        "click",
+        () => {
+          if (!isAuthenticated()) focusAccessPanel();
+          else focusPlansPanel();
+        },
+        { once: true }
       );
-      footer.appendChild(meta);
     }
-
-    row.querySelector(".msg-card")?.removeAttribute("data-placeholder");
-    syncReplyReinforcement(row);
-
-    scrollMessagesToBottom(true);
-    refreshMessageShellGlow();
   }
 
   function enforceWorkspaceLimit() {
@@ -1898,6 +1908,16 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     syncCommandStripCapacity();
     refreshEmptyStateContent();
     if (!state.sending) refreshComposerIdleHint();
+
+    const banner = document.getElementById("inlineLimitBanner");
+    if (banner) {
+      const guest = !isAuthenticated();
+      const atCap = guest ? state.remaining <= 0 : Boolean(state.atLimit);
+      if (!atCap) {
+        banner.hidden = true;
+        banner.innerHTML = "";
+      }
+    }
   }
 
   function syncMonetizationChrome() {
@@ -2593,6 +2613,12 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (accessTab) accessTab.click();
     els.usernameInput?.scrollIntoView?.({ behavior: "smooth", block: "center" });
     window.setTimeout(() => els.usernameInput?.focus?.(), 120);
+  }
+
+  function focusPlansPanel() {
+    const plansTab = els.sidebarShell?.querySelector?.('[data-sidebar-tab="plans"]');
+    if (plansTab) plansTab.click();
+    document.getElementById("sidebarPanelPlans")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
 
   function bindEmptyStateActions(empty) {
