@@ -44,6 +44,12 @@ if (typeof window.pulseRail !== "function") {
     newChatBtn: document.getElementById("newChatBtn"),
     usernameInput: document.getElementById("usernameInput"),
     passwordInput: document.getElementById("passwordInput"),
+    accessStatePill: document.getElementById("accessStatePill"),
+    accessStateTitle: document.getElementById("accessStateTitle"),
+    accessStateCopy: document.getElementById("accessStateCopy"),
+    accessTierValue: document.getElementById("accessTierValue"),
+    accessRemainingValue: document.getElementById("accessRemainingValue"),
+    accessPlansLink: document.getElementById("accessPlansLink"),
     notice: document.getElementById("notice"),
     noticeTitle: document.getElementById("noticeTitle"),
     noticeDetail: document.getElementById("noticeDetail"),
@@ -1905,6 +1911,34 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   function updateAuthStatus() {
     if (state.username) setText(els.authStatus, `Session: ${state.username}`);
     else setText(els.authStatus, "Session: guest");
+    syncAccessOverview();
+  }
+
+  function syncAccessOverview() {
+    const guest = !isAuthenticated();
+    const tier = formatTier(state.tier || "free");
+    const remaining = Number.isFinite(Number(state.remaining)) ? Number(state.remaining) : 0;
+
+    if (els.accessTierValue) setText(els.accessTierValue, tier);
+    if (els.accessRemainingValue) {
+      const label = guest ? `${remaining} preview ${remaining === 1 ? "run" : "runs"}` : `${remaining} runs`;
+      setText(els.accessRemainingValue, label);
+    }
+
+    if (els.accessStateTitle) {
+      setText(els.accessStateTitle, guest ? "Guest session" : `Signed in as ${state.username}`);
+    }
+    if (els.accessStateCopy) {
+      els.accessStateCopy.textContent = guest
+        ? "Create a free account to keep threads, get monthly runs, and continue with the same approval-safe workflow."
+        : "Your workspace keeps saved threads, usage, and gated actions under your plan.";
+    }
+
+    if (els.accessStatePill) {
+      els.accessStatePill.classList.toggle("is-guest", guest);
+      els.accessStatePill.classList.toggle("is-signed-in", !guest);
+      setText(els.accessStatePill, guest ? "GUEST" : "SIGNED IN");
+    }
   }
 
   function updateStreamStatus(text = "Response: ready") {
@@ -1940,6 +1974,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     }
 
     if (els.usagePanelCopy) els.usagePanelCopy.textContent = planCopy(state.tier);
+    syncAccessOverview();
     updateRefundUI();
     persistAuth();
     syncUsageApproachNotice();
@@ -2736,7 +2771,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       else upgradePlan("pro");
     });
     empty.querySelector("#emptyLoginLink")?.addEventListener("click", () => {
-      els.usernameInput?.focus();
+      focusAccessPanel();
     });
   }
 
@@ -5465,6 +5500,9 @@ function bindEvents() {
     els.loginBtn?.addEventListener("click", login);
     els.logoutBtn?.addEventListener("click", logout);
     els.devBtn?.addEventListener("click", activatePreviewAccess);
+    els.accessPlansLink?.addEventListener("click", () => {
+      focusPlansPanel();
+    });
     els.newChatBtn?.addEventListener("click", () => {
       resetWorkspaceThread();
       setNotice("info", "New thread", "Cleared. Paste the next ticket whenever you’re ready.");

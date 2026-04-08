@@ -135,20 +135,46 @@
 
               <section class="sidebar-panel" id="sidebarPanelAccount" data-sidebar-panel="account" role="tabpanel" aria-labelledby="sidebarTabAccount" aria-label="Account access" hidden aria-hidden="true">
                 <div class="section-label section-label-tight">Account / access</div>
-                <p id="authAccessBridge" class="muted-copy auth-access-bridge">
-                  Same workspace after signup — saved threads, monthly runs, and the preview workflow you already used.
-                </p>
-                <div class="auth-card" id="authAccessCard">
-                  <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
-                  <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
-                  <p id="authHints" class="muted-copy auth-hints">
-                    Username: 3–64 characters, letters, numbers, and <code>.</code> <code>_</code> <code>-</code> only.
-                    Password: at least 8 characters.
-                  </p>
-                  <div class="btn-row">
-                    <button id="signupBtn" class="ghost-btn" type="button">Sign up</button>
-                    <button id="loginBtn" class="btn" type="button">Log in</button>
+                <div class="access-overview-card" id="accessOverviewCard" aria-live="polite">
+                  <div class="access-overview-head">
+                    <div class="access-overview-title">
+                      <div class="access-overview-label">Access status</div>
+                      <div id="accessStateTitle" class="access-overview-state">Checking…</div>
+                    </div>
+                    <span id="accessStatePill" class="access-state-pill">—</span>
                   </div>
+                  <div id="accessStateCopy" class="muted-copy access-overview-copy">
+                    Same workspace after signup — saved threads, monthly runs, and the preview workflow you already used.
+                  </div>
+                  <div class="access-metrics" role="list" aria-label="Account usage">
+                    <div class="access-metric-row" role="listitem">
+                      <span class="access-metric-k">Plan</span>
+                      <span id="accessTierValue" class="access-metric-v">FREE</span>
+                    </div>
+                    <div class="access-metric-row" role="listitem">
+                      <span class="access-metric-k">Remaining</span>
+                      <span id="accessRemainingValue" class="access-metric-v">—</span>
+                    </div>
+                  </div>
+                  <button id="accessPlansLink" class="access-link-inline" type="button">View plans &amp; limits</button>
+                </div>
+
+                <div class="auth-card auth-card-refined" id="authAccessCard">
+                  <div class="auth-field-stack">
+                    <input id="usernameInput" class="input" type="text" placeholder="Username" autocomplete="username" />
+                    <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
+                  </div>
+                  <div class="btn-row auth-cta-row">
+                    <button id="signupBtn" class="btn" type="button">Create account</button>
+                    <button id="loginBtn" class="ghost-btn" type="button">Log in</button>
+                  </div>
+                  <details class="auth-hints-fold" id="authHintsFold">
+                    <summary class="auth-hints-summary">Credentials requirements</summary>
+                    <div id="authHints" class="muted-copy auth-hints">
+                      Username: 3–64 characters, letters, numbers, and <code>.</code> <code>_</code> <code>-</code> only.
+                      Password: at least 8 characters.
+                    </div>
+                  </details>
                   <div class="btn-row access-links-row">
                     <button id="devBtn" class="access-link-btn" type="button">Refresh guided tries</button>
                     <button id="logoutBtn" class="access-link-btn" type="button">Logout</button>

@@ -627,6 +627,122 @@ select.refund-select{ padding-right: 34px; }
 .btn-row.access-links-row{ margin-top: 4px; }
 .btn-row .btn, .btn-row .ghost-btn, .btn-row .access-link-btn{ flex:1; }
 
+/* Access panel — premium, scannable hierarchy (status → metrics → action) */
+.access-overview-card{
+  background: color-mix(in oklab, var(--surface-soft) 18%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+  border-radius: var(--r-md);
+  padding: 12px;
+  margin: 0 0 10px 0;
+}
+.access-overview-head{
+  display:flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.access-overview-label{
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.access-overview-state{
+  margin-top: 4px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  line-height: 1.25;
+}
+.access-overview-copy{
+  margin-top: 8px;
+}
+.access-state-pill{
+  flex-shrink: 0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 6px 10px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+  border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  background: color-mix(in oklab, var(--bg1) 52%, transparent);
+}
+.access-state-pill.is-signed-in{
+  color: color-mix(in oklab, var(--success) 74%, var(--text-2));
+  border-color: color-mix(in oklab, var(--success) 22%, var(--line));
+  background: color-mix(in oklab, var(--success) 7%, var(--bg1));
+}
+.access-state-pill.is-guest{
+  color: color-mix(in oklab, var(--accent) 78%, var(--text-2));
+  border-color: color-mix(in oklab, var(--accent) 20%, var(--line));
+  background: color-mix(in oklab, var(--accent) 7%, var(--bg1));
+}
+.access-metrics{
+  margin-top: 10px;
+  display:flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+}
+.access-metric-row{
+  display:flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.access-metric-k{
+  color: var(--text-4);
+}
+.access-metric-v{
+  color: var(--text);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.access-link-inline{
+  margin-top: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-3);
+  text-align: left;
+  transition: background var(--t-med) var(--ease), color var(--t-med) var(--ease), border-color var(--t-med) var(--ease);
+}
+.access-link-inline:hover{
+  background: color-mix(in oklab, white 4.5%, transparent);
+  border-color: color-mix(in oklab, var(--line) 70%, transparent);
+  color: var(--text-2);
+}
+.access-link-inline:focus-visible{ outline: none; box-shadow: var(--ring); }
+
+.auth-card.auth-card-refined{ gap: 12px; }
+.auth-field-stack{ display:flex; flex-direction: column; gap: 10px; }
+.auth-cta-row .btn{ flex: 1.25; }
+.auth-cta-row .ghost-btn{ flex: 0.9; }
+.auth-hints-fold{
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  background: color-mix(in oklab, var(--bg2) 52%, transparent);
+}
+.auth-hints-summary{
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-2);
+  font-weight: 540;
+  font-size: 13px;
+}
+.auth-hints-summary::-webkit-details-marker{ display:none; }
+.auth-hints{ margin-top: 10px; }
+
 .sidebar-more{
   margin-top: 12px;
   border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
@@ -1546,6 +1662,11 @@ select.refund-select{ padding-right: 34px; }
   border-color: transparent;
   padding: 9px 10px;
   text-align: center;
+}
+.limit-secondary-link:focus-visible{
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--r-sm);
 }
 .empty-flow-strip{
   display:flex;
