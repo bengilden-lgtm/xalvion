@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlencode
 
 import stripe
 from fastapi import HTTPException
@@ -544,6 +545,29 @@ def execute_manual_charge(
             "status": "stripe_charge_failed",
             "detail": str(exc),
         }
+
+
+def build_stripe_connect_authorize_url(
+    *,
+    client_id: str,
+    redirect_uri: str,
+    state: str,
+    scope: str = "read_write",
+) -> str:
+    """
+    Stripe Connect OAuth URL (Standard). Single place for query shaping so
+    billing routes and docs stay aligned.
+    """
+    qs = urlencode(
+        {
+            "response_type": "code",
+            "client_id": (client_id or "").strip(),
+            "scope": (scope or "read_write").strip(),
+            "state": state or "",
+            "redirect_uri": redirect_uri or "",
+        }
+    )
+    return f"https://connect.stripe.com/oauth/authorize?{qs}"
 
 
 def validate_upgrade_request(desired: str, current_tier: str) -> None:

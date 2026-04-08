@@ -8,10 +8,10 @@
   color-scheme: dark;
 
   /* Claude-adjacent foundation (exact token set) */
-  --bg: #171717;
-  --surface: #1e1e1e;
-  --surface-soft: #232323;
-  --border: rgba(255,255,255,0.08);
+  --bg: #1a1a1a;
+  --surface: #222222;
+  --surface-soft: #262626;
+  --border: rgba(255,255,255,0.07);
   --text: #eaeaea;
   --text-muted: #a1a1a1;
 
@@ -68,8 +68,8 @@
   /* Layout */
   --sidebar-expanded: 292px;
   --sidebar-collapsed: 56px;
-  --thread-max: 860px;
-  --stage-pad: 22px;
+  --thread-max: 800px;
+  --stage-pad: 24px;
 
   /* Motion */
   --ease: cubic-bezier(.16,1,.3,1);
@@ -242,10 +242,10 @@ svg{
   display:flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
-  border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--bg2) 58%, transparent);
+  padding: 5px 12px;
+  border: 1px solid color-mix(in oklab, var(--line) 72%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--surface-soft) 35%, transparent);
   min-width: 0;
 }
 .command-status-dot{
@@ -695,7 +695,7 @@ select.refund-select{ padding-right: 34px; }
   min-height: 0;
   display:flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
 }
 
 /* Messages zone */
@@ -777,8 +777,8 @@ select.refund-select{ padding-right: 34px; }
 .msg-card{
   width: 100%;
   border-radius: 14px;
-  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
-  background: color-mix(in oklab, var(--surface-soft) 35%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 28%, transparent);
   padding: 16px 16px 14px 16px;
   transition: border-color var(--t-med) var(--ease), background var(--t-med) var(--ease);
 }
@@ -1201,11 +1201,11 @@ select.refund-select{ padding-right: 34px; }
 }
 
 .composer{
-  width: min(720px, 96vw);
-  border-radius: 24px;
-  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
-  background: color-mix(in oklab, var(--surface) 42%, var(--bg));
-  box-shadow: 0 12px 40px rgba(0,0,0,.14);
+  width: min(700px, 96vw);
+  border-radius: 20px;
+  border: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+  background: color-mix(in oklab, var(--surface) 50%, var(--bg));
+  box-shadow: 0 10px 36px rgba(0,0,0,.12);
   overflow: hidden;
   transition: border-color var(--t-med) var(--ease), box-shadow var(--t-med) var(--ease);
 }
@@ -1772,6 +1772,25 @@ details > summary{ user-select:none; }
 .plans-upgrade-secondary:hover{
   color: var(--text-2);
 }
+
+/* Preview-locked composer (guest cap): no dead controls */
+.composer-dock--locked-preview .composer-field-inner{
+  opacity: 0.78;
+}
+.composer-dock--locked-preview .send-btn:disabled,
+.composer-dock--locked-preview textarea:disabled{
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.composer-dock--locked-preview .quick-actions .chip:disabled{
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.stripe-connect-btn--needs-auth{
+  border-style: dashed;
+}
+
 .upgrade-value-inline{
   font-size: 12.5px;
   line-height: 1.5;

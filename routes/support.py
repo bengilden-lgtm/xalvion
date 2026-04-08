@@ -417,9 +417,11 @@ def update_operator_mode(
 def support(
     req: app_mod.SupportRequest,
     user: app_mod.User = Depends(app_mod.get_current_user),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
 ):
+    guest_client_id = app_mod.normalize_guest_client_id(x_guest_client)
     try:
-        return app_mod.run_support(req, user)
+        return app_mod.run_support(req, user, guest_client_id=guest_client_id)
     except HTTPException:
         raise
     except Exception:
@@ -434,8 +436,10 @@ def support(
 async def support_stream(
     req: app_mod.SupportRequest,
     authorization: str | None = Header(None),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
 ):
     username = app_mod.get_current_username_from_header(authorization)
+    guest_client_id = app_mod.normalize_guest_client_id(x_guest_client)
 
     async def generator() -> AsyncIterator[str]:
         # Stream visible progress immediately so the UI does not sit on a blank loader
@@ -450,50 +454,110 @@ async def support_stream(
 
         try:
             result = await asyncio.wait_for(
-                run_in_threadpool(app_mod.run_support_for_username, req, username),
+                run_in_threadpool(app_mod.run_support_for_username, req, username, guest_client_id),
                 timeout=28.0,
             )
         except HTTPException as he:
-            msg = he.detail if isinstance(he.detail, str) else "Request could not be completed."
-            if he.status_code == 503:
-                app_mod._log_throttled_db_issue("support_ticket_persist", he)
-            fallback = {
-                "reply": msg,
-                "final": msg,
-                "response": msg,
-                "action": "review",
-                "amount": 0,
-                "reason": "db_unavailable",
-                "issue_type": "general_support",
-                "order_status": "unknown",
-                "tool_status": "db_unavailable",
-                "tool_result": {"status": "db_unavailable"},
-                "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
-                "decision": {
-                    "action": "review",
-                    "queue": "escalated",
-                    "priority": "high",
-                    "risk_level": "medium",
-                    "requires_approval": False,
-                    "status": "waiting",
-                },
-                "execution": {
+            detail = he.detail
+            if isinstance(detail, dict):
+                if he.status_code == 503:
+                    app_mod._log_throttled_db_issue("support_ticket_persist", he)
+                msg = str(detail.get("message") or detail.get("code") or "Request could not be completed.")
+                code = str(detail.get("code") or "")
+                if code == "preview_exhausted":
+                    tool_st = "preview_blocked"
+                    mode_val = "preview_blocked"
+                elif he.status_code == 503:
+                    tool_st = "db_unavailable"
+                    mode_val = "db_unavailable"
+                else:
+                    tool_st = "blocked"
+                    mode_val = "error"
+                reason_key = code or ("db_unavailable" if he.status_code == 503 else "request_blocked")
+                fallback = {
+                    **detail,
+                    "reply": msg,
+                    "final": msg,
+                    "response": msg,
                     "action": "review",
                     "amount": 0,
-                    "status": "db_unavailable",
-                    "auto_resolved": False,
-                    "requires_approval": False,
-                },
-                "meta": {"operator_mode": "balanced"},
-                "triage": {},
-                "history": {},
-                "mode": "db_unavailable",
-                "confidence": 0.0,
-                "quality": 0.0,
-            }
-            yield app_mod.sse_event("status", {"stage": "finalizing", "label": "Could not save support request"})
+                    "reason": reason_key,
+                    "issue_type": "general_support",
+                    "order_status": "unknown",
+                    "tool_status": tool_st,
+                    "tool_result": {"status": tool_st, "code": code or None},
+                    "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
+                    "decision": {
+                        "action": "review",
+                        "queue": "escalated",
+                        "priority": "high",
+                        "risk_level": "medium",
+                        "requires_approval": False,
+                        "status": "waiting",
+                    },
+                    "execution": {
+                        "action": "review",
+                        "amount": 0,
+                        "status": tool_st,
+                        "auto_resolved": False,
+                        "requires_approval": False,
+                    },
+                    "meta": {"operator_mode": "balanced"},
+                    "triage": {},
+                    "history": {},
+                    "mode": mode_val,
+                    "confidence": 0.0,
+                    "quality": 0.0,
+                }
+            else:
+                msg = str(detail) if detail else "Request could not be completed."
+                if he.status_code == 503:
+                    app_mod._log_throttled_db_issue("support_ticket_persist", he)
+                fallback = {
+                    "reply": msg,
+                    "final": msg,
+                    "response": msg,
+                    "action": "review",
+                    "amount": 0,
+                    "reason": "db_unavailable",
+                    "issue_type": "general_support",
+                    "order_status": "unknown",
+                    "tool_status": "db_unavailable",
+                    "tool_result": {"status": "db_unavailable"},
+                    "impact": {"type": "saved", "amount": 0, "money_saved": 0, "auto_resolved": False},
+                    "decision": {
+                        "action": "review",
+                        "queue": "escalated",
+                        "priority": "high",
+                        "risk_level": "medium",
+                        "requires_approval": False,
+                        "status": "waiting",
+                    },
+                    "execution": {
+                        "action": "review",
+                        "amount": 0,
+                        "status": "db_unavailable",
+                        "auto_resolved": False,
+                        "requires_approval": False,
+                    },
+                    "meta": {"operator_mode": "balanced"},
+                    "triage": {},
+                    "history": {},
+                    "mode": "db_unavailable",
+                    "confidence": 0.0,
+                    "quality": 0.0,
+                }
+            label = (
+                "Preview limit reached"
+                if he.status_code == 402
+                else ("Service unavailable" if he.status_code == 503 else "Could not complete request")
+            )
+            yield app_mod.sse_event("status", {"stage": "finalizing", "label": label})
             yield app_mod.sse_event("result", fallback)
-            yield app_mod.sse_event("done", {"ok": False, "status": getattr(he, "status_code", 503)})
+            done_payload: dict[str, Any] = {"ok": False, "status": int(he.status_code)}
+            if isinstance(he.detail, dict) and he.detail.get("code"):
+                done_payload["code"] = he.detail.get("code")
+            yield app_mod.sse_event("done", done_payload)
             return
         except asyncio.TimeoutError:
             logger.warning(

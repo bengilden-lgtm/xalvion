@@ -46,13 +46,10 @@ def integrations_stripe_connect(user: app_mod.User = Depends(app_mod.require_aut
         raise HTTPException(status_code=500, detail="Stripe Connect is not configured.")
 
     state = app_mod.create_stripe_state(user.username)
-    url = (
-        "https://connect.stripe.com/oauth/authorize"
-        f"?response_type=code"
-        f"&client_id={app_mod.STRIPE_CONNECT_CLIENT_ID}"
-        f"&scope=read_write"
-        f"&state={state}"
-        f"&redirect_uri={app_mod.STRIPE_CONNECT_REDIRECT_URI}"
+    url = stripe_service.build_stripe_connect_authorize_url(
+        client_id=app_mod.STRIPE_CONNECT_CLIENT_ID,
+        redirect_uri=app_mod.STRIPE_CONNECT_REDIRECT_URI,
+        state=state,
     )
     return {"url": url}
 

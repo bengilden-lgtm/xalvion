@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -278,6 +279,9 @@ PLAN_CONFIG: dict[str, dict[str, Any]] = {
 PUBLIC_PLAN_TIERS = {"free", "pro", "elite"}
 PRICE_MAP = {"pro": STRIPE_PRICE_PRO, "elite": STRIPE_PRICE_ELITE}
 
+# Unauthenticated operator preview (workspace): must match frontend GUEST_USAGE_LIMIT in app.js.
+GUEST_PREVIEW_OPERATOR_LIMIT = int(os.getenv("GUEST_PREVIEW_OPERATOR_LIMIT", "3"))
+
 if STRIPE_KEY:
     stripe.api_key = STRIPE_KEY
 
@@ -458,6 +462,16 @@ class ProcessedWebhook(Base):
     processed_at = Column(String, nullable=False)
     outcome = Column(String, default="ok")
     detail = Column(Text, default="")
+
+
+class GuestPreviewUsage(Base):
+    """Server-side tally for unauthenticated workspace preview runs (abuse hardening)."""
+
+    __tablename__ = "guest_preview_usage"
+
+    client_id = Column(String(80), primary_key=True)
+    usage_count = Column(Integer, nullable=False, default=0)
+    updated_at = Column(String, nullable=False)
 
 
 def _import_orm_submodules() -> None:
@@ -903,6 +917,80 @@ def enforce_plan_limits(user: User) -> None:
             headers={"X-Xalvion-Plan": plan_name, "X-Xalvion-Limit": str(limit)},
         )
 
+
+_guest_preview_lock = threading.Lock()
+
+
+def normalize_guest_client_id(raw: str | None) -> str | None:
+    """Stable id from X-Xalvion-Guest-Client; alphanumeric + ._- only."""
+    s = (raw or "").strip()
+    if not s or len(s) > 80:
+        return None
+    if not re.match(r"^[a-zA-Z0-9._-]+$", s):
+        return None
+    return s
+
+
+def _guest_preview_exhausted_detail(used: int) -> dict[str, Any]:
+    lim = int(GUEST_PREVIEW_OPERATOR_LIMIT)
+    return {
+        "code": "preview_exhausted",
+        "message": "Preview runs are used up. Create a free account for monthly operator capacity and saved threads.",
+        "usage": used,
+        "limit": lim,
+        "plan_limit": lim,
+        "remaining": max(0, lim - used),
+        "requires_signup": True,
+        "requires_auth": True,
+    }
+
+
+def enforce_guest_preview_allow(client_id: str | None) -> None:
+    """Block unauthenticated support runs when preview quota is exhausted (source of truth: DB)."""
+    gid = normalize_guest_client_id(client_id)
+    if not gid:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "preview_client_required",
+                "message": "Reload the workspace and try again (preview client id missing).",
+            },
+        )
+    with _guest_preview_lock:
+        with db_session() as db:
+            row = db.query(GuestPreviewUsage).filter(GuestPreviewUsage.client_id == gid).first()
+            used = int(row.usage_count) if row else 0
+            if used >= GUEST_PREVIEW_OPERATOR_LIMIT:
+                raise HTTPException(status_code=402, detail=_guest_preview_exhausted_detail(used))
+
+
+def bump_guest_preview_usage(client_id: str | None) -> dict[str, Any] | None:
+    """Increment successful guest preview usage; returns entitlement slice for API payloads."""
+    gid = normalize_guest_client_id(client_id)
+    if not gid:
+        return None
+    now = _now_iso()
+    with _guest_preview_lock:
+        with db_session() as db:
+            row = db.query(GuestPreviewUsage).filter(GuestPreviewUsage.client_id == gid).first()
+            if not row:
+                row = GuestPreviewUsage(client_id=gid, usage_count=0, updated_at=now)
+                db.add(row)
+                db.flush()
+            row.usage_count = int(row.usage_count or 0) + 1
+            row.updated_at = now
+            db.commit()
+            used = int(row.usage_count)
+            lim = int(GUEST_PREVIEW_OPERATOR_LIMIT)
+            rem = max(0, lim - used)
+            return {
+                "usage": used,
+                "limit": lim,
+                "plan_limit": lim,
+                "remaining": rem,
+                "preview_exhausted": rem <= 0,
+            }
+
 # =============================================================================
 # 8. OPERATOR & TICKET HELPERS
 # =============================================================================
@@ -1172,8 +1260,33 @@ def _attach_trust_layer(result: dict[str, Any]) -> tuple[dict[str, Any] | None, 
     return merged, key
 
 
-def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, Any]:
-    usage_summary = get_usage_summary(user)
+def serialize_support_result(
+    result: dict[str, Any],
+    user: User,
+    *,
+    guest_preview: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if guest_preview:
+        usage_summary = {
+            "tier": "free",
+            "label": "Preview",
+            "usage": int(guest_preview.get("usage", 0) or 0),
+            "limit": int(guest_preview.get("limit", GUEST_PREVIEW_OPERATOR_LIMIT) or GUEST_PREVIEW_OPERATOR_LIMIT),
+            "remaining": int(guest_preview.get("remaining", 0) or 0),
+            "dashboard_access": get_plan_config("free")["dashboard_access"],
+            "priority_routing": False,
+        }
+        plan_limit_val = int(guest_preview.get("plan_limit", usage_summary["limit"]) or usage_summary["limit"])
+        usage_val = int(guest_preview.get("usage", 0) or 0)
+        remaining_val = int(guest_preview.get("remaining", 0) or 0)
+    else:
+        usage_summary = get_usage_summary(user)
+        plan_limit_val = int(usage_summary["limit"])
+        usage_val = int(usage_summary["usage"])
+        remaining_val = max(
+            0,
+            get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"],
+        )
     tool_result = result.get("tool_result") or {}
     impact = result.get("impact") or {}
     reply = result.get("reply") or result.get("response") or result.get("final") or "No response"
@@ -1218,10 +1331,19 @@ def serialize_support_result(result: dict[str, Any], user: User) -> dict[str, An
         "triage": result.get("triage", {}),
         "history": result.get("history", {}),
         "runtime_ticket": result.get("runtime_ticket", {}),
+        "username": str(getattr(user, "username", "guest") or "guest"),
         "tier": usage_summary["tier"],
-        "plan_limit": usage_summary["limit"],
-        "usage": usage_summary["usage"],
-        "remaining": max(0, get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"]),
+        "plan_limit": plan_limit_val,
+        "usage": usage_val,
+        "remaining": remaining_val,
+        "entitlement": {
+            "kind": "guest_preview" if guest_preview else "account",
+            "usage": usage_val,
+            "limit": plan_limit_val,
+            "remaining": remaining_val,
+            "preview_exhausted": bool(guest_preview.get("preview_exhausted")) if guest_preview else False,
+            "requires_signup": bool(guest_preview and guest_preview.get("preview_exhausted")),
+        },
         "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
         "stripe_account_id": getattr(user, "stripe_account_id", None),
         "decision_state": "pending_decision"
@@ -1651,8 +1773,10 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
     return payload, "approved"
 
 
-def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
+def run_support(req: SupportRequest, user: User, guest_client_id: str | None = None) -> dict[str, Any]:
     enforce_plan_limits(user)
+    if str(getattr(user, "username", "") or "").strip().lower() == "guest":
+        enforce_guest_preview_allow(guest_client_id)
 
     with db_session() as db:
         try:
@@ -1890,6 +2014,7 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
             )
 
             ser_user: User = user
+            guest_preview_snapshot: dict[str, Any] | None = None
             if hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
                 u_row = db.query(User).filter(User.username == user.username).first()
                 if u_row:
@@ -1897,8 +2022,10 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
                     db.commit()
                     db.refresh(u_row)
                     ser_user = u_row
+            elif str(getattr(user, "username", "") or "").strip().lower() == "guest":
+                guest_preview_snapshot = bump_guest_preview_usage(guest_client_id)
 
-            serialized = serialize_support_result(result, ser_user)
+            serialized = serialize_support_result(result, ser_user, guest_preview=guest_preview_snapshot)
             serialized["ticket"] = serialize_ticket_with_log(t, db)
             serialized["action_log"] = serialized["ticket"].get("action_log") or {
                 "log_id": action_entry.id,
@@ -1988,7 +2115,11 @@ def run_support(req: SupportRequest, user: User) -> dict[str, Any]:
         }
 
 
-def run_support_for_username(req: SupportRequest, username: str) -> dict[str, Any]:
+def run_support_for_username(
+    req: SupportRequest,
+    username: str,
+    guest_client_id: str | None = None,
+) -> dict[str, Any]:
     with db_session() as db:
         if username and username != "guest":
             row = db.query(User).filter(User.username == username).first()
@@ -1999,7 +2130,7 @@ def run_support_for_username(req: SupportRequest, username: str) -> dict[str, An
                 user = row
         else:
             user = User(username="guest", password="", usage=0, tier="free")
-    return run_support(req, user)
+    return run_support(req, user, guest_client_id=guest_client_id)
 
 # =============================================================================
 # 12. STREAMING HELPERS

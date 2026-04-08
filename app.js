@@ -9,6 +9,7 @@
   const DRAFT_KEY = "xalvion_workspace_draft";
   const GUEST_USAGE_KEY = "xalvion_guest_usage";
   const GUEST_USAGE_RESET_KEY = "xalvion_guest_usage_reset_at";
+  const PREVIEW_CLIENT_KEY = "xalvion_preview_client_id";
   const GUEST_USAGE_LIMIT = 3;
   const FREE_USAGE_LIMIT = 12;
   const GUEST_USAGE_RESET_WINDOW_MS = 12 * 60 * 60 * 1000;
@@ -908,6 +909,33 @@ if (typeof window.pulseRail !== "function") {
     return Math.max(0, Number(localStorage.getItem(GUEST_USAGE_KEY) || 0) || 0);
   }
 
+  function ensurePreviewClientId() {
+    try {
+      let id = localStorage.getItem(PREVIEW_CLIENT_KEY);
+      if (id && id.length >= 8) return id;
+      id =
+        (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function" && globalThis.crypto.randomUUID()) ||
+        `pv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+      localStorage.setItem(PREVIEW_CLIENT_KEY, id);
+      return id;
+    } catch {
+      return "";
+    }
+  }
+
+  function syncGuestEntitlementFromServerPayload(payload) {
+    if (!payload || isAuthenticated()) return;
+    const u = Number(payload.usage);
+    if (Number.isFinite(u)) setGuestUsage(u);
+    const lim = Number(payload.limit || payload.plan_limit || GUEST_USAGE_LIMIT);
+    const safeLim = Number.isFinite(lim) && lim > 0 ? lim : GUEST_USAGE_LIMIT;
+    const rem = Number.isFinite(Number(payload.remaining))
+      ? Math.max(0, Number(payload.remaining))
+      : Math.max(0, safeLim - getGuestUsage());
+    updatePlanUI("free", getGuestUsage(), safeLim, rem);
+    applyComposerInteractiveLock();
+  }
+
   function setGuestUsage(value) {
     const usage = Math.max(0, Number(value || 0) || 0);
     localStorage.setItem(GUEST_USAGE_KEY, String(usage));
@@ -1088,6 +1116,10 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     const out = {};
     if (withJson) out["Content-Type"] = "application/json";
     if (state.token) out.Authorization = `Bearer ${state.token}`;
+    else {
+      const gid = ensurePreviewClientId();
+      if (gid) out["X-Xalvion-Guest-Client"] = gid;
+    }
     return out;
   }
 
@@ -1166,6 +1198,9 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   function detailFromApiBody(data) {
     const d = data && data.detail;
     if (typeof d === "string") return d;
+    if (d && typeof d === "object" && !Array.isArray(d)) {
+      if (typeof d.message === "string") return d.message;
+    }
     if (Array.isArray(d) && d.length) {
       const parts = d
         .map((item) => {
@@ -1195,14 +1230,26 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     const mode = String(data.mode || "").toLowerCase();
     const reason = String(data.reason || "").toLowerCase();
     const tool = String(data.tool_status || (data.tool_result && data.tool_result.status) || "").toLowerCase();
+    const code = String(data.code || (data.tool_result && data.tool_result.code) || "").toLowerCase();
     return (
       mode === "error"
       || mode === "timeout"
+      || mode === "preview_blocked"
       || reason === "stream_error"
       || reason === "stream_timeout"
+      || reason === "preview_exhausted"
       || tool === "error"
       || tool === "timeout"
+      || tool === "preview_blocked"
+      || code === "preview_exhausted"
     );
+  }
+
+  function isPreviewExhaustedPayload(data) {
+    if (!data || typeof data !== "object") return false;
+    const code = String(data.code || "").toLowerCase();
+    const tool = String(data.tool_status || "").toLowerCase();
+    return code === "preview_exhausted" || tool === "preview_blocked";
   }
 
   function describeAuthRuleViolations(username, password) {
@@ -1587,6 +1634,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
 
     if (!delegated) {
       const connected = Boolean(state.stripeConnected);
+      const authed = Boolean(state.token && state.username);
 
       if (els.stripeStatus) {
         els.stripeStatus.textContent = connected ? "Connected" : "Not connected";
@@ -1595,12 +1643,15 @@ The workspace already showed you real routing and approval discipline. Pro keeps
 
       if (els.stripeConnectBtn) {
         const label = els.stripeConnectBtn.querySelector(".stripe-connect-label");
+        let connectLabel = connected ? "Reconnect Stripe" : "Connect Stripe";
+        if (!authed) connectLabel = "Sign in to connect Stripe";
         if (label) {
-          label.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
+          label.textContent = connectLabel;
         } else {
-          els.stripeConnectBtn.textContent = connected ? "Reconnect Stripe" : "Connect Stripe";
+          els.stripeConnectBtn.textContent = connectLabel;
         }
         els.stripeConnectBtn.disabled = false;
+        els.stripeConnectBtn.classList.toggle("stripe-connect-btn--needs-auth", !authed && !connected);
       }
 
       if (els.stripeDisconnectBtn) {
@@ -1671,7 +1722,12 @@ The workspace already showed you real routing and approval discipline. Pro keeps
 
   async function connectStripe() {
     if (!state.token || !state.username) {
-      setNotice("warning", "Authentication required", "Log in before connecting Stripe.");
+      focusAccessPanel();
+      setNotice(
+        "warning",
+        "Sign in to connect Stripe",
+        "Open Access in the sidebar, create an account or log in, then return to Integrations to connect Stripe."
+      );
       return;
     }
 
@@ -1909,6 +1965,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     syncCommandStripCapacity();
     refreshEmptyStateContent();
     if (!state.sending) refreshComposerIdleHint();
+    applyComposerInteractiveLock();
 
     const banner = document.getElementById("inlineLimitBanner");
     if (banner) {
@@ -1987,6 +2044,25 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     if (!composer) return;
     const guest = !isAuthenticated();
     composer.classList.toggle("composer-preview-continue", guest && state.remaining <= 0);
+  }
+
+  function applyComposerInteractiveLock() {
+    const guest = !isAuthenticated();
+    const locked = guest && getGuestUsage() >= GUEST_USAGE_LIMIT;
+    const dock = document.getElementById("workspaceComposerDock");
+    if (dock) dock.classList.toggle("composer-dock--locked-preview", locked);
+    const input = els.messageInput;
+    const send = els.sendBtn;
+    if (input && !state.sending) {
+      input.disabled = locked;
+      input.readOnly = locked;
+    }
+    if (send && !state.sending) {
+      send.disabled = locked;
+    }
+    document.querySelectorAll(".quick-actions .chip").forEach((chip) => {
+      if (chip instanceof HTMLButtonElement) chip.disabled = locked;
+    });
   }
 
   function syncCommandAuthChip() {
@@ -2413,6 +2489,12 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function applyFillFromButton(button) {
     const fill = button?.dataset?.fill || "";
     if (!fill || !els.messageInput) return;
+    if (!isAuthenticated() && getGuestUsage() >= GUEST_USAGE_LIMIT) {
+      focusAccessPanel();
+      pushLimitMessage(true);
+      applyComposerInteractiveLock();
+      return;
+    }
     els.messageInput.value = fill;
     saveDraft(fill);
     autoResizeTextarea();
@@ -3702,6 +3784,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     syncComposerDraftClass();
 
     updateStreamStatus(state.sending ? "Response: streaming" : "Response: ready");
+    if (!state.sending) applyComposerInteractiveLock();
   }
 
   function parseSseEvents(text) {
@@ -3739,8 +3822,19 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const data = await parseApiResponse(res);
 
     if (res.status === 402) {
+      const inner = data.detail && typeof data.detail === "object" && !Array.isArray(data.detail) ? data.detail : data;
+      syncGuestEntitlementFromServerPayload(inner);
       pushLimitMessage(true);
+      applyComposerInteractiveLock();
       throw new Error(detailFromApiBody(data) || "Plan limit reached. Upgrade to continue.");
+    }
+
+    if (res.status === 400) {
+      const inner = data.detail && typeof data.detail === "object" && !Array.isArray(data.detail) ? data.detail : null;
+      if (inner && inner.code === "preview_client_required") {
+        ensurePreviewClientId();
+        throw new Error(inner.message || "Reload the workspace and try again.");
+      }
     }
 
     if (!res.ok) {
@@ -3759,7 +3853,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!res.ok || !res.body) {
       const data = await parseApiResponse(res);
       if (res.status === 402) {
+        const inner = data.detail && typeof data.detail === "object" && !Array.isArray(data.detail) ? data.detail : data;
+        syncGuestEntitlementFromServerPayload(inner);
         pushLimitMessage(true);
+        applyComposerInteractiveLock();
         throw new Error(detailFromApiBody(data) || "Plan limit reached. Upgrade to continue.");
       }
       throw new Error(detailFromApiBody(data) || `Streaming failed (${res.status}).`);
@@ -3838,6 +3935,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
     if (buffer.trim()) {
       processEvents(buffer);
+    }
+
+    if (finalData && !isAuthenticated() && isPreviewExhaustedPayload(finalData)) {
+      syncGuestEntitlementFromServerPayload(finalData);
+      applyComposerInteractiveLock();
     }
 
     return finalData;
@@ -4194,16 +4296,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const payload = buildSupportPayload();
     if (!payload.message || state.sending) return;
 
-    if (!enforceWorkspaceLimit()) {
-      if (!isAuthenticated()) {
-        const reset = maybeResetGuestUsage(true);
-        if (reset) {
-          updatePlanUI("free", getGuestUsage(), GUEST_USAGE_LIMIT, Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()));
-          setNotice("info", "Preview refreshed", "Your preview runs were reset for this session.");
-        }
-      }
-      if (!enforceWorkspaceLimit()) return;
-    }
+    if (!enforceWorkspaceLimit()) return;
 
     ensureInjectedStyles();
     clearEmptyState();
@@ -4270,16 +4363,23 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       }
 
       if (data && isStreamFailureResult(data)) {
-        authDebugLog("support_stream_failure_payload", data.reason || data.mode || data.tool_status);
-        try {
-          const std = await handleStandardReply(payload);
-          if (std && !isStreamFailureResult(std)) {
-            data = std;
-            const fb = std.reply || std.response || std.final || "";
-            if (fb) setAssistantCopy(row, fb);
+        if (isPreviewExhaustedPayload(data)) {
+          syncGuestEntitlementFromServerPayload(data);
+          pushLimitMessage(true);
+          applyComposerInteractiveLock();
+          authDebugLog("support_preview_exhausted", data.code || data.tool_status);
+        } else {
+          authDebugLog("support_stream_failure_payload", data.reason || data.mode || data.tool_status);
+          try {
+            const std = await handleStandardReply(payload);
+            if (std && !isStreamFailureResult(std)) {
+              data = std;
+              const fb = std.reply || std.response || std.final || "";
+              if (fb) setAssistantCopy(row, fb);
+            }
+          } catch (retryErr) {
+            authDebugLog("support_standard_after_stream_payload_failed", retryErr);
           }
-        } catch (retryErr) {
-          authDebugLog("support_standard_after_stream_payload_failed", retryErr);
         }
       }
 
@@ -4336,17 +4436,16 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       const responseIsGuest = !responseUsername || responseUsername === "guest" || responseUsername === "dev_user";
 
       if (!isAuthenticated() && responseIsGuest) {
-        const localGuestUsage = getGuestUsage();
         const nextGuestUsage = hasServerUsage
-          ? Math.max(Number(data.usage || 0), localGuestUsage + 1)
-          : (localGuestUsage + 1);
+          ? Math.max(0, Number(data.usage || 0))
+          : getGuestUsage() + 1;
+        const cap = Number(data.plan_limit || data.limit || GUEST_USAGE_LIMIT);
+        const safeCap = Number.isFinite(cap) && cap > 0 ? cap : GUEST_USAGE_LIMIT;
+        const rem = Number.isFinite(Number(data.remaining))
+          ? Math.max(0, Number(data.remaining))
+          : Math.max(0, safeCap - nextGuestUsage);
 
-        updatePlanUI(
-          "free",
-          nextGuestUsage,
-          GUEST_USAGE_LIMIT,
-          Math.max(0, GUEST_USAGE_LIMIT - nextGuestUsage)
-        );
+        updatePlanUI("free", nextGuestUsage, safeCap, rem);
       } else if (hasServerUsage || planTier) {
         if (hasServerUsage) {
           updatePlanUI(
@@ -4535,7 +4634,14 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function activatePreviewAccess() {
     maybeResetGuestUsage(true);
+    try {
+      localStorage.removeItem(PREVIEW_CLIENT_KEY);
+    } catch {
+      /* no-op */
+    }
+    ensurePreviewClientId();
     updatePlanUI("free", getGuestUsage(), GUEST_USAGE_LIMIT, Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()));
+    applyComposerInteractiveLock();
     const demoText = "A customer says: I was charged twice for one order and wants it fixed today.";
     if (els.messageInput) {
       els.messageInput.value = demoText;
@@ -4544,7 +4650,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       syncComposerDraftClass();
       els.messageInput.focus();
     }
-    setNotice("info", "Example ticket loaded", "A realistic billing case is in the composer — send when you’re ready.");
+    setNotice(
+      "info",
+      "Preview refreshed",
+      "Guest counters and preview client id were reset — you get a fresh server-side preview quota for local testing."
+    );
   }
 
   async function upgradePlan(tier) {
@@ -5511,6 +5621,7 @@ function bindEvents() {
 
     ensureInjectedStyles();
     ensureCrmStyles();
+    ensurePreviewClientId();
     hydrateStripeCallbackState();
     buildKeyboardOverlay();
     ensureOpsCard();
