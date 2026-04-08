@@ -2872,9 +2872,21 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function openAccessDrawer(target = "account") {
     const drawer = els.accessDrawer;
     if (!drawer) return;
+    if (drawer.dataset.accessState === "closing") return;
+
     drawer.classList.add("open");
+    drawer.dataset.accessState = "opening";
     drawer.setAttribute("aria-hidden", "false");
     document.body.classList.add("access-open");
+
+    // Ensure staged entrance (backdrop → panel → content) lands reliably.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (!drawer.classList.contains("open")) return;
+        if (drawer.dataset.accessState === "opening") drawer.dataset.accessState = "open";
+      });
+    });
+
     const id = "accessDrawerSectionAccount";
     window.setTimeout(() => {
       document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
@@ -2885,9 +2897,17 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function closeAccessDrawer() {
     const drawer = els.accessDrawer;
     if (!drawer) return;
-    drawer.classList.remove("open");
+    if (drawer.dataset.accessState === "closing" || !drawer.classList.contains("open")) return;
+
+    drawer.dataset.accessState = "closing";
     drawer.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("access-open");
+
+    // Mirror the staged open in reverse: content → panel → backdrop.
+    window.setTimeout(() => {
+      drawer.classList.remove("open");
+      delete drawer.dataset.accessState;
+      document.body.classList.remove("access-open");
+    }, 340);
   }
 
   function focusAccessPanel(target = "account") {
