@@ -182,13 +182,13 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 body[data-ui="claude"]{
-  /* Claude-like soft dark system — warm gray, not flat black */
-  --cld-bg:#1a1b1f;
-  --cld-surface:#242428;
-  --cld-control:#2e2e33;
-  --cld-text:rgba(255,255,255,0.93);
-  --cld-text-2:rgba(225,228,236,0.68);
-  --cld-border:rgba(255,255,255,0.09);
+  /* Warm graphite system — restrained, matte, neutral */
+  --cld-bg:#201e1b;
+  --cld-surface:#25231f;
+  --cld-control:#2b2924;
+  --cld-text:rgba(243,241,234,0.94);
+  --cld-text-2:rgba(219,214,204,0.70);
+  --cld-border:rgba(243,241,234,0.08);
 
   /* Keep existing tokens, remap tone to Claude palette */
   --l1-bg:var(--cld-bg);
@@ -200,11 +200,11 @@ body[data-ui="claude"]{
   --decision-surface:var(--cld-surface);
   --text-primary:var(--cld-text);
   --text-secondary:var(--cld-text-2);
-  --text-muted:rgba(255,255,255,0.52);
-  --border-subtle:rgba(255,255,255,0.09);
-  --border-soft:rgba(255,255,255,0.09);
-  --border-medium:rgba(255,255,255,0.13);
-  --border-strong:rgba(255,255,255,0.17);
+  --text-muted:rgba(219,214,204,0.54);
+  --border-subtle:rgba(243,241,234,0.08);
+  --border-soft:rgba(243,241,234,0.08);
+  --border-medium:rgba(243,241,234,0.12);
+  --border-strong:rgba(243,241,234,0.16);
 
   /* Core layout authority */
   --cld-sidebar-expanded: 224px;
@@ -216,10 +216,23 @@ body[data-ui="claude"]{
   --cld-radius-xl: 22px;
   --cld-radius-lg: 16px;
   --cld-radius-md: 12px;
-  --cld-hairline: rgba(255,255,255,0.075);
-  --cld-hairline-2: rgba(255,255,255,0.10);
-  --cld-surface-2: rgba(255,255,255,0.035);
-  --cld-surface-3: rgba(255,255,255,0.055);
+  --cld-hairline: rgba(243,241,234,0.07);
+  --cld-hairline-2: rgba(243,241,234,0.10);
+  --cld-surface-2: rgba(243,241,234,0.030);
+  --cld-surface-3: rgba(243,241,234,0.050);
+
+  /* Remove neon identity cues; keep accent only for micro-actions */
+  --ambient-purple: rgba(0,0,0,0);
+  --ambient-blue: rgba(0,0,0,0);
+  --ambient-center: rgba(0,0,0,0);
+  --focal-glow: rgba(0,0,0,0);
+  --accent-1: #cbbda6;
+  --accent-2: #d6ccb9;
+  --accent-blue: #cbbda6;
+  --accent-blue-2: #d6ccb9;
+  --accent-soft: rgba(203,189,166,0.10);
+  --accent-glow: rgba(203,189,166,0.10);
+  --border-accent: rgba(243,241,234,0.16);
 }
 
 body[data-ui="claude"]{
@@ -243,8 +256,8 @@ body[data-ui="claude"] .glass{
 }
 
 body[data-ui="claude"] .command-strip.glass{
-  background: rgba(15, 16, 19, 0.58) !important;
-  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+  background: rgba(32, 30, 27, 0.72) !important;
+  border-bottom: 1px solid rgba(243,241,234,0.06) !important;
 }
 
 /* Top bar: lighter, slimmer, less “pill” */
@@ -262,19 +275,19 @@ body[data-ui="claude"] .command-brand-mark{
 }
 body[data-ui="claude"] .command-mode-pill{
   background: transparent !important;
-  border: 1px solid rgba(255,255,255,0.07) !important;
-  color: rgba(185, 194, 214, 0.72) !important;
+  border: 1px solid rgba(243,241,234,0.08) !important;
+  color: rgba(219, 214, 204, 0.68) !important;
   border-radius: 999px !important;
   padding: 6px 10px !important;
 }
 body[data-ui="claude"] .command-status-chip{
-  background: rgba(255,255,255,0.025) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: rgba(243,241,234,0.022) !important;
+  border: 1px solid rgba(243,241,234,0.08) !important;
   box-shadow: none !important;
 }
 body[data-ui="claude"] .command-auth-chip{
   background: transparent !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(243,241,234,0.08) !important;
   box-shadow: none !important;
 }
 
@@ -341,20 +354,20 @@ body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] [data-cld-ti
   top: 50%;
   transform: translateY(-50%);
   padding: 7px 11px;
-  background: rgba(16, 17, 20, 0.92);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(32, 30, 27, 0.96);
+  border: 1px solid rgba(243,241,234,0.08);
   border-radius: 10px;
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.01em;
-  color: rgba(244, 247, 255, 0.92);
+  color: rgba(243, 241, 234, 0.92);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease, transform 0.12s ease;
   transform: translateY(-50%) translateX(-2px);
-  box-shadow: 0 10px 28px rgba(0,0,0,0.34);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.30);
   z-index: 300;
 }
 body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] [data-cld-tip]:hover::after{
@@ -430,8 +443,8 @@ body[data-ui="claude"] .sidebar-nav-item:hover{
 body[data-ui="claude"] .sidebar-nav-item.is-active{
   background: rgba(255,255,255,0.03);
   border-color: transparent;
-  color: rgba(236, 240, 252, 0.92);
-  box-shadow: inset 2px 0 0 rgba(124, 92, 252, 0.42);
+  color: rgba(243, 241, 234, 0.92);
+  box-shadow: inset 2px 0 0 rgba(243, 241, 234, 0.12);
 }
 
 body[data-ui="claude"] .sidebar-nav-icon{
@@ -483,26 +496,22 @@ body[data-ui="claude"] .main-stage-ambient *{
 }
 /* Structural ambient only — anchors the center column, not decoration */
 body[data-ui="claude"] .workspace-atmosphere{
-  display: block !important;
-  opacity: 1 !important;
-  background: transparent !important;
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 body[data-ui="claude"] .workspace-atmosphere-glow{
-  opacity: 0.14 !important;
-  inset: -28% -12% 52% -12% !important;
-  filter: blur(60px) saturate(0.95) !important;
-  background: radial-gradient(ellipse 50% 38% at 50% 0%, rgba(124,92,252,0.11), transparent 70%) !important;
+  display: none !important;
 }
 body[data-ui="claude"] .workspace-atmosphere-falloff{
-  opacity: 0.35 !important;
-  background: radial-gradient(ellipse 70% 50% at 50% 110%, rgba(34,211,238,0.04), transparent 55%) !important;
+  display: none !important;
 }
 body[data-ui="claude"] .workspace-atmosphere-vignette{
-  opacity: 0.42 !important;
-  background: radial-gradient(ellipse 92% 88% at 50% 48%, transparent 52%, rgba(8,9,12,0.5) 100%) !important;
+  display: none !important;
 }
 body[data-ui="claude"] .workspace-atmosphere-grain{
-  opacity: 0.022 !important;
+  display: none !important;
 }
 
 body[data-ui="claude"] .messages-shell{
@@ -544,7 +553,7 @@ body[data-ui="claude"] .msg-time{
 body[data-ui="claude"] .msg-who{
   font-size: 12px !important;
   letter-spacing: 0.10em !important;
-  color: rgba(160, 172, 200, 0.72) !important;
+  color: rgba(201, 194, 182, 0.72) !important;
 }
 
 body[data-ui="claude"] .msg-group.user .reply-text{
@@ -553,7 +562,7 @@ body[data-ui="claude"] .msg-group.user .reply-text{
   border-radius: 0 !important;
   padding: 0 !important;
   max-width: var(--cld-thread-max);
-  color: rgba(200, 210, 235, 0.82) !important;
+  color: rgba(214, 208, 196, 0.84) !important;
 }
 
 body[data-ui="claude"] .msg-group.assistant .customer-message-block{
@@ -583,7 +592,7 @@ body[data-ui="claude"] .msg-group.user .reply-body::before{
 }
 
 body[data-ui="claude"] .msg-group.assistant .reply-body::before{
-  background: rgba(124, 92, 252, 0.22);
+  background: rgba(243, 241, 234, 0.08);
 }
 
 body[data-ui="claude"] .assistant-footer{
@@ -600,7 +609,7 @@ body[data-ui="claude"] .reply-value-reinforcement{
 body[data-ui="claude"] .reply-text{
   font-size: 15.75px !important;
   line-height: 1.74 !important;
-  color: rgba(244, 247, 255, 0.96) !important;
+  color: rgba(243, 241, 234, 0.94) !important;
 }
 
 body[data-ui="claude"] .composer-wrap.composer-dock{
@@ -627,15 +636,15 @@ body[data-ui="claude"] .composer-field{
   gap: 10px;
   width: 100%;
   padding: 13px 14px 13px 18px;
-  border-radius: 24px;
-  border: 1px solid var(--cld-hairline);
-  background: color-mix(in srgb, var(--cld-surface) 92%, rgba(255,255,255,0.02) 100%);
+  border-radius: 22px;
+  border: 1px solid var(--cld-border);
+  background: var(--cld-surface);
   box-sizing: border-box;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 18px 45px rgba(0,0,0,0.26);
+  box-shadow: none;
 }
 body[data-ui="claude"] .composer-field:focus-within{
-  border-color: rgba(255,255,255,0.12);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 20px 55px rgba(0,0,0,0.30);
+  border-color: rgba(243,241,234,0.12);
+  box-shadow: 0 0 0 3px rgba(243,241,234,0.045);
 }
 body[data-ui="claude"] .composer-field textarea,
 body[data-ui="claude"] #messageInput{
@@ -668,8 +677,13 @@ body[data-ui="claude"] #sendBtn{
   height: 36px !important;
   border-radius: 18px !important;
   box-shadow: none !important;
-  background: linear-gradient(135deg, #6d28d9, #4338ca) !important;
-  border: none !important;
+  background: rgba(243,241,234,0.075) !important;
+  border: 1px solid rgba(243,241,234,0.10) !important;
+}
+body[data-ui="claude"] .composer-field .send-btn:hover:not(:disabled),
+body[data-ui="claude"] #sendBtn:hover:not(:disabled){
+  background: rgba(243,241,234,0.095) !important;
+  border-color: rgba(243,241,234,0.14) !important;
 }
 
 /* —— Claude opening: vertically centered stack, hero composer —— */
@@ -679,8 +693,8 @@ body[data-ui="claude"] #workspaceRoot.workspace-idle .main.main-canvas{
   box-shadow: none !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .command-strip.glass{
-  background: rgba(14, 15, 20, 0.55) !important;
-  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+  background: rgba(32, 30, 27, 0.70) !important;
+  border-bottom: 1px solid rgba(243,241,234,0.055) !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .command-mode-pill{
   display: none !important;
@@ -792,9 +806,9 @@ body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-chat .quick-actio
   margin: 2px 0 0 !important;
 }
 body[data-ui="claude"] #workspaceRoot.workspace-idle .composer-chat .chip{
-  background: rgba(255,255,255,0.03) !important;
-  border: 1px solid rgba(255,255,255,0.06) !important;
-  color: rgba(168, 178, 205, 0.78) !important;
+  background: rgba(243,241,234,0.022) !important;
+  border: 1px solid rgba(243,241,234,0.055) !important;
+  color: rgba(219,214,204,0.72) !important;
   font-weight: 450 !important;
   padding: 5px 11px !important;
   font-size: 11.5px !important;
@@ -932,7 +946,7 @@ body[data-ui="claude"] #workspaceRoot.workspace-active .composer.composer-chat:f
 }
 body[data-ui="claude"] #workspaceRoot.workspace-active .composer-chat .chip{
   background: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(243,241,234,0.07) !important;
 }
 
 /* Beat later #workspaceRoot textarea rules — single well stays borderless inside .composer-field */
