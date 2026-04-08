@@ -2874,6 +2874,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!drawer) return;
     drawer.classList.add("open");
     drawer.setAttribute("aria-hidden", "false");
+    document.body.classList.add("access-open");
     const id = "accessDrawerSectionAccount";
     window.setTimeout(() => {
       document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
@@ -2886,6 +2887,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!drawer) return;
     drawer.classList.remove("open");
     drawer.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("access-open");
   }
 
   function focusAccessPanel(target = "account") {

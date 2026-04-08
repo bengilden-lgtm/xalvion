@@ -2568,8 +2568,19 @@ details[open] > .details-toggle .chev{
   align-items: stretch;
   justify-content: flex-end;
   padding: 16px;
-  background: color-mix(in oklab, var(--bg) 78%, black);
+  background: rgba(0,0,0,0.52);
+  backdrop-filter: blur(5px) saturate(0.92);
+  -webkit-backdrop-filter: blur(5px) saturate(0.92);
   z-index: 85;
+}
+.access-drawer::before{
+  content:"";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 900px at 30% 18%, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.42) 55%, rgba(0,0,0,0.52) 100%),
+    linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.52) 100%);
 }
 .access-drawer.open{ display:flex; }
 .access-drawer-panel{
@@ -2584,6 +2595,11 @@ details[open] > .details-toggle .chev{
   display:flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Keep the workspace faintly present behind Access */
+body.access-open .workspace-root{
+  filter: brightness(0.92) contrast(0.96) saturate(0.92);
 }
 .access-drawer-head{
   display:flex;
