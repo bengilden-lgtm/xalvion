@@ -2678,22 +2678,17 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       </div>`;
     }
 
-    const chipHintGuest = guest
-      ? `Preview mode · ${previewLeft} operator ${previewRunsWord} remaining`
-      : `${formatTier(state.tier)} · ${state.remaining} operator runs this period`;
-
-    const capPillText = guest
-      ? `Preview · ${previewLeft} ${previewRunsWord} left`
-      : `${formatTier(state.tier)} · ${state.remaining} of ${state.limit} this month`;
-
     if (isClaudeShell()) {
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-thread-open" role="status">
-        <h2 class="cld-welcome-headline">What should we handle?</h2>
-        <p class="cld-welcome-prompt">Paste the issue or use a starter below.</p>
-        <div class="cld-welcome-meta"><span class="cld-cap-pill">${escapeHtml(capPillText)}</span></div>
+        <h2 class="cld-welcome-headline">What needs attention?</h2>
+        <p class="cld-welcome-prompt">Share a case or pick a starter.</p>
       </div>`;
     }
+
+    const chipHintGuest = guest
+      ? `Preview mode · ${previewLeft} operator ${previewRunsWord} remaining`
+      : `${formatTier(state.tier)} · ${state.remaining} operator runs this period`;
 
     return `
       <div class="empty-card empty-card-premium empty-card-launch">
@@ -2771,6 +2766,13 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     els.messages?.querySelector(".empty-state")?.remove();
   }
 
+  function syncComposerDockThreadClass() {
+    const dock = document.getElementById("workspaceComposerDock");
+    if (!dock || !els.messages) return;
+    const hasThread = Boolean(els.messages.querySelector(".msg-group"));
+    dock.classList.toggle("composer-dock--thread", hasThread);
+  }
+
   function syncWorkspaceLayoutMode() {
     const root = els.workspaceRoot;
     if (!root || !els.messages) return;
@@ -2780,6 +2782,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     root.classList.toggle("workspace-idle", !active);
     root.classList.toggle("workspace-active", active);
     root.style.setProperty("--xv-layout-active", active ? "1" : "0");
+    syncComposerDockThreadClass();
   }
 
   function addUserMessage(text) {
@@ -3747,7 +3750,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function autoResizeTextarea() {
     if (!els.messageInput) return;
     els.messageInput.style.height = "auto";
-    els.messageInput.style.height = `${Math.min(240, Math.max(50, els.messageInput.scrollHeight))}px`;
+    els.messageInput.style.height = `${Math.min(220, Math.max(38, els.messageInput.scrollHeight))}px`;
   }
 
   function syncComposerDraftClass() {
@@ -3761,6 +3764,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function refreshComposerIdleHint() {
     if (!els.composerStatusLine || state.sending) return;
     const hasThread = Boolean(els.messages?.querySelector(".msg-group"));
+    if (isClaudeShell() && hasThread) {
+      els.composerStatusLine.textContent = "";
+      return;
+    }
     if (!hasThread) {
       els.composerStatusLine.textContent = isAuthenticated()
         ? "Describe the case below."

@@ -734,7 +734,7 @@ select.refund-select{ padding-right: 34px; }
   overflow: hidden;
 }
 .workspace-conversation-column:has(.empty-state){
-  gap: 20px;
+  gap: 16px;
 }
 .workspace-conversation-column:has(.empty-state) .composer-wrap{
   padding-top: 0;
@@ -772,7 +772,7 @@ select.refund-select{ padding-right: 34px; }
   max-height: 100%;
   overflow:auto;
   overscroll-behavior: contain;
-  padding: 4px var(--composer-pad-x) 56px var(--composer-pad-x);
+  padding: 4px var(--composer-pad-x) 48px var(--composer-pad-x);
   display:flex;
   flex-direction: column;
   gap: 14px;
@@ -1462,27 +1462,23 @@ select.refund-select{ padding-right: 34px; }
 }
 
 .cld-welcome-headline{
-  margin: 0 0 10px 0;
-  font-size: 26px;
-  font-weight: 560;
-  letter-spacing: -0.55px;
-  line-height: 1.22;
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
   color: var(--text);
 }
 .cld-welcome-prompt{
-  margin: 0 0 16px 0;
-  color: color-mix(in oklab, var(--text-muted) 92%, var(--text-4));
-  font-size: 14px;
+  margin: 0;
+  color: color-mix(in oklab, var(--text-muted) 88%, var(--text-4));
+  font-size: 13.5px;
   font-weight: 450;
-  line-height: 1.52;
-  max-width: 32ch;
+  line-height: 1.45;
+  max-width: 28ch;
   margin-left: auto;
   margin-right: auto;
-}
-.cld-welcome-meta{
-  display: flex;
-  justify-content: center;
-  margin: 0;
+  letter-spacing: -0.01em;
 }
 .cld-cap-pill{
   display: inline-flex;
@@ -1564,10 +1560,15 @@ select.refund-select{ padding-right: 34px; }
 .empty-actions{ display:flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .empty-chip-hint{ color: var(--text-4); font-size: 12.5px; }
 
+/* Thread view (Claude): no status strip above the field — capacity lives in the command strip */
+body[data-ui="claude"] .composer-wrap.composer-dock.composer-dock--thread .composer-hint-band{
+  display: none;
+}
+
 /* Composer — Claude-like: one quiet pill, minimal outer chrome */
 .composer-wrap{
   position: relative;
-  padding-top: 4px;
+  padding-top: 2px;
   width: 100%;
   max-width: var(--thread-max);
   margin-left: auto;
@@ -1674,7 +1675,7 @@ select.refund-select{ padding-right: 34px; }
   transition: none;
 }
 .composer-hint-band{
-  padding: 0 2px 8px 4px;
+  padding: 0 2px 6px 4px;
   border-bottom: none;
   background: transparent;
 }
@@ -1728,9 +1729,9 @@ select.refund-select{ padding-right: 34px; }
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px 10px 16px;
-  border-radius: 20px;
+  gap: 8px;
+  padding: 7px 10px 7px 14px;
+  border-radius: 16px;
   background: #242424;
   border: 1px solid rgba(255,255,255,0.1);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
@@ -1744,11 +1745,11 @@ select.refund-select{ padding-right: 34px; }
 
 #messageInput{
   flex: 1;
-  min-height: 44px;
-  max-height: 220px;
+  min-height: 38px;
+  max-height: 200px;
   resize: none;
-  padding: 10px 8px 10px 0;
-  line-height: 1.52;
+  padding: 6px 6px 6px 0;
+  line-height: 1.48;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -1771,10 +1772,10 @@ select.refund-select{ padding-right: 34px; }
 
 .send-btn,
 #sendBtn{
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   flex-shrink: 0;
   border-radius: 999px;
   border: 1px solid color-mix(in oklab, var(--accent) 40%, rgba(255,255,255,0.1));
@@ -1795,8 +1796,8 @@ select.refund-select{ padding-right: 34px; }
   position:absolute;
   inset: 0;
   margin:auto;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   transform: translateX(1px);
   background: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='black' d='M2.5 10.3a.9.9 0 0 1 .6-.86l13.9-5.2a.9.9 0 0 1 1.19 1.09l-2.45 11.2a.9.9 0 0 1-1.28.63l-4.06-2.01-2.2 2.9a.9.9 0 0 1-1.61-.44l-.3-4.45-4.48-2.24a.9.9 0 0 1-.46-.62Zm5.95 2.27.22 3.2 1.38-1.82a.9.9 0 0 1 1.13-.27l3.46 1.71 1.77-8.08-9.96 3.73 3.61 1.81a.9.9 0 0 1 .5.73l-.02.26-2.09-.96Z'/%3E%3C/svg%3E") center / contain no-repeat;
@@ -1831,9 +1832,9 @@ select.refund-select{ padding-right: 34px; }
 }
 
 .quick-actions{
-  padding: 8px 4px 4px 4px;
+  padding: 5px 2px 2px 2px;
   display:flex;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
 }
 .chip{
@@ -1841,8 +1842,8 @@ select.refund-select{ padding-right: 34px; }
   border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   background: transparent;
   color: var(--text-3);
-  padding: 6px 11px;
-  font-size: 12.5px;
+  padding: 5px 10px;
+  font-size: 12px;
   font-weight: 520;
   transition: background var(--t-med) var(--ease), border-color var(--t-med) var(--ease), color var(--t-med) var(--ease);
 }
