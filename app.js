@@ -2168,7 +2168,17 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       const used = Math.max(0, Number(state.usage || 0) || 0);
       const cap = Math.max(0, Number(state.limit || 0) || 0);
       const runWord = used === 1 ? "run" : "runs";
-      el.textContent = `${tierLabel}: ${used} / ${cap} ${runWord} used`;
+      const nextText = `${tierLabel}: ${used} / ${cap} ${runWord} used`;
+      const prevText = el.textContent || "";
+      if (prevText && prevText !== nextText) {
+        el.classList.add("xv-swap");
+        window.setTimeout(() => {
+          el.textContent = nextText;
+          window.setTimeout(() => el.classList.remove("xv-swap"), 140);
+        }, 80);
+      } else {
+        el.textContent = nextText;
+      }
       if (cap > 0 && used >= cap) el.classList.add("is-limit");
       else if (pct >= 0.75) el.classList.add("is-warning");
     }
@@ -4179,6 +4189,138 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!composer || !input) return;
     const hasDraft = Boolean(String(input.value || "").trim());
     composer.classList.toggle("composer-has-draft", hasDraft);
+    if (els.sendBtn) {
+      // Premium feel: send reacts immediately when draft becomes valid.
+      // sendMessage() already guards empty payload; this is purely interaction polish.
+      if (!state.sending) els.sendBtn.disabled = !hasDraft;
+      els.sendBtn.classList.toggle("xv-send-ready", hasDraft);
+    }
+  }
+
+  function prefersReducedMotion() {
+    try {
+      return Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    } catch {
+      return false;
+    }
+  }
+
+  function getDetailsPanel(detailsEl) {
+    if (!detailsEl) return null;
+    // Prefer first non-summary direct child.
+    for (const child of Array.from(detailsEl.children || [])) {
+      if (child && child.tagName !== "SUMMARY") return child;
+    }
+    return detailsEl.querySelector(":scope > :not(summary)");
+  }
+
+  function animateDetailsToggle(detailsEl, willOpen) {
+    const panel = getDetailsPanel(detailsEl);
+    if (!panel) {
+      detailsEl.open = Boolean(willOpen);
+      return;
+    }
+
+    detailsEl.classList.add("xv-details-anim");
+    panel.classList.add("xv-details-panel");
+
+    if (prefersReducedMotion()) {
+      detailsEl.open = Boolean(willOpen);
+      return;
+    }
+
+    const ease = "cubic-bezier(.16,1,.3,1)";
+    const duration = willOpen ? 170 : 150;
+
+    // Cancel any in-flight animation.
+    try {
+      if (detailsEl._xvAnim) detailsEl._xvAnim.cancel();
+    } catch {}
+
+    if (willOpen) {
+      // Measure expanded height.
+      detailsEl.open = true;
+      panel.style.overflow = "hidden";
+      const target = panel.scrollHeight;
+      panel.style.height = "0px";
+      panel.style.opacity = "0.01";
+
+      detailsEl._xvAnim = panel.animate(
+        [{ height: "0px", opacity: 0.01, transform: "translateY(-1px)" }, { height: `${target}px`, opacity: 1, transform: "translateY(0px)" }],
+        { duration, easing: ease, fill: "both" }
+      );
+
+      detailsEl._xvAnim.onfinish = () => {
+        panel.style.height = "";
+        panel.style.overflow = "";
+        panel.style.opacity = "";
+        detailsEl._xvAnim = null;
+      };
+      detailsEl._xvAnim.oncancel = () => {
+        panel.style.height = "";
+        panel.style.overflow = "";
+        panel.style.opacity = "";
+        detailsEl._xvAnim = null;
+      };
+      return;
+    }
+
+    // Closing: freeze current height, animate down, then remove open.
+    panel.style.overflow = "hidden";
+    const start = panel.getBoundingClientRect().height;
+    panel.style.height = `${start}px`;
+    panel.style.opacity = "1";
+
+    detailsEl._xvAnim = panel.animate(
+      [{ height: `${start}px`, opacity: 1, transform: "translateY(0px)" }, { height: "0px", opacity: 0.01, transform: "translateY(-1px)" }],
+      { duration, easing: ease, fill: "both" }
+    );
+
+    detailsEl._xvAnim.onfinish = () => {
+      detailsEl.open = false;
+      panel.style.height = "";
+      panel.style.overflow = "";
+      panel.style.opacity = "";
+      detailsEl._xvAnim = null;
+    };
+    detailsEl._xvAnim.oncancel = () => {
+      panel.style.height = "";
+      panel.style.overflow = "";
+      panel.style.opacity = "";
+      detailsEl._xvAnim = null;
+    };
+  }
+
+  function bindPremiumDetailsInteractions() {
+    if (document.documentElement.dataset.xvDetailsBound === "true") return;
+    document.documentElement.dataset.xvDetailsBound = "true";
+
+    document.addEventListener(
+      "click",
+      (event) => {
+        const summary = event.target && event.target.closest ? event.target.closest("summary") : null;
+        if (!summary) return;
+        const detailsEl = summary.parentElement;
+        if (!detailsEl || detailsEl.tagName !== "DETAILS") return;
+
+        const cls = detailsEl.classList;
+        const managed =
+          cls.contains("details-wrap") ||
+          cls.contains("assistant-meta-fold") ||
+          cls.contains("auth-hints-fold") ||
+          cls.contains("sidebar-more") ||
+          cls.contains("stripe-more") ||
+          cls.contains("composer-stripe-fold") ||
+          cls.contains("notice-detail-fold");
+
+        if (!managed) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        animateDetailsToggle(detailsEl, !detailsEl.open);
+      },
+      true
+    );
   }
 
   function syncComposerAriaDescribedBy() {
@@ -6143,6 +6285,7 @@ function bindEvents() {
     buildKeyboardOverlay();
     ensureOpsCard();
     bindEvents();
+    bindPremiumDetailsInteractions();
     initWorkspaceChromeShell();
     try {
       const url = new URL(window.location.href);
