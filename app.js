@@ -312,9 +312,108 @@ if (typeof window.pulseRail !== "function") {
   };
 
   function ensureInjectedStyles() {
+    // In Claude-mode we keep the bulk of styling in `styles.css`, but we still
+    // allow a small, surgical runtime override for spacing/rail/composer rhythm.
+    // This avoids architecture changes while letting us refine the merged UI.
     try {
       if (document?.body?.dataset?.ui === "claude") {
-        // Claude-mode styling is authoritative in `styles.css`.
+        if (!document.getElementById("xalvion-claude-tweaks")) {
+          const claudeStyle = document.createElement("style");
+          claudeStyle.id = "xalvion-claude-tweaks";
+          claudeStyle.textContent = `
+            /* Xalvion surgical merge: Claude-style rhythm refinements (no logic changes) */
+            body[data-ui="claude"]{
+              --cld-sidebar-expanded: 200px;
+              --cld-sidebar-collapsed: 48px;
+              --cld-thread-max: min(880px, 92vw);
+              --cld-open-composer: min(880px, 92vw);
+            }
+
+            /* Thinner, calmer left rail with tighter icon rhythm */
+            body[data-ui="claude"] #sidebarShell{
+              padding: 8px 8px 12px !important;
+              background: rgba(14, 14, 18, 0.97) !important;
+              border-right-color: rgba(255,255,255,0.04) !important;
+            }
+            body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"]{
+              padding: 10px 5px 12px !important;
+            }
+            body[data-ui="claude"] .sidebar-collapse-btn{
+              width: 38px !important;
+              height: 38px !important;
+              border-radius: 12px !important;
+              background: rgba(255,255,255,0.035) !important;
+              border-color: rgba(255,255,255,0.075) !important;
+            }
+            body[data-ui="claude"] .sidebar-nav-item{
+              min-height: 38px !important;
+              border-radius: 10px !important;
+              gap: 8px !important;
+              padding: 0 10px !important;
+            }
+            body[data-ui="claude"] .sidebar-nav-item:hover{
+              background: rgba(255,255,255,0.04) !important;
+              border-color: rgba(255,255,255,0.04) !important;
+            }
+            body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-item{
+              width: 42px !important;
+              height: 42px !important;
+              min-height: 42px !important;
+              margin: 0 auto 6px !important;
+            }
+            body[data-ui="claude"] .sidebar-nav-icon{
+              width: 18px !important;
+              min-width: 18px !important;
+              height: 18px !important;
+              font-size: 15px !important;
+            }
+
+            /* Cleaner workspace shell: slightly more editorial center column */
+            body[data-ui="claude"] .main-canvas-inner.main-stage{
+              padding: clamp(12px, 2.5vh, 24px) clamp(16px, 3vw, 28px) 14px !important;
+            }
+            body[data-ui="claude"] #messages{
+              padding: 12px 0 120px !important;
+              gap: 14px !important;
+            }
+
+            /* Flatter conversation flow; reduce visual “card” energy */
+            body[data-ui="claude"] .msg-group .reply-body{
+              padding-left: 12px !important;
+            }
+            body[data-ui="claude"] .msg-group .reply-body::before{
+              width: 2px !important;
+              opacity: 0.9 !important;
+            }
+            body[data-ui="claude"] .assistant-footer{
+              padding-top: 8px !important;
+            }
+            body[data-ui="claude"] .msg-actions{
+              padding: 12px 0 0 14px !important;
+              gap: 6px !important;
+              opacity: 0.62 !important;
+            }
+            body[data-ui="claude"] .msg-group:hover .msg-actions,
+            body[data-ui="claude"] .msg-group:focus-within .msg-actions,
+            body[data-ui="claude"] .msg-group.assistant.show-actions .msg-actions{
+              opacity: 0.92 !important;
+            }
+            body[data-ui="claude"] .act-btn{
+              height: 28px !important;
+              padding: 0 9px !important;
+              border-radius: 9px !important;
+            }
+
+            /* Composer: do not re-box here. This tag is appended after styles.css and
+               previously used !important to override the flattened chat-first composer. */
+            body[data-ui="claude"] #workspaceRoot .composer-wrap.composer-dock{
+              max-width: var(--cld-thread-max) !important;
+              margin-left: auto !important;
+              margin-right: auto !important;
+            }
+          `;
+          document.head.appendChild(claudeStyle);
+        }
         return;
       }
     } catch {}
@@ -2458,13 +2557,10 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       : `${formatTier(state.tier)} · ${state.remaining} operator runs this period`;
 
     if (isClaudeShell()) {
-      const nick = openingDisplayName();
-      const greet = openingTimeGreeting();
-      const headline = nick ? `${greet}, ${nick}` : greet;
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-thread-open" role="status">
-        <h2 class="cld-welcome-headline">${headline}</h2>
-        <p class="cld-welcome-prompt">What ticket should we work through?</p>
+        <h2 class="cld-welcome-headline">How can I help with this ticket?</h2>
+        <p class="cld-welcome-prompt">Paste a customer issue below or start with one of the suggested prompts.</p>
         <p class="cld-welcome-support empty-launch-plan-hint empty-launch-plan-hint--quiet">${chipHintGuest}</p>
       </div>`;
     }
@@ -4679,7 +4775,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     try {
       const raw = localStorage.getItem(KEY);
       if (document.body?.dataset?.ui === "claude") {
-        initial = raw === null ? true : raw === "1";
+        initial = raw === null ? false : raw === "1";
       } else {
         initial = (raw || "0") === "1";
       }

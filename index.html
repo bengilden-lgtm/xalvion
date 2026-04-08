@@ -3,85 +3,99 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Xalvion — Workspace</title>
+  <title>Xalvion — Operator workspace</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%2323221e'/><text x='32' y='46' font-family='Inter,system-ui,sans-serif' font-size='40' font-weight='700' fill='%23f3f1ea' text-anchor='middle'>X</text></svg>" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><text x='32' y='48' font-family='Georgia,serif' font-size='48' font-weight='700' fill='%23ffffff' text-anchor='middle'>X</text></svg>" />
   <link rel="stylesheet" href="/styles.css?v=claude-workspace-9" />
 </head>
 <body data-ui="claude">
+  <div class="workspace-atmosphere" aria-hidden="true">
+    <div class="workspace-atmosphere-glow"></div>
+    <div class="workspace-atmosphere-falloff"></div>
+    <div class="workspace-atmosphere-vignette"></div>
+    <div class="workspace-atmosphere-grain"></div>
+  </div>
+
   <div class="workspace-root workspace-idle" id="workspaceRoot" aria-busy="false">
-    <header class="topbar" id="commandStrip">
-      <div class="topbar-inner">
-        <div class="topbar-left">
-          <a class="topbar-brand" href="/landing" title="Xalvion">
-            <span class="topbar-brand-mark" aria-hidden="true">X</span>
-            <span class="topbar-brand-name">Xalvion</span>
-          </a>
-          <span id="commandModeLine" class="topbar-mode" translate="no">AI prepares · you approve</span>
+    <header class="command-strip glass" id="commandStrip">
+      <div class="command-strip-left">
+        <a class="command-brand" href="/landing" title="Xalvion">
+          <span class="command-brand-mark" aria-hidden="true"></span>
+            <span class="command-brand-text">
+            <span class="command-brand-name">Xalvion</span>
+            <span class="command-brand-tag command-brand-tag--strip" aria-hidden="true">Operator workspace</span>
+          </span>
+        </a>
+        <span id="commandModeLine" class="command-mode-pill" translate="no">AI prepares · you approve</span>
+      </div>
+      <div class="command-strip-center command-strip-center--align">
+        <div class="command-status-chip" role="status" aria-live="polite">
+          <span class="command-status-dot" aria-hidden="true"></span>
+          <span id="commandPlanCapacity" class="command-capacity" translate="no">Preview mode · loading</span>
         </div>
-
-        <div class="topbar-center" aria-hidden="true">
-          <div class="topbar-status" role="status" aria-live="polite">
-            <span class="topbar-status-dot" aria-hidden="true"></span>
-            <span id="commandPlanCapacity" class="topbar-status-text" translate="no">Preview mode · loading</span>
-          </div>
-        </div>
-
-        <div class="topbar-right">
-          <button id="newChatBtn" class="icon-btn topbar-icon" type="button" title="New thread">+</button>
-          <a class="icon-btn topbar-icon" href="/landing" title="Landing">↗</a>
-          <span id="commandAuthChip" class="topbar-chip" translate="no">Session</span>
-        </div>
+      </div>
+      <div class="command-strip-right">
+        <button id="newChatBtn" class="icon-btn command-tool-btn" type="button" title="New thread">+</button>
+        <a class="icon-btn command-tool-btn" href="/landing" title="Landing">↗</a>
+        <span id="commandAuthChip" class="command-auth-chip" translate="no">Session</span>
       </div>
     </header>
 
-    <div class="workspace" id="workspaceApp">
-      <aside class="rail" id="sidebarShell" data-sidebar-active="workspace" data-sidebar-collapsed="true" data-cld-rail="1" aria-label="Sidebar">
-        <div class="rail-inner">
-          <div class="rail-header" role="presentation">
-            <button id="sidebarCollapseBtn" class="icon-btn rail-toggle" type="button" title="Toggle sidebar" aria-label="Toggle sidebar" data-cld-tip="Expand sidebar">
-              <span class="rail-toggle-glyph" aria-hidden="true"></span>
+    <div class="app workspace-grid workspace-body workspace-split">
+      <aside class="sidebar glass rail-col rail-col-left sidebar-app-rail" id="sidebarShell" data-sidebar-active="workspace" data-sidebar-collapsed="false" data-cld-rail="1">
+        <div class="sidebar-chrome">
+          <div class="sidebar-topbar" role="presentation">
+            <button id="sidebarCollapseBtn" class="icon-btn sidebar-collapse-btn" type="button" title="Toggle sidebar" aria-label="Toggle sidebar" data-cld-tip="Expand sidebar">
+              <span class="sidebar-collapse-glyph" aria-hidden="true"></span>
             </button>
           </div>
-
-          <nav class="rail-nav" role="tablist" aria-label="Workspace areas">
-            <button type="button" class="rail-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace" title="Workspace" data-cld-tip="Workspace">
-              <span class="rail-nav-icon" aria-hidden="true">⌂</span>
-              <span class="rail-nav-label">Workspace</span>
-            </button>
-            <button type="button" class="rail-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount" title="Access" data-cld-tip="Access">
-              <span class="rail-nav-icon" aria-hidden="true">⌁</span>
-              <span class="rail-nav-label">Access</span>
-            </button>
-            <button type="button" class="rail-nav-item" role="tab" data-sidebar-tab="plans" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans" title="Plans" data-cld-tip="Plans">
-              <span class="rail-nav-icon" aria-hidden="true">◈</span>
-              <span class="rail-nav-label">Plans</span>
-            </button>
-            <div class="rail-sep" aria-hidden="true"></div>
-            <button type="button" class="rail-nav-item" role="tab" data-sidebar-tab="integrations" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations" title="Integrations" data-cld-tip="Integrations">
-              <span class="rail-nav-icon" aria-hidden="true">⛓</span>
-              <span class="rail-nav-label">Integrations</span>
-            </button>
-            <button type="button" class="rail-nav-item" role="tab" data-sidebar-tab="crm" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm" title="CRM" data-cld-tip="CRM">
-              <span class="rail-nav-icon" aria-hidden="true">◎</span>
-              <span class="rail-nav-label">CRM</span>
-            </button>
-            <button type="button" class="rail-nav-item" role="tab" data-sidebar-tab="revenue" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue" title="Revenue" data-cld-tip="Revenue">
-              <span class="rail-nav-icon" aria-hidden="true">⌾</span>
-              <span class="rail-nav-label">Revenue</span>
-            </button>
-            <div class="rail-sep" aria-hidden="true"></div>
-            <button type="button" class="rail-nav-item" role="tab" data-sidebar-tab="more" data-nav-cluster="tools" aria-selected="false" aria-controls="sidebarPanelMore" id="sidebarTabMore" title="More" data-cld-tip="More tools">
-              <span class="rail-nav-icon" aria-hidden="true">⋯</span>
-              <span class="rail-nav-label">More</span>
-            </button>
+          <nav class="sidebar-nav" role="tablist" aria-label="Workspace areas">
+            <div class="sidebar-nav-group" role="presentation">
+              <span class="sidebar-nav-group-label" aria-hidden="true">Navigate</span>
+              <div class="sidebar-nav-items" role="presentation">
+                <button type="button" class="sidebar-nav-item is-active" role="tab" data-sidebar-tab="workspace" data-nav-cluster="operate" aria-selected="true" aria-controls="sidebarPanelWorkspace" id="sidebarTabWorkspace" title="Workspace" data-cld-tip="Workspace">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⌂</span>
+                  <span class="sidebar-nav-label">Workspace</span>
+                </button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="account" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelAccount" id="sidebarTabAccount" title="Access" data-cld-tip="Access">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⌁</span>
+                  <span class="sidebar-nav-label">Access</span>
+                </button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="plans" data-nav-cluster="operate" aria-selected="false" aria-controls="sidebarPanelPlans" id="sidebarTabPlans" title="Plans" data-cld-tip="Plans">
+                  <span class="sidebar-nav-icon" aria-hidden="true">◈</span>
+                  <span class="sidebar-nav-label">Plans</span>
+                </button>
+              </div>
+              <div class="sidebar-nav-divider" aria-hidden="true"></div>
+              <div class="sidebar-nav-items" role="presentation">
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="integrations" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelIntegrations" id="sidebarTabIntegrations" title="Integrations" data-cld-tip="Integrations">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⛓</span>
+                  <span class="sidebar-nav-label">Integrations</span>
+                </button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="crm" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelCrm" id="sidebarTabCrm" title="CRM" data-cld-tip="CRM">
+                  <span class="sidebar-nav-icon" aria-hidden="true">◎</span>
+                  <span class="sidebar-nav-label">CRM</span>
+                </button>
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="revenue" data-nav-cluster="signals" aria-selected="false" aria-controls="sidebarPanelRevenue" id="sidebarTabRevenue" title="Revenue" data-cld-tip="Revenue">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⌾</span>
+                  <span class="sidebar-nav-label">Revenue</span>
+                </button>
+              </div>
+              <div class="sidebar-nav-divider" aria-hidden="true"></div>
+              <div class="sidebar-nav-items" role="presentation">
+                <button type="button" class="sidebar-nav-item" role="tab" data-sidebar-tab="more" data-nav-cluster="tools" aria-selected="false" aria-controls="sidebarPanelMore" id="sidebarTabMore" title="More" data-cld-tip="More tools">
+                  <span class="sidebar-nav-icon" aria-hidden="true">⋯</span>
+                  <span class="sidebar-nav-label">More</span>
+                </button>
+              </div>
+            </div>
           </nav>
-
-          <div class="drawer scroll-shell" id="sidebarScrollShell" data-show-top="false" data-show-bottom="false">
-            <div class="drawer-scroll scroll-area" id="sidebarScroll">
-              <div class="drawer-panels sidebar-panels-host">
+        </div>
+        <div class="sidebar-scroll-host scroll-shell" id="sidebarScrollShell" data-show-top="false" data-show-bottom="false">
+          <div class="sidebar-scroll scroll-area" id="sidebarScroll">
+            <div class="sidebar-inner sidebar-panels-host">
 
               <section class="sidebar-panel is-active" id="sidebarPanelWorkspace" data-sidebar-panel="workspace" role="tabpanel" aria-labelledby="sidebarTabWorkspace" aria-label="Workspace" aria-hidden="false">
                 <h2 class="sr-only" id="noticeRegionLabel">Workspace status</h2>
@@ -571,56 +585,72 @@
                 </div>
               </section>
 
-              </div>
             </div>
           </div>
         </div>
       </aside>
 
-      <main class="stage" aria-label="Conversation">
-        <div class="stage-inner">
-          <header class="stage-header">
-            <div class="stage-title">
-              <h1 id="workspacePageTitle">Paste a support ticket</h1>
-              <p id="workspaceSubcopy" class="stage-subcopy">Get a customer-ready reply instantly</p>
-              <p id="workspaceSubcopyTier" class="stage-subcopy stage-subcopy--quiet">Sensitive actions stay gated for approval</p>
-            </div>
-          </header>
+      <main class="main main-canvas">
+        <div class="main-canvas-inner canvas-shell main-stage">
+          <div class="main-stage-ambient" aria-hidden="true">
+            <div class="main-stage-ambient-glow"></div>
+            <div class="main-stage-ambient-ripple"></div>
+          </div>
 
-          <section class="thread" aria-label="Transcript">
-            <div class="thread-scroll scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
-              <div id="messages" class="messages scroll-area"></div>
-            </div>
-          </section>
-
-          <footer class="composer-dock" id="workspaceComposerDock">
-            <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
-              <div class="composer-status" role="status" aria-live="polite">
-                <p id="composerStatusLine" class="composer-status-line">Paste a ticket below to start.</p>
-              </div>
-
-              <div class="composer-input-row composer-input-wrap composer-field">
-                <textarea id="messageInput" placeholder="Paste a ticket or describe the customer issue…" autocomplete="off"></textarea>
-                <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
-              </div>
-
-              <div class="quick-actions">
-                <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
-                <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
-                <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
-                <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
-              </div>
-
-              <details class="composer-stripe-fold">
-                <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
-                <div class="stripe-context-row muted-copy composer-stripe-fields">
-                  <span class="stripe-context-hint">Attached to support requests when present.</span>
-                  <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
-                  <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+          <div class="xv-stage-scaffold">
+            <header class="main-stage-header main-thread-header">
+              <div class="main-stage-identity">
+                <div class="main-stage-title-block">
+                  <h1 id="workspacePageTitle">Paste a support ticket</h1>
+                  <p id="workspaceSubcopy" class="workspace-subline">Get a customer-ready reply instantly</p>
+                  <p id="workspaceSubcopyTier" class="workspace-subline workspace-subline--quiet">Sensitive actions stay gated for approval</p>
                 </div>
-              </details>
+              </div>
+            </header>
+
+            <div class="main-stage-body xv-stage-body">
+              <div class="workspace-conversation-column" id="workspaceConversationColumn">
+                <div class="messages-zone" id="messagesZone">
+                  <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
+                    <div id="messages" class="messages scroll-area"></div>
+                  </div>
+                </div>
+
+                <footer class="composer-wrap composer-dock xv-composer-foot" id="workspaceComposerDock">
+                <div class="composer-unified composer-module">
+                  <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
+                    <div class="composer-hint-band composer-hint-band--integrated">
+                      <div class="composer-status-cluster" role="status" aria-live="polite">
+                        <span class="composer-thinking-anchor" aria-hidden="true">
+                          <span class="xalvion-sovereign-mark xalvion-sovereign-mark--sm xv-spark-mark" data-xv-thinking-glyph><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span>
+                        </span>
+                        <p id="composerStatusLine" class="composer-status-line composer-inline-hint">Paste a ticket below to start.</p>
+                      </div>
+                    </div>
+                    <div class="composer-input-row composer-input-wrap composer-field">
+                      <textarea id="messageInput" placeholder="Paste a ticket or describe the customer issue…" autocomplete="off"></textarea>
+                      <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
+                    </div>
+                    <div class="quick-actions">
+                      <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
+                      <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
+                      <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
+                      <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
+                    </div>
+                    <details class="composer-stripe-fold">
+                      <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
+                      <div class="stripe-context-row muted-copy composer-stripe-fields">
+                        <span class="stripe-context-hint">Attached to support requests when present.</span>
+                        <input id="paymentIntentInput" class="refund-input" type="text" placeholder="pi_…" inputmode="text" />
+                        <input id="chargeIdInput" class="refund-input" type="text" placeholder="ch_…" inputmode="text" />
+                      </div>
+                    </details>
+                  </div>
+                </div>
+                </footer>
+              </div>
             </div>
-          </footer>
+          </div>
         </div>
       </main>
     </div>
