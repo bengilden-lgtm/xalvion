@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Instrument+Sans:ital,wght@0,400;0,450;0,500;0,550;0,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><text x='32' y='48' font-family='Georgia,serif' font-size='48' font-weight='700' fill='%23ffffff' text-anchor='middle'>X</text></svg>" />
-  <link rel="stylesheet" href="/styles.css?v=claude-soft-2" />
+  <link rel="stylesheet" href="/styles.css?v=claude-soft-3" />
 </head>
 <body data-ui="claude">
   <div class="workspace-atmosphere" aria-hidden="true">
@@ -159,10 +159,40 @@
               <section class="sidebar-panel" id="sidebarPanelPlans" data-sidebar-panel="plans" role="tabpanel" aria-labelledby="sidebarTabPlans" aria-label="Plans" hidden aria-hidden="true">
                 <div class="section-label section-label-tight">Plans &amp; capacity</div>
                 <div id="upgradeValueSummary" class="upgrade-value-inline" style="display:none"></div>
-                <div class="tier-card tier-card-plans">
-                  <button class="upgrade-btn" data-upgrade="pro" type="button"><span>Upgrade to Pro — full operator capacity</span><span>→</span></button>
-                  <button type="button" class="plans-upgrade-secondary" data-upgrade="elite">Need more scale? Upgrade to Elite</button>
+                <p id="plansAuthHint" class="plans-auth-hint" hidden>Sign in under <strong>Access</strong> to change billing. You can still explore the workspace as a guest.</p>
+                <div class="plans-stack" id="plansStack">
+                  <article class="plan-offer plan-offer--pro" data-plan-tier="pro">
+                    <div class="plan-offer-header">
+                      <div class="plan-offer-title-row">
+                        <h3 class="plan-offer-name">Pro</h3>
+                        <span class="plan-offer-badge" data-plan-badge hidden>Current plan</span>
+                      </div>
+                      <p class="plan-offer-spec">500 runs / month</p>
+                    </div>
+                    <ul class="plan-offer-features">
+                      <li>Live Stripe refund execution from the workspace</li>
+                      <li>Full approval workflow, saved threads, higher limits</li>
+                      <li>Priority routing when ticket volume spikes</li>
+                    </ul>
+                    <button type="button" class="plan-cta plan-cta--primary" data-upgrade="pro"><span>Upgrade to Pro</span></button>
+                  </article>
+                  <article class="plan-offer plan-offer--elite" data-plan-tier="elite">
+                    <div class="plan-offer-header">
+                      <div class="plan-offer-title-row">
+                        <h3 class="plan-offer-name">Elite</h3>
+                        <span class="plan-offer-badge" data-plan-badge hidden>Current plan</span>
+                      </div>
+                      <p class="plan-offer-spec">5,000 runs / month</p>
+                    </div>
+                    <ul class="plan-offer-features">
+                      <li>Everything in Pro, with scale headroom</li>
+                      <li>Deeper throughput and operator analytics</li>
+                      <li>Built for teams clearing very high volume</li>
+                    </ul>
+                    <button type="button" class="plan-cta plan-cta--secondary" data-upgrade="elite"><span>Upgrade to Elite</span></button>
+                  </article>
                 </div>
+                <p id="plansEliteNote" class="plans-tier-note" hidden>You are on the top workspace tier for this product.</p>
                 <details class="sidebar-more">
                   <summary class="sidebar-more-summary">Where to see usage</summary>
                   <p class="muted-copy sidebar-panel-hint">Usage meters and limits also appear under <strong>More</strong> while you work.</p>
@@ -654,7 +684,7 @@
                     <div class="composer-input-row composer-input-wrap composer-field">
                       <div class="composer-input-shell">
                         <div class="composer-field-inner">
-                          <textarea id="messageInput" placeholder="How can I help with this ticket?" autocomplete="off"></textarea>
+                          <textarea id="messageInput" placeholder="Describe the issue or paste the ticket…" autocomplete="off"></textarea>
                           <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                         </div>
                       </div>
@@ -775,7 +805,7 @@
 
   <script type="module" src="/workspace-client/boot.js"></script>
   <script src="/workspace_modules.js"></script>
-  <script src="/app.js?v=claude-soft-2"></script>
+  <script src="/app.js?v=claude-soft-3"></script>
   <script>
     (() => {
       function bindMoreJumpers() {

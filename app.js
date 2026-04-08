@@ -325,10 +325,10 @@ if (typeof window.pulseRail !== "function") {
           claudeStyle.textContent = `
             /* Xalvion surgical merge: Claude-style rhythm refinements (no logic changes) */
             body[data-ui="claude"]{
-              --cld-sidebar-expanded: 200px;
-              --cld-sidebar-collapsed: 48px;
-              --cld-thread-max: min(880px, 92vw);
-              --cld-open-composer: min(880px, 92vw);
+              --cld-sidebar-expanded: 248px;
+              --cld-sidebar-collapsed: 52px;
+              --cld-thread-max: min(720px, 92vw);
+              --cld-open-composer: min(720px, 92vw);
             }
 
             /* Thinner, calmer left rail with tighter icon rhythm */
@@ -372,11 +372,11 @@ if (typeof window.pulseRail !== "function") {
 
             /* Cleaner workspace shell: slightly more editorial center column */
             body[data-ui="claude"] .main-canvas-inner.main-stage{
-              padding: clamp(12px, 2.5vh, 24px) clamp(16px, 3vw, 28px) 14px !important;
+              padding: clamp(10px, 2vh, 20px) clamp(12px, 2.5vw, 22px) 10px !important;
             }
             body[data-ui="claude"] #messages{
-              padding: 12px 0 120px !important;
-              gap: 14px !important;
+              padding: 6px 0 96px !important;
+              gap: 12px !important;
             }
 
             /* Flatter conversation flow; reduce visual “card” energy */
@@ -412,6 +412,8 @@ if (typeof window.pulseRail !== "function") {
               max-width: var(--cld-thread-max) !important;
               margin-left: auto !important;
               margin-right: auto !important;
+              padding-left: 0 !important;
+              padding-right: 0 !important;
             }
           `;
           document.head.appendChild(claudeStyle);
@@ -1966,6 +1968,7 @@ The workspace already showed you real routing and approval discipline. Pro keeps
     refreshEmptyStateContent();
     if (!state.sending) refreshComposerIdleHint();
     applyComposerInteractiveLock();
+    syncPlansPanelChrome();
 
     const banner = document.getElementById("inlineLimitBanner");
     if (banner) {
@@ -2009,6 +2012,41 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       root.classList.toggle("mono-tier-elite", tier === "elite" || tier === "dev");
     }
     els.commandAuthChip?.classList.toggle("is-guest-chip", guest);
+  }
+
+  function syncPlansPanelChrome() {
+    const authHint = document.getElementById("plansAuthHint");
+    const eliteNote = document.getElementById("plansEliteNote");
+    const stack = document.getElementById("plansStack");
+    if (!stack) return;
+    const authed = isAuthenticated();
+    const tier = String(state.tier || "free").toLowerCase();
+    const topTier = tier === "elite" || tier === "dev";
+
+    if (authHint) authHint.hidden = authed;
+    if (eliteNote) eliteNote.hidden = !topTier;
+
+    stack.querySelectorAll(".plan-offer").forEach((el) => {
+      const offerTier = String(el.dataset.planTier || "").toLowerCase();
+      const onThisPlan = authed && offerTier === tier && tier !== "free";
+      el.classList.toggle("is-current", Boolean(onThisPlan));
+      el.classList.toggle("is-locked-preview", !authed);
+      const badge = el.querySelector("[data-plan-badge]");
+      if (badge) badge.hidden = !onThisPlan;
+    });
+
+    stack.querySelectorAll("[data-upgrade]").forEach((btn) => {
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const t = String(btn.dataset.upgrade || "").toLowerCase();
+      let hide = false;
+      if (topTier) {
+        hide = true;
+      } else if (tier === "pro") {
+        hide = t === "pro";
+      }
+      btn.hidden = hide;
+      btn.disabled = false;
+    });
   }
 
   function syncCommandStripCapacity() {
@@ -3244,16 +3282,20 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       controls.innerHTML = "";
       const rej = document.createElement("button");
       rej.type = "button";
-      rej.className = "btn-reject";
-      rej.textContent = "Reject";
+      rej.className = "op-action op-action--ghost-danger";
+      rej.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.reject}</span><span class="op-action__label">Reject</span>`;
       const ed = document.createElement("button");
       ed.type = "button";
-      ed.className = "btn-edit";
-      ed.textContent = "Edit";
+      ed.className = "op-action op-action--secondary";
+      ed.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.edit}</span><span class="op-action__label">Edit</span>`;
       const ap = document.createElement("button");
       ap.type = "button";
-      ap.className = "btn-approve";
-      ap.textContent = "Approve";
+      const setApproveIdle = () => {
+        ap.classList.remove("is-loading");
+        ap.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.approve}</span><span class="op-action__label">Approve</span>`;
+      };
+      ap.className = "op-action op-action--primary";
+      setApproveIdle();
       controls.append(rej, ed, ap);
 
       ed.addEventListener("click", () => {
@@ -3301,7 +3343,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
             });
             sendEdited.disabled = true;
             sendEdited.textContent = "Sending…";
-            ap.textContent = "…";
+            ap.classList.add("is-loading");
             try {
               const response = await resolveApproval(ticketId, "approve", {
                 payment_intent_id: approval.paymentIntentId,
@@ -3327,7 +3369,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
               [rej, ed, ap].forEach((b) => {
                 b.disabled = false;
               });
-              ap.textContent = "Approve";
+              setApproveIdle();
               sendEdited.disabled = false;
               sendEdited.textContent = "Send edited reply";
             }
@@ -3398,7 +3440,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           [rej, ed, ap].forEach((b) => {
             b.disabled = true;
           });
-          ap.textContent = "…";
+          ap.classList.add("is-loading");
           try {
             const response = await resolveApproval(ticketId, "approve", {
               payment_intent_id: approval.paymentIntentId,
@@ -3419,7 +3461,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
             [rej, ed, ap].forEach((b) => {
               b.disabled = false;
             });
-            ap.textContent = "Approve";
+            setApproveIdle();
           }
           return;
         }
@@ -3761,7 +3803,11 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     els.workspaceRoot?.setAttribute("aria-busy", state.sending ? "true" : "false");
 
     if (els.composerStatusLine) {
-      els.composerStatusLine.textContent = state.sending ? "Working on a reply…" : "";
+      els.composerStatusLine.textContent = state.sending
+        ? isClaudeShell()
+          ? "Drafting a reply…"
+          : "Working on a reply…"
+        : "";
       if (!state.sending) refreshComposerIdleHint();
       els.composerStatusLine.classList.toggle("composer-status-live", state.sending);
     }
@@ -5436,12 +5482,16 @@ function bindEvents() {
       }
     });
 
-    els.upgradeButtons.forEach((button) => {
-      button.addEventListener("mouseenter", refreshUpgradeValueSummary);
-      button.addEventListener("focus", refreshUpgradeValueSummary);
-      button.addEventListener("click", () => {
-        upgradePlan(button.dataset.upgrade || "");
-      });
+    els.sidebarShell?.addEventListener("focusin", (e) => {
+      if (e.target && e.target.closest && e.target.closest("[data-upgrade]")) refreshUpgradeValueSummary();
+    });
+    els.sidebarShell?.addEventListener("click", (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest("[data-upgrade]") : null;
+      if (!btn || !els.sidebarShell?.contains(btn)) return;
+      if (btn.hidden || btn.disabled) return;
+      e.preventDefault();
+      refreshUpgradeValueSummary();
+      upgradePlan(btn.dataset.upgrade || "");
     });
 
     els.stripeConnectBtn?.addEventListener("click", connectStripe);
