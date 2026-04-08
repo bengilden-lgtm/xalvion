@@ -207,7 +207,7 @@ svg{
 .command-brand{
   display:flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 6px 8px;
   border-radius: var(--r-sm);
 }
@@ -222,14 +222,16 @@ svg{
   flex-shrink: 0;
   background: transparent;
   box-shadow: none;
-  color: color-mix(in oklab, var(--text) 82%, transparent);
-  opacity: 0.88;
+  color: var(--accent);
+  opacity: 0.94;
 }
 .command-brand-mark svg{
   width: 18px;
   height: 18px;
   display: block;
 }
+.xv-brand-mark{ color: var(--accent); }
+.xv-brand-glyph{ color: color-mix(in oklab, var(--accent) 92%, white 0%); }
 .command-brand-text{ display:flex; flex-direction: column; line-height: 1.05; }
 .command-brand-name{ font-weight: 600; letter-spacing: .2px; color: var(--text); }
 .command-brand-tag{ color: var(--text-3); font-size: 12px; }
@@ -1965,6 +1967,21 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
   }
 }
 
+/* Thinking swap + response arrival (subtle, fast) */
+.js-reply-text{
+  transition: opacity var(--t-med) var(--ease);
+}
+.js-reply-text.xv-fade-out{
+  opacity: 0;
+}
+.msg-card.xv-soft-fade-in{
+  animation: xvSoftFadeIn var(--t-med) var(--ease) 1;
+}
+@keyframes xvSoftFadeIn{
+  from{ opacity: 0.01; }
+  to{ opacity: 1; }
+}
+
 .composer{
   width: 100%;
   max-width: var(--thread-max);
@@ -2125,6 +2142,7 @@ body[data-ui="claude"] #messageInput{
 #sendBtn:hover{
   filter: brightness(1.06);
   border-color: color-mix(in oklab, var(--accent) 40%, var(--line-2));
+  transform: scale(1.03);
 }
 .send-btn:active,
 #sendBtn:active{

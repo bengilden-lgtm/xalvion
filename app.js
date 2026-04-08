@@ -317,6 +317,11 @@ if (typeof window.pulseRail !== "function") {
         <path d="M12.4 10.8l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6Z"></path>
       </svg>
     `,
+    xalvionX: `
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M3.2 3.2h2.1L8 6.1l2.7-2.9h2.1L9.9 8l2.9 4.8h-2.1L8 9.9l-2.7 2.9H3.2L6.1 8 3.2 3.2Z" fill="currentColor"></path>
+      </svg>
+    `,
     person: `
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="8" cy="5.5" r="2.5"></circle>
@@ -2647,7 +2652,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function createTypingMarkup() {
     return `
       <span class="xv-thinking-block typing" aria-live="polite" aria-busy="true">
-        <span class="xv-thinking-text">Xalvion is thinking</span>
+        <span class="xv-thinking-text">Xalvion is preparing a response…</span>
         <span class="xv-thinking-dots" aria-hidden="true">
           <span class="xv-thinking-dot"></span>
           <span class="xv-thinking-dot"></span>
@@ -2666,9 +2671,23 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function getAssistantBadge() {
     return `
-      <span class="msg-identity" aria-hidden="true">${ICONS.spark}</span>
+      <span class="msg-identity" aria-hidden="true">${ICONS.xalvionX}</span>
       <span>Xalvion</span>
     `;
+  }
+
+  function swapThinkingToContent(node, nextHtml) {
+    if (!node) return;
+    const hasTyping = Boolean(node.querySelector(".typing, .xv-thinking-block"));
+    if (!hasTyping) return;
+
+    node.classList.add("xv-fade-out");
+    window.setTimeout(() => {
+      node.innerHTML = nextHtml;
+      node.classList.remove("xv-fade-out");
+      node.closest?.(".msg-card")?.classList.add("xv-soft-fade-in");
+      window.setTimeout(() => node.closest?.(".msg-card")?.classList.remove("xv-soft-fade-in"), 260);
+    }, 160);
   }
 
   function createMessageGroup(role, bodyHtml, isPlaceholder = false) {
@@ -3092,7 +3111,14 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
   function setAssistantCopy(row, text) {
     const node = getAssistantCopyNode(row);
     if (!node) return;
-    node.innerHTML = escapeHtml(text || "").replace(/\n/g, "<br>");
+    const html = escapeHtml(text || "").replace(/\n/g, "<br>");
+    if (node.querySelector(".typing, .xv-thinking-block")) {
+      swapThinkingToContent(node, html);
+    } else {
+      node.innerHTML = html;
+      node.closest?.(".msg-card")?.classList.add("xv-soft-fade-in");
+      window.setTimeout(() => node.closest?.(".msg-card")?.classList.remove("xv-soft-fade-in"), 260);
+    }
     const card = row?.querySelector(".msg-card");
     if (card?.dataset.placeholder !== "true") syncReplyReinforcement(row);
   }
@@ -3101,7 +3127,17 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const node = getAssistantCopyNode(row);
     if (!node) return;
 
-    if (node.querySelector(".typing, .xv-thinking-block")) node.innerHTML = "";
+    if (node.querySelector(".typing, .xv-thinking-block")) {
+      // Fade out thinking, then begin streaming into the real node.
+      swapThinkingToContent(node, "");
+      window.setTimeout(() => {
+        const current = node.textContent || "";
+        node.innerHTML = escapeHtml(current + chunk).replace(/\n/g, "<br>");
+        syncReplyReinforcement(row);
+        scrollMessagesToBottom();
+      }, 170);
+      return;
+    }
 
     const current = node.textContent || "";
     node.innerHTML = escapeHtml(current + chunk).replace(/\n/g, "<br>");
