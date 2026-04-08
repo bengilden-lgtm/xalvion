@@ -31,6 +31,11 @@ _outcome_stats_cache: dict[str, Any] = {}
 _outcome_stats_cache_ts: float = 0.0
 _OUTCOME_STATS_TTL: float = 30.0
 
+# Outcome intelligence snapshot cache (UI-facing, compact)
+_outcome_intel_cache: dict[str, Any] = {}
+_outcome_intel_cache_ts: float = 0.0
+_OUTCOME_INTEL_TTL: float = 15.0
+
 
 # ---------------------------------------------------------------------------
 # ORM Model
@@ -644,3 +649,305 @@ def get_outcome_stats() -> dict[str, Any]:
         return result
     finally:
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# Outcome intelligence (additive UI surface)
+# ---------------------------------------------------------------------------
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value or 0)
+    except Exception:
+        return default
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value or 0.0)
+    except Exception:
+        return default
+
+
+def summarize_recent_outcomes(limit: int = 25) -> dict[str, Any]:
+    """
+    Compact aggregation over the most recent outcome rows.
+    Additive helper; never raises; safe to call from summary endpoints.
+    """
+    lim = max(1, min(500, _safe_int(limit, 25)))
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(ActionOutcomeLog)
+            .order_by(ActionOutcomeLog.id.desc())
+            .limit(lim)
+            .all()
+        )
+        if not rows:
+            return {
+                "excellent": 0,
+                "good": 0,
+                "neutral": 0,
+                "bad": 0,
+                "auto_success": 0,
+                "assisted_success": 0,
+                "failed": 0,
+                "ticket_reopened": 0,
+                "refund_reversed": 0,
+                "dispute_filed": 0,
+                "crm_closed": 0,
+                "money_refunded": 0.0,
+                "money_credited": 0.0,
+            }
+
+        counts = {
+            "excellent": 0,
+            "good": 0,
+            "neutral": 0,
+            "bad": 0,
+            "auto_success": 0,
+            "assisted_success": 0,
+            "failed": 0,
+            "ticket_reopened": 0,
+            "refund_reversed": 0,
+            "dispute_filed": 0,
+            "crm_closed": 0,
+            "money_refunded": 0.0,
+            "money_credited": 0.0,
+        }
+
+        for r in rows:
+            d = {
+                "success": bool(r.success),
+                "auto_resolved": bool(r.auto_resolved),
+                "approved_by_human": bool(r.approved_by_human),
+                "refund_reversed": bool(r.refund_reversed),
+                "dispute_filed": bool(r.dispute_filed),
+                "ticket_reopened": bool(getattr(r, "ticket_reopened", 0)),
+                "crm_closed": bool(getattr(r, "crm_closed", 0)),
+                "action": r.action,
+                "amount": r.amount,
+            }
+            imp = compute_outcome_impact(d)
+            tier = str(imp.get("impact_label") or "neutral")
+            if tier in counts:
+                counts[tier] += 1
+
+            norm = normalize_business_outcome(d)
+            rc = str(norm.get("resolution_class") or "unknown")
+            if rc == "auto_success":
+                counts["auto_success"] += 1
+            elif rc == "assisted_success":
+                counts["assisted_success"] += 1
+            elif rc == "failed":
+                counts["failed"] += 1
+
+            if d["ticket_reopened"]:
+                counts["ticket_reopened"] += 1
+            if d["refund_reversed"]:
+                counts["refund_reversed"] += 1
+            if d["dispute_filed"]:
+                counts["dispute_filed"] += 1
+            if d["crm_closed"]:
+                counts["crm_closed"] += 1
+
+            action = str(d.get("action") or "none").lower()
+            amt = round(_safe_float(d.get("amount"), 0.0), 2)
+            if amt > 0 and d.get("success"):
+                if action == "refund":
+                    counts["money_refunded"] = round(float(counts["money_refunded"]) + amt, 2)
+                elif action == "credit":
+                    counts["money_credited"] = round(float(counts["money_credited"]) + amt, 2)
+
+        return counts
+    except Exception:
+        return {
+            "excellent": 0,
+            "good": 0,
+            "neutral": 0,
+            "bad": 0,
+            "auto_success": 0,
+            "assisted_success": 0,
+            "failed": 0,
+            "ticket_reopened": 0,
+            "refund_reversed": 0,
+            "dispute_filed": 0,
+            "crm_closed": 0,
+            "money_refunded": 0.0,
+            "money_credited": 0.0,
+        }
+    finally:
+        db.close()
+
+
+def latest_outcome_summary() -> dict[str, Any] | None:
+    """
+    Latest outcome row summarized for UI.
+    Returns None if no rows exist; never raises.
+    """
+    db = SessionLocal()
+    try:
+        row = db.query(ActionOutcomeLog).order_by(ActionOutcomeLog.id.desc()).first()
+        if not row:
+            return None
+        row_dict = {
+            "id": row.id,
+            "outcome_key": row.outcome_key,
+            "action": row.action,
+            "amount": row.amount,
+            "success": bool(row.success),
+            "tool_status": row.tool_status,
+            "auto_resolved": bool(row.auto_resolved),
+            "approved_by_human": bool(row.approved_by_human),
+            "refund_reversed": bool(row.refund_reversed),
+            "dispute_filed": bool(row.dispute_filed),
+            "ticket_reopened": bool(getattr(row, "ticket_reopened", 0)),
+            "crm_closed": bool(getattr(row, "crm_closed", 0)),
+            "created_at": row.created_at,
+        }
+        summary = build_outcome_summary_for_ui(row_dict)
+        # Keep UI surface compact + safe: do not leak tool_response_json.
+        summary.pop("components", None)
+        return summary
+    except Exception:
+        return None
+    finally:
+        db.close()
+
+
+def build_outcome_insights(summary: dict[str, Any] | None, latest: dict[str, Any] | None) -> list[str]:
+    """
+    Deterministic, operator-safe micro-insights (1–3 lines).
+    Never raises; never dramatic; never implies certainty beyond signals.
+    """
+    s = summary if isinstance(summary, dict) else {}
+    latest_tier = (latest or {}).get("tier")
+    tier = str(latest_tier or "unknown").lower()
+
+    excellent = _safe_int(s.get("excellent", 0))
+    good = _safe_int(s.get("good", 0))
+    neutral = _safe_int(s.get("neutral", 0))
+    bad = _safe_int(s.get("bad", 0))
+    reopened = _safe_int(s.get("ticket_reopened", 0))
+    reversed_n = _safe_int(s.get("refund_reversed", 0))
+    disputes = _safe_int(s.get("dispute_filed", 0))
+    assisted = _safe_int(s.get("assisted_success", 0))
+    auto = _safe_int(s.get("auto_success", 0))
+
+    total = excellent + good + neutral + bad
+    lines: list[str] = []
+
+    if total <= 0:
+        return []
+
+    if tier in {"excellent", "good", "neutral", "bad"}:
+        label = "excellent" if tier == "excellent" else "good" if tier == "good" else "neutral" if tier == "neutral" else "poor"
+        lines.append(f"Most recent outcome was {label}.")
+
+    risk_events = reversed_n + disputes
+    if risk_events > 0:
+        lines.append("Refund reversals or disputes detected — review policy fit on recent motions.")
+    elif reopened > max(1, total // 6):
+        lines.append("Reopened tickets are elevated — consider tightening resolution steps.")
+    else:
+        # Stable if bad outcomes are not dominating and no major risk events.
+        bad_rate = bad / max(1, total)
+        if bad_rate <= 0.12:
+            lines.append("Recent outcomes look stable.")
+
+    if assisted > 0 and auto > 0:
+        lines.append("Most successful outcomes are approval-reviewed.")
+    elif assisted > 0 and auto == 0:
+        lines.append("Most successful outcomes required operator review.")
+    elif auto > 0 and assisted == 0:
+        lines.append("Most successful outcomes were fully automatic.")
+
+    # Keep to 1–3 short lines.
+    out: list[str] = []
+    for line in lines:
+        t = str(line or "").strip()
+        if t and t not in out:
+            out.append(t)
+        if len(out) >= 3:
+            break
+    return out
+
+
+def _best_pattern_snapshot() -> dict[str, Any] | None:
+    """
+    Optional: select best performing pattern from the learning store.
+    Returns None if unavailable or empty.
+    """
+    try:
+        from state_store import load_state
+        from learning import PATTERN_STORE_KEY
+
+        patterns = load_state(PATTERN_STORE_KEY, {})
+        if not isinstance(patterns, dict) or not patterns:
+            return None
+
+        best_key = None
+        best_score = -1.0
+        best_entry: dict[str, Any] | None = None
+
+        for k, entry in patterns.items():
+            if not isinstance(entry, dict):
+                continue
+            sc = _safe_float(entry.get("ema_score", 0.5), 0.5)
+            n = _safe_int(entry.get("sample_count", 0), 0)
+            if n < 3:
+                continue
+            if sc > best_score:
+                best_score = sc
+                best_key = str(k)
+                best_entry = entry
+
+        if not best_key or not best_entry:
+            return None
+
+        expectation = "high" if best_score >= 0.75 else "medium" if best_score >= 0.45 else "low"
+        return {
+            "pattern_key": best_key[:180],
+            "expectation": expectation,
+            "ema_score": round(float(best_score), 4),
+            "sample_count": _safe_int(best_entry.get("sample_count", 0)),
+        }
+    except Exception:
+        return None
+
+
+def outcome_intelligence_snapshot(limit: int = 25) -> dict[str, Any]:
+    """
+    UI-facing outcome intelligence snapshot.
+    Cached briefly; never raises; returns {} when no outcome data exists.
+    """
+    import time as _time
+
+    global _outcome_intel_cache, _outcome_intel_cache_ts
+    now = _time.time()
+    if _outcome_intel_cache and (now - _outcome_intel_cache_ts) < _OUTCOME_INTEL_TTL:
+        return dict(_outcome_intel_cache)
+
+    latest = latest_outcome_summary()
+    summary = summarize_recent_outcomes(limit=limit)
+    # If there are no outcomes at all, return empty to keep payload minimal.
+    total = _safe_int(summary.get("excellent", 0)) + _safe_int(summary.get("good", 0)) + _safe_int(summary.get("neutral", 0)) + _safe_int(summary.get("bad", 0))
+    if total <= 0 and not latest:
+        _outcome_intel_cache.clear()
+        _outcome_intel_cache_ts = now
+        return {}
+
+    insights = build_outcome_insights(summary, latest)
+    best_pattern = _best_pattern_snapshot()
+
+    snapshot: dict[str, Any] = {
+        "latest": latest,
+        "summary": summary,
+        "insights": insights,
+        "best_pattern": best_pattern,
+    }
+
+    _outcome_intel_cache.clear()
+    _outcome_intel_cache.update(snapshot)
+    _outcome_intel_cache_ts = now
+    return dict(snapshot)

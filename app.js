@@ -4787,6 +4787,146 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     return card;
   }
 
+  function ensureOutcomeIntelCard() {
+    let card = document.getElementById("xalvionOutcomeIntelCard");
+    if (card) return card;
+
+    card = document.createElement("div");
+    card.id = "xalvionOutcomeIntelCard";
+    card.className = "outcome-intel-card";
+    card.innerHTML = `
+      <div class="outcome-intel-head">
+        <div>
+          <div class="panel-title">Outcome intelligence</div>
+          <div class="panel-copy">What happened after actions — quality, value preserved, and stability signals.</div>
+        </div>
+      </div>
+
+      <div class="outcome-intel-latest" id="outcomeIntelLatest">
+        <div class="outcome-intel-latest-row">
+          <div class="outcome-tier-badge tier-unknown" id="outcomeIntelTier">Outcome</div>
+          <div class="outcome-intel-headline" id="outcomeIntelHeadline">No outcomes recorded yet.</div>
+        </div>
+        <div class="outcome-intel-badges" id="outcomeIntelBadges"></div>
+        <div class="outcome-intel-money" id="outcomeIntelMoney"></div>
+      </div>
+
+      <div class="outcome-metric-grid" id="outcomeIntelGrid"></div>
+      <div class="outcome-insights" id="outcomeIntelInsights"></div>
+      <div class="outcome-pattern" id="outcomeIntelPattern"></div>
+    `;
+
+    if (els.railInner) els.railInner.appendChild(card);
+    else if (els.usageCard?.parentElement) els.usageCard.parentElement.appendChild(card);
+
+    return card;
+  }
+
+  function syncOutcomeIntelligenceRail(dashboardStats = null) {
+    const d = dashboardStats && typeof dashboardStats === "object" ? dashboardStats : state.dashboardStats || {};
+    const raw = d.outcome_intelligence && typeof d.outcome_intelligence === "object" ? d.outcome_intelligence : null;
+    ensureOutcomeIntelCard();
+
+    const tierEl = document.getElementById("outcomeIntelTier");
+    const headlineEl = document.getElementById("outcomeIntelHeadline");
+    const badgesEl = document.getElementById("outcomeIntelBadges");
+    const moneyEl = document.getElementById("outcomeIntelMoney");
+    const gridEl = document.getElementById("outcomeIntelGrid");
+    const insightsEl = document.getElementById("outcomeIntelInsights");
+    const patternEl = document.getElementById("outcomeIntelPattern");
+
+    const fmt = globalThis.__XALVION_FORMAT__;
+    const norm =
+      fmt?.normalizeOutcomeIntelligence
+        ? fmt.normalizeOutcomeIntelligence(raw)
+        : { latest: null, summary: {}, insights: [], bestPattern: null };
+
+    const latest = norm.latest;
+    const tier = String(latest?.tier || "unknown").toLowerCase();
+    const tierLabel = fmt?.formatOutcomeTier ? fmt.formatOutcomeTier(tier) : tier ? `${tier} outcome` : "Outcome unavailable";
+
+    if (tierEl) {
+      tierEl.textContent = tierLabel;
+      tierEl.className = `outcome-tier-badge tier-${tier || "unknown"}`;
+    }
+    if (headlineEl) {
+      const hl = String(latest?.headline || "").trim();
+      headlineEl.textContent = hl || (raw ? "Outcome recorded." : "No outcomes recorded yet.");
+    }
+
+    if (badgesEl) {
+      badgesEl.innerHTML = "";
+      const badges = Array.isArray(latest?.badges) ? latest.badges : [];
+      for (const b of badges.slice(0, 6)) {
+        const t = String(b || "").trim();
+        if (!t) continue;
+        const chip = document.createElement("span");
+        chip.className = "meta-chip";
+        chip.textContent = t.replaceAll("_", " ");
+        badgesEl.appendChild(chip);
+      }
+    }
+
+    if (moneyEl) {
+      const refund = Number(latest?.money?.refund || 0) || 0;
+      const credit = Number(latest?.money?.credit || 0) || 0;
+      const bits = [];
+      if (refund > 0) bits.push(`Refund ${formatMoney(refund)}`);
+      if (credit > 0) bits.push(`Credit ${formatMoney(credit)}`);
+      moneyEl.textContent = bits.length ? bits.join(" · ") : "";
+      moneyEl.classList.toggle("is-hidden", !bits.length);
+    }
+
+    if (gridEl) {
+      gridEl.innerHTML = "";
+      const s = norm.summary || {};
+      const keys = ["excellent", "good", "neutral", "bad", "ticket_reopened", "refund_reversed", "dispute_filed"];
+      for (const k of keys) {
+        const v = Number(s[k] || 0) || 0;
+        if (v <= 0 && (k === "refund_reversed" || k === "dispute_filed")) continue;
+        const cell = document.createElement("div");
+        cell.className = "outcome-metric";
+        const label = fmt?.formatOutcomeMetricLabel ? fmt.formatOutcomeMetricLabel(k) : k;
+        cell.innerHTML = `
+          <div class="outcome-metric-label">${escapeHtml(label)}</div>
+          <div class="outcome-metric-value">${escapeHtml(String(v))}</div>
+        `;
+        gridEl.appendChild(cell);
+      }
+
+      const hasAny = gridEl.children.length > 0;
+      gridEl.classList.toggle("is-hidden", !hasAny);
+    }
+
+    if (insightsEl) {
+      insightsEl.innerHTML = "";
+      const lines = Array.isArray(norm.insights) ? norm.insights : [];
+      for (const line of lines.slice(0, 3)) {
+        const t = String(line || "").trim();
+        if (!t) continue;
+        const row = document.createElement("div");
+        row.className = "outcome-insight";
+        row.textContent = t;
+        insightsEl.appendChild(row);
+      }
+      insightsEl.classList.toggle("is-hidden", insightsEl.children.length === 0);
+    }
+
+    if (patternEl) {
+      const bp = norm.bestPattern;
+      if (bp && bp.pattern_key) {
+        const pk = fmt?.formatPatternKey ? fmt.formatPatternKey(bp.pattern_key) : String(bp.pattern_key);
+        const exp = String(bp.expectation || "medium").toLowerCase();
+        const expLabel = exp === "high" ? "high expectation" : exp === "low" ? "low expectation" : "medium expectation";
+        patternEl.innerHTML = `<span class="outcome-pattern-label">Best pattern</span> ${escapeHtml(pk)} <span class="outcome-pattern-exp">${escapeHtml(expLabel)}</span>`;
+        patternEl.classList.remove("is-hidden");
+      } else {
+        patternEl.textContent = "";
+        patternEl.classList.add("is-hidden");
+      }
+    }
+  }
+
   function updateLatestRunCard(data = {}) {
     ensureOpsCard();
 
@@ -5637,6 +5777,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       refreshUpgradeValueSummary();
       updateRefundUI();
       syncAnalyticsRail();
+      syncOutcomeIntelligenceRail(data);
     } catch {
       setText(els.statInteractions, formatMetric(state.totalInteractions, 0));
       setText(els.statQuality, formatMetric(state.avgQuality, 2));
@@ -6494,6 +6635,7 @@ function bindEvents() {
     globalThis.addEventListener?.("xalvion:phase2-ready", () => {
       syncPhase2Stores();
       syncAnalyticsRail();
+      syncOutcomeIntelligenceRail();
     });
 
     let phase2Core = null;
@@ -6515,6 +6657,7 @@ function bindEvents() {
     hydrateStripeCallbackState();
     buildKeyboardOverlay();
     ensureOpsCard();
+    ensureOutcomeIntelCard();
     bindEvents();
     bindPremiumDetailsInteractions();
     initWorkspaceChromeShell();

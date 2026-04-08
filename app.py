@@ -2633,7 +2633,7 @@ def dashboard_summary(
         metrics = get_metrics()
     except Exception:
         metrics = dict(_METRICS_FALLBACK)
-    return {
+    payload: dict[str, Any] = {
         "ok": True,
         "usage": usage,
         "value_generated": {
@@ -2643,6 +2643,19 @@ def dashboard_summary(
         "metrics": metrics,
         "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
     }
+
+    # Outcome intelligence (additive, optional): never break summary if unavailable.
+    try:
+        from outcome_store import outcome_intelligence_snapshot
+
+        oi = outcome_intelligence_snapshot(limit=25)
+        if oi:
+            payload["outcome_intelligence"] = oi
+    except Exception:
+        # Silent fallback: dashboard summary must never fail due to outcome stats.
+        pass
+
+    return payload
 
 
 def _build_extension_meta(

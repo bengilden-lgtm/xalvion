@@ -194,6 +194,170 @@ svg{
   overflow: hidden;
 }
 
+/* -------------------------------------------------------------------------
+   Outcome intelligence surface (additive, compact, premium)
+   ------------------------------------------------------------------------- */
+
+.outcome-intel-card{
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--surface) 92%, black 0%), color-mix(in oklab, var(--bg) 92%, black 0%));
+  border-radius: var(--r-lg);
+  padding: var(--s-4);
+  box-shadow: var(--shadow-1);
+  margin-top: var(--s-4);
+}
+
+.outcome-intel-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+
+.outcome-intel-latest{
+  border: 1px solid color-mix(in oklab, var(--border) 86%, transparent);
+  background: color-mix(in oklab, white 3.5%, transparent);
+  border-radius: var(--r-md);
+  padding: var(--s-3);
+}
+
+.outcome-intel-latest-row{
+  display:flex;
+  align-items:center;
+  gap: var(--s-2);
+}
+
+.outcome-intel-headline{
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.outcome-tier-badge{
+  display:inline-flex;
+  align-items:center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, white 2.5%, transparent);
+  color: color-mix(in oklab, var(--text) 92%, var(--text-muted));
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  flex-shrink: 0;
+}
+
+.outcome-tier-badge.tier-excellent{
+  border-color: color-mix(in oklab, var(--success) 45%, var(--border));
+  background: color-mix(in oklab, var(--success) 12%, transparent);
+}
+.outcome-tier-badge.tier-good{
+  border-color: color-mix(in oklab, var(--success) 32%, var(--border));
+  background: color-mix(in oklab, var(--success) 8%, transparent);
+}
+.outcome-tier-badge.tier-neutral{
+  border-color: color-mix(in oklab, var(--warning) 34%, var(--border));
+  background: color-mix(in oklab, var(--warning) 10%, transparent);
+}
+.outcome-tier-badge.tier-bad{
+  border-color: color-mix(in oklab, var(--danger) 38%, var(--border));
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+}
+.outcome-tier-badge.tier-unknown{
+  opacity: .9;
+}
+
+.outcome-intel-badges{
+  margin-top: var(--s-2);
+  display:flex;
+  flex-wrap:wrap;
+  gap: var(--s-2);
+}
+
+.outcome-intel-money{
+  margin-top: var(--s-2);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.outcome-intel-money.is-hidden{ display:none; }
+
+.outcome-metric-grid{
+  margin-top: var(--s-3);
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-2);
+}
+.outcome-metric-grid.is-hidden{ display:none; }
+
+.outcome-metric{
+  border: 1px solid color-mix(in oklab, var(--border) 86%, transparent);
+  background: color-mix(in oklab, white 2.8%, transparent);
+  border-radius: var(--r-md);
+  padding: 10px 10px;
+}
+
+.outcome-metric-label{
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: .01em;
+}
+
+.outcome-metric-value{
+  margin-top: 2px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.outcome-insights{
+  margin-top: var(--s-3);
+  display:flex;
+  flex-direction:column;
+  gap: 6px;
+}
+.outcome-insights.is-hidden{ display:none; }
+
+.outcome-insight{
+  font-size: 12.5px;
+  color: color-mix(in oklab, var(--text) 88%, var(--text-muted));
+  line-height: 1.45;
+}
+
+.outcome-pattern{
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.outcome-pattern.is-hidden{ display:none; }
+
+.outcome-pattern-label{
+  color: color-mix(in oklab, var(--text) 90%, var(--text-muted));
+  font-weight: 650;
+  margin-right: 6px;
+}
+.outcome-pattern-exp{
+  margin-left: 6px;
+  display:inline-flex;
+  align-items:center;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--accent) 24%, var(--border));
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  color: color-mix(in oklab, var(--text) 92%, var(--text-muted));
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .workspace-body{
   flex: 1;
   min-height: 0;

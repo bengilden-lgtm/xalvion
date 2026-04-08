@@ -146,6 +146,9 @@ def get_metrics() -> dict[str, Any]:
 
         approval_rate = 0.0
         good_excellent_outcome_rate = 0.0
+        outcome_quality_mix: dict[str, int] | None = None
+        recent_risk_events: int | None = None
+        reviewed_motion_rate: float | None = None
         try:
             from outcome_store import get_outcome_stats as _outcome_stats
 
@@ -153,6 +156,30 @@ def get_metrics() -> dict[str, Any]:
             ot = max(1, int(ost.get("total", 0) or 0))
             approval_rate = round(float(ost.get("human_approved", 0) or 0) / ot * 100, 2)
             good_excellent_outcome_rate = float(ost.get("good_excellent_outcome_rate", 0.0) or 0.0)
+
+            # Optional enrichments for workspace intelligence surfaces.
+            try:
+                from outcome_store import summarize_recent_outcomes as _summ_recent
+
+                mix = _summ_recent(limit=50)
+                if isinstance(mix, dict):
+                    outcome_quality_mix = {
+                        "excellent": int(mix.get("excellent", 0) or 0),
+                        "good": int(mix.get("good", 0) or 0),
+                        "neutral": int(mix.get("neutral", 0) or 0),
+                        "bad": int(mix.get("bad", 0) or 0),
+                    }
+                    recent_risk_events = int(mix.get("refund_reversed", 0) or 0) + int(mix.get("dispute_filed", 0) or 0) + int(mix.get("ticket_reopened", 0) or 0)
+            except Exception:
+                outcome_quality_mix = None
+                recent_risk_events = None
+
+            try:
+                total = float(ost.get("total", 0) or 0)
+                human = float(ost.get("human_approved", 0) or 0)
+                reviewed_motion_rate = round((human / max(1.0, total)) * 100, 2)
+            except Exception:
+                reviewed_motion_rate = None
         except Exception:
             global _outcome_stats_enrich_fail_logged
             if not _outcome_stats_enrich_fail_logged:
@@ -175,6 +202,10 @@ def get_metrics() -> dict[str, Any]:
             "revenue_saved": revenue_saved,
             "refund_cost": round(float(refund_cost), 2),
             "good_excellent_outcome_rate": round(good_excellent_outcome_rate, 2),
+            # Optional additions: safe for old clients (ignored if unknown).
+            "outcome_quality_mix": outcome_quality_mix,
+            "recent_risk_events": recent_risk_events,
+            "reviewed_motion_rate": reviewed_motion_rate,
         }
     except SQLTimeoutError as exc:
         _log_metrics_pool_timeout_once(exc)

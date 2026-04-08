@@ -75,6 +75,124 @@
         const k = String(label || "").toLowerCase();
         return map[k] || label || "—";
       },
+      formatOutcomeTier(labelOrTier) {
+        const map = {
+          excellent: "Excellent outcome",
+          good: "Good outcome",
+          neutral: "Neutral outcome",
+          bad: "Poor outcome",
+          unknown: "Outcome unavailable",
+        };
+        const k = String(labelOrTier || "").toLowerCase();
+        return map[k] || (k ? `${k.charAt(0).toUpperCase()}${k.slice(1)} outcome` : "Outcome unavailable");
+      },
+      formatOutcomeMetricLabel(key) {
+        const map = {
+          excellent: "Excellent",
+          good: "Good",
+          neutral: "Neutral",
+          bad: "Poor",
+          auto_success: "Auto success",
+          assisted_success: "Assisted success",
+          failed: "Failed",
+          ticket_reopened: "Reopened",
+          refund_reversed: "Reversed",
+          dispute_filed: "Disputes",
+          crm_closed: "CRM closed",
+          money_refunded: "Refunded",
+          money_credited: "Credited",
+        };
+        const k = String(key || "").toLowerCase();
+        if (map[k]) return map[k];
+        return k ? k.replaceAll("_", " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "";
+      },
+      formatPatternKey(patternKey) {
+        const raw = String(patternKey || "").trim();
+        if (!raw) return "";
+        // Expected format from learning.py: issue:action:risk:tier
+        const parts = raw.split(":");
+        if (parts.length === 4) {
+          const [issue, action, risk, tier] = parts;
+          const issueLabel = String(issue || "").replaceAll("_", " ");
+          return `${issueLabel}:${action}:${risk}:${tier}`;
+        }
+        return raw;
+      },
+      normalizeOutcomeIntelligence(data) {
+        const d = data && typeof data === "object" ? data : {};
+        const latest = d.latest && typeof d.latest === "object" ? d.latest : null;
+        const summary = d.summary && typeof d.summary === "object" ? d.summary : {};
+        const insights = Array.isArray(d.insights) ? d.insights.filter((x) => typeof x === "string" && x.trim()) : [];
+        const bestPattern = d.best_pattern && typeof d.best_pattern === "object" ? d.best_pattern : null;
+        const safeLatest =
+          latest && typeof latest === "object"
+            ? {
+                headline: String(latest.headline || "").trim(),
+                tier: String(latest.tier || "unknown").toLowerCase(),
+                score: latest.score === null || typeof latest.score === "undefined" ? null : Number(latest.score),
+                badges: Array.isArray(latest.badges) ? latest.badges.map((b) => String(b || "").trim()).filter(Boolean).slice(0, 6) : [],
+                money: {
+                  refund: Number(latest.money?.refund || 0) || 0,
+                  credit: Number(latest.money?.credit || 0) || 0,
+                },
+                flags: latest.flags && typeof latest.flags === "object" ? latest.flags : {},
+              }
+            : null;
+
+        const coerceNum = (v) => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : 0;
+        };
+
+        const safeSummary = {
+          excellent: Math.max(0, Math.floor(coerceNum(summary.excellent))),
+          good: Math.max(0, Math.floor(coerceNum(summary.good))),
+          neutral: Math.max(0, Math.floor(coerceNum(summary.neutral))),
+          bad: Math.max(0, Math.floor(coerceNum(summary.bad))),
+          auto_success: Math.max(0, Math.floor(coerceNum(summary.auto_success))),
+          assisted_success: Math.max(0, Math.floor(coerceNum(summary.assisted_success))),
+          failed: Math.max(0, Math.floor(coerceNum(summary.failed))),
+          ticket_reopened: Math.max(0, Math.floor(coerceNum(summary.ticket_reopened))),
+          refund_reversed: Math.max(0, Math.floor(coerceNum(summary.refund_reversed))),
+          dispute_filed: Math.max(0, Math.floor(coerceNum(summary.dispute_filed))),
+          crm_closed: Math.max(0, Math.floor(coerceNum(summary.crm_closed))),
+          money_refunded: Math.max(0, coerceNum(summary.money_refunded)),
+          money_credited: Math.max(0, coerceNum(summary.money_credited)),
+        };
+
+        const safeBest =
+          bestPattern
+            ? {
+                pattern_key: String(bestPattern.pattern_key || "").trim(),
+                expectation: String(bestPattern.expectation || "medium").toLowerCase(),
+                ema_score: bestPattern.ema_score === null || typeof bestPattern.ema_score === "undefined" ? null : Number(bestPattern.ema_score),
+                sample_count: Math.max(0, Math.floor(coerceNum(bestPattern.sample_count))),
+              }
+            : null;
+
+        return {
+          latest: safeLatest,
+          summary: safeSummary,
+          insights: insights.slice(0, 3),
+          bestPattern: safeBest,
+        };
+      },
+      formatOutcomeSummaryLine(snapshot) {
+        const d = snapshot && typeof snapshot === "object" ? snapshot : {};
+        const s = d.summary && typeof d.summary === "object" ? d.summary : {};
+        const ex = Number(s.excellent || 0) || 0;
+        const g = Number(s.good || 0) || 0;
+        const n = Number(s.neutral || 0) || 0;
+        const b = Number(s.bad || 0) || 0;
+        const total = ex + g + n + b;
+        if (total <= 0) return "";
+        const bits = [];
+        if (ex) bits.push(`${ex} excellent`);
+        if (g) bits.push(`${g} good`);
+        if (b) bits.push(`${b} poor`);
+        if (!bits.length) bits.push(`${n} neutral`);
+        return `Recent outcomes: ${bits.join(" · ")}`;
+      },
       buildExplanationSummary(explanation) {
         if (!explanation || typeof explanation !== "object") return "";
         const s = explanation.summary;
