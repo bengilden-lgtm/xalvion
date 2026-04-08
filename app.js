@@ -162,7 +162,10 @@ if (typeof window.pulseRail !== "function") {
     sidebarRevenueWin: document.getElementById("sidebarRevenueWin"),
     sidebarRevenueSource: document.getElementById("sidebarRevenueSource"),
     sidebarJumpCrmBtn: document.getElementById("sidebarJumpCrmBtn"),
-    sidebarJumpRevenueBtn: document.getElementById("sidebarJumpRevenueBtn")
+    sidebarJumpRevenueBtn: document.getElementById("sidebarJumpRevenueBtn"),
+    accessDrawer: document.getElementById("accessDrawer"),
+    accessDrawerBody: document.getElementById("accessDrawerBody"),
+    closeAccessDrawerBtn: document.getElementById("closeAccessDrawerBtn")
   };
 
   const state = {
@@ -2746,17 +2749,37 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       </div>`;
   }
 
-  function focusAccessPanel() {
-    const accessTab = els.sidebarShell?.querySelector?.('[data-sidebar-tab="account"]');
-    if (accessTab) accessTab.click();
-    els.usernameInput?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-    window.setTimeout(() => els.usernameInput?.focus?.(), 120);
+  function openAccessDrawer(target = "account") {
+    const drawer = els.accessDrawer;
+    if (!drawer) return;
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden", "false");
+
+    const map = {
+      account: "accessDrawerSectionAccount",
+      plans: "accessDrawerSectionPlans",
+      integrations: "accessDrawerSectionIntegrations"
+    };
+    const id = map[target] || map.account;
+    window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      if (target === "account") window.setTimeout(() => els.usernameInput?.focus?.(), 80);
+    }, 60);
+  }
+
+  function closeAccessDrawer() {
+    const drawer = els.accessDrawer;
+    if (!drawer) return;
+    drawer.classList.remove("open");
+    drawer.setAttribute("aria-hidden", "true");
+  }
+
+  function focusAccessPanel(target = "account") {
+    openAccessDrawer(target);
   }
 
   function focusPlansPanel() {
-    const plansTab = els.sidebarShell?.querySelector?.('[data-sidebar-tab="plans"]');
-    if (plansTab) plansTab.click();
-    document.getElementById("sidebarPanelPlans")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    openAccessDrawer("plans");
   }
 
   function bindEmptyStateActions(empty) {
@@ -4981,6 +5004,25 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     initSidebarCollapse();
     initSidebarNav();
     initRailBriefToggles();
+    initAccessDrawer();
+  }
+
+  function initAccessDrawer() {
+    const drawer = els.accessDrawer;
+    if (!drawer || drawer.dataset.accessDrawerBound) return;
+    drawer.dataset.accessDrawerBound = "1";
+
+    const onBackdrop = (e) => {
+      if (e.target === drawer) closeAccessDrawer();
+    };
+    drawer.addEventListener("click", onBackdrop);
+    drawer.addEventListener("mousedown", onBackdrop);
+
+    els.closeAccessDrawerBtn?.addEventListener("click", closeAccessDrawer);
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && drawer.classList.contains("open")) closeAccessDrawer();
+    });
   }
 
   function initSidebarCollapse() {
@@ -5060,17 +5102,34 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         }
       });
       shell.dataset.sidebarActive = key;
-      const scrollArea = document.getElementById("sidebarScroll");
-      if (scrollArea) scrollArea.scrollTop = 0;
       try {
         sessionStorage.setItem("xalvion-sidebar-tab", key);
       } catch {}
     };
 
     tabs.forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
         expandIfClaudeRail();
-        applyTab(btn.getAttribute("data-sidebar-tab") || "workspace");
+        const key = btn.getAttribute("data-sidebar-tab") || "workspace";
+        if (key === "account") {
+          e.preventDefault();
+          e.stopPropagation();
+          openAccessDrawer("account");
+          return;
+        }
+        if (key === "plans") {
+          e.preventDefault();
+          e.stopPropagation();
+          openAccessDrawer("plans");
+          return;
+        }
+        if (key === "integrations") {
+          e.preventDefault();
+          e.stopPropagation();
+          openAccessDrawer("integrations");
+          return;
+        }
+        applyTab(key);
       });
     });
 
