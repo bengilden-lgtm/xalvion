@@ -138,6 +138,30 @@ def list_tickets(
     }
 
 
+@router.get("/tickets/recent")
+def recent_tickets(
+    limit: int = 5,
+    user: app_mod.User = Depends(app_mod.get_current_user),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
+    db: Session = Depends(app_mod.get_db),
+):
+    limit = max(1, min(int(limit or 5), 10))
+    username = getattr(user, "username", "") or ""
+
+    # Authenticated users: scope to account (admin can see own only here; list_tickets supports admin browse).
+    if username and username not in {"guest", "dev_user"}:
+        q = db.query(app_mod.Ticket).filter(app_mod.Ticket.username == username)
+    else:
+        guest_client_id = app_mod.normalize_guest_client_id(x_guest_client)
+        if not guest_client_id:
+            return {"items": [], "tickets": []}
+        q = db.query(app_mod.Ticket).filter(app_mod.Ticket.username == guest_client_id)
+
+    rows = q.order_by(app_mod.Ticket.updated_at.desc(), app_mod.Ticket.id.desc()).limit(limit).all()
+    items = [app_mod.serialize_ticket(r) for r in rows]
+    return {"items": items, "tickets": items}
+
+
 @router.get("/tickets/queues")
 def ticket_queue_counts(
     user: app_mod.User = Depends(app_mod.get_current_user),

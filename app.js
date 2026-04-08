@@ -197,8 +197,98 @@ if (typeof window.pulseRail !== "function") {
     atLimit: false,
     valueSignals: null,
     dashboardStats: null,
-    automationUpsellShown: false
+    automationUpsellShown: false,
+    recentTickets: [],
+    lastSessionAt: Number(localStorage.getItem("xalvion-last-session-at") || 0) || 0,
+    postApprovalNudgesShown: 0
   };
+
+  function setLastSessionNow() {
+    const now = Date.now();
+    state.lastSessionAt = now;
+    try {
+      localStorage.setItem("xalvion-last-session-at", String(now));
+    } catch {}
+  }
+
+  function effectiveTicketCount() {
+    if (!isAuthenticated()) return Math.max(0, getGuestUsage());
+    const vs = state.valueSignals;
+    const fromSignals = vs && typeof vs.tickets_handled === "number" ? Number(vs.tickets_handled) : NaN;
+    if (Number.isFinite(fromSignals) && fromSignals >= 0) return Math.floor(fromSignals);
+    return Math.max(0, Number(state.usage || 0) || 0);
+  }
+
+  function momentumLine() {
+    const n = effectiveTicketCount();
+    if (n <= 0) return "";
+    if (n === 1) return "You’ve resolved 1 issue with Xalvion.";
+    if (n <= 3) return "You’re speeding up your workflow.";
+    if (n <= 5) return "You’re saving time on support already.";
+    return `You’ve handled ${n} tickets with Xalvion.`;
+  }
+
+  function estimateTimeSavedMinutes() {
+    // Conservative heuristic. We also read real server metrics when available elsewhere.
+    const n = effectiveTicketCount();
+    return Math.max(0, Math.round(n * 3));
+  }
+
+  async function fetchRecentTickets(limit = 5) {
+    try {
+      const res = await fetch(`${API}/tickets/recent?limit=${encodeURIComponent(String(limit))}`, {
+        method: "GET",
+        headers: headers(),
+      });
+      if (!res.ok) return [];
+      const data = await res.json().catch(() => ({}));
+      const items = Array.isArray(data?.items) ? data.items : Array.isArray(data?.tickets) ? data.tickets : [];
+      return items.filter((t) => t && typeof t === "object").slice(0, limit);
+    } catch {
+      return [];
+    }
+  }
+
+  function setRecentTickets(items) {
+    state.recentTickets = Array.isArray(items) ? items.slice(0, 5) : [];
+    try {
+      const slim = state.recentTickets.map((t) => ({
+        id: t.id,
+        updated_at: t.updated_at,
+        issue_type: t.issue_type,
+        queue: t.queue,
+        status: t.status,
+        subject: t.subject,
+        customer_message: typeof t.customer_message === "string" ? t.customer_message.slice(0, 220) : "",
+      }));
+      localStorage.setItem("xalvion-recent-tickets", JSON.stringify(slim));
+    } catch {}
+  }
+
+  function loadRecentTicketsFromCache() {
+    try {
+      const raw = localStorage.getItem("xalvion-recent-tickets");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.slice(0, 5) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function hydrateRecentTickets() {
+    // Render immediately from cache, then refresh from server.
+    const cached = loadRecentTicketsFromCache();
+    if (cached.length) {
+      state.recentTickets = cached;
+      refreshEmptyStateContent();
+    }
+    const items = await fetchRecentTickets(5);
+    if (items.length) {
+      setRecentTickets(items);
+      refreshEmptyStateContent();
+    }
+  }
 
   function getPhase2() {
     return typeof globalThis !== "undefined" ? globalThis.__XALVION_PHASE2__ : null;
@@ -2676,13 +2766,53 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     }
 
     if (isClaudeShell()) {
+      const name = openingDisplayName();
+      const greet = openingTimeGreeting();
+      const recents = Array.isArray(state.recentTickets) ? state.recentTickets : [];
+      const hasRecents = recents.length > 0;
+      const momentum = momentumLine();
+      const savedMin = estimateTimeSavedMinutes();
+      const subMomentum =
+        momentum
+          ? `<div class="xv-momentum-line">${escapeHtml(momentum)}${savedMin > 0 ? ` <span class="xv-momentum-sub">Estimated time saved: ${savedMin} minutes</span>` : ""}</div>`
+          : "";
+      const recentList = hasRecents
+        ? `<div class="xv-recent-block" aria-label="Recent tickets">
+            <div class="xv-recent-head">
+              <div class="xv-recent-title">Continue where you left off</div>
+              <button type="button" class="xv-recent-cta" data-act="continue-last">Continue last case</button>
+            </div>
+            <div class="xv-recent-list">
+              ${recents
+                .slice(0, 5)
+                .map((t) => {
+                  const id = Number(t.id || 0) || 0;
+                  const msg = String(t.customer_message || "").trim();
+                  const preview = msg ? msg.replace(/\s+/g, " ").slice(0, 110) : String(t.subject || "").slice(0, 110);
+                  const meta = [t.issue_type, t.queue].filter(Boolean).join(" · ");
+                  return `
+                    <button type="button" class="xv-recent-item" data-act="recent-open" data-ticket-id="${escapeHtml(String(id || ""))}">
+                      <div class="xv-recent-item-top">
+                        <span class="xv-recent-item-id">#${escapeHtml(String(id || "—"))}</span>
+                        <span class="xv-recent-item-meta">${escapeHtml(meta || "Recent")}</span>
+                      </div>
+                      <div class="xv-recent-item-preview">${escapeHtml(preview || "Open ticket")}</div>
+                    </button>
+                  `;
+                })
+                .join("")}
+            </div>
+          </div>`
+        : "";
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-card-onboarding" role="status">
-        <h2 class="cld-welcome-headline">Resolve customer issues instantly — before you reply</h2>
-        <p class="cld-welcome-prompt onboarding-subline">Paste a support ticket and let Xalvion prepare the best response and actions.</p>
+        <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""} — ready to handle tickets?`)}</h2>
+        <p class="cld-welcome-prompt onboarding-subline">Paste a support ticket. Xalvion prepares the reply and suggested actions — you approve.</p>
+        ${subMomentum}
+        ${recentList}
         <div class="onboarding-example" aria-hidden="true">
-          <div class="onboarding-example-label">Example</div>
-          <div class="onboarding-example-text">Customer says: My order hasn’t arrived and I’m frustrated</div>
+          <div class="onboarding-example-label">Operator habit</div>
+          <div class="onboarding-example-text">Use Xalvion before replying to any customer</div>
         </div>
       </div>`;
     }
@@ -2780,6 +2910,47 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     });
     empty.querySelector("#emptyFreeAccountCta")?.addEventListener("click", () => {
       focusAccessPanel();
+    });
+
+    empty.querySelector("[data-act='continue-last']")?.addEventListener("click", async () => {
+      const t = Array.isArray(state.recentTickets) ? state.recentTickets[0] : null;
+      const id = Number(t?.id || 0) || 0;
+      if (!id) return;
+      try {
+        const res = await fetch(`${API}/tickets/${id}`, { method: "GET", headers: headers(true) });
+        const data = await parseApiResponse(res);
+        if (!res.ok) return;
+        const ticket = data?.ticket || data;
+        const msg = String(ticket?.customer_message || "").trim();
+        if (msg) {
+          els.messageInput.value = msg;
+          saveDraft(msg);
+          autoResizeTextarea();
+          syncComposerDraftClass();
+          els.messageInput.focus();
+        }
+      } catch {}
+    });
+
+    empty.querySelectorAll("[data-act='recent-open']").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.getAttribute("data-ticket-id") || 0) || 0;
+        if (!id) return;
+        try {
+          const res = await fetch(`${API}/tickets/${id}`, { method: "GET", headers: headers(true) });
+          const data = await parseApiResponse(res);
+          if (!res.ok) return;
+          const ticket = data?.ticket || data;
+          const msg = String(ticket?.customer_message || "").trim();
+          if (msg) {
+            els.messageInput.value = msg;
+            saveDraft(msg);
+            autoResizeTextarea();
+            syncComposerDraftClass();
+            els.messageInput.focus();
+          }
+        } catch {}
+      });
     });
   }
 
@@ -3299,6 +3470,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       <div class="decision-panel-note" data-role="note" style="display:none"></div>
       <div class="decision-panel-error" data-role="err" style="display:none"></div>
       <div class="edit-mode-container" data-role="edit" style="display:none"></div>
+      <div class="xv-next-action" data-role="next" style="display:none"></div>
     `;
     mountTarget.appendChild(panel);
 
@@ -3309,6 +3481,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const noteEl = panel.querySelector("[data-role='note']");
     const errEl = panel.querySelector("[data-role='err']");
     const editWrap = panel.querySelector("[data-role='edit']");
+    const nextWrap = panel.querySelector("[data-role='next']");
 
     const showErr = (t) => {
       errEl.textContent = t || "";
@@ -3332,12 +3505,106 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         noteEl.style.display = "none";
         noteEl.dataset.tone = "";
       }
+
+      if (nextWrap) {
+        const approved = pill === "Approved" || pill === "Sent as edited";
+        nextWrap.style.display = approved ? "block" : "none";
+        nextWrap.innerHTML = approved ? buildNextActionHtml() : "";
+        if (approved) bindNextActionHandlers(nextWrap);
+      }
     };
+
+    function buildNextActionHtml() {
+      const n = effectiveTicketCount();
+      const mins = estimateTimeSavedMinutes();
+      const momentum = momentumLine();
+      const integrationHint = n >= 2 ? "Connect your system to auto-fill tracking, refunds, and orders" : "";
+      const volumeHint = n >= 5 ? "Handling more tickets? Upgrade for higher limits" : "";
+      const tierLc = String(state.tier || "free").toLowerCase();
+      const canShowAutomation = !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev";
+      const automationBlock = canShowAutomation
+        ? `<div class="xv-next-nudge">
+            <div class="xv-next-nudge-copy">Want Xalvion to handle this automatically next time?</div>
+            <button type="button" class="xv-next-nudge-cta" data-act="enable-automation">Enable automation</button>
+          </div>`
+        : "";
+      const integrationBlock = integrationHint
+        ? `<div class="xv-next-nudge">
+            <div class="xv-next-nudge-copy">${escapeHtml(integrationHint)}.</div>
+            <button type="button" class="xv-next-nudge-cta" data-act="connect-integrations">Connect Stripe / CRM</button>
+          </div>`
+        : "";
+      const volumeBlock = volumeHint
+        ? `<div class="xv-next-nudge xv-next-nudge--subtle">
+            <div class="xv-next-nudge-copy">${escapeHtml(volumeHint)}.</div>
+            <button type="button" class="xv-next-nudge-cta" data-act="upgrade">View plans</button>
+          </div>`
+        : "";
+
+      return `
+        <div class="xv-next-success" role="status" aria-live="polite">
+          <div class="xv-next-success-title">Response approved <span aria-hidden="true">✓</span></div>
+          <div class="xv-next-success-sub">Ready to send</div>
+        </div>
+
+        <div class="xv-next-prompt">
+          <div class="xv-next-prompt-title">Handle another ticket?</div>
+          <div class="xv-next-actions" role="group" aria-label="Next actions">
+            <button type="button" class="xv-next-btn" data-act="paste-another">Paste another</button>
+            <button type="button" class="xv-next-btn xv-next-btn--ghost" data-act="simulate">Simulate new case</button>
+          </div>
+          <div class="xv-next-meta">
+            ${momentum ? `<span class="xv-next-meta-chip">${escapeHtml(momentum)}</span>` : ""}
+            ${mins > 0 ? `<span class="xv-next-meta-chip">Estimated time saved: ${escapeHtml(String(mins))} min</span>` : ""}
+            <span class="xv-next-meta-chip">For teams handling higher volume, Xalvion scales with your workflow</span>
+          </div>
+        </div>
+
+        ${automationBlock}
+        ${integrationBlock}
+        ${volumeBlock}
+      `;
+    }
+
+    function bindNextActionHandlers(host) {
+      host.querySelector("[data-act='paste-another']")?.addEventListener("click", () => {
+        els.messageInput?.focus?.();
+      });
+      host.querySelector("[data-act='simulate']")?.addEventListener("click", () => {
+        const samples = [
+          "A customer says: I was charged twice and I need a refund.",
+          "A customer says: My order is late and I’m frustrated — can you check tracking?",
+          "A customer says: The item arrived damaged. I want a replacement or refund.",
+          "A customer says: Where is my order? I can’t find an update.",
+        ];
+        const fill = samples[Math.floor(Math.random() * samples.length)] || samples[0];
+        if (fill && els.messageInput) {
+          els.messageInput.value = fill;
+          saveDraft(fill);
+          autoResizeTextarea();
+          syncComposerDraftClass();
+          els.messageInput.focus();
+        }
+      });
+      host.querySelector("[data-act='enable-automation']")?.addEventListener("click", () => {
+        state.automationUpsellShown = true;
+        focusPlansPanel();
+        window.setTimeout(() => {
+          document.getElementById("planEliteCard")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        }, 120);
+      });
+      host.querySelector("[data-act='connect-integrations']")?.addEventListener("click", () => {
+        setSurface("integrations");
+      });
+      host.querySelector("[data-act='upgrade']")?.addEventListener("click", () => {
+        focusPlansPanel();
+      });
+    }
 
     const postPill = row.dataset.opPostPill;
     if (postPill) {
       delete row.dataset.opPostPill;
-      setTerminal(postPill, "✓  Sent to customer");
+      setTerminal(postPill, "Ready to send");
       return;
     }
     const tst = String(data.tool_status || "").toLowerCase();
@@ -3347,7 +3614,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       return;
     }
     if (approval.approved) {
-      setTerminal("Approved", "✓  Sent to customer");
+      setTerminal("Approved", "Ready to send");
       return;
     }
 
@@ -3538,7 +3805,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           }
           return;
         }
-        setTerminal("Approved", "✓  Sent to customer");
+        setTerminal("Approved", "Ready to send");
         setNotice("success", "Cleared", "Operator cleared this response — copy when ready.");
       });
     };
@@ -3862,7 +4129,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!els.composerStatusLine || state.sending) return;
     const hasThread = Boolean(els.messages?.querySelector(".msg-group"));
     if (isClaudeShell() && hasThread) {
-      els.composerStatusLine.textContent = "";
+      const m = momentumLine();
+      els.composerStatusLine.textContent = m ? m : "";
       syncComposerAriaDescribedBy();
       return;
     }
@@ -3881,14 +4149,18 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     if (!isAuthenticated()) {
       const left = Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage());
       const rw = left === 1 ? "run" : "runs";
+      const m = momentumLine();
       els.composerStatusLine.textContent =
         left > 0
-          ? `Review the draft, then send another · ${left} preview ${rw} left`
+          ? `${m ? `${m} ` : ""}Review the draft, then send another · ${left} preview ${rw} left`
           : "Preview finished — sign in under Access to continue.";
       syncComposerAriaDescribedBy();
       return;
     }
-    els.composerStatusLine.textContent = "Next ticket, or refine this thread.";
+    {
+      const m = momentumLine();
+      els.composerStatusLine.textContent = m ? `${m} Next ticket?` : "Next ticket, or refine this thread.";
+    }
     syncComposerAriaDescribedBy();
   }
 
@@ -4536,6 +4808,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
       data = normalizeWorkspaceResult(data);
       state.latestRun = data;
+      setLastSessionNow();
 
       const replyText = data.reply || data.response || data.final || "No response returned.";
       setAssistantCopy(row, replyText);
@@ -4552,7 +4825,6 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         addCopyControl(toolsWrap, replyText, row);
         footer.appendChild(toolsWrap);
         footer.appendChild(wrapAssistantMetaFold(createMetaRow(data)));
-        maybeMountAutomationUpsell(row, replyText);
 
         if (briefSlot) {
           briefSlot.innerHTML = "";
@@ -4577,6 +4849,9 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       updateRevenueCard(data);
       updateLatestRunCard(data);
       updateSystemNarrative(data);
+      // Refresh recent tickets quietly (return trigger).
+      // Prefer server truth when available, but keep working if offline.
+      hydrateRecentTickets().catch(() => {});
 
       const hasServerUsage = Number.isFinite(Number(data.usage));
       const planTier = data.tier || state.tier;
@@ -5864,6 +6139,7 @@ function bindEvents() {
     updateRefundUI();
     renderRefundHistory([]);
     addEmptyState();
+    hydrateRecentTickets().catch(() => {});
     scrollMessagesToBottom(true);
     setSending(false);
 
