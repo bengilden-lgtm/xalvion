@@ -333,8 +333,8 @@ if (typeof window.pulseRail !== "function") {
             /* Thinner, calmer left rail with tighter icon rhythm */
             body[data-ui="claude"] #sidebarShell{
               padding: 8px 8px 12px !important;
-              background: rgba(14, 14, 18, 0.97) !important;
-              border-right-color: rgba(255,255,255,0.04) !important;
+              background: var(--surface) !important;
+              border-right-color: var(--border) !important;
             }
             body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"]{
               padding: 10px 5px 12px !important;
@@ -1015,14 +1015,15 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       const usageLine = `${getEffectiveUsage(state.usage)} / ${getEffectiveLimit(state.tier, state.limit)} used`;
       const primaryLabel = isAuthenticated() ? "Upgrade" : "Create free account";
       const secondaryLabel = isAuthenticated() ? "See plans" : "Log in";
+      const eyebrow = !isAuthenticated() ? "Preview" : "Capacity";
       banner.innerHTML = `
-        <div class="inline-limit-eyebrow">Preview</div>
+        <div class="inline-limit-eyebrow">${escapeHtml(eyebrow)}</div>
         <div class="inline-limit-title">${escapeHtml(title)}</div>
         <div class="inline-limit-detail">${escapeHtml(detail)}</div>
         <div class="inline-limit-actions">
           <button type="button" class="btn inline-limit-primary" id="inlineLimitPrimary">${escapeHtml(primaryLabel)}</button>
           <button type="button" class="ghost-btn inline-limit-secondary" id="inlineLimitSecondary">${escapeHtml(secondaryLabel)}</button>
-          <span class="muted-copy" style="margin-left:auto;align-self:center">${escapeHtml(usageLine)}</span>
+          <span class="muted-copy inline-limit-usage">${escapeHtml(usageLine)}</span>
         </div>
       `;
       banner.hidden = false;
@@ -2431,22 +2432,27 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function createTypingMarkup() {
     return `
-      <span class="xalvion-typing-sovereign" aria-hidden="true">
-        <span class="xalvion-sovereign-mark xalvion-sovereign-mark--xs xv-spark-mark" aria-hidden="true"><span class="xv-signal-rays" aria-hidden="true"></span><span class="xv-spark-orbit" aria-hidden="true"></span></span>
+      <span class="xv-thinking-block typing" aria-live="polite" aria-busy="true">
+        <span class="xv-thinking-text">Xalvion is thinking</span>
+        <span class="xv-thinking-dots" aria-hidden="true">
+          <span class="xv-thinking-dot"></span>
+          <span class="xv-thinking-dot"></span>
+          <span class="xv-thinking-dot"></span>
+        </span>
       </span>
     `;
   }
 
   function getUserBadge() {
     return `
-      <span class="msg-badge">${ICONS.person}</span>
+      <span class="msg-identity" aria-hidden="true">${ICONS.person}</span>
       <span>Customer</span>
     `;
   }
 
   function getAssistantBadge() {
     return `
-      <span class="msg-badge">${ICONS.spark}</span>
+      <span class="msg-identity" aria-hidden="true">${ICONS.spark}</span>
       <span>Xalvion</span>
     `;
   }
@@ -2708,7 +2714,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const card = row?.querySelector(".msg-card");
     const node = getAssistantCopyNode(row);
     const txt = (node?.textContent || "").trim();
-    const typing = node?.querySelector?.(".xalvion-typing-sovereign");
+    const typing = node?.querySelector?.(".xalvion-typing-sovereign, .xv-thinking-block");
     const looksLikeError = /something went wrong|request failed|no response returned|plan limit reached/i.test(txt);
     rein.hidden = !txt || Boolean(typing) || card?.dataset.placeholder === "true" || looksLikeError;
   }
@@ -2729,7 +2735,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     const node = getAssistantCopyNode(row);
     if (!node) return;
 
-    if (node.querySelector(".typing")) node.innerHTML = "";
+    if (node.querySelector(".typing, .xv-thinking-block")) node.innerHTML = "";
 
     const current = node.textContent || "";
     node.innerHTML = escapeHtml(current + chunk).replace(/\n/g, "<br>");
@@ -3673,9 +3679,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     els.workspaceRoot?.setAttribute("aria-busy", state.sending ? "true" : "false");
 
     if (els.composerStatusLine) {
-      els.composerStatusLine.textContent = state.sending
-        ? "Drafting customer-ready reply and operator brief…"
-        : "";
+      els.composerStatusLine.textContent = state.sending ? "Working on a reply…" : "";
       if (!state.sending) refreshComposerIdleHint();
       els.composerStatusLine.classList.toggle("composer-status-live", state.sending);
     }
