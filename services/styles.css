@@ -2636,6 +2636,24 @@ details > summary{ user-select:none; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
+.trust-chip-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.trust-chip{
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--line) 76%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 22%, transparent);
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
 @media (max-width: 720px){
   .plans-stack{ grid-template-columns: 1fr; }
 }

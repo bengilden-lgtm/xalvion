@@ -868,12 +868,22 @@ def get_usage_summary(user: User | None) -> dict[str, Any]:
     usage = int(getattr(user, "usage", 0) or 0)
     limit = int(plan["monthly_limit"])
     remaining = max(0, limit - usage) if limit < 10**9 else limit
+    billable_usage = max(0, usage - limit) if limit < 10**9 else 0
+    within_included = usage if limit >= 10**9 else min(usage, limit)
+    usage_pct = (usage / limit) if limit > 0 and limit < 10**9 else 0.0
+    at_limit = bool(limit < 10**9 and usage >= limit)
+    approaching_limit = bool(limit < 10**9 and usage_pct >= 0.75 and not at_limit)
     return {
         "tier": plan_name,
         "label": plan["label"],
         "usage": usage,
         "limit": limit,
         "remaining": remaining,
+        "within_included": within_included,
+        "billable_usage": billable_usage,
+        "usage_pct": usage_pct,
+        "at_limit": at_limit,
+        "approaching_limit": approaching_limit,
         "dashboard_access": plan["dashboard_access"],
         "priority_routing": plan["priority_routing"],
     }
@@ -907,15 +917,9 @@ def enforce_plan_limits(user: User) -> None:
 
     if not check_rate_limit(user.username):
         raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
-
-    usage = int(getattr(user, "usage", 0) or 0)
-    limit = int(plan["monthly_limit"])
-    if usage >= limit:
-        raise HTTPException(
-            status_code=402,
-            detail=f"{plan['label']} plan limit reached. Used {usage}/{limit} tickets. Upgrade to continue.",
-            headers={"X-Xalvion-Plan": plan_name, "X-Xalvion-Limit": str(limit)},
-        )
+    # NOTE: We never hard-block after plan limits. Overages are marked as billable usage
+    # (front-end surfaces the notice), while rate limits still protect the service.
+    _ = (plan_name, plan)
 
 
 _guest_preview_lock = threading.Lock()
@@ -946,7 +950,11 @@ def _guest_preview_exhausted_detail(used: int) -> dict[str, Any]:
 
 
 def enforce_guest_preview_allow(client_id: str | None) -> None:
-    """Block unauthenticated support runs when preview quota is exhausted (source of truth: DB)."""
+    """Do not hard-block guest preview usage; keep experience continuous.
+
+    Abuse protection remains via `check_rate_limit` and the guest preview counter is still incremented
+    so the UI can surface upgrade nudges and billable overage semantics.
+    """
     gid = normalize_guest_client_id(client_id)
     if not gid:
         raise HTTPException(
@@ -959,9 +967,7 @@ def enforce_guest_preview_allow(client_id: str | None) -> None:
     with _guest_preview_lock:
         with db_session() as db:
             row = db.query(GuestPreviewUsage).filter(GuestPreviewUsage.client_id == gid).first()
-            used = int(row.usage_count) if row else 0
-            if used >= GUEST_PREVIEW_OPERATOR_LIMIT:
-                raise HTTPException(status_code=402, detail=_guest_preview_exhausted_detail(used))
+            _ = int(row.usage_count) if row else 0
 
 
 def bump_guest_preview_usage(client_id: str | None) -> dict[str, Any] | None:
@@ -1287,6 +1293,11 @@ def serialize_support_result(
             0,
             get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"],
         )
+    billable_usage_val = max(0, usage_val - plan_limit_val) if plan_limit_val < 10**9 else 0
+    within_included_val = usage_val if plan_limit_val >= 10**9 else min(usage_val, plan_limit_val)
+    usage_pct_val = (usage_val / plan_limit_val) if plan_limit_val > 0 and plan_limit_val < 10**9 else 0.0
+    at_limit_val = bool(plan_limit_val < 10**9 and usage_val >= plan_limit_val)
+    approaching_limit_val = bool(plan_limit_val < 10**9 and usage_pct_val >= 0.75 and not at_limit_val)
     tool_result = result.get("tool_result") or {}
     impact = result.get("impact") or {}
     reply = result.get("reply") or result.get("response") or result.get("final") or "No response"
@@ -1336,11 +1347,21 @@ def serialize_support_result(
         "plan_limit": plan_limit_val,
         "usage": usage_val,
         "remaining": remaining_val,
+        "within_included": within_included_val,
+        "billable_usage": billable_usage_val,
+        "usage_pct": usage_pct_val,
+        "at_limit": at_limit_val,
+        "approaching_limit": approaching_limit_val,
         "entitlement": {
             "kind": "guest_preview" if guest_preview else "account",
             "usage": usage_val,
             "limit": plan_limit_val,
             "remaining": remaining_val,
+            "within_included": within_included_val,
+            "billable_usage": billable_usage_val,
+            "usage_pct": usage_pct_val,
+            "at_limit": at_limit_val,
+            "approaching_limit": approaching_limit_val,
             "preview_exhausted": bool(guest_preview.get("preview_exhausted")) if guest_preview else False,
             "requires_signup": bool(guest_preview and guest_preview.get("preview_exhausted")),
         },

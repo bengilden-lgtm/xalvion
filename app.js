@@ -1069,9 +1069,11 @@ if (typeof window.pulseRail !== "function") {
     if (!isAuthenticated()) {
       return {
         key: `guest-${getEffectiveUsage(state.usage)}`,
-        title: "Continue where you left off — unlock full access",
-        detail: `You’ve seen how Xalvion prepares replies. Create a free account for ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same workflow.`,
-        body: `Continue without limits — free accounts get ${FREE_USAGE_LIMIT} runs/month, saved threads, and the same draft-and-review flow. Sign up under Access when you’re ready.`
+        title: "Preview limit reached — continue in operator mode",
+        detail: `You can keep working. Create a free account for ${FREE_USAGE_LIMIT} included runs/month, saved threads, and a persistent operator workspace.`,
+        body: `You’ve reached the preview run allowance.
+
+You can continue using the workspace — additional usage is tracked. Create a free account for ${FREE_USAGE_LIMIT} included runs/month, saved threads, and a stable workflow for support teams.`
       };
     }
 
@@ -1093,21 +1095,21 @@ if (typeof window.pulseRail !== "function") {
     if (tier === "pro") {
       return {
         key: `pro-${getEffectiveUsage(state.usage)}`,
-        title: "Pro capacity reached — momentum is already here",
-        detail: `${valuePrefix}Upgrade to Elite for 5,000 tickets/month, advanced dashboard depth, and room to scale without another hard stop.`,
-        body: `${valuePrefix}You’ve reached the Pro monthly ticket limit.
+        title: "Plan limit reached — additional usage will be billed",
+        detail: `${valuePrefix}Keep working. Upgrade to Elite for higher included capacity (5,000 runs/month) and more automation headroom.`,
+        body: `${valuePrefix}You’ve reached your included Pro capacity.
 
-You’re already running a serious operator surface. Elite adds headroom (5,000 tickets/month), advanced analytics, and team scale so growth doesn’t hit another wall next quarter.`
+You can continue running tickets — additional usage will be billed. Elite adds higher included runs, deeper analytics, and room to scale without another ceiling mid-shift.`
       };
     }
 
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
-      title: "Free plan capacity reached — you proved the value",
-      detail: `${valuePrefix}Upgrade to Pro for 500 tickets/month, live refund execution, and uninterrupted operator runs.`,
-      body: `${valuePrefix}You’ve used all ${FREE_USAGE_LIMIT} free runs this month.
+      title: "Plan limit reached — additional usage will be billed",
+      detail: `${valuePrefix}Keep working. Upgrade to Pro for higher included capacity (500 runs/month) plus automation and integrations.`,
+      body: `${valuePrefix}You’ve reached your included Free capacity.
 
-The workspace already showed you real routing and approval discipline. Pro keeps that loop running with higher limits, the refund center live, and priority routing when volume spikes.`
+You can continue running tickets — additional usage will be billed. Pro keeps the operator loop running with more included runs, live Stripe execution, and integration access for support teams.`
     };
   }
 
@@ -1121,7 +1123,11 @@ The workspace already showed you real routing and approval discipline. Pro keeps
 
     const banner = document.getElementById("inlineLimitBanner");
     if (banner) {
-      const usageLine = `${getEffectiveUsage(state.usage)} / ${getEffectiveLimit(state.tier, state.limit)} used`;
+      const used = getEffectiveUsage(state.usage);
+      const lim = getEffectiveLimit(state.tier, state.limit);
+      const billable = Math.max(0, Number(state.billableUsage || 0) || 0);
+      const within = lim >= 1e9 ? used : Math.min(used, lim);
+      const usageLine = billable > 0 ? `${within} / ${lim} included · ${billable} billable` : `${used} / ${lim} runs used`;
       const primaryLabel = isAuthenticated() ? "Upgrade" : "Create free account";
       const secondaryLabel = isAuthenticated() ? "See plans" : "Log in";
       const eyebrow = !isAuthenticated() ? "Preview" : "Capacity";
@@ -1169,16 +1175,12 @@ The workspace already showed you real routing and approval discipline. Pro keeps
 
     if (usage < limit) return true;
 
+    // Soft limit: never hard-block. Keep operating, but surface billable overage.
+    state.atLimit = true;
     updatePlanUI(state.tier, usage, limit, Math.max(0, limit - usage));
     pulseRail("usage");
     pushLimitMessage();
-
-    if (!isAuthenticated()) {
-      focusAccessPanel();
-      return false;
-    }
-
-    return false;
+    return true;
   }
 
   function consumeWorkspaceRun(serverUsage = null) {
@@ -2158,10 +2160,11 @@ The workspace already showed you real routing and approval discipline. Pro keeps
       el.classList.remove("is-warning", "is-limit");
       const pct = state.limit > 0 ? state.usage / state.limit : 0;
       const tierLabel = isAuthenticated() ? formatTier(state.tier) : "Free";
-      const rem = Math.max(0, Number(state.remaining || 0) || 0);
-      const runWord = rem === 1 ? "run" : "runs";
-      el.textContent = `${tierLabel}: ${rem} ${runWord} left`;
-      if (rem <= 0) el.classList.add("is-limit");
+      const used = Math.max(0, Number(state.usage || 0) || 0);
+      const cap = Math.max(0, Number(state.limit || 0) || 0);
+      const runWord = used === 1 ? "run" : "runs";
+      el.textContent = `${tierLabel}: ${used} / ${cap} ${runWord} used`;
+      if (cap > 0 && used >= cap) el.classList.add("is-limit");
       else if (pct >= 0.75) el.classList.add("is-warning");
     }
     syncMonetizationChrome();
@@ -2176,8 +2179,8 @@ The workspace already showed you real routing and approval discipline. Pro keeps
   }
 
   function applyComposerInteractiveLock() {
-    const guest = !isAuthenticated();
-    const locked = guest && state.remaining <= 0;
+    // Never hard-lock the composer after limits. Usage is tracked and billed as overage.
+    const locked = false;
     const dock = document.getElementById("workspaceComposerDock");
     if (dock) dock.classList.toggle("composer-dock--locked-preview", locked);
     const input = els.messageInput;
@@ -4853,6 +4856,15 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
       // Prefer server truth when available, but keep working if offline.
       hydrateRecentTickets().catch(() => {});
 
+      // Server can send limit/overage intelligence. Apply it before re-rendering usage surfaces.
+      applyUsageWarningFromStream(data);
+      if (data && typeof data === "object") {
+        const b = Number(data.billable_usage);
+        if (Number.isFinite(b)) state.billableUsage = Math.max(0, b);
+        const w = Number(data.within_included);
+        if (Number.isFinite(w)) state.withinIncluded = Math.max(0, w);
+      }
+
       const hasServerUsage = Number.isFinite(Number(data.usage));
       const planTier = data.tier || state.tier;
       const planLimit = Number(data.plan_limit || data.limit || state.limit || GUEST_USAGE_LIMIT);
@@ -4894,7 +4906,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
       const usageAfterRun = getEffectiveUsage(state.usage);
       const limitAfterRun = getEffectiveLimit(state.tier, state.limit);
-      const limitReachedAfterRun = usageAfterRun >= limitAfterRun && (String(state.tier || "free").toLowerCase() === "free" || !isAuthenticated());
+      const limitReachedAfterRun = limitAfterRun > 0 && usageAfterRun >= limitAfterRun;
 
       updateTopbarStatus();
       setNotice(data.action === "review" ? "warning" : "success", noticeTitleForResult(data), replyText);

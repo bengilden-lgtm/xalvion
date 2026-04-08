@@ -182,7 +182,12 @@
                   <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(840px, 100%);">
                     <div class="cld-cap-pill" id="plansSurfaceStatusPill" translate="no">Plans</div>
                     <h2 class="cld-welcome-headline" style="margin-top:10px;">Choose capacity that matches your workload.</h2>
-                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Free runs reset monthly. Upgrade when you need automation, integrations, and higher limits.</p>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Plans include base runs. When you exceed the limit, you can keep operating — additional usage is billed.</p>
+                    <div class="trust-chip-row" aria-hidden="true" style="margin-top:12px;">
+                      <span class="trust-chip">Nothing is sent without approval</span>
+                      <span class="trust-chip">Secure billing via Stripe</span>
+                      <span class="trust-chip">Designed for support teams</span>
+                    </div>
                     <div class="plans-stack" id="plansSurfaceGrid" style="margin-top:16px;">
                       <article class="plan-offer plan-offer--pro" data-plan-tier="preview" id="planPreviewCard">
                         <div class="plan-offer-header">
@@ -190,12 +195,13 @@
                             <h3 class="plan-offer-name">Preview</h3>
                             <span class="plan-offer-badge" data-plan-badge hidden>Current</span>
                           </div>
-                          <p class="plan-offer-spec">3 runs · no account</p>
+                          <p class="plan-offer-spec">3 runs included · no account</p>
                         </div>
                         <ul class="plan-offer-features">
-                          <li>Try the approval-safe workflow</li>
-                          <li>No saved threads</li>
-                          <li>No automation</li>
+                          <li><strong>Runs included</strong>: 3</li>
+                          <li><strong>Automation</strong>: no</li>
+                          <li><strong>Integrations</strong>: no</li>
+                          <li><strong>Best for</strong>: evaluation</li>
                         </ul>
                         <button type="button" class="plan-cta plan-cta--secondary" data-open-access="signup"><span>Create free account</span></button>
                       </article>
@@ -206,12 +212,13 @@
                             <h3 class="plan-offer-name">Free</h3>
                             <span class="plan-offer-badge" data-plan-badge hidden>Current</span>
                           </div>
-                          <p class="plan-offer-spec">12 runs / month</p>
+                          <p class="plan-offer-spec">12 runs included / month</p>
                         </div>
                         <ul class="plan-offer-features">
-                          <li>Saved threads</li>
-                          <li>Approval-safe replies</li>
-                          <li>No automation</li>
+                          <li><strong>Runs included</strong>: 12 / month</li>
+                          <li><strong>Automation</strong>: no</li>
+                          <li><strong>Integrations</strong>: limited (connect + prepare)</li>
+                          <li><strong>Best for</strong>: solo operators &amp; low volume</li>
                         </ul>
                         <button type="button" class="plan-cta plan-cta--secondary" data-open-access="login"><span>Already have an account?</span></button>
                       </article>
@@ -222,12 +229,13 @@
                             <h3 class="plan-offer-name">Pro</h3>
                             <span class="plan-offer-badge" data-plan-badge hidden>Current</span>
                           </div>
-                          <p class="plan-offer-spec">500 runs / month</p>
+                          <p class="plan-offer-spec">500 runs included / month</p>
                         </div>
                         <ul class="plan-offer-features">
-                          <li>More runs + faster responses</li>
-                          <li>Basic integrations</li>
-                          <li>Live Stripe refund execution</li>
+                          <li><strong>Runs included</strong>: 500 / month</li>
+                          <li><strong>Automation</strong>: guided (approval-first)</li>
+                          <li><strong>Integrations</strong>: Stripe execution + workflow hooks</li>
+                          <li><strong>Best for</strong>: growing support volume</li>
                         </ul>
                         <button type="button" class="plan-cta plan-cta--primary" data-upgrade="pro"><span>Upgrade to Pro</span></button>
                       </article>
@@ -239,12 +247,13 @@
                             <span class="plan-offer-badge plan-offer-badge--popular">Most popular</span>
                             <span class="plan-offer-badge" data-plan-badge hidden>Current</span>
                           </div>
-                          <p class="plan-offer-spec">5,000 runs / month</p>
+                          <p class="plan-offer-spec">5,000 runs included / month</p>
                         </div>
                         <ul class="plan-offer-features">
-                          <li>Automation (refunds, tracking, actions)</li>
-                          <li>Integrations + priority</li>
-                          <li>High-volume capacity</li>
+                          <li><strong>Runs included</strong>: 5,000 / month</li>
+                          <li><strong>Automation</strong>: high-volume workflows</li>
+                          <li><strong>Integrations</strong>: full workflow integration</li>
+                          <li><strong>Best for</strong>: support teams &amp; high throughput</li>
                         </ul>
                         <button type="button" class="plan-cta plan-cta--secondary" data-upgrade="elite"><span>Upgrade to Elite</span></button>
                       </article>

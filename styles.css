@@ -947,3 +947,22 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
 .refund-footer{ display:flex; gap:10px; flex-wrap:wrap; }
 .sidebar-jump-btn{ margin-top:10px; }
 textarea{ resize:vertical; }
+
+/* Trust layer chips (fallback UI) */
+.trust-chip-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.trust-chip{
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:0 10px;
+  border-radius:999px;
+  border:1px solid var(--line-soft);
+  background:rgba(255,255,255,0.02);
+  color:var(--text-soft);
+  font-size:12px;
+  font-weight:600;
+}
