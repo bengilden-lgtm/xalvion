@@ -2651,14 +2651,18 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
 
   function createTypingMarkup() {
     return `
-      <span class="xv-thinking-block typing" aria-live="polite" aria-busy="true">
-        <span class="xv-thinking-text">Xalvion is preparing a response…</span>
-        <span class="xv-thinking-dots" aria-hidden="true">
+      <div class="xv-thinking-card typing" role="status" aria-live="polite" aria-busy="true">
+        <div class="xv-thinking-head">
+          <span class="xv-thinking-icon" aria-hidden="true">${ICONS.xalvionX}</span>
+          <span class="xv-thinking-label" translate="no">Xalvion</span>
+        </div>
+        <div class="xv-thinking-line">Thinking through the case…</div>
+        <div class="xv-thinking-dots" aria-hidden="true">
           <span class="xv-thinking-dot"></span>
           <span class="xv-thinking-dot"></span>
           <span class="xv-thinking-dot"></span>
-        </span>
-      </span>
+        </div>
+      </div>
     `;
   }
 
@@ -4297,7 +4301,7 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     return data;
   }
 
-  async function handleStreamReply(payload, row, stepsEl) {
+  async function handleStreamReply(payload, row) {
     const res = await fetch(`${API}/support/stream`, {
       method: "POST",
       headers: headers(),
@@ -4330,15 +4334,8 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         }
 
         if (item.event === "status") {
-          const stage = String(item.data.stage || "");
-          const label = item.data.label || stage || "streaming";
-
-          if (stage === "reviewing") advanceStreamStep(stepsEl, 0);
-          else if (stage === "routing") advanceStreamStep(stepsEl, 1);
-          else if (stage === "acting" || stage === "responding") advanceStreamStep(stepsEl, 2);
-          else if (stage === "finalizing") advanceStreamStep(stepsEl, 3);
-
-          updateStreamStatus(`Response: ${label}`);
+          // Keep status generic. Do not expose internal pipeline stages/labels to the UI.
+          updateStreamStatus("Response: working");
         }
 
         if (item.event === "result") {
@@ -4767,31 +4764,17 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
     }
 
     const row = addAssistantMessage("");
-    const stepsEl = createStreamSteps();
     const replyNode = getAssistantCopyNode(row);
-    const streamHost = row.querySelector(".stream-trace-host");
-    if (streamHost) {
-      streamHost.appendChild(stepsEl);
-    } else if (replyNode) {
-      replyNode.innerHTML = createTypingMarkup();
-      replyNode.parentElement.insertBefore(stepsEl, replyNode);
-    }
     if (replyNode) replyNode.innerHTML = createTypingMarkup();
 
     setSending(true);
-    setNotice("info", "Running support case", "Streaming live action states from the support pipeline.");
-
-    const stepTimers = [
-      window.setTimeout(() => advanceStreamStep(stepsEl, 1), 600),
-      window.setTimeout(() => advanceStreamStep(stepsEl, 2), 1400),
-      window.setTimeout(() => advanceStreamStep(stepsEl, 3), 2400)
-    ];
+    setNotice("info", "Running support case", "Xalvion is preparing a response.");
 
     try {
       let data = null;
 
       try {
-        data = await handleStreamReply(payload, row, stepsEl);
+        data = await handleStreamReply(payload, row);
       } catch (streamErr) {
         authDebugLog("support_stream_fallback", streamErr);
         try {
@@ -4838,10 +4821,6 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
           }
         }
       }
-
-      stepTimers.forEach((timer) => window.clearTimeout(timer));
-      removeStreamSteps(stepsEl);
-      streamHost?.classList.add("stream-trace-host--settled");
 
       if (!data) throw new Error("No response returned.");
 
@@ -4953,9 +4932,6 @@ ${unlock ? `<div style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
         state.lastLimitNoticeKey = "";
       }
     } catch (error) {
-      stepTimers.forEach((timer) => window.clearTimeout(timer));
-      removeStreamSteps(stepsEl);
-      streamHost?.classList.add("stream-trace-host--settled");
       const errText =
         (error && error.message) ||
         "Something went wrong while processing this support request.";

@@ -1204,46 +1204,71 @@ select.refund-select{ padding-right: 34px; }
   100%{ filter: none; }
 }
 
-/* Thinking / typing — subtle pulse ~1.2s */
-.xv-thinking-block{
+/* Thinking (single premium block) — calm, subtle, no debug steps */
+.xv-thinking-card{
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 14%, transparent);
+  color: var(--text-muted);
+}
+.xv-thinking-head{
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  color: var(--text-muted);
+  gap: 8px;
+}
+.xv-thinking-icon{
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in oklab, var(--text) 70%, transparent);
+  opacity: 0.9;
+}
+.xv-thinking-icon svg{
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+.xv-thinking-label{
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: color-mix(in oklab, var(--text) 78%, transparent);
+}
+.xv-thinking-line{
   font-size: 14px;
   line-height: 1.5;
-  opacity: 0.92;
-  animation: xvThinkingBreath 1.2s var(--ease) infinite;
-}
-.xv-thinking-text{
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
+  color: color-mix(in oklab, var(--text-muted) 92%, var(--text-4));
 }
 .xv-thinking-dots{
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  height: 10px;
 }
 .xv-thinking-dot{
   width: 4px;
   height: 4px;
-  border-radius: 50%;
+  border-radius: 99px;
   background: currentColor;
-  opacity: 0.35;
-  animation: xvThinkingDot 1.2s var(--ease) infinite;
+  opacity: 0.28;
+  animation: xvThinkingDotPulse 1.15s var(--ease) infinite;
 }
-.xv-thinking-dot:nth-child(2){ animation-delay: 0.15s; }
-.xv-thinking-dot:nth-child(3){ animation-delay: 0.3s; }
-@keyframes xvThinkingBreath{
-  0%, 100%{ opacity: 0.72; }
-  50%{ opacity: 0.95; }
-}
-@keyframes xvThinkingDot{
-  0%, 100%{ opacity: 0.25; transform: translateY(0); }
-  50%{ opacity: 0.95; transform: translateY(-1px); }
+.xv-thinking-dot:nth-child(2){ animation-delay: 0.12s; }
+.xv-thinking-dot:nth-child(3){ animation-delay: 0.24s; }
+@keyframes xvThinkingDotPulse{
+  0%, 100%{ opacity: 0.25; }
+  45%{ opacity: 0.78; }
 }
 
 @media (prefers-reduced-motion: reduce){
-  .xv-thinking-block,
+  .xv-thinking-card,
   .xv-thinking-dot{
     animation: none !important;
     opacity: 0.85 !important;
