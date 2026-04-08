@@ -43,7 +43,7 @@
       </div>
     </header>
 
-    <div class="app workspace-grid workspace-body workspace-split">
+    <div class="app workspace-grid workspace-body workspace-split" id="workspaceApp">
       <aside class="sidebar glass rail-col rail-col-left sidebar-app-rail" id="sidebarShell" data-sidebar-active="workspace" data-sidebar-collapsed="true" data-cld-rail="1">
         <div class="sidebar-chrome">
           <div class="sidebar-topbar" role="presentation">
@@ -591,32 +591,31 @@
       </aside>
 
       <main class="main main-canvas">
-        <div class="main-canvas-inner canvas-shell main-stage">
+        <div class="main-canvas-inner canvas-shell main-stage" id="mainStage">
           <div class="main-stage-ambient" aria-hidden="true">
             <div class="main-stage-ambient-glow"></div>
             <div class="main-stage-ambient-ripple"></div>
           </div>
 
-          <div class="xv-stage-scaffold">
-            <header class="main-stage-header main-thread-header">
-              <div class="main-stage-identity">
-                <div class="main-stage-title-block">
-                  <h1 id="workspacePageTitle">Paste a support ticket</h1>
-                  <p id="workspaceSubcopy" class="workspace-subline">Get a customer-ready reply instantly</p>
-                  <p id="workspaceSubcopyTier" class="workspace-subline workspace-subline--quiet">Sensitive actions stay gated for approval</p>
+          <header class="main-stage-header main-thread-header">
+            <div class="main-stage-identity">
+              <div class="main-stage-title-block">
+                <h1 id="workspacePageTitle">Paste a support ticket</h1>
+                <p id="workspaceSubcopy" class="workspace-subline">Get a customer-ready reply instantly</p>
+                <p id="workspaceSubcopyTier" class="workspace-subline workspace-subline--quiet">Sensitive actions stay gated for approval</p>
+              </div>
+            </div>
+          </header>
+
+          <div class="main-stage-body xv-stage-body" id="mainStageBody">
+            <div class="workspace-conversation-column" id="workspaceConversationColumn">
+              <div class="messages-zone" id="messagesZone">
+                <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
+                  <div id="messages" class="messages scroll-area"></div>
                 </div>
               </div>
-            </header>
 
-            <div class="main-stage-body xv-stage-body">
-              <div class="workspace-conversation-column" id="workspaceConversationColumn">
-                <div class="messages-zone" id="messagesZone">
-                  <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
-                    <div id="messages" class="messages scroll-area"></div>
-                  </div>
-                </div>
-
-                <footer class="composer-wrap composer-dock xv-composer-foot" id="workspaceComposerDock">
+              <footer class="composer-wrap composer-dock xv-composer-foot" id="workspaceComposerDock">
                 <div class="composer-unified composer-module">
                   <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
                     <div class="composer-hint-band composer-hint-band--integrated">
@@ -647,8 +646,7 @@
                     </details>
                   </div>
                 </div>
-                </footer>
-              </div>
+              </footer>
             </div>
           </div>
         </div>

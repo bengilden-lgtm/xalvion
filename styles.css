@@ -206,12 +206,20 @@ body[data-ui="claude"]{
   --border-medium:rgba(255,255,255,0.13);
   --border-strong:rgba(255,255,255,0.17);
 
-  --cld-sidebar-expanded: 200px;
-  --cld-sidebar-collapsed: 48px;
-  --cld-thread-max: min(880px, 92vw);
-  --cld-open-composer: min(880px, 92vw);
-  --main-max: min(880px, 92vw);
-  --main-pad-x: clamp(16px, 3vw, 28px);
+  /* Core layout authority */
+  --cld-sidebar-expanded: 224px;
+  --cld-sidebar-collapsed: 56px;
+  --cld-thread-max: min(820px, 92vw);
+  --cld-open-composer: min(820px, 92vw);
+  --main-max: min(820px, 92vw);
+  --main-pad-x: clamp(18px, 3vw, 30px);
+  --cld-radius-xl: 22px;
+  --cld-radius-lg: 16px;
+  --cld-radius-md: 12px;
+  --cld-hairline: rgba(255,255,255,0.075);
+  --cld-hairline-2: rgba(255,255,255,0.10);
+  --cld-surface-2: rgba(255,255,255,0.035);
+  --cld-surface-3: rgba(255,255,255,0.055);
 }
 
 body[data-ui="claude"]{
@@ -235,16 +243,16 @@ body[data-ui="claude"] .glass{
 }
 
 body[data-ui="claude"] .command-strip.glass{
-  background: rgba(23, 23, 23, 0.92) !important;
-  border-bottom: 1px solid rgba(255,255,255,0.10) !important;
+  background: rgba(15, 16, 19, 0.58) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
 }
 
 /* Top bar: lighter, slimmer, less “pill” */
 body[data-ui="claude"] .command-strip{
-  min-height: 48px;
+  min-height: 44px;
 }
 body[data-ui="claude"] .command-strip.glass{
-  padding: 8px 14px !important;
+  padding: 7px 14px !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   box-shadow: none !important;
@@ -254,19 +262,19 @@ body[data-ui="claude"] .command-brand-mark{
 }
 body[data-ui="claude"] .command-mode-pill{
   background: transparent !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  color: rgba(170, 182, 208, 0.78) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  color: rgba(185, 194, 214, 0.72) !important;
   border-radius: 999px !important;
   padding: 6px 10px !important;
 }
 body[data-ui="claude"] .command-status-chip{
-  background: rgba(255,255,255,0.03) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
+  background: rgba(255,255,255,0.025) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
   box-shadow: none !important;
 }
 body[data-ui="claude"] .command-auth-chip{
   background: transparent !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
   box-shadow: none !important;
 }
 
@@ -297,9 +305,9 @@ body[data-ui="claude"] #workspaceRoot .main.main-canvas{
 
 body[data-ui="claude"] #sidebarShell{
   background: var(--cld-surface) !important;
-  border-right: 1px solid rgba(255,255,255,0.08) !important;
+  border-right: 1px solid rgba(255,255,255,0.06) !important;
   border-radius: 0 !important;
-  padding: 8px 7px 10px !important;
+  padding: 10px 8px 12px !important;
   width: var(--cld-sidebar-expanded) !important;
   max-width: var(--cld-sidebar-expanded) !important;
   transition: width 180ms var(--sys-curve), max-width 180ms var(--sys-curve);
@@ -308,7 +316,7 @@ body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"]{
   width: var(--cld-sidebar-collapsed) !important;
   max-width: var(--cld-sidebar-collapsed) !important;
   overflow: hidden;
-  padding: 8px 5px 10px !important;
+  padding: 10px 6px 12px !important;
 }
 
 /* Collapse must shrink the grid track (otherwise the column stays wide and feels “stuck”) */
@@ -333,30 +341,32 @@ body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] [data-cld-ti
   top: 50%;
   transform: translateY(-50%);
   padding: 7px 11px;
-  background: rgba(20, 21, 30, 0.96);
-  border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 8px;
+  background: rgba(16, 17, 20, 0.92);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.01em;
-  color: rgba(244, 247, 255, 0.94);
+  color: rgba(244, 247, 255, 0.92);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.12s ease;
-  box-shadow: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  transform: translateY(-50%) translateX(-2px);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.34);
   z-index: 300;
 }
 body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] [data-cld-tip]:hover::after{
   opacity: 1;
+  transform: translateY(-50%) translateX(0px);
 }
 
 body[data-ui="claude"] .sidebar-topbar{
   display:flex;
   align-items:center;
   justify-content:center;
-  padding: 0 0 12px;
+  padding: 0 0 14px;
 }
 body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-topbar{
   padding-bottom: 10px;
@@ -365,13 +375,14 @@ body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-top
 body[data-ui="claude"] .sidebar-collapse-btn{
   width: 40px;
   height: 40px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.03);
   color: rgba(244, 247, 255, 0.92);
 }
 body[data-ui="claude"] .sidebar-collapse-btn:hover{
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.09);
 }
 body[data-ui="claude"] .sidebar-collapse-glyph{
   display:block;
@@ -401,26 +412,26 @@ body[data-ui="claude"] .sidebar-nav-item{
   display:flex;
   align-items:center;
   gap: 8px;
-  min-height: 36px;
-  padding: 0 9px;
-  border-radius: 8px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
   font-size: 13px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-  color: rgba(188, 198, 222, 0.72);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: rgba(193, 201, 222, 0.74);
   background: transparent;
   border: 1px solid transparent;
 }
 body[data-ui="claude"] .sidebar-nav-item:hover{
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.035);
   border-color: transparent;
   color: rgba(220, 226, 244, 0.88);
 }
 body[data-ui="claude"] .sidebar-nav-item.is-active{
-  background: transparent;
+  background: rgba(255,255,255,0.03);
   border-color: transparent;
   color: rgba(236, 240, 252, 0.92);
-  box-shadow: inset 2px 0 0 rgba(124, 92, 252, 0.35);
+  box-shadow: inset 2px 0 0 rgba(124, 92, 252, 0.42);
 }
 
 body[data-ui="claude"] .sidebar-nav-icon{
@@ -442,12 +453,12 @@ body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav
 
 body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-item{
   justify-content:center;
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  margin: 0 auto 5px;
+  width: 46px;
+  height: 46px;
+  min-height: 46px;
+  margin: 0 auto 6px;
   padding: 0;
-  border-radius: 12px;
+  border-radius: 14px;
 }
 body[data-ui="claude"] #sidebarShell[data-sidebar-collapsed="true"] .sidebar-nav-label{
   display:none;
@@ -460,7 +471,7 @@ body[data-ui="claude"] .sidebar-scroll-host{
 }
 
 body[data-ui="claude"] .main-canvas-inner.main-stage{
-  padding: 10px 16px 12px !important;
+  padding: clamp(14px, 2.6vh, 28px) var(--main-pad-x) clamp(14px, 2.4vh, 22px) !important;
 }
 
 /* Flat stage chrome; keep thread clean */
@@ -502,8 +513,8 @@ body[data-ui="claude"] .messages-shell{
 body[data-ui="claude"] #messages{
   max-width: var(--cld-thread-max) !important;
   margin: 0 auto !important;
-  padding: 8px 0 100px !important;
-  gap: 18px !important;
+  padding: 10px 0 120px !important;
+  gap: 16px !important;
 }
 
 body[data-ui="claude"] #workspaceRoot .workspace-conversation-column,
@@ -587,8 +598,8 @@ body[data-ui="claude"] .reply-value-reinforcement{
 }
 
 body[data-ui="claude"] .reply-text{
-  font-size: 15.5px !important;
-  line-height: 1.72 !important;
+  font-size: 15.75px !important;
+  line-height: 1.74 !important;
   color: rgba(244, 247, 255, 0.96) !important;
 }
 
@@ -606,7 +617,7 @@ body[data-ui="claude"] .composer.composer-chat{
 }
 
 body[data-ui="claude"] .composer-hint-band--integrated{
-  padding: 0 2px 6px;
+  padding: 0 2px 8px;
 }
 
 /* Single input surface — textarea + send aligned as one control */
@@ -615,16 +626,16 @@ body[data-ui="claude"] .composer-field{
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 12px 14px 12px 18px;
-  border-radius: 22px;
-  border: 1px solid var(--cld-border);
-  background: var(--cld-surface);
+  padding: 13px 14px 13px 18px;
+  border-radius: 24px;
+  border: 1px solid var(--cld-hairline);
+  background: color-mix(in srgb, var(--cld-surface) 92%, rgba(255,255,255,0.02) 100%);
   box-sizing: border-box;
-  box-shadow: none;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 18px 45px rgba(0,0,0,0.26);
 }
 body[data-ui="claude"] .composer-field:focus-within{
-  border-color: rgba(255,255,255,0.14);
-  box-shadow: none;
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 20px 55px rgba(0,0,0,0.30);
 }
 body[data-ui="claude"] .composer-field textarea,
 body[data-ui="claude"] #messageInput{
@@ -634,11 +645,11 @@ body[data-ui="claude"] #messageInput{
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  min-height: 44px !important;
+  min-height: 46px !important;
   max-height: min(36vh, 220px) !important;
   padding: 4px 0 !important;
-  font-size: 15px !important;
-  line-height: 1.55 !important;
+  font-size: 15.5px !important;
+  line-height: 1.52 !important;
   color: var(--cld-text) !important;
 }
 body[data-ui="claude"] .composer-field textarea:focus,
@@ -652,12 +663,12 @@ body[data-ui="claude"] #sendBtn{
   flex-shrink: 0;
   align-self: center;
   margin-bottom: 0;
-  width: 38px !important;
-  min-width: 38px !important;
-  height: 38px !important;
-  border-radius: 19px !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  border-radius: 18px !important;
   box-shadow: none !important;
-  background: linear-gradient(135deg, #5b21b6, #4338ca) !important;
+  background: linear-gradient(135deg, #6d28d9, #4338ca) !important;
   border: none !important;
 }
 
@@ -9188,7 +9199,7 @@ body[data-ui="claude"] #workspaceRoot .empty-thread-open{
   display:flex !important;
   flex-direction:column !important;
   align-items:center !important;
-  padding:4px 12px 8px !important;
+  padding:10px 14px 14px !important;
   margin:0 auto !important;
   max-width:min(var(--cld-open-composer),100%) !important;
   background:transparent !important;
@@ -9198,21 +9209,21 @@ body[data-ui="claude"] #workspaceRoot .empty-thread-open{
 body[data-ui="claude"] #workspaceRoot .cld-welcome-headline{
   margin:0 !important;
   font-family:var(--font-sans) !important;
-  font-size:clamp(22px,3vw,28px) !important;
-  font-weight:600 !important;
-  letter-spacing:-0.022em !important;
-  line-height:1.2 !important;
+  font-size:clamp(22px,3.3vw,30px) !important;
+  font-weight:650 !important;
+  letter-spacing:-0.028em !important;
+  line-height:1.16 !important;
   color:rgba(244,246,252,0.96) !important;
   text-align:center !important;
 }
 body[data-ui="claude"] #workspaceRoot .cld-welcome-prompt{
-  margin:10px 0 0 !important;
+  margin:12px 0 0 !important;
   max-width:40ch !important;
-  font-size:15px !important;
+  font-size:15.25px !important;
   font-weight:400 !important;
-  line-height:1.5 !important;
+  line-height:1.55 !important;
   letter-spacing:0 !important;
-  color:rgba(186,194,214,0.86) !important;
+  color:rgba(186,194,214,0.84) !important;
   text-align:center !important;
 }
 body[data-ui="claude"] #workspaceRoot .cld-welcome-support{
