@@ -492,6 +492,19 @@ class GuestPreviewUsage(Base):
     updated_at = Column(String, nullable=False)
 
 
+class RateLimitEvent(Base):
+    """
+    DB-backed sliding-window rate limit log.
+    Behavior must match the prior in-memory limiter: max 12 events per 60 seconds per key.
+    """
+
+    __tablename__ = "rate_limit_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String(96), nullable=False, index=True)
+    ts = Column(Float, nullable=False, index=True)  # epoch seconds
+
+
 def _import_orm_submodules() -> None:
     """Import modules that register ORM classes on shared Base (required before create_all).
     Missing optional modules are logged instead of crashing process boot.
@@ -522,8 +535,9 @@ def ensure_user_columns() -> None:
             with engine.begin() as conn:
                 for statement in additions:
                     conn.execute(text(statement))
-    except Exception:
-        pass
+    except Exception as exc:
+        STARTUP_ISSUES.append(f"user_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
+        logger.error("ensure_user_columns_failed detail=%s", str(exc)[:500], exc_info=True)
 
 
 @app.on_event("startup")
@@ -545,12 +559,14 @@ def _startup_database() -> None:
     ensure_user_columns()
     try:
         ensure_outcome_log_columns()
-    except Exception:
-        pass
+    except Exception as exc:
+        STARTUP_ISSUES.append(f"outcome_log_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
+        logger.error("ensure_outcome_log_columns_failed detail=%s", str(exc)[:500], exc_info=True)
     try:
         ensure_outcome_columns()
-    except Exception:
-        pass
+    except Exception as exc:
+        STARTUP_ISSUES.append(f"outcome_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
+        logger.error("ensure_outcome_columns_failed detail=%s", str(exc)[:500], exc_info=True)
     try:
         from learning import sync_rules_to_brain
 
@@ -860,6 +876,35 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 def check_rate_limit(user_id: str) -> bool:
     key = user_id if user_id and user_id != "guest" else "__guest__"
     now = time.time()
+    cutoff = now - 60.0
+
+    # Primary: DB-backed limiter for cross-process correctness.
+    try:
+        with db_session() as db:
+            # Best-effort prune (keeps table bounded).
+            db.query(RateLimitEvent).filter(
+                RateLimitEvent.key == str(key)[:96],
+                RateLimitEvent.ts < cutoff,
+            ).delete(synchronize_session=False)
+
+            count = (
+                db.query(func.count(RateLimitEvent.id))
+                .filter(RateLimitEvent.key == str(key)[:96], RateLimitEvent.ts >= cutoff)
+                .scalar()
+                or 0
+            )
+            if int(count) >= 12:
+                db.commit()
+                return False
+
+            db.add(RateLimitEvent(key=str(key)[:96], ts=float(now)))
+            db.commit()
+            return True
+    except Exception as exc:
+        # Fallback: preserve service availability if DB temporarily fails.
+        # This is intentionally loud so ops sees it; behavior remains consistent for callers.
+        logger.error("rate_limit_db_failed key=%s detail=%s", str(key)[:96], str(exc)[:500], exc_info=True)
+
     _rate_log.setdefault(key, [])
     _rate_log[key] = [t for t in _rate_log[key] if now - t < 60]
     if len(_rate_log[key]) >= 12:

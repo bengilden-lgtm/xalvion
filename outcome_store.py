@@ -17,6 +17,7 @@ of the self-reported executed dict.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -25,6 +26,8 @@ from sqlalchemy import Column, Float, Integer, String, Text, func
 from sqlalchemy import inspect, text
 
 from db import Base, SessionLocal, engine
+
+logger = logging.getLogger("xalvion.outcome_store")
 
 
 _outcome_stats_cache: dict[str, Any] = {}
@@ -75,6 +78,7 @@ def _tool_response_json(tool_result: dict[str, Any]) -> str:
     try:
         return json.dumps(tool_result, ensure_ascii=False, default=str)[:4000]
     except Exception:
+        logger.warning("tool_response_json_serialize_failed", exc_info=True)
         return "{}"
 
 
@@ -162,8 +166,17 @@ def log_outcome(
             "success":     bool(success),
             "tool_status": tool_status,
         }
-    except Exception:
+    except Exception as exc:
         db.rollback()
+        logger.error(
+            "log_outcome_failed outcome_key=%s user_id=%s action=%s tool_status=%s detail=%s",
+            str(outcome_key or "")[:64],
+            str(user_id or "")[:120],
+            str(action or "none")[:32],
+            str(tool_status or "unknown")[:64],
+            str(exc)[:500],
+            exc_info=True,
+        )
         return {}
     finally:
         db.close()
@@ -495,8 +508,14 @@ def mark_ticket_reopened(outcome_key: str) -> bool:
         row.updated_at = _now_iso()
         db.commit()
         return True
-    except Exception:
+    except Exception as exc:
         db.rollback()
+        logger.error(
+            "mark_ticket_reopened_failed outcome_key=%s detail=%s",
+            str(outcome_key or "")[:64],
+            str(exc)[:500],
+            exc_info=True,
+        )
         return False
     finally:
         db.close()
@@ -517,8 +536,14 @@ def mark_crm_closed(outcome_key: str) -> bool:
         row.updated_at = _now_iso()
         db.commit()
         return True
-    except Exception:
+    except Exception as exc:
         db.rollback()
+        logger.error(
+            "mark_crm_closed_failed outcome_key=%s detail=%s",
+            str(outcome_key or "")[:64],
+            str(exc)[:500],
+            exc_info=True,
+        )
         return False
     finally:
         db.close()
@@ -537,8 +562,14 @@ def mark_reversed(outcome_key: str) -> bool:
         row.updated_at = _now_iso()
         db.commit()
         return True
-    except Exception:
+    except Exception as exc:
         db.rollback()
+        logger.error(
+            "mark_reversed_failed outcome_key=%s detail=%s",
+            str(outcome_key or "")[:64],
+            str(exc)[:500],
+            exc_info=True,
+        )
         return False
     finally:
         db.close()
@@ -588,6 +619,7 @@ def get_outcome_stats() -> dict[str, Any]:
         except Exception:
             avg_impact_score, excellent_rate, bad_rate = 0.5, 0.0, 0.0
             good_excellent_outcome_rate = 0.0
+            logger.warning("get_outcome_stats_sample_impact_failed", exc_info=True)
 
         total = db.query(ActionOutcomeLog).count()
         if not total:

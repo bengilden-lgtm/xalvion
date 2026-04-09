@@ -42,6 +42,7 @@ def load_rules() -> List[Dict[str, Any]]:
             data = json.load(f)
             return data if isinstance(data, list) else []
     except Exception:
+        logger.warning("load_rules_failed rules_file=%s", RULES_FILE, exc_info=True)
         return []
 
 

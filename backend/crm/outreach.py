@@ -14,6 +14,7 @@ Design notes:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import uuid
@@ -23,6 +24,35 @@ from typing import Any, Callable
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, field_validator
+from sqlalchemy import Column, Integer, String, Text, Float, func
+
+from db import Base, SessionLocal
+
+logger = logging.getLogger("xalvion.crm.outreach")
+
+
+class OutreachLeadRow(Base):
+    """
+    DB-backed persistence for the outreach CRM queue.
+    Stores the original lead dict as JSON while duplicating key fields for sorting/metrics.
+    """
+
+    __tablename__ = "crm_outreach_leads"
+
+    id = Column(String(64), primary_key=True)
+    payload_json = Column(Text, nullable=False, default="{}")
+
+    # Query-friendly columns (kept in sync with payload)
+    created_at = Column(String(40), nullable=False, index=True)
+    updated_at = Column(String(40), nullable=False, index=True)
+    status = Column(String(16), nullable=False, index=True, default="new")
+    stage = Column(String(16), nullable=False, index=True, default="lead")
+    score = Column(Integer, nullable=False, default=1, index=True)
+    source = Column(String(32), nullable=False, default="manual", index=True)
+    follow_up_due = Column(String(40), nullable=True, index=True)
+    converted_at = Column(String(40), nullable=True, index=True)
+    value = Column(Float, nullable=False, default=0.0)
+    converted_value = Column(Float, nullable=False, default=0.0)
 
 
 def register_outreach_crm_routes(
@@ -206,6 +236,68 @@ def register_outreach_crm_routes(
         return mapping.get(status_norm, "lead")
 
     def _read_outreach_queue() -> list[dict[str, Any]]:
+        # DB-first persistence.
+        # One-time best-effort import from legacy JSON file if DB is empty.
+        try:
+            db = SessionLocal()
+            try:
+                total = db.query(func.count(OutreachLeadRow.id)).scalar() or 0
+                if int(total) <= 0 and os.path.exists(outreach_queue_path):
+                    with outreach_queue_lock:
+                        try:
+                            with open(outreach_queue_path, "r", encoding="utf-8") as f:
+                                legacy = json.load(f)
+                        except Exception as exc:
+                            legacy = None
+                            logger.error("crm_legacy_json_read_failed detail=%s", str(exc)[:500], exc_info=True)
+                    if isinstance(legacy, list) and legacy:
+                        now_iso = _crm_now_iso()
+                        for item in legacy:
+                            if not isinstance(item, dict):
+                                continue
+                            lead_id = str(item.get("id") or "").strip() or uuid.uuid4().hex
+                            normalized = _serialize_lead({**item, "id": lead_id})
+                            row = OutreachLeadRow(
+                                id=str(lead_id)[:64],
+                                payload_json=json.dumps(normalized, ensure_ascii=False, default=str),
+                                created_at=str(normalized.get("created_at") or now_iso)[:40],
+                                updated_at=now_iso[:40],
+                                status=str(normalized.get("status") or "new")[:16],
+                                stage=str(normalized.get("stage") or "lead")[:16],
+                                score=int(normalized.get("score", 1) or 1),
+                                source=str(normalized.get("source") or "manual")[:32],
+                                follow_up_due=(str(normalized.get("follow_up_due"))[:40] if normalized.get("follow_up_due") else None),
+                                converted_at=(str(normalized.get("converted_at"))[:40] if normalized.get("converted_at") else None),
+                                value=float(normalized.get("value", 0.0) or 0.0),
+                                converted_value=float(normalized.get("converted_value", 0.0) or 0.0),
+                            )
+                            # Upsert semantics: last write wins, matches legacy behavior.
+                            existing = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == row.id).first()
+                            if existing:
+                                for k, v in row.__dict__.items():
+                                    if k.startswith("_"):
+                                        continue
+                                    setattr(existing, k, v)
+                            else:
+                                db.add(row)
+                        db.commit()
+
+                rows = db.query(OutreachLeadRow).all()
+                leads: list[dict[str, Any]] = []
+                for r in rows:
+                    try:
+                        payload = json.loads(str(r.payload_json or "{}"))
+                        if isinstance(payload, dict):
+                            leads.append(payload)
+                    except Exception:
+                        logger.error("crm_payload_deserialize_failed lead_id=%s", str(getattr(r, "id", ""))[:64], exc_info=True)
+                return leads
+            finally:
+                db.close()
+        except Exception as exc:
+            # Loud failure; fallback to legacy file read to preserve runtime behavior.
+            logger.error("crm_db_read_failed detail=%s", str(exc)[:500], exc_info=True)
+
         with outreach_queue_lock:
             try:
                 if not os.path.exists(outreach_queue_path):
@@ -213,15 +305,69 @@ def register_outreach_crm_routes(
                 with open(outreach_queue_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 return data if isinstance(data, list) else []
-            except Exception:
+            except Exception as exc:
+                logger.error("crm_legacy_read_failed detail=%s", str(exc)[:500], exc_info=True)
                 return []
 
     def _write_outreach_queue(leads: list[dict[str, Any]]) -> None:
-        tmp_path = outreach_queue_path + ".tmp"
-        with outreach_queue_lock:
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(leads, f, indent=2, ensure_ascii=False)
-            os.replace(tmp_path, outreach_queue_path)
+        # DB-backed persistence; legacy JSON is no longer the source of truth.
+        now_iso = _crm_now_iso()
+        try:
+            db = SessionLocal()
+            try:
+                seen: set[str] = set()
+                for item in leads:
+                    if not isinstance(item, dict):
+                        continue
+                    lead_id = str(item.get("id") or "").strip()
+                    if not lead_id:
+                        continue
+                    seen.add(lead_id)
+                    normalized = _serialize_lead(item)
+                    row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+                    payload = json.dumps(normalized, ensure_ascii=False, default=str)
+                    if row is None:
+                        row = OutreachLeadRow(id=str(lead_id)[:64])
+                        db.add(row)
+                    row.payload_json = payload
+                    row.created_at = str(normalized.get("created_at") or now_iso)[:40]
+                    row.updated_at = now_iso[:40]
+                    row.status = str(normalized.get("status") or "new")[:16]
+                    row.stage = str(normalized.get("stage") or "lead")[:16]
+                    try:
+                        row.score = int(normalized.get("score", 1) or 1)
+                    except Exception:
+                        row.score = 1
+                    row.source = str(normalized.get("source") or "manual")[:32]
+                    row.follow_up_due = str(normalized.get("follow_up_due"))[:40] if normalized.get("follow_up_due") else None
+                    row.converted_at = str(normalized.get("converted_at"))[:40] if normalized.get("converted_at") else None
+                    try:
+                        row.value = float(normalized.get("value", 0.0) or 0.0)
+                    except Exception:
+                        row.value = 0.0
+                    try:
+                        row.converted_value = float(normalized.get("converted_value", 0.0) or 0.0)
+                    except Exception:
+                        row.converted_value = 0.0
+
+                # Legacy behavior: writing the full list replaces the prior file contents.
+                # DB equivalent: remove rows not present in the current list snapshot.
+                if leads is not None:
+                    if seen:
+                        db.query(OutreachLeadRow).filter(~OutreachLeadRow.id.in_([str(x)[:64] for x in seen])).delete(synchronize_session=False)
+                    else:
+                        db.query(OutreachLeadRow).delete(synchronize_session=False)
+                db.commit()
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.error("crm_db_write_failed detail=%s", str(exc)[:500], exc_info=True)
+            # Fallback to legacy JSON persistence to preserve behavior if DB fails.
+            tmp_path = outreach_queue_path + ".tmp"
+            with outreach_queue_lock:
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump(leads, f, indent=2, ensure_ascii=False)
+                os.replace(tmp_path, outreach_queue_path)
 
     def _lead_score(text: str, source: str = "manual") -> int:
         lowered = (text or "").lower()
