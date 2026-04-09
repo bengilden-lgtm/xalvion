@@ -639,12 +639,15 @@
                       <textarea id="messageInput" placeholder="Paste a ticket or describe the customer issue…" autocomplete="off"></textarea>
                       <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                     </div>
-                    <div class="quick-actions">
-                      <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
-                      <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
-                      <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
-                      <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
-                    </div>
+                    <details class="quick-examples" id="quickExamples">
+                      <summary class="chip quick-examples-trigger" role="button" aria-label="Quick examples">Quick examples</summary>
+                      <div class="quick-examples-panel" role="group" aria-label="Quick example tickets">
+                        <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
+                        <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
+                        <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
+                        <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
+                      </div>
+                    </details>
                     <details class="composer-stripe-fold">
                       <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
                       <div class="stripe-context-row muted-copy composer-stripe-fields">

@@ -1217,6 +1217,76 @@ if (typeof window.pulseRail !== "function") {
         transform: translateY(-1px);
       }
 
+      .composer .quick-examples {
+        margin-top: 12px;
+      }
+
+      .composer .quick-examples > summary {
+        list-style: none;
+        cursor: pointer;
+        user-select: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .composer .quick-examples > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .composer .quick-examples > summary::after {
+        content: "⌄";
+        font-size: 12px;
+        line-height: 1;
+        opacity: 0.75;
+        transform: translateY(1px);
+      }
+
+      .composer .quick-examples[open] > summary::after {
+        content: "⌃";
+        opacity: 0.75;
+      }
+
+      .composer .quick-examples-panel {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .xv-inbox-panel[data-panel="recommended"] {
+        background: rgba(141,108,255,0.07);
+        border-color: rgba(141,108,255,0.16);
+      }
+
+      .xv-inbox-panel[data-panel="risk"] {
+        background: rgba(255,255,255,0.020);
+        border-color: rgba(255,255,255,0.050);
+      }
+
+      .xv-inbox-panel[data-panel="recommended"] .xv-inbox-title {
+        color: rgba(240, 242, 255, 0.96);
+      }
+
+      .xv-inbox-panel[data-panel="recommended"] .xv-inbox-sub {
+        color: rgba(214, 220, 244, 0.88);
+      }
+
+      .xv-inbox-prompt-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(141,108,255,0.26);
+        background: rgba(141,108,255,0.10);
+        color: rgba(240, 242, 255, 0.92);
+        font-size: 11.5px;
+        font-weight: 750;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+      }
+
       textarea:focus,
       #messageInput:focus,
       .message-input:focus {
@@ -2692,7 +2762,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (send && !state.sending) {
       send.disabled = locked;
     }
-    document.querySelectorAll(".quick-actions .chip").forEach((chip) => {
+    document.querySelectorAll(".quick-actions .chip, .quick-examples [data-fill], .empty-actions [data-fill]").forEach((chip) => {
       if (chip instanceof HTMLButtonElement) chip.disabled = locked;
     });
   }
@@ -3386,10 +3456,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
               </div>
               <div class="xv-inbox-list" id="xvInboxIncoming"></div>
             </div>
-            <div class="xv-inbox-panel" data-panel="recommended">
+        <div class="xv-inbox-panel" data-panel="recommended">
               <div class="xv-inbox-panel-head">
-                <div class="xv-inbox-title">Recommended next action</div>
+            <div class="xv-inbox-title">Recommended next action</div>
                 <div class="xv-inbox-sub">Operator-first routing</div>
+            <span class="xv-inbox-prompt-pill" aria-hidden="true">Start here</span>
               </div>
               <div class="xv-inbox-reco" id="xvInboxRecommended"></div>
             </div>
@@ -3434,10 +3505,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
               </div>
               <div class="xv-inbox-list" id="xvInboxIncoming"></div>
             </div>
-            <div class="xv-inbox-panel" data-panel="recommended">
+        <div class="xv-inbox-panel" data-panel="recommended">
               <div class="xv-inbox-panel-head">
-                <div class="xv-inbox-title">Recommended next action</div>
+            <div class="xv-inbox-title">Recommended next action</div>
                 <div class="xv-inbox-sub">Operator-first routing</div>
+            <span class="xv-inbox-prompt-pill" aria-hidden="true">Start here</span>
               </div>
               <div class="xv-inbox-reco" id="xvInboxRecommended"></div>
             </div>
@@ -3451,11 +3523,14 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           </div>
           <div class="xv-inbox-footer-hint">Manual paste still works — paste a ticket below any time.</div>
         </div>
-        <div class="empty-actions empty-actions-intent" role="group" aria-label="Example ticket">
-          <button type="button" class="chip empty-intent-chip" data-fill="A customer says: I was charged twice.">Duplicate charge</button>
-          <button type="button" class="chip empty-intent-chip" data-fill="A customer says: my package is late and I need an update.">Late package</button>
-          <button type="button" class="chip empty-intent-chip" data-fill="A customer says: my order arrived damaged and I want help.">Damaged order</button>
-        </div>
+        <details class="empty-actions empty-actions-intent quick-examples" aria-label="Quick examples">
+          <summary class="chip quick-examples-trigger" role="button" aria-label="Quick examples">Quick examples</summary>
+          <div class="quick-examples-panel" role="group" aria-label="Quick example tickets">
+            <button type="button" class="chip empty-intent-chip" data-fill="A customer says: I was charged twice.">Duplicate charge</button>
+            <button type="button" class="chip empty-intent-chip" data-fill="A customer says: my package is late and I need an update.">Late package</button>
+            <button type="button" class="chip empty-intent-chip" data-fill="A customer says: my order arrived damaged and I want help.">Damaged order</button>
+          </div>
+        </details>
         <div class="empty-actions empty-actions-launch">
           <span class="empty-chip-hint">${chipHintGuest}</span>
           <span class="empty-chip-hint empty-chip-hint-secondary">Approval-safe actions stay gated until you decide</span>
