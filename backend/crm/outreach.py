@@ -17,6 +17,7 @@ import json
 import os
 import threading
 import uuid
+import math
 from datetime import datetime, timedelta
 from typing import Any, Callable
 
@@ -53,6 +54,7 @@ def register_outreach_crm_routes(
         username: str
         text: str
         source: str | None = "manual"
+        value: float | None = None
 
         @field_validator("username")
         @classmethod
@@ -74,10 +76,25 @@ def register_outreach_crm_routes(
                 raise ValueError("text too long")
             return text
 
+        @field_validator("value")
+        @classmethod
+        def validate_value_field(cls, v: float | None) -> float | None:
+            if v is None:
+                return None
+            try:
+                value = float(v)
+            except Exception:
+                return None
+            if not math.isfinite(value):
+                return None
+            return max(0.0, min(1000000.0, value))
+
     class LeadStatusRequest(BaseModel):
         status: str | None = None
         stage: str | None = None
         note: str | None = None
+        value: float | None = None
+        probability: float | None = None
 
         @field_validator("status")
         @classmethod
@@ -98,6 +115,32 @@ def register_outreach_crm_routes(
             if stage not in lead_stage_order:
                 raise ValueError("stage must be one of lead/contacted/replied/demo/closed")
             return stage
+
+        @field_validator("value")
+        @classmethod
+        def validate_value_field(cls, v: float | None) -> float | None:
+            if v is None:
+                return None
+            try:
+                value = float(v)
+            except Exception:
+                return None
+            if not math.isfinite(value):
+                return None
+            return max(0.0, min(1000000.0, value))
+
+        @field_validator("probability")
+        @classmethod
+        def validate_probability_field(cls, v: float | None) -> float | None:
+            if v is None:
+                return None
+            try:
+                value = float(v)
+            except Exception:
+                return None
+            if not math.isfinite(value):
+                return None
+            return max(0.0, min(1.0, value))
 
     class LeadReminderRequest(BaseModel):
         days: int | None = 1
