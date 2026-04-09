@@ -185,3 +185,139 @@ def serialize_ticket_with_log(ticket: Any, db: Session) -> dict[str, Any]:
     else:
         base["action_log"] = None
     return base
+
+
+def generate_simulated_inbox_tickets(*, count: int = 6, seed: str | None = None) -> list[dict[str, Any]]:
+    """Generate realistic-looking inbound tickets for the workspace inbox layer.
+
+    Additive / safe: used only when there is no upstream integration providing real tickets.
+    """
+    import hashlib
+    import random
+    import time
+
+    count = int(count or 0)
+    if count <= 0:
+        return []
+    count = min(24, max(1, count))
+
+    seed_raw = (seed or "").strip()
+    if not seed_raw:
+        seed_raw = str(int(time.time() // 60))
+    digest = hashlib.sha256(seed_raw.encode("utf-8")).hexdigest()
+    rng = random.Random(int(digest[:12], 16))
+
+    templates: list[dict[str, Any]] = [
+        {
+            "issue_type": "refund_request",
+            "subject": "I want a refund — this is unacceptable",
+            "message": "I’ve been trying to resolve this for days. Please refund my order immediately. I’m done with this service.",
+            "churn_risk": (78, 96),
+            "refund_likelihood": (70, 95),
+            "urgency": (70, 92),
+            "complexity": (22, 55),
+            "ltv": (180, 650),
+        },
+        {
+            "issue_type": "duplicate_charge",
+            "subject": "Charged twice — need this fixed now",
+            "message": "I was charged twice for the same order. Can you reverse the extra charge today? This is really frustrating.",
+            "churn_risk": (55, 86),
+            "refund_likelihood": (65, 92),
+            "urgency": (62, 90),
+            "complexity": (25, 60),
+            "ltv": (300, 900),
+        },
+        {
+            "issue_type": "late_delivery",
+            "subject": "Package is late and I need an update",
+            "message": "My package was supposed to arrive yesterday. Can you tell me where it is and when it’ll be delivered?",
+            "churn_risk": (35, 68),
+            "refund_likelihood": (20, 55),
+            "urgency": (55, 85),
+            "complexity": (20, 55),
+            "ltv": (120, 480),
+        },
+        {
+            "issue_type": "cancel_subscription",
+            "subject": "Please cancel my subscription",
+            "message": "I’d like to cancel my subscription effective immediately. Also confirm I won’t be billed again.",
+            "churn_risk": (70, 96),
+            "refund_likelihood": (25, 60),
+            "urgency": (40, 78),
+            "complexity": (18, 50),
+            "ltv": (700, 2400),
+        },
+        {
+            "issue_type": "damaged_item",
+            "subject": "Item arrived damaged",
+            "message": "My order arrived damaged. I can share photos. What’s the fastest way to get a replacement?",
+            "churn_risk": (45, 78),
+            "refund_likelihood": (35, 70),
+            "urgency": (52, 82),
+            "complexity": (28, 62),
+            "ltv": (250, 1100),
+        },
+        {
+            "issue_type": "address_change",
+            "subject": "Need to change shipping address",
+            "message": "I entered the wrong shipping address. Can you update it before it ships? Order number is in my account.",
+            "churn_risk": (18, 42),
+            "refund_likelihood": (8, 28),
+            "urgency": (48, 78),
+            "complexity": (18, 45),
+            "ltv": (80, 420),
+        },
+    ]
+
+    def rrange(lo_hi: tuple[int, int]) -> int:
+        lo, hi = lo_hi
+        return int(rng.randint(int(lo), int(hi)))
+
+    now_ms = int(time.time() * 1000)
+    out: list[dict[str, Any]] = []
+    for i in range(count):
+        t = rng.choice(templates)
+        churn = rrange(t["churn_risk"])
+        refund = rrange(t["refund_likelihood"])
+        urgency = rrange(t["urgency"])
+        complexity = rrange(t["complexity"])
+        ltv = float(rrange(t["ltv"]))
+
+        risk_score = max(churn, refund)
+        if risk_score >= 80 or (refund >= 72 and urgency >= 68):
+            risk_level = "high"
+        elif risk_score >= 55:
+            risk_level = "medium"
+        else:
+            risk_level = "low"
+
+        if urgency >= 78:
+            priority = "high"
+        elif urgency >= 58:
+            priority = "medium"
+        else:
+            priority = "low"
+
+        sid = f"sim-{digest[:6]}-{(now_ms // 1000) % 100000:05d}-{i+1}"
+        out.append(
+            {
+                "id": sid,
+                "source": "sim",
+                "created_at": now_ms - (i * 19_000),
+                "subject": str(t["subject"]),
+                "customer_message": str(t["message"]),
+                "issue_type": str(t["issue_type"]),
+                "queue": "incoming",
+                "status": "new",
+                "priority": priority,
+                "risk_level": risk_level,
+                "urgency": urgency,
+                "churn_risk": churn,
+                "refund_likelihood": refund,
+                "abuse_likelihood": 0,
+                "complexity": complexity,
+                "ltv": round(float(ltv), 2),
+            }
+        )
+    return out

@@ -199,7 +199,11 @@ if (typeof window.pulseRail !== "function") {
     /** Epoch ms — show subtle post-run conversion strip after a high-impact workspace reply. */
     postRunValueMomentUntil: 0,
     /** Inline, product-native CTA in the usage strip (no popups). */
-    usageInlineCtaUntil: 0
+    usageInlineCtaUntil: 0,
+    /** Inbox auto-pull snapshot (additive queue intelligence layer). */
+    inboxSnapshot: null,
+    inboxLastPulledAt: 0,
+    inboxPullFailures: 0
   };
 
   function getValueSnapshot() {
@@ -3372,7 +3376,32 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-card-onboarding" role="status">
         <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""} — ready to handle tickets?`)}</h2>
-        <p class="cld-welcome-prompt onboarding-subline">Paste a support ticket. Xalvion prepares the reply and suggested actions — you approve.</p>
+        <p class="cld-welcome-prompt onboarding-subline">Incoming tickets are routed here automatically. Paste a ticket any time as a fallback.</p>
+        <div class="xv-inbox-layer xv-inbox-layer--claude" id="xvInboxLayer" aria-label="Queue intelligence">
+          <div class="xv-inbox-grid">
+            <div class="xv-inbox-panel" data-panel="incoming">
+              <div class="xv-inbox-panel-head">
+                <div class="xv-inbox-title">Incoming tickets</div>
+                <div class="xv-inbox-sub" id="xvInboxMeta" aria-live="polite">Pulling now…</div>
+              </div>
+              <div class="xv-inbox-list" id="xvInboxIncoming"></div>
+            </div>
+            <div class="xv-inbox-panel" data-panel="recommended">
+              <div class="xv-inbox-panel-head">
+                <div class="xv-inbox-title">Recommended next action</div>
+                <div class="xv-inbox-sub">Operator-first routing</div>
+              </div>
+              <div class="xv-inbox-reco" id="xvInboxRecommended"></div>
+            </div>
+            <div class="xv-inbox-panel" data-panel="risk">
+              <div class="xv-inbox-panel-head">
+                <div class="xv-inbox-title">High-risk cases</div>
+                <div class="xv-inbox-sub">Churn · refund · urgency</div>
+              </div>
+              <div class="xv-inbox-list" id="xvInboxHighRisk"></div>
+            </div>
+          </div>
+        </div>
         ${subMomentum}
         ${recentList}
         <div class="onboarding-example" aria-hidden="true">
@@ -3396,6 +3425,32 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           <span>Prepare action</span>
           <span>Approve &amp; execute</span>
         </div>
+        <div class="xv-inbox-layer" id="xvInboxLayer" aria-label="Queue intelligence">
+          <div class="xv-inbox-grid">
+            <div class="xv-inbox-panel" data-panel="incoming">
+              <div class="xv-inbox-panel-head">
+                <div class="xv-inbox-title">Incoming tickets</div>
+                <div class="xv-inbox-sub" id="xvInboxMeta" aria-live="polite">Pulling now…</div>
+              </div>
+              <div class="xv-inbox-list" id="xvInboxIncoming"></div>
+            </div>
+            <div class="xv-inbox-panel" data-panel="recommended">
+              <div class="xv-inbox-panel-head">
+                <div class="xv-inbox-title">Recommended next action</div>
+                <div class="xv-inbox-sub">Operator-first routing</div>
+              </div>
+              <div class="xv-inbox-reco" id="xvInboxRecommended"></div>
+            </div>
+            <div class="xv-inbox-panel" data-panel="risk">
+              <div class="xv-inbox-panel-head">
+                <div class="xv-inbox-title">High-risk cases</div>
+                <div class="xv-inbox-sub">Churn · refund · urgency</div>
+              </div>
+              <div class="xv-inbox-list" id="xvInboxHighRisk"></div>
+            </div>
+          </div>
+          <div class="xv-inbox-footer-hint">Manual paste still works — paste a ticket below any time.</div>
+        </div>
         <div class="empty-actions empty-actions-intent" role="group" aria-label="Example ticket">
           <button type="button" class="chip empty-intent-chip" data-fill="A customer says: I was charged twice.">Duplicate charge</button>
           <button type="button" class="chip empty-intent-chip" data-fill="A customer says: my package is late and I need an update.">Late package</button>
@@ -3406,6 +3461,182 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           <span class="empty-chip-hint empty-chip-hint-secondary">Approval-safe actions stay gated until you decide</span>
         </div>
       </div>`;
+  }
+
+  let _inboxPullTimer = null;
+
+  function shouldAutoPullInbox() {
+    const root = els.workspaceRoot;
+    if (!root || !els.messages) return false;
+    const empty = Boolean(els.messages.querySelector(".empty-state"));
+    const hasThread = Boolean(els.messages.querySelector(".msg-group"));
+    if (!empty || hasThread) return false;
+    const main = document.getElementById("mainCanvas");
+    const surface = String(main?.dataset?.surface || "workspace").toLowerCase();
+    return surface === "workspace";
+  }
+
+  function inboxTone(item) {
+    try {
+      const tags = Array.isArray(item?.tags) ? item.tags : [];
+      if (tags.includes("high_risk")) return "risk";
+      const nba = String(item?.next_best_action || "").toLowerCase();
+      if (nba.includes("safe")) return "safe";
+      if (nba.includes("review")) return "review";
+      if (tags.includes("urgent")) return "risk";
+      return "review";
+    } catch {
+      return "review";
+    }
+  }
+
+  function inboxBadgeLabel(item) {
+    const nba = String(item?.next_best_action || "").trim();
+    return nba || "Requires review";
+  }
+
+  function formatInboxId(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "—";
+    if (s.startsWith("sim-")) return "SIM";
+    const n = Number(s);
+    if (Number.isFinite(n) && n > 0) return `#${n}`;
+    return s.slice(0, 8).toUpperCase();
+  }
+
+  function buildInboxTicketButton(item) {
+    const msg = String(item?.customer_message || "").trim();
+    const subject = String(item?.subject || "").trim();
+    const preview = (msg || subject).replace(/\s+/g, " ").slice(0, 120);
+    const metaLeft = formatInboxId(item?.id);
+    const metaRight = [item?.issue_type, item?.queue].filter(Boolean).join(" · ");
+    const tone = inboxTone(item);
+    const badge = inboxBadgeLabel(item);
+    return `
+      <button type="button" class="xv-inbox-item" data-act="inbox-open" data-inbox-id="${escapeHtml(String(item?.id || ""))}">
+        <div class="xv-inbox-item-top">
+          <span class="xv-inbox-item-id">${escapeHtml(metaLeft)}</span>
+          <span class="xv-inbox-item-meta">${escapeHtml(metaRight || "Incoming")}</span>
+          <span class="meta-chip ${escapeHtml(tone)}">${ICONS.shield}<span>${escapeHtml(badge)}</span></span>
+        </div>
+        <div class="xv-inbox-item-preview">${escapeHtml(preview || "Open ticket")}</div>
+      </button>
+    `;
+  }
+
+  function renderInboxLayer(snapshot) {
+    const host = els.messages?.querySelector(".empty-state #xvInboxLayer");
+    if (!host) return;
+
+    const incomingNode = host.querySelector("#xvInboxIncoming");
+    const recNode = host.querySelector("#xvInboxRecommended");
+    const riskNode = host.querySelector("#xvInboxHighRisk");
+    const metaNode = host.querySelector("#xvInboxMeta");
+    if (!incomingNode || !recNode || !riskNode) return;
+
+    const s = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const incoming = Array.isArray(s.incoming) ? s.incoming : [];
+    const recommended = s.recommended_next_action || null;
+    const highRisk = Array.isArray(s.high_risk_cases) ? s.high_risk_cases : [];
+
+    const mix = s.meta?.source_mix || {};
+    const mixLine =
+      incoming.length > 0
+        ? `${incoming.length} queued · ${Number(mix.db || 0) || 0} live · ${Number(mix.sim || 0) || 0} simulated`
+        : "No incoming tickets yet";
+    if (metaNode) metaNode.textContent = mixLine;
+
+    incomingNode.innerHTML = incoming.length
+      ? incoming.slice(0, 6).map(buildInboxTicketButton).join("")
+      : `<div class="xv-inbox-empty">No new tickets. Paste a ticket below to start a run.</div>`;
+
+    if (recommended) {
+      const tone = inboxTone(recommended);
+      const title = inboxBadgeLabel(recommended);
+      const msg = String(recommended.customer_message || "").trim();
+      const preview = msg.replace(/\s+/g, " ").slice(0, 150);
+      recNode.innerHTML = `
+        <button type="button" class="xv-inbox-reco-btn" data-act="inbox-open" data-inbox-id="${escapeHtml(String(recommended.id || ""))}">
+          <div class="xv-inbox-reco-top">
+            <span class="meta-chip ${escapeHtml(tone)}">${ICONS.pulse}<span>${escapeHtml(title)}</span></span>
+            <span class="xv-inbox-reco-id">${escapeHtml(formatInboxId(recommended.id))}</span>
+          </div>
+          <div class="xv-inbox-reco-preview">${escapeHtml(preview || "Open recommended case")}</div>
+          <div class="xv-inbox-reco-cta">Handle this case →</div>
+        </button>
+      `;
+    } else {
+      recNode.innerHTML = `<div class="xv-inbox-empty">Stand by. Xalvion will surface the next best case as it lands.</div>`;
+    }
+
+    riskNode.innerHTML = highRisk.length
+      ? highRisk.slice(0, 4).map(buildInboxTicketButton).join("")
+      : `<div class="xv-inbox-empty">No high-risk tickets detected right now.</div>`;
+
+    host.querySelectorAll("[data-act='inbox-open']").forEach((btn) => {
+      btn.addEventListener(
+        "click",
+        () => {
+          const id = String(btn.getAttribute("data-inbox-id") || "").trim();
+          const all = [
+            ...(Array.isArray(snapshot?.incoming) ? snapshot.incoming : []),
+            ...(Array.isArray(snapshot?.high_risk_cases) ? snapshot.high_risk_cases : []),
+          ];
+          const picked = all.find((x) => String(x?.id || "") === id) || snapshot?.recommended_next_action || null;
+          const msg = String(picked?.customer_message || "").trim();
+          if (!msg || !els.messageInput) return;
+          els.messageInput.value = msg;
+          saveDraft(msg);
+          autoResizeTextarea();
+          syncComposerDraftClass();
+          els.messageInput.focus();
+        },
+        { once: true }
+      );
+    });
+  }
+
+  async function pullInboxSnapshot() {
+    const now = Date.now();
+    if (!shouldAutoPullInbox()) return;
+    if (state.inboxLastPulledAt && now - state.inboxLastPulledAt < 3500) return;
+    state.inboxLastPulledAt = now;
+
+    try {
+      const res = await fetch(`${API}/inbox/pull?limit=8`, { method: "GET", headers: headers(true) });
+      const data = await parseApiResponse(res);
+      if (!res.ok || !data || data.ok !== true) throw new Error("inbox_pull_failed");
+      state.inboxPullFailures = 0;
+      state.inboxSnapshot = data;
+      renderInboxLayer(data);
+    } catch {
+      state.inboxPullFailures = Math.min(12, (state.inboxPullFailures || 0) + 1);
+      if (state.inboxSnapshot) renderInboxLayer(state.inboxSnapshot);
+    }
+  }
+
+  function syncInboxAutopull() {
+    const on = shouldAutoPullInbox();
+    if (!on) {
+      if (_inboxPullTimer) {
+        window.clearTimeout(_inboxPullTimer);
+        _inboxPullTimer = null;
+      }
+      return;
+    }
+    if (_inboxPullTimer) return;
+
+    const loop = async () => {
+      _inboxPullTimer = null;
+      await pullInboxSnapshot();
+      if (!shouldAutoPullInbox()) return;
+      const fails = Number(state.inboxPullFailures || 0) || 0;
+      const base = 5200;
+      const backoff = Math.min(30_000, base + fails * 2400);
+      const jitter = Math.floor(Math.random() * 900);
+      _inboxPullTimer = window.setTimeout(loop, backoff + jitter);
+    };
+    _inboxPullTimer = window.setTimeout(loop, 250);
   }
 
   function openAccessDrawer(target = "account") {
@@ -3479,6 +3710,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (surface === "revenue") {
       refreshRevenue().catch(() => {});
     }
+    // Inbox auto-pull runs only on the workspace surface.
+    syncInboxAutopull();
     try {
       sessionStorage.setItem("xalvion-surface", surface);
     } catch {}
@@ -3546,6 +3779,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (!empty) return;
     empty.innerHTML = buildEmptyStateHtml();
     bindEmptyStateActions(empty);
+    if (state.inboxSnapshot) renderInboxLayer(state.inboxSnapshot);
+    syncInboxAutopull();
     syncWorkspaceLayoutMode();
   }
 
@@ -3560,6 +3795,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     syncWorkspaceLayoutMode();
 
     bindEmptyStateActions(empty);
+    if (state.inboxSnapshot) renderInboxLayer(state.inboxSnapshot);
+    syncInboxAutopull();
   }
 
   function clearEmptyState() {
@@ -3583,6 +3820,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     root.classList.toggle("workspace-active", active);
     root.style.setProperty("--xv-layout-active", active ? "1" : "0");
     syncComposerDockThreadClass();
+    syncInboxAutopull();
   }
 
   function addUserMessage(text) {

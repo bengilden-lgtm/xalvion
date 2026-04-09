@@ -1300,3 +1300,54 @@ textarea{ resize:vertical; }
 .approval-banner-copy{ margin-top:6px; font-size:12.5px; line-height:1.5; color:var(--text-soft); }
 .approval-banner-gov{ margin-top:8px; font-size:12.5px; color:var(--text-muted); line-height:1.45; padding-top:8px; border-top:1px solid var(--line-soft); }
 .op-action--primary--hold{ font-weight:700; box-shadow:0 0 0 1px rgba(245,243,255,0.22); }
+
+/* -------------------------------------------------------------------------
+   Inbox layer (queue intelligence) — additive / fallback stylesheet only
+   ------------------------------------------------------------------------- */
+.xv-inbox-layer{ margin-top:14px; text-align:left; }
+.xv-inbox-grid{ display:grid; grid-template-columns:1fr; gap:10px; }
+@media (min-width: 760px){
+  .xv-inbox-grid{ grid-template-columns: 1.05fr 1fr 1.05fr; gap:12px; }
+  .xv-inbox-layer--claude .xv-inbox-grid{ grid-template-columns:1fr; }
+}
+.xv-inbox-panel{
+  border:1px solid var(--line-soft);
+  background: rgba(255,255,255,0.02);
+  border-radius:16px;
+  padding:12px;
+}
+.xv-inbox-panel-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.xv-inbox-title{ font-size:12px; font-weight:700; letter-spacing:0.11em; text-transform:uppercase; color:rgba(246,242,235,0.90); }
+.xv-inbox-sub{ font-size:11.5px; color:var(--text-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.xv-inbox-list{ display:flex; flex-direction:column; gap:8px; }
+.xv-inbox-item{
+  width:100%;
+  text-align:left;
+  border:1px solid var(--line-soft);
+  background: rgba(255,255,255,0.02);
+  border-radius:14px;
+  padding:10px;
+  cursor:pointer;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
+}
+.xv-inbox-item:hover{ background:rgba(255,255,255,0.04); border-color:var(--line); transform: translateY(-1px); }
+.xv-inbox-item-top{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.xv-inbox-item-id{ font-size:11.5px; font-weight:700; color:rgba(246,242,235,0.92); }
+.xv-inbox-item-meta{ font-size:11.5px; color:var(--text-soft); flex:1 1 auto; min-width:120px; }
+.xv-inbox-item-preview{ margin-top:6px; font-size:13px; line-height:1.45; color:var(--text-muted); }
+.xv-inbox-reco-btn{
+  width:100%;
+  text-align:left;
+  border:1px solid var(--line-soft);
+  background: rgba(255,255,255,0.02);
+  border-radius:16px;
+  padding:12px;
+  cursor:pointer;
+}
+.xv-inbox-reco-btn:hover{ background:rgba(255,255,255,0.04); border-color:var(--line); transform: translateY(-1px); }
+.xv-inbox-reco-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.xv-inbox-reco-id{ font-size:11.5px; font-weight:650; color:var(--text-soft); }
+.xv-inbox-reco-preview{ margin-top:10px; font-size:13px; line-height:1.5; color:var(--text-muted); }
+.xv-inbox-reco-cta{ margin-top:10px; font-size:12.5px; font-weight:650; color:rgba(246,242,235,0.88); }
+.xv-inbox-empty{ font-size:12.5px; color:var(--text-soft); line-height:1.45; padding:6px 2px 2px; }
+.xv-inbox-footer-hint{ margin-top:10px; font-size:12px; color:var(--text-soft); text-align:center; }

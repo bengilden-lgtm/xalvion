@@ -2349,6 +2349,147 @@ select.refund-select{ padding-right: 34px; }
 .empty-card h2{ margin: 0 0 10px 0; font-size: 20px; letter-spacing: .2px; }
 .empty-card p{ margin: 0; color: var(--text-2); }
 
+/* Inbox layer (queue intelligence) — additive, quiet */
+.xv-inbox-layer{
+  margin-top: 14px;
+  text-align: left;
+}
+.xv-inbox-layer--claude{
+  margin-top: 12px;
+}
+.xv-inbox-grid{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 760px){
+  .xv-inbox-grid{
+    grid-template-columns: 1.05fr 1fr 1.05fr;
+    gap: 12px;
+  }
+  .empty-card-launch--claude .xv-inbox-grid{
+    grid-template-columns: 1fr;
+  }
+}
+.xv-inbox-panel{
+  border: 1px solid color-mix(in oklab, var(--border) 68%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 22%, transparent);
+  border-radius: 14px;
+  padding: 12px 12px;
+  box-shadow: none;
+}
+.xv-inbox-panel-head{
+  display:flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.xv-inbox-title{
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--text) 90%, var(--text-3));
+}
+.xv-inbox-sub{
+  font-size: 11.5px;
+  color: var(--text-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xv-inbox-list{
+  display:flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.xv-inbox-item{
+  width: 100%;
+  text-align: left;
+  border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  background: color-mix(in oklab, var(--xv-glass) 80%, transparent);
+  border-radius: 12px;
+  padding: 10px 10px;
+  cursor: pointer;
+  transition: transform var(--t-press) var(--ease), background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+.xv-inbox-item:hover{
+  transform: translateY(-1px);
+  background: color-mix(in oklab, var(--xv-glass-2) 85%, transparent);
+  border-color: color-mix(in oklab, var(--line-3) 85%, transparent);
+}
+.xv-inbox-item-top{
+  display:flex;
+  align-items:center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.xv-inbox-item-id{
+  font-size: 11.5px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.xv-inbox-item-meta{
+  font-size: 11.5px;
+  color: var(--text-4);
+  flex: 1 1 auto;
+  min-width: 100px;
+}
+.xv-inbox-item-preview{
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: color-mix(in oklab, var(--text-2) 92%, var(--text-4));
+}
+.xv-inbox-reco-btn{
+  width: 100%;
+  text-align: left;
+  border: 1px solid color-mix(in oklab, var(--line-3) 78%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklab, var(--surface-soft) 28%, transparent), color-mix(in oklab, var(--xv-glass-2) 55%, transparent));
+  border-radius: 14px;
+  padding: 12px 12px;
+  cursor: pointer;
+  transition: transform var(--t-press) var(--ease), border-color var(--t-fast) var(--ease);
+}
+.xv-inbox-reco-btn:hover{ transform: translateY(-1px); border-color: color-mix(in oklab, var(--line-3) 92%, transparent); }
+.xv-inbox-reco-top{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.xv-inbox-reco-id{
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--text-4);
+}
+.xv-inbox-reco-preview{
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--text-2) 92%, var(--text-4));
+}
+.xv-inbox-reco-cta{
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: color-mix(in oklab, var(--text) 88%, var(--text-3));
+}
+.xv-inbox-empty{
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-4);
+  padding: 6px 2px 2px 2px;
+}
+.xv-inbox-footer-hint{
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-4);
+  text-align: center;
+}
+
 /* Limit / conversion moment: single quiet panel */
 .empty-card.limit-moment-card{
   width: min(520px, 100%);

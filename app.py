@@ -2652,6 +2652,130 @@ def me(
     }
 
 
+def _inbox_priority_score(item: dict[str, Any]) -> float:
+    risk = float(max(int(item.get("churn_risk", 0) or 0), int(item.get("refund_likelihood", 0) or 0), int(item.get("abuse_likelihood", 0) or 0)))
+    urgency = float(int(item.get("urgency", 0) or 0))
+    complexity = float(int(item.get("complexity", 0) or 0))
+    ltv = float(item.get("ltv", 0) or 0)
+    # Weighted, operator-first: risk + urgency dominate; value influences but doesn't override safety.
+    return (risk * 1.25) + (urgency * 1.05) + (ltv / 22.0) - (complexity * 0.28)
+
+
+def _inbox_next_best_action(item: dict[str, Any]) -> str:
+    risk = int(max(int(item.get("churn_risk", 0) or 0), int(item.get("refund_likelihood", 0) or 0), int(item.get("abuse_likelihood", 0) or 0)))
+    urgency = int(item.get("urgency", 0) or 0)
+    complexity = int(item.get("complexity", 0) or 0)
+    if risk >= 75 or complexity >= 72:
+        return "Requires review"
+    if urgency >= 72 and risk >= 55:
+        return "Handle this now"
+    if urgency >= 78:
+        return "Handle this now"
+    if risk <= 40 and complexity <= 55:
+        return "Safe to resolve"
+    return "Requires review"
+
+
+def _inbox_bucket_tags(item: dict[str, Any]) -> list[str]:
+    tags: list[str] = []
+    churn = int(item.get("churn_risk", 0) or 0)
+    refund = int(item.get("refund_likelihood", 0) or 0)
+    urgency = int(item.get("urgency", 0) or 0)
+    ltv = float(item.get("ltv", 0) or 0)
+    if max(churn, refund) >= 70:
+        tags.append("high_risk")
+    if ltv >= 900:
+        tags.append("high_value")
+    if urgency >= 75:
+        tags.append("urgent")
+    return tags
+
+
+@app.get("/inbox/pull")
+def inbox_pull(
+    limit: int = 8,
+    user: User = Depends(get_current_user),
+    guest_client_id: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
+    db: Session = Depends(get_db),
+):
+    """Auto-pull inbox layer.
+
+    - Returns real queued tickets when present (no breaking changes to ticket ingestion).
+    - Tops up with simulated inbound tickets so the workspace never feels empty.
+    """
+    try:
+        lim = int(limit or 0)
+    except Exception:
+        lim = 8
+    lim = min(12, max(3, lim))
+
+    # Guest workspace should never read cross-user DB rows.
+    is_guest = getattr(user, "username", "") in {"", "guest"}
+    username = "" if is_guest else str(getattr(user, "username", "") or "")
+
+    items: list[dict[str, Any]] = []
+    if username:
+        try:
+            # Pull newest “incoming” work for this operator.
+            rows = (
+                db.query(Ticket)
+                .filter(Ticket.username == username)
+                .filter(Ticket.status.in_(["new", "waiting"]))
+                .filter(Ticket.queue.in_(["new", "incoming"]))
+                .order_by(Ticket.id.desc())
+                .limit(lim)
+                .all()
+            )
+            from services.ticket_service import serialize_ticket as _ser  # local import to avoid circulars during startup
+
+            for t in rows or []:
+                base = _ser(t)
+                base["source"] = "db"
+                base["ltv"] = 0.0
+                items.append(base)
+        except Exception as exc:
+            _log_throttled_db_issue("GET /inbox/pull", exc)
+
+    # Top up with simulation so the empty state has a queue surface.
+    try:
+        from services.ticket_service import generate_simulated_inbox_tickets as _sim
+
+        seed = username or normalize_guest_client_id(guest_client_id) or "guest"
+        needed = max(0, lim - len(items))
+        if needed > 0:
+            items.extend(_sim(count=needed, seed=seed))
+    except Exception:
+        pass
+
+    # Enrich + sort.
+    enriched: list[dict[str, Any]] = []
+    for it in items[: lim * 2]:
+        d = dict(it or {})
+        d["next_best_action"] = _inbox_next_best_action(d)
+        d["priority_score"] = round(_inbox_priority_score(d), 3)
+        d["tags"] = _inbox_bucket_tags(d)
+        enriched.append(d)
+
+    enriched.sort(key=lambda x: float(x.get("priority_score", 0) or 0), reverse=True)
+    incoming = enriched[:lim]
+    high_risk = [x for x in enriched if "high_risk" in (x.get("tags") or [])][: min(4, lim)]
+    recommended = incoming[0] if incoming else None
+
+    return {
+        "ok": True,
+        "limit": lim,
+        "incoming": incoming,
+        "recommended_next_action": recommended,
+        "high_risk_cases": high_risk,
+        "meta": {
+            "source_mix": {
+                "db": sum(1 for x in incoming if str(x.get("source", "") or "") == "db"),
+                "sim": sum(1 for x in incoming if str(x.get("source", "") or "") == "sim"),
+            }
+        },
+    }
+
+
 @app.get("/billing/plans")
 def billing_plans(
     user: User = Depends(get_current_user),
