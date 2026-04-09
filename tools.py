@@ -1,6 +1,9 @@
 import hashlib
 from typing import Optional
 
+import logging
+
+logger = logging.getLogger("xalvion.tools")
 
 # 📦 FIXED KNOWN TEST CUSTOMERS
 ORDERS = {
@@ -185,9 +188,13 @@ def execute_tool(
     try:
         return _live_dispatch(action, payload)
     except Exception as _exc:
+        # Defensive: never leak huge exception strings or stack traces through the tool interface.
+        # Tool callers treat this as a "review" signal; truncation preserves behavior while
+        # reducing accidental secret exposure (tokens, URLs, headers) in exception text.
+        logger.warning("live_tool_dispatch_failed action=%s detail=%s", action, str(_exc)[:200])
         return {
             "status":   "live_error",
-            "error":    str(_exc),
+            "error":    str(_exc)[:500],
             "fallback": "review",
             "mode":     "live",
         }

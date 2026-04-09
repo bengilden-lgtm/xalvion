@@ -3,6 +3,7 @@ security.py - input sanitization, output safety, and production runtime guards.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 import unicodedata
@@ -49,6 +50,8 @@ _LEAK_PHRASES: list[str] = [
 
 _INSECURE_SECRET_MARKERS = {"dev_secret_change_me", "change_me", "fallback", "dev", "development", "insecure", "test-secret"}
 
+logger = logging.getLogger("xalvion.security")
+
 
 def assert_production_runtime_safety() -> None:
     environment = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
@@ -58,6 +61,7 @@ def assert_production_runtime_safety() -> None:
         insecure = (not secret) or any(marker in lowered for marker in _INSECURE_SECRET_MARKERS)
         if insecure or len(secret) < 32:
             raise RuntimeError("Refusing to start in production: JWT_SECRET is missing, too short, or using a dev/fallback value.")
+        logger.info("production_runtime_safety_ok")
 
 
 def sanitize_input(user_input: str) -> Tuple[str | None, str | None]:

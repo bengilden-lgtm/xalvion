@@ -290,6 +290,19 @@ GUEST_PREVIEW_OPERATOR_LIMIT = int(os.getenv("GUEST_PREVIEW_OPERATOR_LIMIT", "3"
 if STRIPE_KEY:
     stripe.api_key = STRIPE_KEY
 
+# Production safety guards (fail-fast only in production).
+# Keep this close to config so a maintainer doesn't accidentally bypass it.
+try:
+    from security import assert_production_runtime_safety as _assert_production_runtime_safety
+
+    _assert_production_runtime_safety()
+except Exception as exc:
+    env = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
+    if env == "production":
+        raise
+    STARTUP_ISSUES.append(f"prod_safety_skipped:{type(exc).__name__}:{str(exc)[:180]}")
+    logger.warning("production_safety_guard_skipped env=%s detail=%s", env, str(exc)[:200])
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 _SERVICES_DIR = os.path.join(BASE_DIR, "services")
 INDEX_PATH = (
@@ -735,7 +748,15 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_token(username: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": username, "exp": expire}
+    # Use numeric exp/iat for portability across JWT libraries/languages.
+    # JWT is opaque to clients; adding iat/jti is non-breaking and aids incident response.
+    now = int(datetime.utcnow().timestamp())
+    payload = {
+        "sub": username,
+        "exp": int(expire.timestamp()),
+        "iat": now,
+        "jti": uuid.uuid4().hex,
+    }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -969,6 +990,11 @@ def enforce_guest_preview_allow(client_id: str | None) -> None:
                 "message": "Reload the workspace and try again (preview client id missing).",
             },
         )
+    # Defensive visibility: rotating client IDs can bypass per-client usage counters.
+    # We intentionally do not block here to preserve preview UX, but we log when the
+    # header looks suspiciously non-stable so ops can monitor abuse patterns.
+    if len(gid) < 6:
+        logger.info("guest_preview_client_id_short len=%s", len(gid))
     with _guest_preview_lock:
         with db_session() as db:
             row = db.query(GuestPreviewUsage).filter(GuestPreviewUsage.client_id == gid).first()
@@ -2567,13 +2593,22 @@ def stripe_connect_callback(code: str | None = None, state: str | None = None, d
         return RedirectResponse(url=f"{FRONTEND_URL}?surface=integrations&stripe=not_configured")
 
     try:
-        resp = stripe.OAuth.token(grant_type="authorization_code", code=code)
+        # Bind the OAuth token exchange to the configured redirect URI.
+        # This should be a no-op when configured correctly, but helps prevent
+        # misconfiguration and some classes of callback confusion.
+        resp = stripe.OAuth.token(
+            grant_type="authorization_code",
+            code=code,
+            redirect_uri=STRIPE_CONNECT_REDIRECT_URI,
+        )
         acct_id = str(resp.get("stripe_user_id") or "")
         scope = str(resp.get("scope") or "")
         livemode = bool(resp.get("livemode", False))
         if not acct_id:
             raise RuntimeError("No stripe_user_id returned from Stripe")
     except Exception:
+        # Never log the OAuth code or state token.
+        logger.warning("stripe_oauth_callback_failed user=%s", username)
         return RedirectResponse(url=f"{FRONTEND_URL}?surface=integrations&stripe=oauth_error")
 
     user = db.query(User).filter(User.username == username).first()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import math
 from typing import Any
 from urllib.parse import urlencode
 
@@ -8,6 +10,8 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 import app as _app
+
+logger = logging.getLogger("xalvion.stripe")
 
 
 def safe_refund_reason(value: str | None) -> str:
@@ -19,6 +23,9 @@ def cents_from_dollars(amount: Any) -> int:
     try:
         value = float(amount)
     except (TypeError, ValueError):
+        value = 0.0
+    # Defensive: reject NaN/inf without raising. This is a no-op for normal numeric inputs.
+    if not math.isfinite(value):
         value = 0.0
     return int(round(min(max(value, 0), _app.MAX_AUTO_REFUND) * 100))
 
@@ -501,6 +508,14 @@ def require_connected_stripe_account(user: Any) -> str:
         raise HTTPException(status_code=500, detail="Stripe not configured.")
     stripe_account_id = str(getattr(user, "stripe_account_id", "") or "").strip()
     if stripe_account_id:
+        # Safety footgun: older rows or manual DB edits can create mismatches between
+        # `stripe_connected` and `stripe_account_id`. Preserve behavior (allow account_id
+        # to proceed) but emit a warning so the inconsistency is detectable.
+        if not bool(getattr(user, "stripe_connected", 0)):
+            logger.warning(
+                "stripe_connected_flag_mismatch user=%s stripe_account_id_present=1",
+                str(getattr(user, "username", "") or ""),
+            )
         return stripe_account_id
     raise HTTPException(status_code=400, detail="Missing connected Stripe account.")
 
