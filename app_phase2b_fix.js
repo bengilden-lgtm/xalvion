@@ -16,7 +16,6 @@
     sendBtn: document.getElementById("sendBtn"),
     signupBtn: document.getElementById("signupBtn"),
     loginBtn: document.getElementById("loginBtn"),
-    devBtn: document.getElementById("devBtn"),
     logoutBtn: document.getElementById("logoutBtn"),
     newChatBtn: document.getElementById("newChatBtn"),
     usernameInput: document.getElementById("usernameInput"),
@@ -3158,17 +3157,6 @@ You just saved real support effort. Upgrade to Pro to keep the approval-first op
     await loadRevenueMetrics();
   }
 
-  function activatePreviewAccess() {
-    const demoText = "A customer says: I was charged twice for one order and wants it fixed today.";
-    if (els.messageInput) {
-      els.messageInput.value = demoText;
-      autoResizeTextarea();
-      saveDraft(demoText);
-      els.messageInput.focus();
-    }
-    setNotice("info", "Quick demo loaded", "A high-intent billing case is ready to run through the workspace.");
-  }
-
   async function upgradePlan(tier) {
     if (!tier) return;
 
@@ -3724,7 +3712,6 @@ function bindEvents() {
     els.signupBtn?.addEventListener("click", signup);
     els.loginBtn?.addEventListener("click", login);
     els.logoutBtn?.addEventListener("click", logout);
-    els.devBtn?.addEventListener("click", activatePreviewAccess);
     els.newChatBtn?.addEventListener("click", () => {
       resetWorkspaceThread();
       setNotice("info", "New workspace thread", "The thread was cleared. Run the next customer issue whenever you're ready.");
@@ -3901,12 +3888,6 @@ function bindEvents() {
         event.preventDefault();
         resetWorkspaceThread();
         setNotice("info", "Fresh thread", "The workspace is ready for a new support run.");
-        return;
-      }
-
-      if (!typingInField && (event.key === "d" || event.key === "D")) {
-        event.preventDefault();
-        activatePreviewAccess();
         return;
       }
 

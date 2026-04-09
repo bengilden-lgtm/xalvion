@@ -39,7 +39,6 @@ if (typeof window.pulseRail !== "function") {
     sendBtn: document.getElementById("sendBtn"),
     signupBtn: document.getElementById("signupBtn"),
     loginBtn: document.getElementById("loginBtn"),
-    devBtn: document.getElementById("devBtn"),
     logoutBtn: document.getElementById("logoutBtn"),
     newChatBtn: document.getElementById("newChatBtn"),
     usernameInput: document.getElementById("usernameInput"),
@@ -5642,31 +5641,6 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     await loadRevenueMetrics();
   }
 
-  function activatePreviewAccess() {
-    maybeResetGuestUsage(true);
-    try {
-      localStorage.removeItem(PREVIEW_CLIENT_KEY);
-    } catch {
-      /* no-op */
-    }
-    ensurePreviewClientId();
-    updatePlanUI("free", getGuestUsage(), GUEST_USAGE_LIMIT, Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage()));
-    applyComposerInteractiveLock();
-    const demoText = "A customer says: I was charged twice for one order and wants it fixed today.";
-    if (els.messageInput) {
-      els.messageInput.value = demoText;
-      autoResizeTextarea();
-      saveDraft(demoText);
-      syncComposerDraftClass();
-      els.messageInput.focus();
-    }
-    setNotice(
-      "info",
-      "Preview refreshed",
-      "Guest counters and preview client id were reset — you get a fresh server-side preview quota for local testing."
-    );
-  }
-
   async function upgradePlan(tier) {
     if (!tier) return;
 
@@ -6503,7 +6477,6 @@ function bindEvents() {
     els.signupBtn?.addEventListener("click", signup);
     els.loginBtn?.addEventListener("click", login);
     els.logoutBtn?.addEventListener("click", logout);
-    els.devBtn?.addEventListener("click", activatePreviewAccess);
     els.accessPlansLink?.addEventListener("click", () => {
       focusPlansPanel();
     });
@@ -6699,12 +6672,6 @@ function bindEvents() {
         event.preventDefault();
         resetWorkspaceThread();
         setNotice("info", "Fresh thread", "The workspace is ready for a new support run.");
-        return;
-      }
-
-      if (!typingInField && (event.key === "d" || event.key === "D")) {
-        event.preventDefault();
-        activatePreviewAccess();
         return;
       }
 
