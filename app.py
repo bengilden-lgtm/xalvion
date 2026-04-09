@@ -305,6 +305,8 @@ except Exception as exc:
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 _SERVICES_DIR = os.path.join(BASE_DIR, "services")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+FAVICON_PNG_PATH = os.path.join(STATIC_DIR, "favicon.png")
 INDEX_PATH = (
     os.path.join(_SERVICES_DIR, "index.html")
     if os.path.isfile(os.path.join(_SERVICES_DIR, "index.html"))
@@ -2489,6 +2491,39 @@ def serve_landing():
     if os.path.exists(LANDING_PATH):
         return FileResponse(LANDING_PATH)
     raise HTTPException(status_code=404, detail="landing.html not found")
+
+
+@app.get("/favicon.ico")
+def serve_favicon_ico():
+    if os.path.exists(FAVICON_PNG_PATH):
+        return FileResponse(
+            FAVICON_PNG_PATH,
+            media_type="image/png",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    raise HTTPException(status_code=404, detail="favicon not found")
+
+
+@app.get("/static/favicon.ico")
+def serve_static_favicon_ico():
+    if os.path.exists(FAVICON_PNG_PATH):
+        return FileResponse(
+            FAVICON_PNG_PATH,
+            media_type="image/png",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    raise HTTPException(status_code=404, detail="favicon not found")
+
+
+@app.get("/static/favicon.png")
+def serve_static_favicon_png():
+    if os.path.exists(FAVICON_PNG_PATH):
+        return FileResponse(
+            FAVICON_PNG_PATH,
+            media_type="image/png",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    raise HTTPException(status_code=404, detail="favicon not found")
 
 # =============================================================================
 # 14. ROUTES — HEALTH
