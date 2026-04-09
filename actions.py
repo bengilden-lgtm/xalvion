@@ -493,6 +493,197 @@ def project_business_impact(
     }
 
 
+def build_decision_confidence_breakdown(
+    ticket: Dict[str, Any],
+    decision: Dict[str, Any],
+    memory: Dict[str, Any] | None,
+    pattern_expectation: Dict[str, Any] | None,
+    outcome_stats: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    """
+    Reusable structural confidence breakdown (deterministic, no IO).
+
+    Combines ticket context, memory, learning pattern expectation, and outcome_store aggregates.
+    When outcome data is sparse, outcome_fit stays neutral-conservative.
+    """
+    ticket = ticket or {}
+    decision = decision or {}
+    memory = memory or {}
+    stats = outcome_stats or {}
+    pat = pattern_expectation or {}
+
+    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
+    act = str(decision.get("action", "none") or "none").strip().lower()
+    sentiment = _clamp(ticket.get("sentiment", 5), 1, 10, 5)
+    triage = ticket.get("triage") or {}
+    risk_level = str(triage.get("risk_level", "medium") or "medium").strip().lower()
+    complexity = _clamp(triage.get("complexity", 40), 0, 99, 40)
+
+    abuse_score = max(0, _to_int(memory.get("abuse_score", 0), 0))
+    refund_count = max(0, _to_int(memory.get("refund_count", 0), 0))
+    review_count = max(0, _to_int(memory.get("review_count", 0), 0))
+    complaint_count = max(0, _to_int(memory.get("complaint_count", 0), 0))
+
+    # --- policy_fit: action aligned with issue heuristics (same family as system_decision) ---
+    policy_fit = 0.72
+    if issue_type == "billing_duplicate_charge" and act == "refund":
+        policy_fit = 0.93
+    elif issue_type == "damaged_order" and act == "credit":
+        policy_fit = 0.90
+    elif issue_type == "shipping_issue" and act == "credit":
+        policy_fit = 0.86
+    elif issue_type == "refund_request" and act == "review":
+        policy_fit = 0.91
+    elif issue_type == "refund_request" and act == "refund":
+        policy_fit = 0.52
+    elif act == "none":
+        policy_fit = 0.78 if complexity < 68 else 0.62
+    elif act == "review":
+        policy_fit = 0.84
+    elif act in {"credit", "refund"}:
+        policy_fit = 0.74
+    elif act == "charge":
+        policy_fit = 0.48
+
+    if risk_level == "high":
+        policy_fit = round(max(0.25, policy_fit - 0.12), 4)
+    elif risk_level == "medium":
+        policy_fit = round(max(0.30, policy_fit - 0.04), 4)
+
+    # --- memory_fit: penalize repeat risk, reward stable-ish history ---
+    memory_fit = 1.0
+    memory_fit -= min(0.42, abuse_score * 0.11)
+    memory_fit -= min(0.22, refund_count * 0.055)
+    memory_fit -= min(0.12, review_count * 0.035)
+    memory_fit -= min(0.14, max(0, complaint_count - 2) * 0.028)
+    if sentiment <= 3:
+        memory_fit -= 0.06
+    memory_fit = round(max(0.28, min(0.98, memory_fit)), 4)
+
+    # --- outcome_fit from logged outcomes + pattern EMA ---
+    n = max(0, _to_int(stats.get("similar_case_count", 0), 0))
+    sr = stats.get("historical_success_rate")
+    rr = stats.get("historical_reopen_rate")
+    fail_r = stats.get("failure_rate")
+    rev_r = stats.get("reverse_rate")
+    disp_r = stats.get("dispute_rate")
+
+    outcome_fit = 0.76
+    if n >= 5:
+        base = 0.48
+        if sr is not None:
+            base += float(sr) * 0.44
+        if rr is not None:
+            base -= float(rr) * 0.62
+        if rev_r is not None:
+            base -= float(rev_r) * 0.78
+        if disp_r is not None:
+            base -= float(disp_r) * 0.72
+        if fail_r is not None:
+            base -= max(0.0, float(fail_r) - 0.12) * 0.35
+        # Reward clean auto-stable history when measurable
+        if (
+            sr is not None
+            and rr is not None
+            and rev_r is not None
+            and disp_r is not None
+            and float(sr) >= 0.87
+            and float(rr) <= 0.07
+            and float(rev_r) <= 0.02
+            and float(disp_r) <= 0.02
+        ):
+            base += 0.10
+        outcome_fit = round(max(0.22, min(0.97, base)), 4)
+    elif n > 0:
+        outcome_fit = 0.74
+
+    exp = str(pat.get("expectation") or "").strip().lower()
+    if exp == "high":
+        outcome_fit = round(min(0.97, outcome_fit + 0.06), 4)
+    elif exp == "low":
+        outcome_fit = round(max(0.22, outcome_fit - 0.10), 4)
+
+    band = str(stats.get("outcome_confidence_band") or "medium").strip().lower()
+    if band == "low" and n >= 5:
+        outcome_fit = round(max(0.22, outcome_fit - 0.12), 4)
+    elif band == "high" and n >= 8:
+        outcome_fit = round(min(0.97, outcome_fit + 0.05), 4)
+
+    # --- execution_risk: higher = riskier motion (not a "fit" — inverted in overall) ---
+    amt = max(0.0, _to_float(_to_int(decision.get("amount", 0), 0), 0.0))
+    execution_risk = 0.22
+    if act == "charge":
+        execution_risk = 0.92
+    elif act == "refund":
+        execution_risk = 0.62 + min(0.28, amt / 120.0)
+    elif act == "credit":
+        execution_risk = 0.38 + min(0.30, amt / 90.0)
+    elif act == "review":
+        execution_risk = 0.28
+    elif act == "none":
+        execution_risk = 0.20
+    if risk_level == "high":
+        execution_risk = round(min(0.98, execution_risk + 0.14), 4)
+    elif risk_level == "medium":
+        execution_risk = round(min(0.98, execution_risk + 0.06), 4)
+
+    # Conservative aggregate: multiplicative dampening by execution risk
+    core = min(policy_fit, memory_fit, outcome_fit)
+    overall_confidence = round(
+        max(0.24, min(0.96, core * (1.0 - 0.38 * execution_risk))),
+        4,
+    )
+
+    return {
+        "policy_fit": round(float(policy_fit), 4),
+        "memory_fit": round(float(memory_fit), 4),
+        "outcome_fit": round(float(outcome_fit), 4),
+        "execution_risk": round(float(execution_risk), 4),
+        "overall_confidence": float(overall_confidence),
+    }
+
+
+def blend_llm_and_structural_confidence(
+    llm_confidence: Any,
+    breakdown: Dict[str, Any] | None,
+    similar_case_count: int,
+) -> float:
+    """
+    Merge LLM-reported confidence with structural overall_confidence.
+    Never increases above the LLM value; pulls down when history is strong and negative.
+    Sparse outcome data barely moves the needle.
+    """
+    try:
+        llm_c = float(llm_confidence)
+    except (TypeError, ValueError):
+        llm_c = 0.9
+    llm_c = max(0.55, min(0.99, llm_c))
+
+    bd = breakdown or {}
+    try:
+        struct = float(bd.get("overall_confidence", llm_c))
+    except (TypeError, ValueError):
+        struct = llm_c
+    struct = max(0.24, min(0.96, struct))
+
+    n = max(0, int(similar_case_count))
+    if n >= 14:
+        w = 0.58
+    elif n >= 9:
+        w = 0.48
+    elif n >= 6:
+        w = 0.36
+    else:
+        w = 0.12
+
+    blended = (1.0 - w) * llm_c + w * struct
+    # Hard cap by structural when we have enough real cases and structure is cautious
+    if n >= 6 and struct < 0.66:
+        blended = min(blended, max(struct, 0.52))
+    blended = min(blended, llm_c)
+    return round(max(0.55, min(0.99, blended)), 4)
+
+
 def merge_impact_with_business_projection(
     ticket: Dict[str, Any],
     executed_action: Dict[str, Any],

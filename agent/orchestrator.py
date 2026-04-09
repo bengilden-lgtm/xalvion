@@ -8,6 +8,8 @@ logger = logging.getLogger("xalvion")
 
 from actions import (
     apply_learned_rules,
+    blend_llm_and_structural_confidence,
+    build_decision_confidence_breakdown,
     build_ticket,
     execution_requires_operator_gate,
     system_decision,
@@ -62,12 +64,24 @@ except Exception as _learning_imp_err:
 
 
 try:
+    from outcome_store import get_decision_outcome_stats as _get_decision_outcome_stats
     from outcome_store import log_outcome as _log_outcome
 except Exception as _outcome_store_imp_err:
     logger.warning("outcome_store.log_outcome unavailable", exc_info=True)
 
     def _log_outcome(outcome_key, user_id, action, amount, issue_type, tool_result, auto_resolved=True, approved_by_human=False):
         raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
+
+    def _get_decision_outcome_stats(issue_type, action, *, limit=300):
+        return {
+            "similar_case_count": 0,
+            "historical_success_rate": None,
+            "historical_reopen_rate": None,
+            "outcome_confidence_band": "medium",
+            "failure_rate": None,
+            "reverse_rate": None,
+            "dispute_rate": None,
+        }
 
 
 from agent.execution import execute_action, normalize_action_payload, should_attach_order_context
@@ -319,6 +333,37 @@ def run_agent(
 
     if execution_requires_operator_gate(final_action.get("action", "none"), final_action.get("amount", 0)):
         final_action = {**final_action, "requires_approval": True}
+
+    # --- Outcome intelligence + structural confidence (before governor; governor may tighten further) ---
+    try:
+        _issue_t = str(ticket.get("issue_type", "general_support") or "general_support")
+        _act_t = str(final_action.get("action", "none") or "none")
+        _outcome_stats = _get_decision_outcome_stats(_issue_t, _act_t, limit=300)
+        _pattern_pre = get_pattern_expectation(ticket, final_action)
+        _breakdown = build_decision_confidence_breakdown(
+            ticket,
+            final_action,
+            user_memory,
+            _pattern_pre,
+            _outcome_stats,
+        )
+        _blended = blend_llm_and_structural_confidence(
+            confidence,
+            _breakdown,
+            int(_outcome_stats.get("similar_case_count") or 0),
+        )
+        final_action = {
+            **final_action,
+            "confidence": _blended,
+            "decision_confidence_breakdown": _breakdown,
+            "similar_case_count": int(_outcome_stats.get("similar_case_count") or 0),
+            "historical_success_rate": _outcome_stats.get("historical_success_rate"),
+            "historical_reopen_rate": _outcome_stats.get("historical_reopen_rate"),
+            "outcome_confidence_band": str(_outcome_stats.get("outcome_confidence_band") or "medium"),
+        }
+        confidence = float(_blended)
+    except Exception:
+        logger.warning("outcome-aware confidence merge skipped", exc_info=True)
 
     # --- governor.py final authority layer (between decisioning and execution) ---
     # File: agent/orchestrator.py

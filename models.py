@@ -82,6 +82,12 @@ class SovereignDecision(BaseModel):
     governor_factors: list[str] | None = None
     approved: bool | None = None
     violations: list[str] | None = None
+    # Outcome-aware decision scoring (additive; deterministic; sparse-safe defaults)
+    decision_confidence_breakdown: dict[str, Any] | None = None
+    similar_case_count: int | None = None
+    historical_success_rate: float | None = None
+    historical_reopen_rate: float | None = None
+    outcome_confidence_band: Literal["low", "medium", "high"] | None = None
 
 
 class ImpactProjections(BaseModel):

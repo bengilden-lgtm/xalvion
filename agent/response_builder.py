@@ -1097,6 +1097,17 @@ def build_decision_explainability(
     )
     summary = " ".join(summary_parts)
 
+    _bd = final_action.get("decision_confidence_breakdown")
+    if not isinstance(_bd, dict):
+        _bd = {}
+    outcome_trust = {
+        "similar_case_count": int(final_action.get("similar_case_count") or 0),
+        "historical_success_rate": final_action.get("historical_success_rate"),
+        "historical_reopen_rate": final_action.get("historical_reopen_rate"),
+        "outcome_confidence_band": final_action.get("outcome_confidence_band"),
+        "decision_confidence_breakdown": _bd if _bd else None,
+    }
+
     return {
         "classification": {
             "issue_type": issue_type,
@@ -1144,6 +1155,7 @@ def build_decision_explainability(
             "required": req_approval,
             "reason":   approval_reason,
         },
+        "outcome_trust": outcome_trust,
         "summary": summary,
     }
 
@@ -1381,6 +1393,23 @@ def _canonicalize_result(
         or tool_status in {"pending_approval", "manual_review"},
         "tool_status": tool_status,
     }
+    _pass_through = (
+        "execution_mode",
+        "governor_reason",
+        "governor_risk_score",
+        "governor_risk_level",
+        "governor_factors",
+        "approved",
+        "violations",
+        "decision_confidence_breakdown",
+        "similar_case_count",
+        "historical_success_rate",
+        "historical_reopen_rate",
+        "outcome_confidence_band",
+    )
+    for _k in _pass_through:
+        if _k in final_action:
+            decision[_k] = final_action[_k]
 
     _exec_tier = compute_execution_tier(
         action=str(decision["action"]),

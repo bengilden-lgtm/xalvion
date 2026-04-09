@@ -198,6 +198,36 @@ def compute_governor_risk(ticket: dict, decision: dict, memory: dict | None = No
         score -= 1
         factors.append("Repeat customer with small credit (risk reduced slightly)")
 
+    # Outcome intelligence on the decision payload — tighten only (never relax abuse/plan gates)
+    sim_n = _to_int(d.get("similar_case_count", 0), 0)
+    band = str(d.get("outcome_confidence_band") or "").strip().lower()
+    if band == "low" and sim_n >= 5:
+        score += 1
+        factors.append("Outcome history confidence band is low for this issue/action pattern")
+    try:
+        h_rr = d.get("historical_reopen_rate")
+        if sim_n >= 8 and h_rr is not None and float(h_rr) >= 0.22:
+            score += 1
+            factors.append("Elevated historical reopen rate for this action pattern")
+    except Exception:
+        pass
+    try:
+        h_sr = d.get("historical_success_rate")
+        if sim_n >= 8 and h_sr is not None and float(h_sr) <= 0.52:
+            score += 1
+            factors.append("Low historical success rate for this action pattern")
+    except Exception:
+        pass
+    br = d.get("decision_confidence_breakdown")
+    if isinstance(br, dict):
+        try:
+            oc = br.get("overall_confidence")
+            if oc is not None and float(oc) < 0.58 and sim_n >= 6:
+                score += 1
+                factors.append("Structural decision confidence is low relative to outcome history")
+        except Exception:
+            pass
+
     # Clamp score into 0-5
     if score < 0:
         score = 0

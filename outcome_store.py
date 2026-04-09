@@ -916,6 +916,99 @@ def _best_pattern_snapshot() -> dict[str, Any] | None:
         return None
 
 
+def get_decision_outcome_stats(
+    issue_type: str,
+    action: str,
+    *,
+    limit: int = 300,
+) -> dict[str, Any]:
+    """
+    Aggregate real outcomes for the same issue_type + action (recent window, deterministic order).
+
+    Used for decision scoring and UI trust metadata. Safe when empty or on DB errors:
+    returns neutral band, zero count, and null rates until enough samples exist.
+    """
+    _MIN_RATE_N = 5
+    _MIN_BAND_N = 5
+
+    lim = max(1, min(500, int(limit)))
+    it = str(issue_type or "general_support").strip()[:64] or "general_support"
+    act = str(action or "none").strip().lower()[:32] or "none"
+
+    neutral: dict[str, Any] = {
+        "similar_case_count": 0,
+        "historical_success_rate": None,
+        "historical_reopen_rate": None,
+        "outcome_confidence_band": "medium",
+        "failure_rate": None,
+        "reverse_rate": None,
+        "dispute_rate": None,
+    }
+
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(ActionOutcomeLog)
+            .filter(
+                ActionOutcomeLog.issue_type == it,
+                ActionOutcomeLog.action == act,
+            )
+            .order_by(ActionOutcomeLog.id.desc())
+            .limit(lim)
+            .all()
+        )
+        n = len(rows)
+        if n == 0:
+            return dict(neutral)
+
+        successes = sum(1 for r in rows if int(r.success or 0))
+        reopened = sum(1 for r in rows if int(getattr(r, "ticket_reopened", 0) or 0))
+        reversed_n = sum(1 for r in rows if int(r.refund_reversed or 0))
+        disputes = sum(1 for r in rows if int(r.dispute_filed or 0))
+
+        sr = round(successes / n, 4)
+        rr = round(reopened / n, 4)
+        rev_r = round(reversed_n / n, 4)
+        disp_r = round(disputes / n, 4)
+        fail_r = round(1.0 - sr, 4)
+
+        band = "medium"
+        if n < _MIN_BAND_N:
+            band = "medium"
+        else:
+            if (
+                rr > 0.20
+                or rev_r > 0.08
+                or disp_r > 0.06
+                or fail_r > 0.35
+            ):
+                band = "low"
+            elif sr >= 0.88 and rr <= 0.06 and reversed_n == 0 and disputes == 0:
+                band = "high"
+            else:
+                band = "medium"
+
+        hist_sr = sr if n >= _MIN_RATE_N else None
+        hist_rr = rr if n >= _MIN_RATE_N else None
+        fail_rep = fail_r if n >= _MIN_RATE_N else None
+        rev_rep = rev_r if n >= _MIN_RATE_N else None
+        disp_rep = disp_r if n >= _MIN_RATE_N else None
+
+        return {
+            "similar_case_count": n,
+            "historical_success_rate": hist_sr,
+            "historical_reopen_rate": hist_rr,
+            "outcome_confidence_band": band,
+            "failure_rate": fail_rep,
+            "reverse_rate": rev_rep,
+            "dispute_rate": disp_rep,
+        }
+    except Exception:
+        return dict(neutral)
+    finally:
+        db.close()
+
+
 def outcome_intelligence_snapshot(limit: int = 25) -> dict[str, Any]:
     """
     UI-facing outcome intelligence snapshot.

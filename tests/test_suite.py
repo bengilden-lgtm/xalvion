@@ -460,6 +460,47 @@ class TestOutcomeImpactScoring:
         assert norm["stability"] == "unstable"
         assert "ticket_reopened" in norm["risk_flags"]
 
+    def test_get_decision_outcome_stats_sparse_safe(self):
+        from outcome_store import get_decision_outcome_stats
+
+        s = get_decision_outcome_stats("__unlikely_issue_type_qz9__", "none", limit=5)
+        assert s["similar_case_count"] == 0
+        assert s["outcome_confidence_band"] == "medium"
+        assert s["historical_success_rate"] is None
+        assert s["historical_reopen_rate"] is None
+
+    def test_build_decision_confidence_breakdown_stable(self):
+        from actions import build_decision_confidence_breakdown, blend_llm_and_structural_confidence
+
+        ticket = {
+            "issue_type": "shipping_issue",
+            "sentiment": 5,
+            "triage": {"risk_level": "low", "complexity": 40},
+        }
+        decision = {"action": "credit", "amount": 15, "reason": "test"}
+        memory = {"abuse_score": 0, "refund_count": 0, "review_count": 0, "complaint_count": 0}
+        stats = {
+            "similar_case_count": 0,
+            "historical_success_rate": None,
+            "historical_reopen_rate": None,
+            "outcome_confidence_band": "medium",
+            "failure_rate": None,
+            "reverse_rate": None,
+            "dispute_rate": None,
+        }
+        b1 = build_decision_confidence_breakdown(ticket, decision, memory, None, stats)
+        b2 = build_decision_confidence_breakdown(ticket, decision, memory, None, stats)
+        assert b1 == b2
+        assert set(b1) == {
+            "policy_fit",
+            "memory_fit",
+            "outcome_fit",
+            "execution_risk",
+            "overall_confidence",
+        }
+        blended = blend_llm_and_structural_confidence(0.9, b1, 0)
+        assert 0.55 <= blended <= 0.9
+
 
 # =============================================================================
 # actions.py — execution tier
