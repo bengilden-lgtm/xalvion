@@ -126,6 +126,15 @@ button:disabled {
   transform: none;
 }
 
+.btn-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 550;
+  color: rgba(210, 220, 245, 0.78);
+  line-height: 1.35;
+}
+
 #analyze {
   background: linear-gradient(135deg, var(--purple-1), var(--purple-2));
   box-shadow: 0 10px 24px rgba(79,70,229,0.35);
@@ -170,6 +179,58 @@ button:disabled {
   color: #ffd1d1;
   background: rgba(255, 107, 107, 0.08);
   border-color: rgba(255, 107, 107, 0.22);
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.status-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  margin-top: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.status.show .status-icon {
+  background: linear-gradient(135deg, rgba(124, 92, 252, 0.24), rgba(34, 193, 255, 0.16));
+  border-color: rgba(124, 92, 252, 0.22);
+}
+
+.status.error .status-icon {
+  background: rgba(255, 107, 107, 0.14);
+  border-color: rgba(255, 107, 107, 0.28);
+}
+
+.status-title {
+  font-size: 12px;
+  font-weight: 750;
+  color: rgba(240, 246, 255, 0.95);
+  line-height: 1.35;
+}
+
+.status-body {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.status-action.is-hidden {
+  display: none !important;
+}
+
+.status-action {
+  margin-top: 1px;
+  white-space: nowrap;
 }
 
 .panel {

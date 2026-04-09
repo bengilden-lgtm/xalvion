@@ -61,6 +61,9 @@ const copyBtn = document.getElementById("copyBtn");
 const insertBtn = document.getElementById("insertBtn");
 
 const statusBox = document.getElementById("status");
+const statusTitle = document.getElementById("statusTitle");
+const statusBody = document.getElementById("statusBody");
+const statusActionBtn = document.getElementById("statusActionBtn");
 const resultPanel = document.getElementById("resultPanel");
 const notePill = document.getElementById("notePill");
 const statusBadge = document.getElementById("statusBadge");
@@ -187,6 +190,7 @@ let replySnapshotBeforeEdit = "";
 let explainabilityOpen = false;
 let thinkingRunId = 0;
 let replyEditing = false;
+let lastPrimaryIntent = "";
 
 function syncCompatFromStores() {
   const ui = uiStore.getState();
@@ -320,23 +324,55 @@ function syncReplyFromTextarea() {
 }
 
 function showStatus(message, isError = false) {
-  uiStore.setState({
-    statusMessage: message || "",
-    statusIsError: Boolean(isError),
-  });
+  const payload =
+    typeof message === "object" && message
+      ? message
+      : {
+          title: isError ? "Something went wrong" : "",
+          body: String(message || ""),
+          action: null,
+        };
+
+  const next = {
+    statusMessage: `${payload.title ? `${payload.title}\n` : ""}${payload.body || ""}`.trim(),
+    statusIsError: Boolean(isError || payload.kind === "error"),
+  };
+
+  uiStore.setState(next);
 
   if (!statusBox) return;
 
-  const { statusMessage: msg, statusIsError: err } = uiStore.getState();
+  const err = uiStore.getState().statusIsError;
+  const hasAny = Boolean(payload.title || payload.body);
 
-  if (!msg) {
-    statusBox.textContent = "";
+  if (!hasAny) {
     statusBox.className = "status";
+    if (statusTitle) statusTitle.textContent = "";
+    if (statusBody) statusBody.textContent = "";
+    if (statusActionBtn) {
+      statusActionBtn.textContent = "";
+      statusActionBtn.classList.add("is-hidden");
+      statusActionBtn.onclick = null;
+    }
     return;
   }
 
-  statusBox.textContent = msg;
   statusBox.className = err ? "status show error" : "status show";
+  if (statusTitle) statusTitle.textContent = payload.title || (err ? "Something went wrong" : "Status");
+  if (statusBody) statusBody.textContent = payload.body || "";
+
+  if (statusActionBtn) {
+    const action = payload.action;
+    if (action?.label && typeof action.onClick === "function") {
+      statusActionBtn.textContent = action.label;
+      statusActionBtn.classList.remove("is-hidden");
+      statusActionBtn.onclick = action.onClick;
+    } else {
+      statusActionBtn.textContent = "";
+      statusActionBtn.classList.add("is-hidden");
+      statusActionBtn.onclick = null;
+    }
+  }
 }
 
 function showPanel() {
@@ -829,6 +865,7 @@ function buildInboxSummary(results) {
 
 async function analyze() {
   await ensureUsageReady();
+  lastPrimaryIntent = "analyze";
   const preSnap = getUsageSnapshot(sessionStore.getState().planTier);
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
     usageChrome.notifyGateAttempt?.("analyze");
@@ -874,7 +911,15 @@ async function analyze() {
 
     if (!tab?.id) {
       hideThinkingPanel();
-      showStatus("No active tab found.", true);
+      showStatus(
+        {
+          kind: "error",
+          title: "No active tab",
+          body: "Open Gmail, Zendesk, or Gorgias in the foreground, then try again.",
+          action: { label: "Retry", onClick: analyze },
+        },
+        true
+      );
       if (emptyState) emptyState.style.display = "grid";
       return;
     }
@@ -885,7 +930,15 @@ async function analyze() {
     if (!text) {
       agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
       hideThinkingPanel();
-      showStatus("No readable content found on this page.", true);
+      showStatus(
+        {
+          kind: "error",
+          title: "No readable ticket content",
+          body: "Try opening a specific message/thread view, then run Analyze again.",
+          action: { label: "Retry", onClick: analyze },
+        },
+        true
+      );
       if (emptyState) emptyState.style.display = "grid";
       return;
     }
@@ -902,7 +955,15 @@ async function analyze() {
 
     if (!res.ok) {
       hideThinkingPanel();
-      showStatus(`Analyze failed (${res.status})`, true);
+      showStatus(
+        {
+          kind: "error",
+          title: "Analyze failed",
+          body: `The operator service returned ${res.status}.`,
+          action: { label: "Retry", onClick: analyze },
+        },
+        true
+      );
       if (emptyState) emptyState.style.display = "grid";
       return;
     }
@@ -918,7 +979,15 @@ async function analyze() {
   } catch (err) {
     console.error("Analyze failed:", err);
     hideThinkingPanel();
-    showStatus("Backend not reachable. Make sure app.py is running on 127.0.0.1:8000.", true);
+    showStatus(
+      {
+        kind: "error",
+        title: "Operator service unavailable",
+        body: "Make sure `app.py` is running on 127.0.0.1:8000, then retry.",
+        action: { label: "Retry", onClick: analyze },
+      },
+      true
+    );
     if (emptyState) emptyState.style.display = "grid";
   } finally {
     uiStore.setState({ loading: false });
@@ -928,6 +997,7 @@ async function analyze() {
 
 async function scanInbox() {
   await ensureUsageReady();
+  lastPrimaryIntent = "scan";
   const preSnap = getUsageSnapshot(sessionStore.getState().planTier);
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
     usageChrome.notifyGateAttempt?.("scan");
@@ -973,7 +1043,15 @@ async function scanInbox() {
 
     if (!tab?.id) {
       hideThinkingPanel();
-      showStatus("No active tab found.", true);
+      showStatus(
+        {
+          kind: "error",
+          title: "No active tab",
+          body: "Open Gmail inbox in the foreground, then try Scan inbox again.",
+          action: { label: "Retry", onClick: scanInbox },
+        },
+        true
+      );
       if (emptyState) emptyState.style.display = "grid";
       return;
     }
@@ -1004,7 +1082,15 @@ async function scanInbox() {
     if (!threads.length) {
       agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
       hideThinkingPanel();
-      showStatus("No inbox threads found on this page.", true);
+      showStatus(
+        {
+          kind: "error",
+          title: "No inbox rows detected",
+          body: "Make sure you’re viewing the inbox list (not a single message) and try again.",
+          action: { label: "Retry", onClick: scanInbox },
+        },
+        true
+      );
       if (emptyState) emptyState.style.display = "grid";
       return;
     }
@@ -1033,7 +1119,15 @@ async function scanInbox() {
     hideThinkingPanel();
 
     if (!results.length) {
-      showStatus("Inbox scan completed, but no tickets were analyzed.", true);
+      showStatus(
+        {
+          kind: "error",
+          title: "Scan completed with no results",
+          body: "The service didn’t return any analyses for the visible rows.",
+          action: { label: "Retry", onClick: scanInbox },
+        },
+        true
+      );
       if (emptyState) emptyState.style.display = "grid";
       return;
     }
@@ -1056,7 +1150,15 @@ async function scanInbox() {
   } catch (err) {
     console.error("Inbox scan failed:", err);
     hideThinkingPanel();
-    showStatus("Inbox scan failed.", true);
+    showStatus(
+      {
+        kind: "error",
+        title: "Inbox scan failed",
+        body: "If the service is running, try again. Otherwise start `app.py` on 127.0.0.1:8000.",
+        action: { label: "Retry", onClick: scanInbox },
+      },
+      true
+    );
     if (emptyState) emptyState.style.display = "grid";
   } finally {
     uiStore.setState({ loading: false });
@@ -1122,13 +1224,21 @@ if (copyBtn) {
       await navigator.clipboard.writeText(lastReply);
       const original = copyBtn.textContent;
       copyBtn.textContent = "Copied ✓";
+      showStatus({ title: "Copied", body: "Final reply is in your clipboard." }, false);
 
       setTimeout(() => {
         copyBtn.textContent = original;
       }, 1200);
     } catch (err) {
       console.error("Copy failed:", err);
-      showStatus("Could not copy the reply.", true);
+      showStatus(
+        {
+          kind: "error",
+          title: "Copy failed",
+          body: "Your browser blocked clipboard access for this panel. Try selecting the reply text and copying manually.",
+        },
+        true
+      );
     }
   });
 }
@@ -1141,27 +1251,48 @@ if (insertBtn) {
       const tab = await chromeCtx.getActiveTab();
 
       if (!tab?.id) {
-        showStatus("No active tab found.", true);
+        showStatus(
+          {
+            kind: "error",
+            title: "No active tab",
+            body: "Focus Gmail in the foreground, then try Insert again.",
+          },
+          true
+        );
         return;
       }
 
       const res = await insertIntoGmail(tab.id, lastReply, chromeApi);
 
       if (!res.ok) {
-        showStatus(res.detail || "Insert failed", true);
+        showStatus(
+          {
+            kind: "error",
+            title: "Insert failed",
+            body: res.detail || "Could not find a Gmail composer to insert into.",
+          },
+          true
+        );
         return;
       }
 
       const original = insertBtn.textContent;
       insertBtn.textContent = "Inserted ✓";
-      showStatus("Reply inserted into Gmail.");
+      showStatus({ title: "Inserted into Gmail", body: "Reply placed into the active composer." }, false);
 
       setTimeout(() => {
         insertBtn.textContent = original;
       }, 1200);
     } catch (err) {
       console.error("Insert failed:", err);
-      showStatus("Could not insert reply into Gmail.", true);
+      showStatus(
+        {
+          kind: "error",
+          title: "Couldn’t insert into Gmail",
+          body: "Open a reply/compose box in Gmail, then try again. (Copy remains available as fallback.)",
+        },
+        true
+      );
     }
   });
 }
