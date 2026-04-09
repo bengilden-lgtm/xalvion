@@ -1185,6 +1185,20 @@ select.refund-select{ padding-right: 34px; }
   gap: 12px;
   overflow: hidden;
 }
+.home-surface{
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: none;
+  flex-direction: column;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: calc(12px + var(--empty-hero-offset)) var(--composer-pad-x) 12px var(--composer-pad-x);
+}
+#workspaceRoot.workspace-idle .home-surface{ display:flex; }
+#workspaceRoot.workspace-active .home-surface{ display:none; }
+#workspaceRoot.workspace-idle .messages-zone{ display:none; }
+#workspaceRoot.workspace-active .messages-zone{ display:flex; }
 .workspace-conversation-column:has(.empty-state){
   gap: 10px;
 }

@@ -1053,6 +1053,22 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
 .sidebar-more summary{ cursor:pointer; color:var(--text-muted); }
 
 /* Idle vs active */
+#homeSurface.home-surface{
+  width:100%;
+  max-width: calc(var(--col-max) + 2 * var(--pad-x));
+  margin:0 auto;
+  min-height:0;
+  display:none;
+  flex-direction:column;
+  overflow:auto;
+  overscroll-behavior:contain;
+  padding: calc(var(--pad-y) + 8px) var(--pad-x) 12px;
+}
+#workspaceRoot.workspace-idle #homeSurface{ display:flex; }
+#workspaceRoot.workspace-active #homeSurface{ display:none; }
+#workspaceRoot.workspace-idle .messages-zone{ display:none; }
+#workspaceRoot.workspace-active .messages-zone{ display:flex; }
+
 #workspaceRoot.workspace-idle .messages-shell{
   overflow:visible;
 }

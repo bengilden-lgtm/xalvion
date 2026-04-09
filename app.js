@@ -27,6 +27,8 @@ if (typeof window.pulseRail !== "function") {
   };
 }
   const els = {
+    homeSurface: document.getElementById("homeSurface"),
+    messagesZone: document.getElementById("messagesZone"),
     messages: document.getElementById("messages"),
     messageInput: document.getElementById("messageInput"),
     sendBtn: document.getElementById("sendBtn"),
@@ -3542,8 +3544,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
   function shouldAutoPullInbox() {
     const root = els.workspaceRoot;
-    if (!root || !els.messages) return false;
-    const empty = Boolean(els.messages.querySelector(".empty-state"));
+    if (!root || !els.homeSurface) return false;
+    const empty = Boolean(els.homeSurface.querySelector(".empty-state"));
     const hasThread = hasActiveThreadContent();
     if (!empty || hasThread) return false;
     const main = document.getElementById("mainCanvas");
@@ -3600,7 +3602,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
   }
 
   function renderInboxLayer(snapshot) {
-    const host = els.messages?.querySelector(".empty-state #xvInboxLayer");
+    const host = els.homeSurface?.querySelector(".empty-state #xvInboxLayer");
     if (!host) return;
 
     const incomingNode = host.querySelector("#xvInboxIncoming");
@@ -3850,7 +3852,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
   }
 
   function refreshEmptyStateContent() {
-    const empty = els.messages?.querySelector(".empty-state");
+    const empty = els.homeSurface?.querySelector(".empty-state");
     if (!empty) return;
     empty.innerHTML = buildEmptyStateHtml();
     bindEmptyStateActions(empty);
@@ -3861,14 +3863,20 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
   }
 
   function addEmptyState() {
-    if (!els.messages) return;
-    if (els.messages.querySelector(".empty-state")) return;
+    if (!els.homeSurface) return;
+    if (els.homeSurface.querySelector(".empty-state")) return;
 
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.innerHTML = buildEmptyStateHtml();
-    // Front-screen queue must start clean at top of viewport.
-    els.messages.prepend(empty);
+    // Front-screen home must start clean at top of viewport.
+    els.homeSurface.replaceChildren(empty);
+    try {
+      els.homeSurface.scrollTop = 0;
+    } catch {}
+    try {
+      empty.scrollIntoView({ block: "start" });
+    } catch {}
     syncWorkspaceLayoutMode();
 
     bindEmptyStateActions(empty);
@@ -3878,7 +3886,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
   }
 
   function clearEmptyState() {
-    els.messages?.querySelector(".empty-state")?.remove();
+    els.homeSurface?.querySelector(".empty-state")?.remove();
   }
 
   function hasActiveThreadContent() {
@@ -3908,7 +3916,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
   function moveThreadBelowQueueIfNeeded() {
     if (!els.messages) return;
-    const empty = els.messages.querySelector(".empty-state");
+    const empty = els.homeSurface?.querySelector(".empty-state");
     if (!empty) return;
 
     const movable = Array.from(els.messages.children).filter((child) => {
@@ -3927,7 +3935,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     movable.forEach((node) => body.appendChild(node));
 
-    // Ensure fold is below the queue/empty-state, never above it.
+    // Ensure fold is below the home/empty-state, never above it.
     if (!fold.parentElement) {
       empty.insertAdjacentElement("afterend", fold);
     } else if (fold.previousElementSibling !== empty) {
@@ -3945,11 +3953,12 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const root = els.workspaceRoot;
     if (!root || !els.messages) return;
     const hasConversation = hasActiveThreadContent();
-    const hasLimitCard = Boolean(els.messages.querySelector(".empty-state .limit-moment-card"));
-    const active = hasConversation || hasLimitCard;
+    const active = hasConversation;
     root.classList.toggle("workspace-idle", !active);
     root.classList.toggle("workspace-active", active);
     root.style.setProperty("--xv-layout-active", active ? "1" : "0");
+    const prevFold = document.getElementById("xvPreviousThreadFold");
+    if (prevFold) prevFold.hidden = active;
     syncComposerDockThreadClass();
     syncInboxAutopull();
   }
@@ -6941,7 +6950,10 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     updateTopbarStatus();
     syncApprovalRail(null);
     if (els.railRunSummary) els.railRunSummary.textContent = "Issue type, action, confidence — updates after each support run.";
-    scrollMessagesToBottom(true);
+    try {
+      if (els.messagesShell) els.messagesShell.scrollTop = 0;
+    } catch {}
+    syncWorkspaceLayoutMode();
   }
 
   function exportThread() {
