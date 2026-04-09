@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List
 
 from state_store import load_state, save_state
@@ -21,6 +22,12 @@ def default_brain() -> Dict[str, Any]:
         "rule_weights": {},
         "rule_scores": {},
         "rule_outcomes": {},
+        # Rich, auditable outcome-driven learning stats (additive; older brains ignore)
+        "rule_stats": {},
+        # Operator/audit-safe per-rule event log (bounded)
+        "rule_audit": {},
+        # Explicit suppressions (safety + performance)
+        "rule_suppressions": {},
         "system_prompt": "",
         "prompt_history": [],
     }
@@ -83,6 +90,12 @@ def normalize_brain(brain: Dict[str, Any]) -> Dict[str, Any]:
         brain["rule_scores"] = {}
     if not isinstance(brain.get("rule_outcomes"), dict):
         brain["rule_outcomes"] = {}
+    if not isinstance(brain.get("rule_stats"), dict):
+        brain["rule_stats"] = {}
+    if not isinstance(brain.get("rule_audit"), dict):
+        brain["rule_audit"] = {}
+    if not isinstance(brain.get("rule_suppressions"), dict):
+        brain["rule_suppressions"] = {}
     if not isinstance(brain.get("prompt_history"), list):
         brain["prompt_history"] = []
     for rule in brain["learned_rules"]:
@@ -90,6 +103,28 @@ def normalize_brain(brain: Dict[str, Any]) -> Dict[str, Any]:
         brain["rule_weights"].setdefault(trigger, 1)
         brain["rule_scores"].setdefault(trigger, 1.0)
         brain["rule_outcomes"].setdefault(trigger, {"wins": 0, "losses": 0, "closed_wins": 0})
+        brain["rule_stats"].setdefault(
+            trigger,
+            {
+                "n_total": 0,
+                "n_real_outcomes": 0,
+                "n_self_report_only": 0,
+                "n_operator_approved": 0,
+                "n_operator_override": 0,
+                "n_success": 0,
+                "n_auto_success": 0,
+                "n_reopened": 0,
+                "n_reversed": 0,
+                "n_dispute": 0,
+                "n_closed": 0,
+                "n_good": 0,
+                "n_bad": 0,
+                "underperform_streak": 0,
+                "last_event_ts": 0.0,
+                "last_real_outcome_ts": 0.0,
+                "last_impact_score": None,
+            },
+        )
     return brain
 
 
@@ -111,13 +146,30 @@ def compute_rule_score(brain: Dict[str, Any], trigger: str) -> float:
     closed_wins = float(outcomes.get("closed_wins", 0))
     conversion_bonus = closed_wins * 0.8
     penalty = losses * 0.35
-    return round(base + (weight * 0.12) + (wins * 0.18) + conversion_bonus - penalty, 4)
+    # Outcome-driven stability penalty (reopens/reversals/disputes) — deterministic + explainable.
+    stats = (brain.get("rule_stats") or {}).get(trigger) or {}
+    reopened = float(stats.get("n_reopened", 0) or 0)
+    reversed_n = float(stats.get("n_reversed", 0) or 0)
+    disputes = float(stats.get("n_dispute", 0) or 0)
+    streak = float(stats.get("underperform_streak", 0) or 0)
+    stability_pen = reopened * 0.55 + reversed_n * 1.10 + disputes * 0.95 + max(0.0, streak - 2.0) * 0.35
+
+    # Explicit suppression is a strong down-rank without deleting evidence.
+    sup = (brain.get("rule_suppressions") or {}).get(trigger) or {}
+    suppressed = bool(sup.get("suppressed", False))
+    sup_pen = 6.0 if suppressed else 0.0
+
+    return round(base + (weight * 0.12) + (wins * 0.18) + conversion_bonus - penalty - stability_pen - sup_pen, 4)
 
 
 def get_top_rule_objects(brain: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]]:
     scored = []
     for rule in brain.get("learned_rules", []):
         trigger = rule.get("trigger", "unknown_rule")
+        # Suppressed rules are not eligible for selection (kept for audit).
+        sup = (brain.get("rule_suppressions") or {}).get(trigger) or {}
+        if bool(sup.get("suppressed", False)):
+            continue
         score = compute_rule_score(brain, trigger)
         scored.append((score, rule))
     scored.sort(key=lambda x: x[0], reverse=True)
@@ -135,6 +187,25 @@ def add_rule(brain: Dict[str, Any], rule: Dict[str, Any] | str) -> None:
         brain["rule_weights"][trigger] = 1
         brain["rule_scores"][trigger] = 1.0
         brain["rule_outcomes"][trigger] = {"wins": 0, "losses": 0, "closed_wins": 0}
+        brain.setdefault("rule_stats", {})[trigger] = {
+            "n_total": 0,
+            "n_real_outcomes": 0,
+            "n_self_report_only": 0,
+            "n_operator_approved": 0,
+            "n_operator_override": 0,
+            "n_success": 0,
+            "n_auto_success": 0,
+            "n_reopened": 0,
+            "n_reversed": 0,
+            "n_dispute": 0,
+            "n_closed": 0,
+            "n_good": 0,
+            "n_bad": 0,
+            "underperform_streak": 0,
+            "last_event_ts": 0.0,
+            "last_real_outcome_ts": 0.0,
+            "last_impact_score": None,
+        }
     else:
         brain["rule_weights"][trigger] = min(
             500,
@@ -144,6 +215,58 @@ def add_rule(brain: Dict[str, Any], rule: Dict[str, Any] | str) -> None:
             50.0,
             round(float(brain["rule_scores"].get(trigger, 1.0)) + 0.2, 4),
         )
+    update_system_prompt(brain)
+    save_brain(brain)
+
+
+def _append_rule_audit(brain: Dict[str, Any], trigger: str, event: Dict[str, Any]) -> None:
+    """
+    Append an operator-safe audit event for a trigger.
+    Bounded to last 40 entries per rule.
+    """
+    if not isinstance(event, dict):
+        return
+    audit = brain.setdefault("rule_audit", {}).setdefault(trigger, [])
+    if not isinstance(audit, list):
+        audit = []
+    audit.append(event)
+    audit = audit[-40:]
+    brain["rule_audit"][trigger] = audit
+
+
+def set_rule_suppression(
+    brain: Dict[str, Any],
+    trigger: str,
+    *,
+    suppressed: bool,
+    reason: str,
+    until_ts: float | None = None,
+    evidence: Dict[str, Any] | None = None,
+) -> None:
+    """
+    Explicitly suppress (or unsuppress) a learned rule trigger.
+    Deterministic, auditable, and does not delete prior learning evidence.
+    """
+    trig = str(trigger or "").strip() or "unknown_rule"
+    now = time.time()
+    entry = {
+        "suppressed": bool(suppressed),
+        "reason": str(reason or "").strip()[:260] or None,
+        "set_at": float(now),
+        "until_ts": float(until_ts) if until_ts is not None else None,
+    }
+    brain.setdefault("rule_suppressions", {})[trig] = entry
+    _append_rule_audit(
+        brain,
+        trig,
+        {
+            "ts": float(now),
+            "event": "suppression_set" if suppressed else "suppression_cleared",
+            "reason": entry["reason"],
+            "until_ts": entry["until_ts"],
+            "evidence": dict(evidence or {}) if isinstance(evidence, dict) else None,
+        },
+    )
     update_system_prompt(brain)
     save_brain(brain)
 
@@ -163,6 +286,112 @@ def register_rule_outcome(brain: Dict[str, Any], trigger: str, *, closed: bool =
     save_brain(brain)
 
 
+def register_rule_outcome_v2(
+    brain: Dict[str, Any],
+    trigger: str,
+    *,
+    channel: str,
+    impact_score: float | None,
+    closed: bool,
+    reopened: bool,
+    reversed_flag: bool,
+    dispute: bool,
+    operator_approved: bool,
+    operator_override: bool,
+    decision_action: str,
+    evidence: Dict[str, Any] | None = None,
+) -> None:
+    """
+    Outcome-aware reinforcement entry point.
+    - channel: "real" | "self_report"
+    - impact_score: 0..1 when real outcome known (None allowed)
+    Updates rule_stats + classic wins/losses, then recomputes rule score.
+    """
+    trig = str(trigger or "").strip() or "unknown_rule"
+    stats = brain.setdefault("rule_stats", {}).setdefault(trig, {})
+    if not isinstance(stats, dict):
+        stats = {}
+    now = time.time()
+
+    # --- update counts ---
+    stats["n_total"] = int(stats.get("n_total", 0) or 0) + 1
+    if str(channel or "").strip().lower() == "real":
+        stats["n_real_outcomes"] = int(stats.get("n_real_outcomes", 0) or 0) + 1
+        stats["last_real_outcome_ts"] = float(now)
+    else:
+        stats["n_self_report_only"] = int(stats.get("n_self_report_only", 0) or 0) + 1
+    if operator_approved:
+        stats["n_operator_approved"] = int(stats.get("n_operator_approved", 0) or 0) + 1
+    if operator_override:
+        stats["n_operator_override"] = int(stats.get("n_operator_override", 0) or 0) + 1
+    if closed:
+        stats["n_closed"] = int(stats.get("n_closed", 0) or 0) + 1
+    if reopened:
+        stats["n_reopened"] = int(stats.get("n_reopened", 0) or 0) + 1
+    if reversed_flag:
+        stats["n_reversed"] = int(stats.get("n_reversed", 0) or 0) + 1
+    if dispute:
+        stats["n_dispute"] = int(stats.get("n_dispute", 0) or 0) + 1
+
+    # --- interpret impact into good/bad + streak ---
+    good = False
+    bad = False
+    if impact_score is not None:
+        try:
+            sc = float(impact_score)
+        except Exception:
+            sc = None
+        if sc is not None:
+            stats["last_impact_score"] = float(sc)
+            # Deterministic bands (aligned with outcome_store impact labels)
+            if sc >= 0.58:
+                good = True
+            elif sc < 0.38:
+                bad = True
+
+    # Stability events override "good" — an outcome that reopens/reverses/disputes is treated as underperforming.
+    if reopened or reversed_flag or dispute:
+        bad = True
+        good = False
+
+    if good:
+        stats["n_good"] = int(stats.get("n_good", 0) or 0) + 1
+        stats["underperform_streak"] = 0
+    elif bad:
+        stats["n_bad"] = int(stats.get("n_bad", 0) or 0) + 1
+        stats["underperform_streak"] = int(stats.get("underperform_streak", 0) or 0) + 1
+    else:
+        # neutral: drift streak toward 0 slowly
+        stats["underperform_streak"] = max(0, int(stats.get("underperform_streak", 0) or 0) - 1)
+
+    stats["last_event_ts"] = float(now)
+    brain["rule_stats"][trig] = stats
+
+    # --- classic wins/losses for backward compatibility ---
+    positive = bool(good) and not bool(bad)
+    register_rule_outcome(brain, trig, closed=bool(closed), positive=positive)
+
+    _append_rule_audit(
+        brain,
+        trig,
+        {
+            "ts": float(now),
+            "event": "rule_outcome",
+            "channel": str(channel or "unknown"),
+            "decision_action": str(decision_action or "none"),
+            "impact_score": float(impact_score) if impact_score is not None else None,
+            "closed": bool(closed),
+            "reopened": bool(reopened),
+            "reversed": bool(reversed_flag),
+            "dispute": bool(dispute),
+            "operator_approved": bool(operator_approved),
+            "operator_override": bool(operator_override),
+            "streak": int(stats.get("underperform_streak", 0) or 0),
+            "evidence": dict(evidence or {}) if isinstance(evidence, dict) else None,
+        },
+    )
+
+
 def decay_rules(brain: Dict[str, Any]) -> None:
     to_remove = []
     for rule in brain.get("learned_rules", []):
@@ -170,6 +399,17 @@ def decay_rules(brain: Dict[str, Any]) -> None:
         current = float(brain["rule_scores"].get(trigger, 1.0)) * 0.992
         current = min(current, 50.0)
         brain["rule_scores"][trigger] = round(current, 4)
+        # Suppression expiry is deterministic based on timestamp; expired suppressions are cleared.
+        sup = (brain.get("rule_suppressions") or {}).get(trigger)
+        if isinstance(sup, dict) and bool(sup.get("suppressed", False)):
+            until_ts = sup.get("until_ts")
+            try:
+                if until_ts is not None and float(until_ts) > 0 and time.time() >= float(until_ts):
+                    sup["suppressed"] = False
+                    sup["reason"] = (str(sup.get("reason") or "")[:180] + " (expired)")[:260] if sup.get("reason") else "expired"
+                    brain["rule_suppressions"][trigger] = sup
+            except Exception:
+                pass
         if current < 0.30:
             to_remove.append(trigger)
     if to_remove:
@@ -178,6 +418,9 @@ def decay_rules(brain: Dict[str, Any]) -> None:
             brain["rule_scores"].pop(trigger, None)
             brain["rule_weights"].pop(trigger, None)
             brain["rule_outcomes"].pop(trigger, None)
+            brain.get("rule_stats", {}).pop(trigger, None)
+            brain.get("rule_audit", {}).pop(trigger, None)
+            brain.get("rule_suppressions", {}).pop(trigger, None)
     update_system_prompt(brain)
     save_brain(brain)
 
