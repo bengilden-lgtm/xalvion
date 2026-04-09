@@ -966,6 +966,7 @@ async function analyze() {
 
   uiStore.setState({ loading: true });
   try {
+    const ANALYZE_TIMEOUT_MS = 9000;
     agentStore.setState((s) => ({
       ...s,
       thinkingRunId: s.thinkingRunId + 1,
@@ -1029,23 +1030,42 @@ async function analyze() {
       return;
     }
 
-    const res = await fetch("http://127.0.0.1:8000/analyze", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text }),
-    });
+    console.log("[xalvion] analyze: start", { timeoutMs: ANALYZE_TIMEOUT_MS, textLen: text.length });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch("http://127.0.0.1:8000/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    console.log("[xalvion] analyze: response", { ok: res.ok, status: res.status });
 
     await thinkingPromise;
 
     if (!res.ok) {
+      let detail = "";
+      try {
+        // Best-effort; do not block failure rendering on body parsing.
+        detail = normalize(await res.text());
+      } catch (e) {
+        console.error("[xalvion] analyze: failed reading error body", e);
+      }
       hideThinkingPanel();
       showStatus(
         {
           kind: "error",
           title: "Analyze failed",
-          body: `The operator service returned ${res.status}.`,
+          body: `The operator service returned ${res.status}.${detail ? `\n\n${detail.slice(0, 240)}` : ""}`,
           action: { label: "Retry", onClick: analyze },
         },
         true
@@ -1055,7 +1075,33 @@ async function analyze() {
     }
 
     showStatus("Generating decision...");
-    const data = await res.json();
+    let data;
+    try {
+      // Some backends may mislabel content-type; parse defensively.
+      const raw = await res.text();
+      try {
+        data = JSON.parse(raw);
+      } catch (jsonErr) {
+        console.error("[xalvion] analyze: invalid JSON", { rawPreview: String(raw || "").slice(0, 240) }, jsonErr);
+        throw new Error("Invalid JSON returned from operator service.");
+      }
+    } catch (err) {
+      console.error("[xalvion] analyze: response parse failed", err);
+      hideThinkingPanel();
+      showStatus(
+        {
+          kind: "error",
+          title: "Analyze failed",
+          body: "The operator service returned an unreadable response. Try again.",
+          action: { label: "Retry", onClick: analyze },
+        },
+        true
+      );
+      if (emptyState) emptyState.style.display = "grid";
+      return;
+    }
+
+    console.log("[xalvion] analyze: parsed", { keys: data && typeof data === "object" ? Object.keys(data).slice(0, 12) : [] });
     render(data);
     await recordSuccessfulOperatorRun(sessionStore.getState().planTier);
     usageChrome.notifyOperatorRunComplete?.(data);
@@ -1063,13 +1109,16 @@ async function analyze() {
     usageChrome.syncPrimaryRunButtons();
     showStatus("Ready.");
   } catch (err) {
-    console.error("Analyze failed:", err);
+    const isAbort = err && typeof err === "object" && (err.name === "AbortError" || /aborted/i.test(String(err.message || "")));
+    console.error("[xalvion] analyze: failed", err);
     hideThinkingPanel();
     showStatus(
       {
         kind: "error",
-        title: "Operator service unavailable",
-        body: "Make sure `app.py` is running on 127.0.0.1:8000, then retry.",
+        title: isAbort ? "Analyze timed out" : "Operator service unavailable",
+        body: isAbort
+          ? "Analysis failed — try again."
+          : "Make sure `app.py` is running on 127.0.0.1:8000, then retry.",
         action: { label: "Retry", onClick: analyze },
       },
       true
