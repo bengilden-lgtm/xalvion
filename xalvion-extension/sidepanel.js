@@ -97,6 +97,7 @@ const aiSummaryCard = document.getElementById("aiSummaryCard");
 const replyStack = document.getElementById("replyStack");
 const replyTextarea = document.getElementById("replyTextarea");
 const replyToggleEditBtn = document.getElementById("replyToggleEditBtn");
+const replyEditBanner = document.getElementById("replyEditBanner");
 const gateEditBtn = document.getElementById("gateEditBtn");
 const gateDoneBtn = document.getElementById("gateDoneBtn");
 const approvalCompact = document.getElementById("approvalCompact");
@@ -259,6 +260,8 @@ function resetReplyEditor() {
     replyTextarea.classList.add("is-hidden");
     replyTextarea.value = "";
   }
+  if (replyStack) replyStack.classList.remove("is-editing");
+  if (replyEditBanner) replyEditBanner.style.display = "";
   if (replyValue) replyValue.classList.remove("is-hidden");
   if (replyToggleEditBtn) replyToggleEditBtn.textContent = "Edit";
 }
@@ -280,6 +283,7 @@ function setReplyEditing(on) {
       replyTextarea.value = text;
       replyTextarea.classList.remove("is-hidden");
       replyValue.classList.add("is-hidden");
+      if (replyStack) replyStack.classList.add("is-editing");
       replyToggleEditBtn.textContent = "Preview";
       replyTextarea.focus();
     } else {
@@ -294,6 +298,7 @@ function setReplyEditing(on) {
       if (replyValue) replyValue.textContent = next || "-";
       replyTextarea.classList.add("is-hidden");
       replyValue.classList.remove("is-hidden");
+      if (replyStack) replyStack.classList.remove("is-editing");
       replyToggleEditBtn.textContent = "Edit";
       if (copyBtn) {
         copyBtn.disabled = !next;

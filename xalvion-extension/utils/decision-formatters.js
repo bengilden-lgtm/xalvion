@@ -276,6 +276,7 @@ export function confidenceMeterPercent(conf) {
 export function buildOperatorBriefLines(data) {
   const decision = getDecisionData(data);
   const triage = getTriageData(data);
+  const impact = getImpactData(data);
   const issueType = normalize(data.issue_type || data.type);
   const reply = normalize(data.reply || data.response || data.final);
   const action = inferDisplayAction(data, reply, issueType);
@@ -288,9 +289,28 @@ export function buildOperatorBriefLines(data) {
     const n = Number(confRaw);
     conf = Number.isFinite(n) ? n.toFixed(2) : String(confRaw);
   }
+  const execTier = normalize(String(data.execution_tier || data.execution?.tier || ""));
+  const requiresApproval = Boolean(decision.requires_approval || data.requires_approval || data.execution?.requires_approval);
+  const governorReason = normalize(String(data.governor_reason || decision.governor_reason || ""));
+  const timeSaved = impact?.agent_minutes_saved ? `${impact.agent_minutes_saved} min` : "";
+
+  const posture =
+    requiresApproval
+      ? "Approval gate active — operator release required"
+      : execTier
+        ? `Execution tier: ${execTier.replace(/_/g, " ")}`
+        : "No approval gate — standard operator verification";
+
+  const operatorCheck = requiresApproval
+    ? "Confirm customer-safe wording + money/policy facts, then approve or reject."
+    : "Skim for factual correctness, then copy/insert.";
+
   return [
-    { label: "Action · type", value: `${safe(action)} · ${safe(issueType)}` },
+    { label: "Mission", value: `${safe(action)} · ${safe(issueType)}${timeSaved ? ` · est. ${timeSaved} saved` : ""}` },
+    { label: "Posture", value: posture },
     { label: "Status · queue", value: `${status} · ${queue}` },
     { label: "Risk · confidence", value: `${risk} · ${conf}` },
+    ...(governorReason ? [{ label: "Governor", value: governorReason }] : []),
+    { label: "Operator check", value: operatorCheck },
   ];
 }

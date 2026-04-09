@@ -644,6 +644,31 @@
       box-shadow: 0 0 0 1px rgba(124, 92, 252, 0.2);
     }
 
+    .reply-stack.is-editing {
+      border-color: rgba(34, 193, 255, 0.22);
+      box-shadow: 0 0 0 1px rgba(34, 193, 255, 0.08);
+    }
+
+    .reply-edit-banner {
+      display: none;
+      border-radius: 10px;
+      border: 1px solid rgba(34, 193, 255, 0.18);
+      background: rgba(34, 193, 255, 0.06);
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: rgba(210, 235, 255, 0.92);
+    }
+
+    .reply-stack.is-editing .reply-edit-banner {
+      display: block;
+    }
+
+    .reply-edit-banner strong {
+      font-weight: 750;
+      color: rgba(240, 250, 255, 0.95);
+    }
+
     .reply-textarea.is-hidden {
       display: none !important;
     }
@@ -1040,8 +1065,8 @@
         <details id="operatorBrief" class="operator-brief">
           <summary class="operator-brief-summary">
             <span class="operator-brief-summary-text">
-              <span class="operator-brief-eyebrow">Brief</span>
-              <span class="operator-brief-heading">Case posture</span>
+              <span class="operator-brief-eyebrow">Operator intelligence</span>
+              <span class="operator-brief-heading">Mission brief (read before send)</span>
             </span>
             <span class="operator-brief-chevron" aria-hidden="true">⌄</span>
           </summary>
@@ -1050,8 +1075,11 @@
 
         <div id="replyStack" class="reply-stack">
           <div class="reply-stack-head">
-            <span class="reply-stack-label">Customer-ready reply</span>
+            <span class="reply-stack-label">Final customer response</span>
             <button type="button" id="replyToggleEditBtn" class="btn-texty">Edit</button>
+          </div>
+          <div class="reply-edit-banner" id="replyEditBanner">
+            <strong>Editing final output.</strong> This is the customer-safe text that will be copied/inserted.
           </div>
           <div id="replyValue" class="value reply-box">-</div>
           <textarea id="replyTextarea" class="reply-textarea is-hidden" aria-label="Edit customer reply" rows="7"></textarea>
@@ -1068,7 +1096,7 @@
 
           <div id="explainabilityPanel" class="explainability-panel">
             <div class="card full" id="explainDecisionCard">
-              <span class="label">Decision logic</span>
+              <span class="label">Internal rationale</span>
               <div id="explainDecisionValue" class="value muted reply-box">-</div>
             </div>
 
@@ -1083,7 +1111,7 @@
             </div>
 
             <div class="card full" id="explainExecutionCard">
-              <span class="label">Execution rationale</span>
+              <span class="label">Governor / execution logic</span>
               <div id="explainExecutionValue" class="value muted reply-box">-</div>
             </div>
 

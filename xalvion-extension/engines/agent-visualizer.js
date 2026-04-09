@@ -154,9 +154,17 @@ export function buildHeaderInsight(data) {
     Number(history.same_action_count) ||
     Number(history.issue_count) ||
     0;
+  const requiresApproval = Boolean(decision.requires_approval || data.requires_approval || data.execution?.requires_approval);
+  const governorReason = normalize(data.governor_reason || decision.governor_reason);
 
   if (issueType === "shipping_issue" && normalize(data.reply)) {
     return "Shipping context verified and a customer-safe tracking reply is ready.";
+  }
+
+  if (requiresApproval) {
+    return governorReason
+      ? `Approval gate active — ${governorReason}`
+      : "Approval gate active — review brief, then approve/reject or edit the final customer response.";
   }
 
   if (status === "resolved" && action && samples > 0 && Number.isFinite(confidence) && confidence > 0) {

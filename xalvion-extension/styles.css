@@ -291,6 +291,12 @@ button:disabled {
   line-height: 1.55;
 }
 
+/* Stronger edit-mode affordance (used by sidepanel.html as inline styles, but kept here for parity) */
+.reply-stack.is-editing{
+  border-color: rgba(34, 193, 255, 0.22);
+  box-shadow: 0 0 0 1px rgba(34, 193, 255, 0.10);
+}
+
 .meter {
   margin-top: 10px;
   width: 100%;

@@ -500,6 +500,113 @@ if (typeof window.pulseRail !== "function") {
               padding-left: 0 !important;
               padding-right: 0 !important;
             }
+
+            /* Operator workflow: command-center hierarchy (no layout changes) */
+            body[data-ui="claude"] .decision-controls{
+              display:flex !important;
+              gap:8px !important;
+              flex-wrap:wrap !important;
+              align-items:center !important;
+            }
+            body[data-ui="claude"] .op-action{
+              display:inline-flex !important;
+              align-items:center !important;
+              gap:8px !important;
+              height:32px !important;
+              padding:0 11px !important;
+              border-radius:999px !important;
+              border:1px solid rgba(255,255,255,0.09) !important;
+              background: rgba(255,255,255,0.03) !important;
+              color: rgba(246,242,235,0.90) !important;
+              cursor:pointer !important;
+              user-select:none !important;
+              letter-spacing:0.01em !important;
+            }
+            body[data-ui="claude"] .op-action__label{ font-weight:650 !important; }
+            body[data-ui="claude"] .op-action--primary{
+              border:none !important;
+              background: rgba(209,190,162,0.18) !important;
+              box-shadow: 0 0 0 1px rgba(209,190,162,0.18) !important;
+            }
+            body[data-ui="claude"] .op-action--primary:hover{ background: rgba(209,190,162,0.24) !important; }
+            body[data-ui="claude"] .op-action--primary--hold{ box-shadow: 0 0 0 1px rgba(186,170,255,0.20) !important; }
+            body[data-ui="claude"] .op-action--ghost-danger{
+              border-color: rgba(210,133,133,0.22) !important;
+              background: rgba(210,133,133,0.08) !important;
+            }
+            body[data-ui="claude"] .op-action--ghost-danger:hover{ background: rgba(210,133,133,0.12) !important; }
+            body[data-ui="claude"] .decision-state-pill{
+              display:inline-flex !important;
+              align-items:center !important;
+              height:30px !important;
+              padding:0 10px !important;
+              border-radius:999px !important;
+              border:1px solid rgba(255,255,255,0.10) !important;
+              background: rgba(255,255,255,0.03) !important;
+              color: rgba(246,242,235,0.86) !important;
+              font-weight:650 !important;
+              letter-spacing:0.06em !important;
+              text-transform:uppercase !important;
+              font-size:11.5px !important;
+            }
+
+            /* Editing state: unmistakably final customer response */
+            body[data-ui="claude"] .decision-state-editing{ box-shadow: 0 0 0 1px rgba(209,190,162,0.14) !important; }
+            body[data-ui="claude"] .edit-mode-sheet{
+              border:1px solid rgba(255,255,255,0.08) !important;
+              border-radius:16px !important;
+              background: rgba(255,255,255,0.02) !important;
+              padding:14px !important;
+              display:grid !important;
+              gap:12px !important;
+            }
+            body[data-ui="claude"] .edit-mode-title{ font-weight:700 !important; color: rgba(246,242,235,0.94) !important; letter-spacing:-0.01em !important; }
+            body[data-ui="claude"] .edit-mode-sub{ margin:6px 0 0 !important; color: rgba(224,217,206,0.62) !important; line-height:1.45 !important; font-size:12.5px !important; }
+            body[data-ui="claude"] .edit-compose-head{ display:flex !important; flex-direction:column !important; gap:4px !important; }
+            body[data-ui="claude"] .edit-compose-label,
+            body[data-ui="claude"] .edit-preview-label{
+              font-size:11px !important;
+              letter-spacing:0.10em !important;
+              text-transform:uppercase !important;
+              color: rgba(224,217,206,0.55) !important;
+              font-weight:650 !important;
+            }
+            body[data-ui="claude"] .edit-compose-hint{ color: rgba(224,217,206,0.62) !important; font-size:12.5px !important; line-height:1.45 !important; }
+            body[data-ui="claude"] .decision-edit-textarea{
+              width:100% !important;
+              min-height: 120px !important;
+              border-radius:12px !important;
+              border:1px solid rgba(255,255,255,0.10) !important;
+              background: rgba(255,255,255,0.03) !important;
+              color: rgba(246,242,235,0.92) !important;
+              padding:12px !important;
+              line-height:1.6 !important;
+              resize: vertical !important;
+            }
+            body[data-ui="claude"] .edit-preview{
+              border-radius:12px !important;
+              border:1px solid rgba(255,255,255,0.08) !important;
+              background: rgba(255,255,255,0.02) !important;
+              padding:12px !important;
+              display:grid !important;
+              gap:8px !important;
+            }
+            body[data-ui="claude"] .edit-preview-body{ white-space: pre-wrap !important; color: rgba(246,242,235,0.90) !important; line-height:1.6 !important; }
+
+            /* Post-approval: explicit logging cues */
+            body[data-ui="claude"] .xv-next-audit{ margin-top:10px !important; display:flex !important; flex-wrap:wrap !important; gap:8px !important; }
+            body[data-ui="claude"] .xv-next-audit-chip{
+              display:inline-flex !important;
+              align-items:center !important;
+              min-height:26px !important;
+              padding:0 10px !important;
+              border-radius:999px !important;
+              border:1px solid rgba(255,255,255,0.10) !important;
+              background: rgba(255,255,255,0.02) !important;
+              color: rgba(224,217,206,0.70) !important;
+              font-size:12px !important;
+              font-weight:650 !important;
+            }
           `;
           document.head.appendChild(claudeStyle);
         }
@@ -3311,6 +3418,49 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     el.hidden = false;
   }
 
+  function formatAuditStamp(epochOrIso) {
+    try {
+      if (!epochOrIso) return "";
+      const n = Number(epochOrIso);
+      const d = Number.isFinite(n) ? new Date(n) : new Date(String(epochOrIso));
+      if (!d || Number.isNaN(d.getTime())) return "";
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+    } catch {
+      return "";
+    }
+  }
+
+  function getApprovalAudit(data = {}) {
+    const ticket = data.ticket || {};
+    const actionLog = data.action_log || ticket.action_log || {};
+    const ticketId = Number(ticket.id || data.ticket_id || 0) || 0;
+    const who =
+      String(actionLog.username || actionLog.approved_by || ticket.approved_by || state.username || "operator").trim() ||
+      "operator";
+    const approvedAt =
+      actionLog.approved_at ||
+      actionLog.timestamp ||
+      ticket.approved_at ||
+      ticket.updated_at ||
+      data.approved_at ||
+      "";
+    const stamp = formatAuditStamp(approvedAt);
+    const runId = String(actionLog.id || actionLog.log_id || "").trim();
+    const action = String(actionLog.action || data.action || data.decision?.action || "").trim();
+    return {
+      ticketId: ticketId || null,
+      who,
+      stamp,
+      runId,
+      action,
+    };
+  }
+
   function maybeMountAutomationUpsell(row, replyText = "") {
     if (state.automationUpsellShown) return;
     const tier = String(state.tier || "free").toLowerCase();
@@ -4034,6 +4184,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     };
 
     function buildNextActionHtml() {
+      const audit = getApprovalAudit(data);
       const n = effectiveTicketCount();
       const mins = estimateTimeSavedMinutes();
       const momentum = momentumLine();
@@ -4090,7 +4241,14 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return `
         <div class="xv-next-success" role="status" aria-live="polite">
           <div class="xv-next-success-title">Response approved <span aria-hidden="true">✓</span></div>
-          <div class="xv-next-success-sub">Ready to send</div>
+          <div class="xv-next-success-sub">Final, logged, and ready to send</div>
+          <div class="xv-next-audit" aria-label="Approval log">
+            ${audit.ticketId ? `<span class="xv-next-audit-chip">Ticket #${escapeHtml(String(audit.ticketId))}</span>` : ""}
+            ${audit.action ? `<span class="xv-next-audit-chip">${escapeHtml(audit.action)}</span>` : ""}
+            ${audit.stamp ? `<span class="xv-next-audit-chip">${escapeHtml(audit.stamp)}</span>` : ""}
+            ${audit.who ? `<span class="xv-next-audit-chip">By ${escapeHtml(audit.who)}</span>` : ""}
+            ${audit.runId ? `<span class="xv-next-audit-chip">Log ${escapeHtml(audit.runId)}</span>` : ""}
+          </div>
         </div>
 
         <div class="xv-next-prompt">
@@ -4192,22 +4350,29 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       ed.addEventListener("click", () => {
         showErr("");
         editWrap.style.display = "grid";
+        panel.classList.add("decision-state-editing");
         const draftSeed = String(
           getCopyTextFromRow(row, initialReply) || originalAi || ""
         ).trim();
         editWrap.innerHTML = `
           <div class="edit-mode-sheet">
             <div class="edit-mode-header">
-              <div class="edit-mode-title">Edit customer-facing reply</div>
-              <p class="edit-mode-sub">Adjust tone or facts — the original stays visible for context.</p>
+              <div class="edit-mode-title">Editing final customer response</div>
+              <p class="edit-mode-sub">You are editing the exact text the customer will see. The governor gate (if present) stays locked until you approve.</p>
             </div>
             <div class="original-response-block">
               <div class="original-response-label">Original prepared reply</div>
               <div class="original-response" data-original-anchor="true">${escapeHtml(originalAi)}</div>
             </div>
-            <label class="edit-compose-label">Your edited version
-              <textarea class="decision-edit-textarea" aria-label="Edited reply">${escapeHtml(draftSeed)}</textarea>
-            </label>
+            <div class="edit-compose-head">
+              <div class="edit-compose-label">Final customer response</div>
+              <div class="edit-compose-hint">Preview updates live below. Keep it customer-safe and policy-compliant.</div>
+            </div>
+            <textarea class="decision-edit-textarea" aria-label="Final customer response">${escapeHtml(draftSeed)}</textarea>
+            <div class="edit-preview">
+              <div class="edit-preview-label">Preview (customer-safe)</div>
+              <div class="edit-preview-body" data-preview-body>${escapeHtml(draftSeed || originalAi || "")}</div>
+            </div>
             <div class="edit-actions">
               <button type="button" class="btn-cancel-edit" data-act="cancel">Cancel edit</button>
               <button type="button" class="btn-send-edited" data-act="send">Send edited reply</button>
@@ -4215,11 +4380,20 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           </div>
         `;
         const ta = editWrap.querySelector(".decision-edit-textarea");
+        const previewBody = editWrap.querySelector("[data-preview-body]");
+        const syncPreview = () => {
+          if (!previewBody) return;
+          const next = String(ta?.value || "").trim();
+          previewBody.textContent = next || "—";
+        };
+        ta?.addEventListener("input", () => syncPreview(), { passive: true });
+        syncPreview();
         ta?.focus();
         ta?.setSelectionRange(ta.value.length, ta.value.length);
         editWrap.querySelector("[data-act='cancel']")?.addEventListener("click", () => {
           editWrap.style.display = "none";
           editWrap.innerHTML = "";
+          panel.classList.remove("decision-state-editing");
         });
         const sendEdited = editWrap.querySelector("[data-act='send']");
         sendEdited?.addEventListener("click", async () => {
@@ -4248,6 +4422,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
               setAssistantCopy(row, normalized.reply || next);
               editWrap.style.display = "none";
               editWrap.innerHTML = "";
+              panel.classList.remove("decision-state-editing");
               rebindResultFooter(row, normalized);
               updateStatsFromResult(normalized);
               updateRevenueCard(normalized);
@@ -4271,6 +4446,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
               setAssistantCopy(row, next);
               editWrap.style.display = "none";
               editWrap.innerHTML = "";
+              panel.classList.remove("decision-state-editing");
               setTerminal("Edited", "Copy the card text when you send to the customer.");
               setNotice("info", "Reply updated", "No server gate on this run — text updated on the card.");
             }, 120);
@@ -4356,7 +4532,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           }
           return;
         }
-        setTerminal("Approved", "Ready to send");
+        setTerminal("Approved", "Final response cleared. Ready to send.");
         setNotice("success", "Cleared", "Operator cleared this response — copy when ready.");
       });
     };
