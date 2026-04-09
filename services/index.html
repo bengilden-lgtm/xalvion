@@ -36,9 +36,12 @@
         <span id="commandModeLine" class="command-mode-pill" translate="no">AI prepares · you approve</span>
       </div>
       <div class="command-strip-center command-strip-center--align">
-        <div class="command-status-chip" role="status" aria-live="polite">
+        <div class="command-status-chip command-status-chip--stack" role="status" aria-live="polite">
           <span class="command-status-dot" aria-hidden="true"></span>
-          <span id="commandPlanCapacity" class="command-capacity" translate="no">Value generated · loading</span>
+          <span class="command-capacity-cluster">
+            <span id="commandPlanCapacity" class="command-capacity" translate="no">Capacity · loading</span>
+            <span id="commandEarnedLine" class="command-earned-line" translate="no" hidden></span>
+          </span>
         </div>
       </div>
       <div class="command-strip-right">
@@ -136,6 +139,7 @@
 
                   <footer class="composer-wrap composer-dock xv-composer-foot" id="workspaceComposerDock">
                   <div id="inlineLimitBanner" class="inline-limit" hidden aria-live="polite"></div>
+                  <div id="composerValueMoment" class="composer-value-moment" hidden aria-live="polite"></div>
                   <div class="composer-unified">
                     <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
                       <div class="composer-hint-band composer-hint-band--integrated">
@@ -238,7 +242,7 @@
                           <li><strong>Integrations</strong>: Stripe execution + workflow hooks</li>
                           <li><strong>Best for</strong>: growing support volume</li>
                         </ul>
-                        <button type="button" class="plan-cta plan-cta--primary" data-upgrade="pro"><span>Upgrade to Pro</span></button>
+                        <button type="button" class="plan-cta plan-cta--primary" data-upgrade="pro"><span>Upgrade to Pro — live execution &amp; 500 runs</span></button>
                       </article>
 
                       <article class="plan-offer plan-offer--elite" data-plan-tier="elite" id="planEliteCard">
@@ -256,7 +260,7 @@
                           <li><strong>Integrations</strong>: full workflow integration</li>
                           <li><strong>Best for</strong>: support teams &amp; high throughput</li>
                         </ul>
-                        <button type="button" class="plan-cta plan-cta--secondary" data-upgrade="elite"><span>Upgrade to Elite</span></button>
+                        <button type="button" class="plan-cta plan-cta--secondary" data-upgrade="elite"><span>Upgrade to Elite — 5k runs &amp; team headroom</span></button>
                       </article>
                     </div>
                   </div>

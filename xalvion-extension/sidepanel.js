@@ -826,8 +826,9 @@ async function analyze() {
   await ensureUsageReady();
   const preSnap = getUsageSnapshot(sessionStore.getState().planTier);
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
+    usageChrome.notifyGateAttempt?.("analyze");
     showStatus(
-      "Operator quota exhausted for this period. Copy, insert, and approval flows stay available for your current reply.",
+      "Included operator runs for this window are used. Copy, insert, and approval flows stay available for your current reply.",
       false
     );
     usageChrome.refreshUsageChrome();
@@ -905,6 +906,7 @@ async function analyze() {
     const data = await res.json();
     render(data);
     await recordSuccessfulOperatorRun(sessionStore.getState().planTier);
+    usageChrome.notifyOperatorRunComplete?.(data);
     usageChrome.refreshUsageChrome();
     usageChrome.syncPrimaryRunButtons();
     showStatus("Ready.");
@@ -923,8 +925,9 @@ async function scanInbox() {
   await ensureUsageReady();
   const preSnap = getUsageSnapshot(sessionStore.getState().planTier);
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
+    usageChrome.notifyGateAttempt?.("scan");
     showStatus(
-      "Operator quota exhausted for this period. Copy, insert, and approval flows stay available for your current reply.",
+      "Included operator runs for this window are used. Copy, insert, and approval flows stay available for your current reply.",
       false
     );
     usageChrome.refreshUsageChrome();
@@ -979,8 +982,9 @@ async function scanInbox() {
       if (remaining <= 0) {
         agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
         hideThinkingPanel();
+        usageChrome.notifyGateAttempt?.("scan");
         showStatus(
-          "Operator quota exhausted for this period. Copy, insert, and approval flows stay available for your current reply.",
+          "Included operator runs for this window are used. Copy, insert, and approval flows stay available for your current reply.",
           false
         );
         if (emptyState) emptyState.style.display = "grid";

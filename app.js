@@ -129,6 +129,8 @@ if (typeof window.pulseRail !== "function") {
     forecastDealList: document.getElementById("forecastDealList"),
     upgradeValueSummary: document.getElementById("upgradeValueSummary"),
     commandPlanCapacity: document.getElementById("commandPlanCapacity"),
+    commandEarnedLine: document.getElementById("commandEarnedLine"),
+    composerValueMoment: document.getElementById("composerValueMoment"),
     commandModeLine: document.getElementById("commandModeLine"),
     commandAuthChip: document.getElementById("commandAuthChip"),
     composerStatusLine: document.getElementById("composerStatusLine"),
@@ -138,6 +140,7 @@ if (typeof window.pulseRail !== "function") {
     railValueTime: document.getElementById("railValueTime"),
     railValueActions: document.getElementById("railValueActions"),
     railSessionTier: document.getElementById("railSessionTier"),
+    valueRailTeaser: document.getElementById("valueRailTeaser"),
     latestRunRailCard: document.getElementById("latestRunRailCard"),
     workspaceRoot: document.getElementById("workspaceRoot"),
     commandStrip: document.getElementById("commandStrip"),
@@ -192,7 +195,9 @@ if (typeof window.pulseRail !== "function") {
     automationUpsellShown: false,
     recentTickets: [],
     lastSessionAt: Number(localStorage.getItem("xalvion-last-session-at") || 0) || 0,
-    postApprovalNudgesShown: 0
+    postApprovalNudgesShown: 0,
+    /** Epoch ms — show subtle post-run conversion strip after a high-impact workspace reply. */
+    postRunValueMomentUntil: 0
   };
 
   function setLastSessionNow() {
@@ -1066,39 +1071,49 @@ if (typeof window.pulseRail !== "function") {
     return numericUsage;
   }
 
-  function getLimitMessageConfig() {
-    if (!isAuthenticated()) {
-      return {
-        key: `guest-${getEffectiveUsage(state.usage)}`,
-        title: "Preview limit reached — continue in operator mode",
-        detail: `You can keep working. Create a free account for ${FREE_USAGE_LIMIT} included runs/month, saved threads, and a persistent operator workspace.`,
-        body: `You’ve reached the preview run allowance.
-
-You can continue using the workspace — additional usage is tracked. Create a free account for ${FREE_USAGE_LIMIT} included runs/month, saved threads, and a stable workflow for support teams.`
-      };
-    }
-
-    const tier = String(state.tier || "free").toLowerCase();
+  function getWorkspaceValueProofPrefix() {
     const vs = state.valueSignals;
     const d = state.dashboardStats || {};
     const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
     const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
     const actions = Number((vg && vg.actions_taken) ?? d.actions ?? 0);
-    const valuePrefix =
-      tier === "free" && vs && typeof vs.tickets_handled === "number" && vs.tickets_handled > 0
-        ? `${vs.tickets_handled} tickets on your plan this cycle${money > 0 ? ` · ${formatMoney(money)} surfaced in billing actions` : ""}${actions > 0 ? ` · ${actions} motions logged` : ""}. `
-        : tier === "free" && money > 0
-          ? `${formatMoney(money)} already moved through workspace billing actions. `
-          : tier === "pro" && money > 0
-            ? `${formatMoney(money)} through billing actions on this workspace — you’re clearly at operating depth. `
-            : "";
+    const tickets =
+      vs && typeof vs.tickets_handled === "number"
+        ? vs.tickets_handled
+        : Number(d.total_tickets ?? d.total_interactions ?? state.totalInteractions ?? 0);
+    const tm = Number((vg && vg.time_saved_minutes) ?? estimateAgentMinutesSavedFromDashboard(d));
+    const parts = [];
+    if (Number.isFinite(tickets) && tickets > 0) parts.push(`${Math.floor(tickets)} ticket${tickets === 1 ? "" : "s"} handled`);
+    if (money > 0) parts.push(`${formatMoney(money)} in billing motions`);
+    if (actions > 0) parts.push(`${actions} billing action${actions === 1 ? "" : "s"} prepared`);
+    if (tm > 0) parts.push(`~${Math.round(tm)} min operator time back`);
+    return parts.length ? `${parts.join(" · ")}. ` : "";
+  }
+
+  function getLimitMessageConfig() {
+    if (!isAuthenticated()) {
+      const proof = getWorkspaceValueProofPrefix();
+      return {
+        key: `guest-${getEffectiveUsage(state.usage)}`,
+        eyebrow: "Preview capacity",
+        title: "Preview runs are allocated — keep working in operator mode",
+        detail: `${proof}Create a free account for ${FREE_USAGE_LIMIT} included runs/month, saved threads, and the same approval-first workspace.`,
+        body: `You’ve reached the preview run allowance.
+
+You can continue — additional usage is tracked. Create a free account for ${FREE_USAGE_LIMIT} included runs/month, saved threads, and a stable workflow for support teams.`
+      };
+    }
+
+    const tier = String(state.tier || "free").toLowerCase();
+    const proof = getWorkspaceValueProofPrefix();
 
     if (tier === "pro") {
       return {
         key: `pro-${getEffectiveUsage(state.usage)}`,
-        title: "Plan limit reached — additional usage will be billed",
-        detail: `${valuePrefix}Keep working. Upgrade to Elite for higher included capacity (5,000 runs/month) and more automation headroom.`,
-        body: `${valuePrefix}You’ve reached your included Pro capacity.
+        eyebrow: "Included capacity",
+        title: "You’ve reached included Pro runs — overage continues to bill",
+        detail: `${proof}Elite adds 5,000 included runs/month and headroom so execution and routing don’t stall when volume spikes.`,
+        body: `${proof}You’ve reached your included Pro capacity.
 
 You can continue running tickets — additional usage will be billed. Elite adds higher included runs, deeper analytics, and room to scale without another ceiling mid-shift.`
       };
@@ -1106,16 +1121,17 @@ You can continue running tickets — additional usage will be billed. Elite adds
 
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
-      title: "Plan limit reached — additional usage will be billed",
-      detail: `${valuePrefix}Keep working. Upgrade to Pro for higher included capacity (500 runs/month) plus automation and integrations.`,
-      body: `${valuePrefix}You’ve reached your included Free capacity.
+      eyebrow: "Included capacity",
+      title: "Included Free runs are used — you can keep operating on overage",
+      detail: `${proof}Upgrade to Pro for 500 included runs/month, live Stripe execution from the workspace, and integrations that match real support volume.`,
+      body: `${proof}You’ve reached your included Free capacity.
 
 You can continue running tickets — additional usage will be billed. Pro keeps the operator loop running with more included runs, live Stripe execution, and integration access for support teams.`
     };
   }
 
   function pushLimitMessage(force = false) {
-    const { key, title, detail, body } = getLimitMessageConfig();
+    const { key, eyebrow, title, detail, body } = getLimitMessageConfig();
     if (!force && state.lastLimitNoticeKey === key) return;
     state.lastLimitNoticeKey = key;
 
@@ -1128,12 +1144,15 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       const lim = getEffectiveLimit(state.tier, state.limit);
       const billable = Math.max(0, Number(state.billableUsage || 0) || 0);
       const within = lim >= 1e9 ? used : Math.min(used, lim);
-      const usageLine = billable > 0 ? `${within} / ${lim} included · ${billable} billable` : `${used} / ${lim} runs used`;
-      const primaryLabel = isAuthenticated() ? "Upgrade" : "Create free account";
-      const secondaryLabel = isAuthenticated() ? "See plans" : "Log in";
-      const eyebrow = !isAuthenticated() ? "Preview" : "Capacity";
+      const usageLine = billable > 0 ? `${within} / ${lim} included · ${billable} billable` : `${used} / ${lim} included runs used`;
+      const tierLc = String(state.tier || "free").toLowerCase();
+      const primaryLabel =
+        !isAuthenticated() ? "Create free account" : tierLc === "pro" ? "Add Elite headroom" : "Upgrade to Pro";
+      const secondaryLabel = isAuthenticated() ? "Compare plans" : "Log in";
+      const eyebrowSafe = eyebrow || (!isAuthenticated() ? "Preview" : "Capacity");
+      banner.dataset.conversionMoment = !isAuthenticated() ? "preview_cap" : tierLc === "pro" ? "included_pro" : "included_free";
       banner.innerHTML = `
-        <div class="inline-limit-eyebrow">${escapeHtml(eyebrow)}</div>
+        <div class="inline-limit-eyebrow">${escapeHtml(eyebrowSafe)}</div>
         <div class="inline-limit-title">${escapeHtml(title)}</div>
         <div class="inline-limit-detail">${escapeHtml(detail)}</div>
         <div class="inline-limit-actions">
@@ -1396,11 +1415,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
   function planCopy(tier) {
     switch (String(tier || "free").toLowerCase()) {
       case "pro":
-        return "Priority handling, larger usage limits, and a more serious operating surface for real support volume.";
+        return "Pro matches working operators: higher included runs, live Stripe execution, and integrations without losing the approval-first loop.";
       case "elite":
-        return "Maximum capacity, premium control, and the strongest Xalvion operator environment.";
+        return "Elite is for teams at scale: very high included runs, automation headroom, and room for spikes without renegotiating mid-shift.";
       default:
-        return "Entry access with clear capacity limits and a visible upgrade path when usage pressure builds.";
+        return "Free keeps the core loop — clear monthly runs, visible capacity, and upgrades only when your volume earns them.";
     }
   }
 
@@ -1527,7 +1546,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
       if (els.openRefundModalBtn) {
         els.openRefundModalBtn.disabled = !allowed;
-        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Unlock live execution";
+        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Unlock live Stripe execution";
       }
 
       if (els.executeRefundBtn) {
@@ -1536,14 +1555,14 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
       if (els.refundModalNote) {
         els.refundModalNote.textContent = allowed
-          ? "Live refund execution is available on this plan. Use a PaymentIntent or Charge ID from Stripe."
-          : "Prepared refund decisions stay visible on this plan. Pro unlocks audited Stripe execution.";
+          ? "Live refund execution is on for this plan — paste a PaymentIntent or Charge ID from Stripe."
+          : "Refund decisions stay prepared here; Pro unlocks audited execution in-place when Stripe is connected.";
       }
 
       if (els.refundCenterCopy) {
         els.refundCenterCopy.textContent = allowed
-          ? "Open the refund UI, paste a PaymentIntent or Charge ID, and run a refund from the workspace."
-          : "Pro turns this from prepared decisions into live Stripe execution — with approvals, auditability, and no context switch.";
+          ? "Paste a PaymentIntent or Charge ID and run the refund without leaving the operator workspace."
+          : "This is a power feature: live execution stays on Pro+ so billing moves stay gated, traceable, and operator-controlled.";
       }
       if (els.refundUpgradeTease) {
         const d = state.dashboardStats || {};
@@ -1551,10 +1570,10 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
         const actions = Number((vg && vg.actions_taken) ?? d.actions ?? 0);
         els.refundUpgradeTease.textContent = allowed
-          ? "Execute refunds from the workspace · Available on Pro and Elite"
+          ? "Stripe execution from the workspace · Pro and Elite"
           : money > 0 || actions > 0
-            ? `Your workspace already logged ${formatMoney(money)} across ${actions} billing motions — Pro turns that into live Stripe execution here.`
-            : "Close the loop on Free → Pro: run real refunds from the workspace with Stripe connected — no console, no context switch.";
+            ? `You’ve already surfaced ${formatMoney(money)} across ${actions} billing motion${actions === 1 ? "" : "s"} — Pro finishes the loop with live refunds here.`
+            : "Free prepares the decision; Pro runs the refund with Stripe connected — same approvals, no console.";
       }
     }
 
@@ -1575,9 +1594,9 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         : null;
       setNotice(
         "warning",
-        locked?.primary || "Refund execution is gated on Pro",
+        locked?.primary || "Live refund execution is a Pro feature",
         locked?.secondary ||
-          "Pro turns prepared refund decisions into audited Stripe execution — without leaving the operator workspace."
+          "You can still review prepared decisions on Free — Pro runs Stripe execution in-place when connected, with approvals intact."
       );
       return;
     }
@@ -1664,9 +1683,9 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         : null;
       setNotice(
         "warning",
-        locked?.primary || "Refund execution is gated on Pro",
+        locked?.primary || "Live refund execution is a Pro feature",
         locked?.secondary ||
-          "Pro turns prepared refund decisions into audited Stripe execution — without leaving the operator workspace."
+          "You can still review prepared decisions on Free — Pro runs Stripe execution in-place when connected, with approvals intact."
       );
       return;
     }
@@ -2094,6 +2113,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     persistAuth();
     syncUsageApproachNotice();
     syncCommandStripCapacity();
+    refreshUpgradeValueSummary();
     refreshEmptyStateContent();
     if (!state.sending) refreshComposerIdleHint();
     applyComposerInteractiveLock();
@@ -2173,6 +2193,46 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     });
   }
 
+  function buildCommandEarnedValueLine() {
+    const d = state.dashboardStats || {};
+    const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
+    const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
+    const actions = Number((vg && vg.actions_taken) ?? d.actions ?? state.actionsCount ?? 0);
+    const mins = Number((vg && vg.time_saved_minutes) ?? estimateAgentMinutesSavedFromDashboard(d));
+    const tickets = Number(d.total_tickets ?? d.total_interactions ?? state.totalInteractions ?? 0);
+    const hasAny =
+      (Number.isFinite(tickets) && tickets > 0) ||
+      money > 0 ||
+      actions > 0 ||
+      (Number.isFinite(mins) && mins > 0);
+    if (!hasAny) return "";
+    const pts = [];
+    if (tickets > 0) pts.push(`${Math.floor(tickets)} ticket${tickets === 1 ? "" : "s"}`);
+    if (mins > 0) pts.push(`~${Math.round(mins)} min saved`);
+    if (actions > 0) pts.push(`${actions} billing action${actions === 1 ? "" : "s"}`);
+    if (money > 0) pts.push(`${formatMoney(money)} protected`);
+    return pts.length ? `Earned value · ${pts.join(" · ")}` : "";
+  }
+
+  function syncCommandStripEarnedLine() {
+    const el = els.commandEarnedLine;
+    if (!el) return;
+    const line = buildCommandEarnedValueLine();
+    const pct = state.limit > 0 ? state.usage / state.limit : 0;
+    const used = Math.max(0, Number(state.usage || 0) || 0);
+    const cap = Math.max(0, Number(state.limit || 0) || 0);
+    const nearCap = cap > 0 && pct >= 0.75 && used < cap;
+    const soft = nearCap ? "Heads-up — included runs almost full." : "";
+    const combined = [line, soft].filter(Boolean).join(" · ");
+    if (combined) {
+      el.hidden = false;
+      el.textContent = combined;
+    } else {
+      el.hidden = true;
+      el.textContent = "";
+    }
+  }
+
   function syncCommandStripCapacity() {
     const el = els.commandPlanCapacity;
     if (el) {
@@ -2196,8 +2256,20 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       if (cap > 0 && used >= cap) el.classList.add("is-limit");
       else if (pct >= 0.75) el.classList.add("is-warning");
     }
+    syncCommandStripEarnedLine();
+    syncValueRailTeaser();
     syncMonetizationChrome();
     syncComposerPreviewChrome();
+  }
+
+  function syncValueRailTeaser() {
+    const el = els.valueRailTeaser;
+    if (!el) return;
+    const line = buildCommandEarnedValueLine();
+    const short = line.replace(/^Earned value · /, "");
+    el.textContent = short
+      ? `Session signal — ${short}`
+      : "Session signal — time saved, billing motions, and tickets flow here after each run.";
   }
 
   function syncComposerPreviewChrome() {
@@ -2205,6 +2277,72 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (!composer) return;
     const guest = !isAuthenticated();
     composer.classList.toggle("composer-preview-continue", guest && state.remaining <= 0);
+  }
+
+  function clearComposerValueMoment() {
+    state.postRunValueMomentUntil = 0;
+    const el = els.composerValueMoment;
+    if (!el) return;
+    el.hidden = true;
+    el.innerHTML = "";
+    el.removeAttribute("data-conversion-moment");
+  }
+
+  function maybeShowPostRunValueMoment(data) {
+    if (!data || typeof data !== "object") return;
+    const tier = String(state.tier || "free").toLowerCase();
+    if (tier === "elite" || tier === "dev") return;
+    const conf = Number(data.confidence ?? data.decision?.confidence ?? 0);
+    const og = String(data.outcome_intelligence?.latest?.tier || "").toLowerCase();
+    const money = Number(
+      data.amount ?? state.dashboardStats?.money_saved ?? state.dashboardStats?.value_generated?.money_saved ?? 0
+    );
+    const strong =
+      (Number.isFinite(conf) && conf >= 0.88) || og === "excellent" || (Number.isFinite(money) && money >= 40);
+    if (!strong) return;
+    state.postRunValueMomentUntil = Date.now() + 100 * 1000;
+    renderComposerValueMoment(tier);
+  }
+
+  function renderComposerValueMoment(tierLc) {
+    const el = els.composerValueMoment;
+    if (!el) return;
+    const isPro = tierLc === "pro";
+    const headline = isPro ? "Strong run — add Elite headroom before the next spike" : "Strong run — match capacity to what you just cleared";
+    const sub = isPro
+      ? "You’re clearly at operating depth. Elite raises included runs and automation ceiling so volume doesn’t stall mid-shift."
+      : "High-confidence work deserves runway — Pro adds included runs, live Stripe execution, and integrations while keeping approvals in place.";
+    const cta = isPro ? "See Elite" : "See Pro";
+    const target = isPro ? "elite" : "pro";
+    el.dataset.conversionMoment = "post_high_value_run";
+    el.hidden = false;
+    el.innerHTML = `
+    <div class="composer-value-moment__inner">
+      <div class="composer-value-moment__eyebrow">Outcome</div>
+      <div class="composer-value-moment__title">${escapeHtml(headline)}</div>
+      <p class="composer-value-moment__detail">${escapeHtml(sub)}</p>
+      <div class="composer-value-moment__actions">
+        <button type="button" class="btn composer-value-moment__cta" id="composerValueMomentCta">${escapeHtml(cta)}</button>
+        <button type="button" class="ghost-btn" id="composerValueMomentDismiss">Dismiss</button>
+      </div>
+    </div>`;
+    el.querySelector("#composerValueMomentCta")?.addEventListener(
+      "click",
+      () => {
+        if (!isAuthenticated()) {
+          focusPlansPanel();
+          clearComposerValueMoment();
+          return;
+        }
+        upgradePlan(target);
+        clearComposerValueMoment();
+      },
+      { once: true }
+    );
+    el.querySelector("#composerValueMomentDismiss")?.addEventListener("click", () => clearComposerValueMoment(), { once: true });
+    window.setTimeout(() => {
+      if (state.postRunValueMomentUntil && Date.now() > state.postRunValueMomentUntil) clearComposerValueMoment();
+    }, 102000);
   }
 
   function applyComposerInteractiveLock() {
@@ -2372,7 +2510,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const primaryLine = narrative?.primary
       ? narrative.primary
       : hasValue
-        ? `Workspace value so far: ${tickets} tickets · ${formatMoney(money)} across billing motions · ~${mins} min saved.`
+        ? `Value logged this workspace: ~${mins} min back · ${formatMoney(money)} in billing motions · ${tickets} ticket${tickets === 1 ? "" : "s"} handled · ${actions} action${actions === 1 ? "" : "s"} prepared.`
         : "";
 
     const secondaryLine = narrative?.secondary ? narrative.secondary : "";
@@ -3186,16 +3324,24 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     const upsell = document.createElement("div");
     upsell.className = "automation-upsell";
+    const ctaLabel = tier === "pro" ? "Review Elite runway" : "Review Pro execution";
+    const copy =
+      tier === "pro"
+        ? "When volume is real, Elite is the layer that keeps routing and automation from bumping the ceiling mid-shift."
+        : "When you’re ready, Pro moves prepared billing actions into live execution — still approval-first, still auditable.";
     upsell.innerHTML = `
-      <div class="automation-upsell-copy">Want Xalvion to handle refunds, tracking, and actions automatically?</div>
-      <button type="button" class="automation-upsell-cta">Unlock automation</button>
+      <div class="automation-upsell-copy">${escapeHtml(copy)}</div>
+      <button type="button" class="automation-upsell-cta">${escapeHtml(ctaLabel)}</button>
     `;
     const btn = upsell.querySelector("button");
     btn?.addEventListener("click", () => {
       state.automationUpsellShown = true;
       focusPlansPanel();
       window.setTimeout(() => {
-        document.getElementById("planEliteCard")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        document.getElementById(tier === "pro" ? "planEliteCard" : "planProCard")?.scrollIntoView?.({
+          behavior: "smooth",
+          block: "center",
+        });
       }, 120);
     });
 
@@ -3905,24 +4051,33 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
             stripeConnected: Boolean(state.stripeConnected),
           })
         : null;
-      const volumeHint = !postValueNudge && n >= 5 ? "You’re handling more tickets — add headroom so execution doesn’t stall mid-shift" : "";
+      const volumeHint =
+        !postValueNudge && n >= 5
+          ? "You’re moving serious volume — add headroom so billing execution and routing don’t stall mid-shift"
+          : "";
       const canShowAutomation = !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev";
       const automationBlock = canShowAutomation
         ? `<div class="xv-next-nudge">
-            <div class="xv-next-nudge-copy">Want Xalvion to handle this automatically next time?</div>
-            <button type="button" class="xv-next-nudge-cta" data-act="enable-automation">Enable automation</button>
+            <div class="xv-next-nudge-copy">${
+              tierLc === "pro"
+                ? "Elite adds runway for high-volume weeks — same approvals, more included capacity."
+                : "Pro turns prepared actions into live execution when you’re ready — approvals stay in the loop."
+            }</div>
+            <button type="button" class="xv-next-nudge-cta" data-act="enable-automation">${
+              tierLc === "pro" ? "See Elite" : "See Pro"
+            }</button>
           </div>`
         : "";
       const integrationBlock = integrationHint
         ? `<div class="xv-next-nudge">
             <div class="xv-next-nudge-copy">${escapeHtml(integrationHint)}.</div>
-            <button type="button" class="xv-next-nudge-cta" data-act="connect-integrations">Connect Stripe / CRM</button>
+            <button type="button" class="xv-next-nudge-cta" data-act="connect-integrations">Connect Stripe</button>
           </div>`
         : "";
       const volumeBlock = volumeHint
         ? `<div class="xv-next-nudge xv-next-nudge--subtle">
             <div class="xv-next-nudge-copy">${escapeHtml(volumeHint)}.</div>
-            <button type="button" class="xv-next-nudge-cta" data-act="upgrade">View plans</button>
+            <button type="button" class="xv-next-nudge-cta" data-act="upgrade">Compare plans</button>
           </div>`
         : "";
       const postValueBlock = postValueNudge
@@ -3981,8 +4136,12 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       host.querySelector("[data-act='enable-automation']")?.addEventListener("click", () => {
         state.automationUpsellShown = true;
         focusPlansPanel();
+        const tierLc = String(state.tier || "free").toLowerCase();
         window.setTimeout(() => {
-          document.getElementById("planEliteCard")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+          document.getElementById(tierLc === "pro" ? "planEliteCard" : "planProCard")?.scrollIntoView?.({
+            behavior: "smooth",
+            block: "center",
+          });
         }, 120);
       });
       host.querySelector("[data-act='connect-integrations']")?.addEventListener("click", () => {
@@ -5425,6 +5584,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const payload = buildSupportPayload();
     if (!payload.message || state.sending) return;
 
+    clearComposerValueMoment();
+
     if (!enforceWorkspaceLimit()) return;
     const startedAt =
       globalThis.performance && typeof globalThis.performance.now === "function" ? globalThis.performance.now() : Date.now();
@@ -5544,6 +5705,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       updateStatsFromResult(data);
       updateRevenueCard(data);
       updateLatestRunCard(data);
+      maybeShowPostRunValueMoment(data);
       updateSystemNarrative(data);
       // Refresh recent tickets quietly (return trigger).
       // Prefer server truth when available, but keep working if offline.

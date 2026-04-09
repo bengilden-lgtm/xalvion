@@ -145,6 +145,40 @@ button,input,textarea,select{ font:inherit; }
   color:var(--text-muted);
   font-size:12.5px;
 }
+
+#commandStrip .command-status-chip--stack{
+  align-items: flex-start;
+}
+.command-capacity-cluster{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.command-earned-line{
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-soft);
+  max-width: min(520px, 52vw);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.command-earned-line[hidden]{ display: none !important; }
+
+.composer-value-moment{
+  width: min(760px, 96vw);
+  margin: 0 auto 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+  padding: 12px 14px;
+  color: var(--text-muted);
+}
+.composer-value-moment[hidden]{ display: none !important; }
+.composer-value-moment__title{ font-weight: 600; font-size: 14px; color: var(--text); }
+.composer-value-moment__detail{ margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+.composer-value-moment__actions{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .topbar-status-dot{
   width:7px;
   height:7px;

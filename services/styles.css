@@ -468,6 +468,29 @@ svg{
   filter: blur(0.15px);
 }
 
+.command-status-chip--stack{
+  align-items: flex-start;
+}
+.command-capacity-cluster{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.command-earned-line{
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-4);
+  max-width: min(520px, 52vw);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.command-earned-line[hidden]{
+  display: none !important;
+}
+
 .command-auth-chip{
   font-size: 12.5px;
   color: var(--text-3);
@@ -2504,6 +2527,55 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
   margin-left: auto;
   align-self: center;
 }
+.inline-limit[data-conversion-moment="preview_cap"]{
+  border-color: color-mix(in oklab, var(--accent) 22%, var(--border));
+}
+.inline-limit[data-conversion-moment="included_free"],
+.inline-limit[data-conversion-moment="included_pro"]{
+  border-color: color-mix(in oklab, var(--warn) 18%, var(--border));
+}
+
+.composer-value-moment{
+  width: min(var(--thread-max), 96vw);
+  margin: 0 auto 10px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--border));
+  background: color-mix(in oklab, var(--surface-soft) 35%, transparent);
+  padding: 12px 14px;
+  color: var(--text-2);
+}
+.composer-value-moment[hidden]{ display: none !important; }
+.composer-value-moment__inner{ display: grid; gap: 8px; }
+.composer-value-moment__eyebrow{
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.composer-value-moment__title{
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  color: var(--text-2);
+}
+.composer-value-moment__detail{
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.composer-value-moment__actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+.composer-value-moment__cta{
+  font-weight: 600;
+  font-size: 13px;
+}
+
 .plans-upgrade-secondary:focus-visible{
   outline: none;
   box-shadow: var(--ring);

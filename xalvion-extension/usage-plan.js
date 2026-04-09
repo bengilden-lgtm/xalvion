@@ -12,6 +12,9 @@ export const SOFT_THRESHOLD_TOTAL = 4;
 /** Total successful runs before Analyze is gated (Copy / Insert / approval flows stay). */
 export const HARD_THRESHOLD_TOTAL = 12;
 
+/** Runs remaining before hard gate — used for contextual “approaching limit” messaging (non-blocking). */
+export const NEAR_HARD_BUFFER = 3;
+
 const initialPersisted = {
   guestUsageCount: 0,
   freeTierUsageCount: 0,
@@ -118,6 +121,8 @@ export function getUsageSnapshot(planTier) {
   const hasAccess = isProFromPlanTier(planTier, cache.proUnlockLocal);
   const atOrPastSoft = !hasAccess && total >= SOFT_THRESHOLD_TOTAL;
   const atHard = !hasAccess && total >= HARD_THRESHOLD_TOTAL;
+  const nearHardLimit =
+    !hasAccess && !atHard && total >= Math.max(0, HARD_THRESHOLD_TOTAL - NEAR_HARD_BUFFER);
   const now = Date.now();
   const pid = periodId(now);
   const softDismissedForPeriod = cache.softNudgeDismissedPeriodId === pid;
@@ -131,6 +136,7 @@ export function getUsageSnapshot(planTier) {
     hasProAccess: hasAccess,
     showSoftNudge: atOrPastSoft && !atHard && !softDismissedForPeriod,
     hardLimited: atHard,
+    nearHardLimit,
     periodResetsInMs: Math.max(0, cache.periodStartedAt + PERIOD_MS - now),
   };
 }
