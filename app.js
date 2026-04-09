@@ -3544,7 +3544,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const root = els.workspaceRoot;
     if (!root || !els.messages) return false;
     const empty = Boolean(els.messages.querySelector(".empty-state"));
-    const hasThread = Boolean(els.messages.querySelector(".msg-group"));
+    const hasThread = hasActiveThreadContent();
     if (!empty || hasThread) return false;
     const main = document.getElementById("mainCanvas");
     const surface = String(main?.dataset?.surface || "workspace").toLowerCase();
@@ -3856,6 +3856,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     bindEmptyStateActions(empty);
     if (state.inboxSnapshot) renderInboxLayer(state.inboxSnapshot);
     syncInboxAutopull();
+    moveThreadBelowQueueIfNeeded();
     syncWorkspaceLayoutMode();
   }
 
@@ -3866,29 +3867,84 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.innerHTML = buildEmptyStateHtml();
-    els.messages.appendChild(empty);
+    // Front-screen queue must start clean at top of viewport.
+    els.messages.prepend(empty);
     syncWorkspaceLayoutMode();
 
     bindEmptyStateActions(empty);
     if (state.inboxSnapshot) renderInboxLayer(state.inboxSnapshot);
     syncInboxAutopull();
+    moveThreadBelowQueueIfNeeded();
   }
 
   function clearEmptyState() {
     els.messages?.querySelector(".empty-state")?.remove();
   }
 
+  function hasActiveThreadContent() {
+    if (!els.messages) return false;
+    const groups = Array.from(els.messages.querySelectorAll(".msg-group"));
+    return groups.some((node) => !node.closest("#xvPreviousThreadFold"));
+  }
+
+  function ensurePreviousThreadFold() {
+    if (!els.messages) return null;
+    let fold = document.getElementById("xvPreviousThreadFold");
+    if (fold) return fold;
+
+    fold = document.createElement("details");
+    fold.id = "xvPreviousThreadFold";
+    fold.className = "xv-previous-thread";
+    fold.open = false;
+    fold.innerHTML = `
+      <summary class="xv-previous-thread__summary">
+        <span>Previous thread</span>
+        <span class="xv-previous-thread__hint">Collapsed</span>
+      </summary>
+      <div class="xv-previous-thread__body" id="xvPreviousThreadBody"></div>
+    `;
+    return fold;
+  }
+
+  function moveThreadBelowQueueIfNeeded() {
+    if (!els.messages) return;
+    const empty = els.messages.querySelector(".empty-state");
+    if (!empty) return;
+
+    const movable = Array.from(els.messages.children).filter((child) => {
+      if (!(child instanceof Element)) return false;
+      if (child.classList.contains("empty-state")) return false;
+      if (child.id === "xvPreviousThreadFold") return false;
+      return child.classList.contains("msg-group");
+    });
+
+    if (!movable.length) return;
+
+    const fold = ensurePreviousThreadFold();
+    if (!fold) return;
+    const body = fold.querySelector("#xvPreviousThreadBody");
+    if (!body) return;
+
+    movable.forEach((node) => body.appendChild(node));
+
+    // Ensure fold is below the queue/empty-state, never above it.
+    if (!fold.parentElement) {
+      empty.insertAdjacentElement("afterend", fold);
+    } else if (fold.previousElementSibling !== empty) {
+      empty.insertAdjacentElement("afterend", fold);
+    }
+  }
+
   function syncComposerDockThreadClass() {
     const dock = document.getElementById("workspaceComposerDock");
     if (!dock || !els.messages) return;
-    const hasThread = Boolean(els.messages.querySelector(".msg-group"));
-    dock.classList.toggle("composer-dock--thread", hasThread);
+    dock.classList.toggle("composer-dock--thread", hasActiveThreadContent());
   }
 
   function syncWorkspaceLayoutMode() {
     const root = els.workspaceRoot;
     if (!root || !els.messages) return;
-    const hasConversation = Boolean(els.messages.querySelector(".msg-group"));
+    const hasConversation = hasActiveThreadContent();
     const hasLimitCard = Boolean(els.messages.querySelector(".empty-state .limit-moment-card"));
     const active = hasConversation || hasLimitCard;
     root.classList.toggle("workspace-idle", !active);
@@ -7789,7 +7845,7 @@ function bindEvents() {
     // On initial front-screen render (idle state), never force a scroll-to-bottom.
     // Only auto-stick when a real thread is present.
     try {
-      const hasThread = Boolean(els.messages?.querySelector?.(".msg-group"));
+      const hasThread = hasActiveThreadContent();
       if (hasThread) {
         scrollMessagesToBottom(true);
       } else if (els.messages) {

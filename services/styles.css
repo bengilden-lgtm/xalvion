@@ -2404,6 +2404,39 @@ select.refund-select{ padding-right: 34px; }
   flex-direction: column;
   gap: 8px;
 }
+
+/* Previous thread fold (queue mode must never render under it) */
+.xv-previous-thread{
+  width: min(var(--thread-max), 100%);
+  margin: 12px auto 0;
+  padding: 0 12px;
+  box-sizing: border-box;
+}
+.xv-previous-thread[open] .xv-previous-thread__hint{ display:none; }
+.xv-previous-thread__summary{
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 18%, transparent);
+  color: var(--text-2);
+}
+.xv-previous-thread__summary::-webkit-details-marker{ display:none; }
+.xv-previous-thread__hint{
+  font-size: 12px;
+  color: var(--text-4);
+}
+.xv-previous-thread__body{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 46%, transparent);
+}
 .xv-inbox-item{
   width: 100%;
   text-align: left;
