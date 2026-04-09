@@ -1002,6 +1002,23 @@ select.refund-select{ padding-right: 34px; }
 .auth-field-stack{ display:flex; flex-direction: column; gap: 10px; }
 .auth-cta-row .btn{ flex: 1.25; }
 .auth-cta-row .ghost-btn{ flex: 0.9; }
+.access-cta-reassurance{
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: color-mix(in oklab, var(--text-muted) 92%, var(--text-4));
+}
+.access-utility-row{
+  justify-content: flex-start;
+}
+.access-utility-row .access-link-btn{
+  flex: 0 0 auto;
+  margin-left: 0;
+  opacity: 0.72;
+}
+.access-utility-row .access-link-btn:hover{
+  opacity: 0.92;
+}
 .auth-hints-fold{
   border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   border-radius: var(--r-md);
@@ -3104,6 +3121,25 @@ body.access-open .workspace-root{
   border-bottom: 1px solid var(--line);
 }
 .access-drawer-title{ display:flex; flex-direction: column; gap: 4px; }
+.access-hero{
+  margin-top: 2px;
+  display: grid;
+  gap: 8px;
+}
+.access-hero-title{
+  font-size: 17px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--text);
+}
+.access-hero-subcopy{
+  max-width: 54ch;
+  color: color-mix(in oklab, var(--text-muted) 92%, var(--text-4));
+}
+.access-trust-strip{
+  margin-top: 2px;
+}
 .access-drawer-body{
   flex: 1;
   min-height: 0;

@@ -415,7 +415,17 @@
       <div class="access-drawer-head">
         <div class="access-drawer-title">
           <div class="section-label section-label-tight">Account / access</div>
-          <div class="muted-copy">Status, plan, usage, and sign-in live here.</div>
+          <div class="access-hero">
+            <div class="access-hero-title">Save this workspace and keep going</div>
+            <div class="muted-copy access-hero-subcopy">
+              Create a free account to keep this thread, continue with monthly runs, and stay in the same approval-safe workflow.
+            </div>
+            <div class="trust-chip-row access-trust-strip" aria-hidden="true">
+              <span class="trust-chip">Keeps this workspace</span>
+              <span class="trust-chip">Monthly runs included</span>
+              <span class="trust-chip">Same approval-safe workflow</span>
+            </div>
+          </div>
         </div>
         <button id="closeAccessDrawerBtn" class="refund-close" type="button" aria-label="Close account panel">×</button>
       </div>
@@ -452,8 +462,11 @@
               <input id="passwordInput" class="input" type="password" placeholder="Password" autocomplete="current-password" />
             </div>
             <div class="btn-row auth-cta-row">
-              <button id="signupBtn" class="btn" type="button">Save your work and continue</button>
-              <button id="loginBtn" class="ghost-btn" type="button">Already have an account?</button>
+              <button id="signupBtn" class="btn" type="button">Save workspace and continue</button>
+              <button id="loginBtn" class="ghost-btn" type="button">Sign in instead</button>
+            </div>
+            <div class="access-cta-reassurance" id="accessCtaReassurance">
+              Free account. Keep your progress — nothing changes in the workflow.
             </div>
             <details class="auth-hints-fold" id="authHintsFold">
               <summary class="auth-hints-summary">Credentials requirements</summary>
@@ -462,7 +475,7 @@
                 Password: at least 8 characters.
               </div>
             </details>
-            <div class="btn-row access-links-row">
+            <div class="btn-row access-links-row access-utility-row">
               <button id="logoutBtn" class="access-link-btn" type="button">Logout</button>
             </div>
           </div>
