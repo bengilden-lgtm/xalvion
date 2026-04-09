@@ -197,8 +197,72 @@ if (typeof window.pulseRail !== "function") {
     lastSessionAt: Number(localStorage.getItem("xalvion-last-session-at") || 0) || 0,
     postApprovalNudgesShown: 0,
     /** Epoch ms — show subtle post-run conversion strip after a high-impact workspace reply. */
-    postRunValueMomentUntil: 0
+    postRunValueMomentUntil: 0,
+    /** Inline, product-native CTA in the usage strip (no popups). */
+    usageInlineCtaUntil: 0
   };
+
+  function getValueSnapshot() {
+    const d = state.dashboardStats || {};
+    const vs = state.valueSignals && typeof state.valueSignals === "object" ? state.valueSignals : {};
+    const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
+
+    const ticketsRaw =
+      typeof vs.tickets_handled === "number"
+        ? Number(vs.tickets_handled)
+        : Number(d.total_tickets ?? d.total_interactions ?? state.totalInteractions ?? 0);
+    const tickets = Number.isFinite(ticketsRaw) ? Math.max(0, Math.floor(ticketsRaw)) : 0;
+
+    const actionsRaw = Number((vg && vg.actions_taken) ?? d.actions ?? state.actionsCount ?? 0);
+    const actions = Number.isFinite(actionsRaw) ? Math.max(0, Math.floor(actionsRaw)) : 0;
+
+    const minsRaw = Number((vg && vg.time_saved_minutes) ?? estimateAgentMinutesSavedFromDashboard(d));
+    const minutes = Number.isFinite(minsRaw) ? Math.max(0, Math.round(minsRaw)) : 0;
+
+    const moneyRaw = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
+    const money = Number.isFinite(moneyRaw) ? Math.max(0, moneyRaw) : 0;
+
+    const churnRiskRaw = Number(d?.triage?.churn_risk ?? state.latestRun?.triage?.churn_risk ?? 0);
+    const churnRisk = Number.isFinite(churnRiskRaw) ? Math.max(0, churnRiskRaw) : 0;
+
+    return { tickets, actions, minutes, money, churnRisk };
+  }
+
+  function setUsageInlineCta({ tone = "neutral", copy = "", cta = "", targetTier = "" } = {}) {
+    const host = document.getElementById("usageInlineCta");
+    if (!host) return;
+    const trimmedCopy = String(copy || "").trim();
+    const trimmedCta = String(cta || "").trim();
+    const target = String(targetTier || "").toLowerCase();
+    if (!trimmedCopy || !trimmedCta || !target) {
+      host.hidden = true;
+      host.innerHTML = "";
+      host.removeAttribute("data-tone");
+      return;
+    }
+    host.hidden = false;
+    host.dataset.tone = String(tone || "neutral");
+    host.innerHTML = `
+      <div class="usage-inline-cta__copy">${escapeHtml(trimmedCopy)}</div>
+      <button type="button" class="usage-inline-cta__link" data-usage-cta="1">${escapeHtml(trimmedCta)} →</button>
+    `;
+    host.querySelector("[data-usage-cta]")?.addEventListener(
+      "click",
+      () => {
+        if (!isAuthenticated()) {
+          focusPlansPanel();
+          return;
+        }
+        upgradePlan(target);
+      },
+      { once: true }
+    );
+  }
+
+  function clearUsageInlineCta() {
+    state.usageInlineCtaUntil = 0;
+    setUsageInlineCta(null);
+  }
 
   function setLastSessionNow() {
     const now = Date.now();
@@ -1356,10 +1420,13 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       const lim = getEffectiveLimit(state.tier, state.limit);
       const billable = Math.max(0, Number(state.billableUsage || 0) || 0);
       const within = lim >= 1e9 ? used : Math.min(used, lim);
-      const usageLine = billable > 0 ? `${within} / ${lim} included · ${billable} billable` : `${used} / ${lim} included runs used`;
+      const { tickets, minutes } = getValueSnapshot();
+      const valueLine =
+        tickets > 0 || minutes > 0 ? `Handled ${tickets} tickets · ~${minutes} min saved` : "Value-based usage active";
+      const usageLine = billable > 0 ? `${valueLine} · ${within} / ${lim} included · ${billable} billable` : `${valueLine} · ${used} / ${lim} included`;
       const tierLc = String(state.tier || "free").toLowerCase();
       const primaryLabel =
-        !isAuthenticated() ? "Create free account" : tierLc === "pro" ? "Add Elite headroom" : "Upgrade to Pro";
+        !isAuthenticated() ? "Create free account" : tierLc === "pro" ? "Add Elite headroom" : "Upgrade for continuity";
       const secondaryLabel = isAuthenticated() ? "Compare plans" : "Log in";
       const eyebrowSafe = eyebrow || (!isAuthenticated() ? "Preview" : "Capacity");
       banner.dataset.conversionMoment = !isAuthenticated() ? "preview_cap" : tierLc === "pro" ? "included_pro" : "included_free";
@@ -1810,6 +1877,17 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         locked?.secondary ||
           "You can still review prepared decisions on Free — Pro runs Stripe execution in-place when connected, with approvals intact."
       );
+      // Product-native upgrade CTA lives in the usage strip (subtle, no spam).
+      const tierLc = String(state.tier || "free").toLowerCase();
+      if (tierLc !== "elite" && tierLc !== "dev") {
+        state.usageInlineCtaUntil = Date.now() + 120 * 1000;
+        setUsageInlineCta({
+          tone: "neutral",
+          copy: "Unlock live Stripe execution + audited trails for billing decisions.",
+          cta: "See Pro",
+          targetTier: "pro",
+        });
+      }
       return;
     }
     try {
@@ -2309,17 +2387,27 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       setGuestUsage(state.usage);
     }
 
+    const { tickets, actions, minutes } = getValueSnapshot();
+    const handledLine = `Handled ${tickets} ticket${tickets === 1 ? "" : "s"} · ~${minutes} min saved`;
     setText(els.planTier, formatTier(state.tier));
-    setText(els.planUsage, `${state.usage} / ${state.limit}`);
-    setText(els.planUsed, `Used ${state.usage}`);
-    setText(els.planRemaining, `Remaining ${state.remaining}`);
+    setText(els.planUsage, handledLine);
+    setText(els.planUsed, String(actions));
+    setText(els.planRemaining, `${state.remaining} runs`);
 
     if (els.planBar) {
       const width = Math.min(100, Math.max(0, (state.usage / Math.max(1, state.limit)) * 100));
       els.planBar.style.width = `${width}%`;
     }
 
-    if (els.usagePanelCopy) els.usagePanelCopy.textContent = planCopy(state.tier);
+    if (els.usagePanelCopy) {
+      // Replace generic usage counters with value-based narrative; keep plan context subtle.
+      const tierLc = String(state.tier || "free").toLowerCase();
+      const cap = Math.max(0, Number(state.limit || 0) || 0);
+      const used = Math.max(0, Number(state.usage || 0) || 0);
+      const capLine = cap ? `Included capacity: ${Math.min(used, cap)} / ${cap} runs.` : "";
+      const planLine = planCopy(tierLc);
+      els.usagePanelCopy.textContent = [capLine, planLine].filter(Boolean).join(" ");
+    }
     syncAccessOverview();
     updateRefundUI();
     persistAuth();
@@ -2330,6 +2418,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (!state.sending) refreshComposerIdleHint();
     applyComposerInteractiveLock();
     syncPlansPanelChrome();
+
+    // Auto-expire subtle inline CTA (avoid spam).
+    if (state.usageInlineCtaUntil && Date.now() > state.usageInlineCtaUntil) {
+      clearUsageInlineCta();
+    }
 
     const banner = document.getElementById("inlineLimitBanner");
     if (banner) {
@@ -2514,6 +2607,30 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (!strong) return;
     state.postRunValueMomentUntil = Date.now() + 100 * 1000;
     renderComposerValueMoment(tier);
+
+    // Also surface a single inline CTA inside the usage strip (product-native, no spam).
+    const churn = Number(data?.triage?.churn_risk ?? 0);
+    const govMode = String(data?.governor_mode ?? data?.governor?.mode ?? "").toLowerCase();
+    const target = tier === "pro" ? "elite" : "pro";
+    const { tickets, minutes } = getValueSnapshot();
+    const valueProof = tickets || minutes ? `Session: ${tickets} tickets · ~${minutes} min back.` : "Session value logged.";
+    if (churn >= 7) {
+      state.usageInlineCtaUntil = Date.now() + 90 * 1000;
+      setUsageInlineCta({
+        tone: "risk",
+        copy: `This run addressed churn pressure. ${valueProof}`,
+        cta: tier === "pro" ? "Add Elite headroom" : "Upgrade for continuity",
+        targetTier: target,
+      });
+    } else if (govMode === "auto") {
+      state.usageInlineCtaUntil = Date.now() + 90 * 1000;
+      setUsageInlineCta({
+        tone: "safe",
+        copy: `High-confidence path detected. Unlock full automation + higher-confidence decisions.`,
+        cta: tier === "pro" ? "Unlock Elite automation" : "Unlock Pro automation",
+        targetTier: target,
+      });
+    }
   }
 
   function renderComposerValueMoment(tierLc) {
@@ -2785,8 +2902,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const story = pressure?.secondary
       ? pressure.secondary
       : th > 0 || Number(vs.money_moved ?? 0) > 0
-        ? `You’re using real capacity — ${th} tickets this cycle · ${money} in billing motions · ~${tm} min of operator time back.`
-        : "You’re approaching this plan’s monthly ceiling — add headroom so approvals and routing don’t stall mid-shift.";
+        ? `You’re using real capacity — ${th} tickets this cycle · ~${tm} min back. Keep handling tickets without interruption.`
+        : "You’re approaching this plan’s ceiling — keep handling tickets without interruption by adding runway.";
 
     const ctaLabel = pressure?.cta
       ? `${pressure.cta} →`
@@ -2794,17 +2911,16 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         ? "Add Elite headroom →"
         : "Upgrade for continuity →";
 
-    el.style.display = "block";
-    el.innerHTML = `<div class="conversion-context conversion-context--${escapeHtml(String(pressure?.tone || "neutral"))}">
-  <div class="value-proof-line">${escapeHtml(story)}</div>
-  ${capLine ? `<div class="plan-hint" style="margin-top:6px">${escapeHtml(capLine)}</div>` : ""}
-  ${unlock ? `<div class="plan-hint" style="margin-top:6px">${escapeHtml(unlock)}</div>` : ""}
-  <button type="button" class="ghost-btn conversion-cta" style="margin-top:8px;padding:6px 10px;font-size:12px">${escapeHtml(ctaLabel)}</button>
-</div>`;
-    const btn = el.querySelector("button");
-    if (btn) {
-      btn.onclick = () => upgradePlan(ctaTier);
-    }
+    // Render as a subtle, inline CTA inside the usage strip (no buttons everywhere).
+    el.style.display = "none";
+    el.innerHTML = "";
+    state.usageInlineCtaUntil = Date.now() + 120 * 1000;
+    setUsageInlineCta({
+      tone: String(pressure?.tone || "neutral"),
+      copy: [story, capLine, unlock].filter(Boolean).join(" "),
+      cta: ctaLabel.replace(/\s*→\s*$/, "").trim() || (tier === "pro" ? "Add Elite headroom" : "Upgrade for continuity"),
+      targetTier: ctaTier,
+    });
   }
 
   function syncUsageApproachNotice() {

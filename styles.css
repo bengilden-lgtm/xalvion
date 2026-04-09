@@ -450,6 +450,50 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
   justify-content:space-between;
   padding:4px 0;
 }
+
+/* -------------------------------------------------------------------------
+   Value-based usage + subtle upgrade CTA (no popups, product-native)
+   ------------------------------------------------------------------------- */
+
+.usage-inline-cta{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.usage-inline-cta[hidden]{ display:none !important; }
+.usage-inline-cta .usage-inline-cta__copy{
+  color: var(--text-soft);
+  font-size: 12.5px;
+  line-height: 1.45;
+  min-width: 0;
+}
+.usage-inline-cta .usage-inline-cta__link{
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  color: rgba(246,242,235,0.88);
+  font-weight: 650;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(246,242,235,0.26);
+  text-underline-offset: 3px;
+}
+.usage-inline-cta .usage-inline-cta__link:hover{
+  text-decoration-color: rgba(246,242,235,0.46);
+}
+.usage-inline-cta[data-tone="risk"]{
+  border-top-color: rgba(210,133,133,0.18);
+}
+.usage-inline-cta[data-tone="safe"]{
+  border-top-color: rgba(170,196,146,0.18);
+}
 .sidebar-cap-value,
 .stripe-meta-value,
 .ops-metric-value,

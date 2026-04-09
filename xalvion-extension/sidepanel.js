@@ -956,7 +956,7 @@ async function analyze() {
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
     usageChrome.notifyGateAttempt?.("analyze");
     showStatus(
-      "Included operator runs for this window are used. Copy, insert, and approval flows stay available for your current reply.",
+      "Included capacity is used for this window. Keep working without interruption — copy/insert and approvals stay available while you add runway.",
       false
     );
     usageChrome.refreshUsageChrome();
@@ -1088,7 +1088,7 @@ async function scanInbox() {
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
     usageChrome.notifyGateAttempt?.("scan");
     showStatus(
-      "Included operator runs for this window are used. Copy, insert, and approval flows stay available for your current reply.",
+      "Included capacity is used for this window. Keep handling threads without interruption — copy/insert and approvals stay available while you add runway.",
       false
     );
     usageChrome.refreshUsageChrome();
@@ -1153,7 +1153,7 @@ async function scanInbox() {
         hideThinkingPanel();
         usageChrome.notifyGateAttempt?.("scan");
         showStatus(
-          "Included operator runs for this window are used. Copy, insert, and approval flows stay available for your current reply.",
+          "Included capacity is used for this window. Continue operating — copy/insert and approvals stay available while you add runway.",
           false
         );
         if (emptyState) emptyState.style.display = "grid";
