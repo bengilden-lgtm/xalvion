@@ -2,6 +2,8 @@
 (() => {
   "use strict";
 
+  const __auth = globalThis.__XALVION_WORKSPACE_MODULES__?.auth || null;
+
   const API = "";
   const TOKEN_KEY = "xalvion_token";
   const USER_KEY = "xalvion_user";
@@ -14,17 +16,8 @@
   const FREE_USAGE_LIMIT = 12;
   const GUEST_USAGE_RESET_WINDOW_MS = 12 * 60 * 60 * 1000;
 
-  const AUTH_DEBUG =
-    typeof location !== "undefined" &&
-    (location.hostname === "localhost" || location.hostname === "127.0.0.1");
-
   function authDebugLog(label, detail) {
-    if (!AUTH_DEBUG) return;
-    try {
-      const msg = detail && (detail.message || String(detail));
-      if (msg) console.warn(`[xalvion:auth] ${label}`, msg);
-      else console.warn(`[xalvion:auth] ${label}`);
-    } catch {}
+    if (__auth?.authDebugLog) return __auth.authDebugLog(label, detail);
   }
 
 // ===== SAFE FALLBACK FOR pulseRail =====

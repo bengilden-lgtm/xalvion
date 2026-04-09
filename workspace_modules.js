@@ -6,6 +6,69 @@
    * monetization surfaces) lives in app.js + styles.css; extend this module only when a shared primitive
    * is required across bundles.
    */
+
+  global.__XALVION_WORKSPACE_MODULES__ = global.__XALVION_WORKSPACE_MODULES__ || {};
+
+  /**
+   * Workspace Auth/Storage primitives
+   * Owner: frontend/auth
+   *
+   * Purpose:
+   * - Provide stable primitives for `app.js` without changing routes/IDs/UI structure.
+   * - Keep `app.js` as an orchestrator by moving reusable auth/storage behaviors here.
+   */
+  function createWorkspaceAuthPrimitives(config) {
+    const cfg = config || {};
+    const debug =
+      typeof location !== "undefined" &&
+      (location.hostname === "localhost" || location.hostname === "127.0.0.1");
+
+    function authDebugLog(label, detail) {
+      if (!debug) return;
+      try {
+        const msg = detail && (detail.message || String(detail));
+        if (msg) console.warn(`[xalvion:auth] ${label}`, msg);
+        else console.warn(`[xalvion:auth] ${label}`);
+      } catch {}
+    }
+
+    function storageGet(key, fallback = "") {
+      try {
+        const v = global.localStorage?.getItem?.(key);
+        return v === null || typeof v === "undefined" ? fallback : v;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function storageSet(key, value) {
+      try {
+        global.localStorage?.setItem?.(key, String(value));
+      } catch {}
+    }
+
+    function storageRemove(key) {
+      try {
+        global.localStorage?.removeItem?.(key);
+      } catch {}
+    }
+
+    return {
+      authDebugLog,
+      storageGet,
+      storageSet,
+      storageRemove,
+      keys: {
+        TOKEN_KEY: String(cfg.TOKEN_KEY || "xalvion_token"),
+        USER_KEY: String(cfg.USER_KEY || "xalvion_user"),
+        TIER_KEY: String(cfg.TIER_KEY || "xalvion_tier"),
+      },
+    };
+  }
+
+  global.__XALVION_WORKSPACE_MODULES__.auth =
+    global.__XALVION_WORKSPACE_MODULES__.auth || createWorkspaceAuthPrimitives();
+
   function createPhase2Core(config) {
     const fetchImpl =
       config && typeof config.fetchImpl === "function"

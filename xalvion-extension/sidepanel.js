@@ -1,5 +1,14 @@
+/**
+ * Xalvion Extension — side panel orchestrator
+ * Owner: xalvion-extension/sidepanel.js
+ *
+ * Wires DOM, analyze/inbox pipelines, and Gmail actions. Delegates quota/upgrade UI to
+ * `./ui/usage-chrome.js` and governor/trust presentation to `./renderers/governor-trust.js`.
+ */
 import { createChromeContext } from "./chrome-context.js";
 import { insertIntoGmail } from "./adapters/chrome-compose.js";
+import { createUsageChrome } from "./ui/usage-chrome.js";
+import { renderConsequenceBar as renderConsequenceBarGov, renderOperatorBrief as renderOperatorBriefGov } from "./renderers/governor-trust.js";
 import {
   applyStructuredExplainabilityToData,
   buildHeaderInsight,
@@ -148,6 +157,29 @@ const scanInboxBtn = document.getElementById("scanInbox");
 const inboxSummary = document.getElementById("inboxSummary");
 const inboxSummaryValue = document.getElementById("inboxSummaryValue");
 
+const usageChrome = createUsageChrome({
+  els: {
+    analyzeBtn,
+    scanInboxBtn,
+    capPill,
+    upgradeContextPanel,
+    upgradeContextEyebrow,
+    upgradeContextPrimary,
+    upgradeContextSecondary,
+    upgradeContextSplit,
+    upgradeEnrollFreeBtn,
+    upgradeDismissSoftBtn,
+    upgradeProLink,
+  },
+  uiStore,
+  sessionStore,
+  getUsageSnapshot,
+  loadUsagePlan,
+  enrollFreeTier,
+  dismissSoftNudgeForPeriod,
+  showStatus: (msg) => showStatus(msg, false),
+});
+
 /** Compat: legacy locals stay in sync with stores for existing closures and guards */
 let lastReply = "";
 let replySnapshotBeforeEdit = "";
@@ -166,347 +198,22 @@ function syncCompatFromStores() {
 
 uiStore.subscribe(() => {
   syncCompatFromStores();
-  syncPrimaryRunButtons();
+  usageChrome.syncPrimaryRunButtons();
 });
 agentStore.subscribe(syncCompatFromStores);
 syncCompatFromStores();
 
-const usageReady = loadUsagePlan().then(() => {
-  refreshUsageChrome();
-  syncPrimaryRunButtons();
-  bindUpgradePanel();
-});
-
-function currentPlanTier() {
-  return sessionStore.getState().planTier;
-}
-
-function updateCapacityPillFromData(data) {
-  if (!capPill) return;
-  if (data?.meta && data.meta.plan_tier) {
-    sessionStore.setState({ planTier: data.meta.plan_tier });
-  }
-  const snap = getUsageSnapshot(currentPlanTier());
-  if (snap.hasProAccess) {
-    const fromServer = data?.meta?.plan_tier;
-    const label = fromServer ? String(fromServer).toUpperCase() : "PRO";
-    capPill.textContent = `Extension · ${label}`;
-    return;
-  }
-  capPill.textContent = `Extension · ${snap.totalOperatorRuns}/${snap.hardThreshold} operator runs`;
-}
-
-function refreshUsageChrome() {
-  const snap = getUsageSnapshot(currentPlanTier());
-  if (capPill) {
-    if (snap.hasProAccess) {
-      const t = currentPlanTier();
-      capPill.textContent = t ? `Extension · ${String(t).toUpperCase()}` : "Extension · PRO";
-    } else {
-      capPill.textContent = `Extension · ${snap.totalOperatorRuns}/${snap.hardThreshold} operator runs`;
-    }
-  }
-
-  if (!upgradeContextPanel) return;
-
-  upgradeContextPanel.classList.remove("is-visible", "mode-soft", "mode-hard");
-
-  if (snap.hasProAccess) {
-    upgradeEnrollFreeBtn?.classList.add("is-hidden");
-    upgradeDismissSoftBtn?.classList.add("is-hidden");
-    if (upgradeContextSplit) upgradeContextSplit.textContent = "";
-    return;
-  }
-
-  if (snap.hardLimited) {
-    upgradeContextPanel.classList.add("is-visible", "mode-hard");
-    if (upgradeContextEyebrow) upgradeContextEyebrow.textContent = "Quota — window limit";
-    if (upgradeContextPrimary) {
-      upgradeContextPrimary.textContent = `You've used ${snap.totalOperatorRuns} operator runs — this window is at capacity (${snap.hardThreshold}).`;
-    }
-    if (upgradeContextSecondary) {
-      upgradeContextSecondary.textContent =
-        "Upgrade for higher capacity and uninterrupted execution. Approval-safe automation continues on Pro. Your current reply stays available to copy or insert.";
-    }
-    if (upgradeContextSplit) {
-      upgradeContextSplit.textContent = `Guest runs ${snap.guestUsageCount} · Free-tier runs ${snap.freeTierUsageCount}`;
-    }
-    upgradeDismissSoftBtn?.classList.add("is-hidden");
-    upgradeEnrollFreeBtn?.classList.toggle("is-hidden", snap.freeTierEnrolled);
-    return;
-  }
-
-  if (snap.showSoftNudge) {
-    upgradeContextPanel.classList.add("is-visible", "mode-soft");
-    if (upgradeContextEyebrow) upgradeContextEyebrow.textContent = "Capacity";
-    if (upgradeContextPrimary) {
-      upgradeContextPrimary.textContent = `You've used ${snap.totalOperatorRuns} operator runs.`;
-    }
-    if (upgradeContextSecondary) {
-      upgradeContextSecondary.textContent =
-        "Upgrade for higher capacity and uninterrupted execution. Approval-safe automation continues on Pro.";
-    }
-    if (upgradeContextSplit) {
-      upgradeContextSplit.textContent = `Guest runs ${snap.guestUsageCount} · Free-tier runs ${snap.freeTierUsageCount}`;
-    }
-    upgradeDismissSoftBtn?.classList.remove("is-hidden");
-    upgradeEnrollFreeBtn?.classList.toggle("is-hidden", snap.freeTierEnrolled);
-    return;
-  }
-
-  if (upgradeContextSplit) upgradeContextSplit.textContent = "";
-  upgradeEnrollFreeBtn?.classList.add("is-hidden");
-  upgradeDismissSoftBtn?.classList.add("is-hidden");
-}
-
-function syncPrimaryRunButtons() {
-  const loading = uiStore.getState().loading;
-  const snap = getUsageSnapshot(currentPlanTier());
-  const block = snap.hardLimited && !snap.hasProAccess;
-  const hint = "Operator quota exhausted for this period. Copy, insert, and review stay available.";
-  if (analyzeBtn) {
-    analyzeBtn.disabled = Boolean(loading || block);
-    analyzeBtn.title = block ? hint : "";
-  }
-  if (scanInboxBtn) {
-    scanInboxBtn.disabled = Boolean(loading || block);
-    scanInboxBtn.title = block ? hint : "";
-  }
-}
-
-function bindUpgradePanel() {
-  if (upgradeEnrollFreeBtn && !upgradeEnrollFreeBtn.dataset.bound) {
-    upgradeEnrollFreeBtn.dataset.bound = "1";
-    upgradeEnrollFreeBtn.addEventListener("click", async () => {
-      await enrollFreeTier();
-      refreshUsageChrome();
-      syncPrimaryRunButtons();
-      showStatus("Free console enrolled — run counts continue on this device; quota resets on the rolling window.");
-    });
-  }
-  if (upgradeDismissSoftBtn && !upgradeDismissSoftBtn.dataset.bound) {
-    upgradeDismissSoftBtn.dataset.bound = "1";
-    upgradeDismissSoftBtn.addEventListener("click", async () => {
-      await dismissSoftNudgeForPeriod();
-      refreshUsageChrome();
-    });
-  }
-  if (upgradeProLink && !upgradeProLink.dataset.bound) {
-    upgradeProLink.dataset.bound = "1";
-    upgradeProLink.addEventListener("click", (e) => {
-      e.preventDefault();
-      showStatus("Pro routing can open your billing or workspace console when wired.");
-    });
-  }
-}
-
 async function ensureUsageReady() {
-  await usageReady;
-}
-
-function normalizeGovernorFactors(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value
-      .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
-      .filter(Boolean);
-  }
-  if (typeof value === "string") {
-    const t = value.trim();
-    if (!t) return [];
-    const parts = t.includes("\n") ? t.split("\n") : t.split(/[;•]/g);
-    return parts.map((x) => String(x || "").trim()).filter(Boolean);
-  }
-  if (typeof value === "object") {
-    const v = value;
-    const candidates = [];
-    if (Array.isArray(v.factors)) candidates.push(...v.factors);
-    if (Array.isArray(v.items)) candidates.push(...v.items);
-    if (Array.isArray(v.signals)) candidates.push(...v.signals);
-    if (candidates.length) {
-      return candidates
-        .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
-        .filter(Boolean);
-    }
-    try {
-      return [JSON.stringify(v)].map((x) => String(x || "").trim()).filter(Boolean);
-    } catch {
-      return [String(v)].map((x) => String(x || "").trim()).filter(Boolean);
-    }
-  }
-  return [String(value)].map((x) => String(x || "").trim()).filter(Boolean);
-}
-
-function normalizeViolations(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value
-      .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
-      .filter(Boolean);
-  }
-  if (typeof value === "string") {
-    const t = value.trim();
-    if (!t) return [];
-    const parts = t.includes("\n") ? t.split("\n") : t.split(/[;•]/g);
-    return parts.map((x) => String(x || "").trim()).filter(Boolean);
-  }
-  if (typeof value === "object") {
-    const v = value;
-    const candidates = [];
-    if (Array.isArray(v.violations)) candidates.push(...v.violations);
-    if (Array.isArray(v.items)) candidates.push(...v.items);
-    if (Array.isArray(v.errors)) candidates.push(...v.errors);
-    if (candidates.length) {
-      return candidates
-        .map((x) => (x === null || typeof x === "undefined" ? "" : String(x)).trim())
-        .filter(Boolean);
-    }
-    try {
-      return [JSON.stringify(v)].map((x) => String(x || "").trim()).filter(Boolean);
-    } catch {
-      return [String(v)].map((x) => String(x || "").trim()).filter(Boolean);
-    }
-  }
-  return [String(value)].map((x) => String(x || "").trim()).filter(Boolean);
-}
-
-function formatGovernorRisk(governor_risk_level, governor_risk_score) {
-  const level = String(governor_risk_level || "").toLowerCase();
-  const levelLabel =
-    level === "low" ? "Low risk" : level === "medium" ? "Medium risk" : level === "high" ? "High risk" : "";
-  if (!levelLabel) return "";
-  const score = Number(governor_risk_score);
-  if (Number.isFinite(score)) {
-    const s = Math.max(0, Math.min(5, Math.round(score)));
-    return `${levelLabel} · ${s}/5`;
-  }
-  return levelLabel;
-}
-
-function deriveGovernorPresentation(data) {
-  const d = data && typeof data === "object" ? data : {};
-  const dec = getDecisionData(d) || {};
-  const execModeRaw = d.execution_mode ?? dec.execution_mode;
-  const execMode = String(execModeRaw || "").toLowerCase();
-  const hasGov =
-    execMode === "auto" ||
-    execMode === "review" ||
-    execMode === "blocked" ||
-    d.governor_reason != null ||
-    dec.governor_reason != null ||
-    d.governor_risk_level != null ||
-    dec.governor_risk_level != null ||
-    d.governor_risk_score != null ||
-    dec.governor_risk_score != null ||
-    d.governor_factors != null ||
-    dec.governor_factors != null ||
-    d.violations != null ||
-    dec.violations != null ||
-    d.approved != null ||
-    dec.approved != null;
-
-  if (!hasGov) {
-    return {
-      label: "",
-      cls: "",
-      title: "",
-      summary: "",
-      nextStep: "",
-      riskLabel: "",
-      riskScoreLabel: "",
-      factors: [],
-      violations: [],
-      mode: "unknown",
-    };
-  }
-
-  const govReason = String(d.governor_reason || dec.governor_reason || "").trim();
-  const govRiskLevel = String(d.governor_risk_level || dec.governor_risk_level || "").toLowerCase();
-  const govRiskScore = d.governor_risk_score ?? dec.governor_risk_score;
-  const factors = normalizeGovernorFactors(d.governor_factors ?? dec.governor_factors).slice(0, 12);
-  const violations = normalizeViolations(d.violations ?? dec.violations).slice(0, 12);
-  const riskChip = formatGovernorRisk(govRiskLevel, govRiskScore);
-
-  const nextStep =
-    execMode === "blocked"
-      ? "Edit or escalate before execution."
-      : execMode === "review"
-        ? "Review and approve before execution."
-        : execMode === "auto"
-          ? "Action can proceed without operator intervention."
-          : "";
-
-  let mode = execMode || "unknown";
-  if (mode === "auto" && (violations.length > 0 || govRiskLevel === "high")) {
-    mode = "review";
-  }
-
-  let label = "";
-  let cls = "";
-  let title = "";
-
-  if (mode === "blocked") {
-    label = "Blocked by policy";
-    cls = "signal-high-risk signal-blocked";
-    title = govReason || "Blocked by governor policy";
-  } else if (mode === "review") {
-    label = "Approval required";
-    cls = "signal-approval";
-    title = govReason || "Review required under governor policy";
-  } else if (mode === "auto") {
-    label = "Safe to automate";
-    cls = "signal-safe";
-    title = govReason || "Meets automation safety criteria";
-  }
-
-  const summary = govReason
-    ? govReason
-    : mode === "blocked"
-      ? "Blocked by policy."
-      : mode === "review"
-        ? "Approval required under policy."
-        : mode === "auto"
-          ? "Low-risk action with no policy violations."
-          : "";
-
-  return {
-    label,
-    cls,
-    title,
-    summary,
-    nextStep,
-    riskLabel: govRiskLevel ? (govRiskLevel === "low" ? "Low risk" : govRiskLevel === "medium" ? "Medium risk" : govRiskLevel === "high" ? "High risk" : "") : "",
-    riskScoreLabel: riskChip,
-    factors,
-    violations,
-    mode: mode === "auto" || mode === "review" || mode === "blocked" ? mode : "unknown",
-  };
+  await usageChrome.ensureUsageReady();
 }
 
 function renderConsequenceBar(data) {
-  if (!consequenceSignal) return;
-  // File: xalvion-extension/sidepanel.js
-  // Governor trust signal parity: when governor fields are present, they become source-of-truth.
-  const pres = (() => {
-    const gov = deriveGovernorPresentation(data);
-    if (gov && gov.mode && gov.mode !== "unknown") {
-      const text =
-        gov.mode === "blocked"
-          ? "⛔ Blocked by policy"
-          : gov.mode === "review"
-            ? "⚡ Approval required"
-            : gov.mode === "auto"
-              ? "✓ Safe to automate"
-              : "○ Manual review";
-      return { cls: gov.cls || "signal-review", text, title: gov.summary || gov.title || "" };
-    }
-    return deriveConsequencePresentation(data);
-  })();
-  consequenceSignal.textContent = pres.text;
-  consequenceSignal.className = `consequence-signal ${pres.cls}`;
-  if (pres.title) consequenceSignal.setAttribute("title", pres.title);
-  else consequenceSignal.removeAttribute("title");
-  consequenceSignal.classList.remove("is-hidden");
+  renderConsequenceBarGov({
+    data,
+    consequenceSignal,
+    deriveConsequencePresentation,
+    getDecisionData,
+  });
 }
 
 function renderApprovalCompact(data, reply) {
@@ -537,36 +244,13 @@ function addBriefLine(container, label, value) {
 }
 
 function renderOperatorBrief(data) {
-  if (!operatorBriefBody) return;
-  operatorBriefBody.replaceChildren();
-  const lines = buildOperatorBriefLines(data);
-  for (const line of lines) {
-    addBriefLine(operatorBriefBody, line.label, line.value);
-  }
-
-  // Governor visibility (optional): concise reason + factors + next step.
-  try {
-    const gov = deriveGovernorPresentation(data);
-    if (gov && gov.mode && gov.mode !== "unknown") {
-      if (gov.summary) addBriefLine(operatorBriefBody, "Governor", gov.summary);
-      if (gov.nextStep) addBriefLine(operatorBriefBody, "Next step", gov.nextStep);
-      const riskText = String(gov.riskScoreLabel || gov.riskLabel || "").trim();
-      if (riskText) addBriefLine(operatorBriefBody, "Risk", riskText);
-      const factors = Array.isArray(gov.factors) ? gov.factors.slice(0, 3) : [];
-      if (factors.length) {
-        addBriefLine(operatorBriefBody, "Governor factors", factors[0]);
-        for (const f of factors.slice(1)) addBriefLine(operatorBriefBody, "", f);
-      }
-      const violations = Array.isArray(gov.violations) ? gov.violations.slice(0, 3) : [];
-      if (violations.length) {
-        addBriefLine(operatorBriefBody, "Policy checks", violations[0]);
-        for (const v of violations.slice(1)) addBriefLine(operatorBriefBody, "", v);
-      }
-    }
-  } catch {}
-  if (operatorBriefEl && !operatorBriefEl.open) {
-    /* default collapsed for compact extension chrome */
-  }
+  renderOperatorBriefGov({
+    data,
+    operatorBriefBody,
+    addBriefLine,
+    buildOperatorBriefLines,
+    getDecisionData,
+  });
 }
 
 function resetReplyEditor() {
@@ -935,7 +619,7 @@ function render(data) {
 
   agentStore.setState({ latestPayload: data });
 
-  updateCapacityPillFromData(data);
+  usageChrome.updateCapacityPillFromData(data);
 
   const decision = getDecisionData(data);
   const triage = getTriageData(data);
@@ -1063,8 +747,8 @@ function render(data) {
     showStatus("Ready.");
   }
 
-  refreshUsageChrome();
-  syncPrimaryRunButtons();
+  usageChrome.refreshUsageChrome();
+  usageChrome.syncPrimaryRunButtons();
 }
 
 async function extractText(tabId) {
@@ -1140,14 +824,14 @@ function buildInboxSummary(results) {
 
 async function analyze() {
   await ensureUsageReady();
-  const preSnap = getUsageSnapshot(currentPlanTier());
+  const preSnap = getUsageSnapshot(sessionStore.getState().planTier);
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
     showStatus(
       "Operator quota exhausted for this period. Copy, insert, and approval flows stay available for your current reply.",
       false
     );
-    refreshUsageChrome();
-    syncPrimaryRunButtons();
+    usageChrome.refreshUsageChrome();
+    usageChrome.syncPrimaryRunButtons();
     return;
   }
 
@@ -1220,9 +904,9 @@ async function analyze() {
     showStatus("Generating decision...");
     const data = await res.json();
     render(data);
-    await recordSuccessfulOperatorRun(currentPlanTier());
-    refreshUsageChrome();
-    syncPrimaryRunButtons();
+    await recordSuccessfulOperatorRun(sessionStore.getState().planTier);
+    usageChrome.refreshUsageChrome();
+    usageChrome.syncPrimaryRunButtons();
     showStatus("Ready.");
   } catch (err) {
     console.error("Analyze failed:", err);
@@ -1231,20 +915,20 @@ async function analyze() {
     if (emptyState) emptyState.style.display = "grid";
   } finally {
     uiStore.setState({ loading: false });
-    syncPrimaryRunButtons();
+    usageChrome.syncPrimaryRunButtons();
   }
 }
 
 async function scanInbox() {
   await ensureUsageReady();
-  const preSnap = getUsageSnapshot(currentPlanTier());
+  const preSnap = getUsageSnapshot(sessionStore.getState().planTier);
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
     showStatus(
       "Operator quota exhausted for this period. Copy, insert, and approval flows stay available for your current reply.",
       false
     );
-    refreshUsageChrome();
-    syncPrimaryRunButtons();
+    usageChrome.refreshUsageChrome();
+    usageChrome.syncPrimaryRunButtons();
     return;
   }
 
@@ -1289,7 +973,7 @@ async function scanInbox() {
     const thinkingPromise = playThinkingSequence(currentRunId, "inbox");
     let threads = await extractThreads(tab.id);
 
-    const preLoopSnap = getUsageSnapshot(currentPlanTier());
+    const preLoopSnap = getUsageSnapshot(sessionStore.getState().planTier);
     if (!preLoopSnap.hasProAccess && threads.length) {
       const remaining = Math.max(0, preLoopSnap.hardThreshold - preLoopSnap.totalOperatorRuns);
       if (remaining <= 0) {
@@ -1345,9 +1029,9 @@ async function scanInbox() {
       return;
     }
 
-    await recordSuccessfulOperatorRuns(currentPlanTier(), results.length);
-    refreshUsageChrome();
-    syncPrimaryRunButtons();
+    await recordSuccessfulOperatorRuns(sessionStore.getState().planTier, results.length);
+    usageChrome.refreshUsageChrome();
+    usageChrome.syncPrimaryRunButtons();
 
     const summary = buildInboxSummary(results);
     const summaryText =
@@ -1367,7 +1051,7 @@ async function scanInbox() {
     if (emptyState) emptyState.style.display = "grid";
   } finally {
     uiStore.setState({ loading: false });
-    syncPrimaryRunButtons();
+    usageChrome.syncPrimaryRunButtons();
   }
 }
 
