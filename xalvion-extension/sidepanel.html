@@ -1001,6 +1001,108 @@
       gap: 10px;
     }
 
+    /* Trust dominance strip + decision microcopy (referenced by sidepanel.js) */
+    .trust-strip{
+      display:flex;
+      align-items:center;
+      gap: 8px;
+      flex-wrap: nowrap;
+      overflow: hidden;
+      padding-top: 2px;
+    }
+    .trust-pill{
+      display:inline-flex;
+      align-items:center;
+      height: 22px;
+      padding: 0 9px;
+      border-radius: var(--r-pill);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    .trust-pill.tone-safe{
+      border-color: rgba(56, 217, 150, 0.22);
+      background: rgba(56, 217, 150, 0.08);
+      color: rgba(180, 250, 215, 0.92);
+    }
+    .trust-pill.tone-review{
+      border-color: rgba(250, 204, 21, 0.22);
+      background: rgba(250, 204, 21, 0.07);
+      color: #fde68a;
+    }
+    .trust-pill.tone-risk{
+      border-color: rgba(248, 113, 113, 0.24);
+      background: rgba(248, 113, 113, 0.08);
+      color: #fecaca;
+    }
+
+    .decision-microcopy{
+      margin-top: -2px;
+      font-size: 11px;
+      line-height: 1.45;
+      letter-spacing: -0.006em;
+      color: var(--muted);
+      animation: fadeUp 0.18s var(--ease);
+    }
+    .decision-microcopy[data-tone="safe"]{ color: rgba(180, 250, 215, 0.82); }
+    .decision-microcopy[data-tone="risk"]{ color: rgba(255, 200, 200, 0.82); }
+    .decision-microcopy[data-tone="hold"]{ color: rgba(210, 202, 255, 0.88); }
+
+    /* Subtle “ready” emphasis without clutter */
+    .panel.xv-decision-ready{
+      animation: xvDecisionFade 220ms var(--ease) both;
+    }
+    .panel.xv-decision-ready[data-decision-tone="hold"],
+    .panel.xv-decision-ready[data-decision-tone="risk"]{
+      animation: xvDecisionFade 220ms var(--ease) both, xvDecisionEmphasis 520ms ease 40ms both;
+    }
+    @media (prefers-reduced-motion: reduce){
+      .panel.xv-decision-ready{ animation: none; }
+      .panel.xv-decision-ready[data-decision-tone="hold"],
+      .panel.xv-decision-ready[data-decision-tone="risk"]{ animation: none; }
+    }
+    @keyframes xvDecisionFade{
+      from{ opacity: 0; transform: translateY(3px); }
+      to{ opacity: 1; transform: translateY(0); }
+    }
+    @keyframes xvDecisionEmphasis{
+      0%{ filter: saturate(1); }
+      45%{ filter: saturate(1.08); }
+      100%{ filter: saturate(1); }
+    }
+    .panel[data-decision-tone="hold"]{
+      box-shadow:
+        0 0 0 1px rgba(124, 92, 252, 0.14),
+        var(--shadow);
+    }
+    .panel[data-decision-tone="risk"]{
+      box-shadow:
+        0 0 0 1px rgba(248, 113, 113, 0.12),
+        var(--shadow);
+    }
+    .panel[data-decision-tone="safe"]{
+      box-shadow:
+        0 0 0 1px rgba(56, 217, 150, 0.10),
+        var(--shadow);
+    }
+
+    /* Premium focus states (keyboard + accessibility) */
+    button:focus-visible,
+    .btn-texty:focus-visible,
+    .reply-textarea:focus-visible,
+    .operator-brief-summary:focus-visible,
+    .explainability-toggle:focus-visible{
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(124, 92, 252, 0.22);
+      border-color: rgba(124, 92, 252, 0.35);
+    }
+
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(5px); }
       to { opacity: 1; transform: translateY(0); }
@@ -1114,13 +1216,13 @@
       </div>
 
       <div id="emptyState" class="empty-state">
-        <div class="empty-title">No ticket analyzed yet</div>
-        <div class="empty-copy">Start with Analyze. You’ll get a consequence signal, a mission brief, and a final customer reply that’s ready to send.</div>
+        <div class="empty-title">Your operator copilot is standing by</div>
+        <div class="empty-copy">Run Analyze on the active ticket to get a consequence signal, a crisp operator brief, and a customer-ready reply you can safely copy or insert.</div>
         <ul class="empty-list">
-          <li>Consequence signal first</li>
-          <li>Operator brief</li>
-          <li>Customer-ready reply</li>
-          <li>Policy-backed detail on demand</li>
+          <li>Consequence first: safe / review / blocked</li>
+          <li>Top factors + next step</li>
+          <li>Customer-ready reply (editable)</li>
+          <li>Trust & policy detail on demand</li>
         </ul>
       </div>
 

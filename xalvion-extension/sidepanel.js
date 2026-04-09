@@ -197,6 +197,7 @@ let explainabilityOpen = false;
 let thinkingRunId = 0;
 let replyEditing = false;
 let lastPrimaryIntent = "";
+let activeRunKind = "";
 
 function syncCompatFromStores() {
   const ui = uiStore.getState();
@@ -216,6 +217,102 @@ syncCompatFromStores();
 
 async function ensureUsageReady() {
   await usageChrome.ensureUsageReady();
+}
+
+function isBusy() {
+  return Boolean(uiStore.getState().loading);
+}
+
+function setPrimaryButtonsBusy(busy, labelOverride = "") {
+  const isOn = Boolean(busy);
+  if (analyzeBtn) {
+    analyzeBtn.disabled = isOn;
+    analyzeBtn.dataset.busy = isOn ? "true" : "false";
+    if (labelOverride) analyzeBtn.dataset.busyLabel = labelOverride;
+  }
+  if (scanInboxBtn) {
+    scanInboxBtn.disabled = isOn;
+    scanInboxBtn.dataset.busy = isOn ? "true" : "false";
+    if (labelOverride) scanInboxBtn.dataset.busyLabel = labelOverride;
+  }
+}
+
+function sanitizeServiceDetail(text) {
+  const t = normalize(String(text || ""));
+  if (!t) return "";
+  // Avoid leaking stack traces or raw internal payloads into the UI.
+  const clipped = t.slice(0, 260);
+  if (/traceback|exception|stack|error:\s/i.test(clipped)) return "";
+  return clipped;
+}
+
+async function fetchJsonWithTimeout(url, payload, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const raw = await res.text().catch(() => "");
+    if (!res.ok) {
+      const detail = sanitizeServiceDetail(raw);
+      return {
+        ok: false,
+        status: res.status,
+        detail,
+        data: null,
+      };
+    }
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (jsonErr) {
+      console.error("[xalvion] service: invalid JSON", { rawPreview: String(raw || "").slice(0, 240) }, jsonErr);
+      return { ok: false, status: 0, detail: "", data: null, kind: "invalid_json" };
+    }
+
+    return { ok: true, status: res.status, detail: "", data };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function armSlowNetworkNudge(runId, mode) {
+  const start = Date.now();
+  let stage = 0;
+  const hints =
+    mode === "inbox"
+      ? [
+          "Connecting to the operator service…",
+          "Still working — scanning visible rows.",
+          "This is taking longer than usual. You can retry if needed.",
+        ]
+      : [
+          "Connecting to the operator service…",
+          "Still working — checking policy edge cases.",
+          "This is taking longer than usual. You can retry if needed.",
+        ];
+
+  const id = setInterval(() => {
+    if (runId !== agentStore.getState().thinkingRunId) {
+      clearInterval(id);
+      return;
+    }
+    const elapsed = Date.now() - start;
+    if (elapsed < 900) return;
+    const nextStage = elapsed > 6500 ? 2 : elapsed > 2200 ? 1 : 0;
+    if (nextStage === stage) return;
+    stage = nextStage;
+    if (thinkingSubtitle) thinkingSubtitle.textContent = hints[stage];
+    showStatus(hints[stage], false);
+  }, 350);
+
+  return () => clearInterval(id);
 }
 
 function renderConsequenceBar(data) {
@@ -951,6 +1048,8 @@ function buildInboxSummary(results) {
 
 async function analyze() {
   await ensureUsageReady();
+  if (isBusy()) return;
+  activeRunKind = "analyze";
   lastPrimaryIntent = "analyze";
   const preSnap = getUsageSnapshot(sessionStore.getState().planTier);
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
@@ -965,6 +1064,7 @@ async function analyze() {
   }
 
   uiStore.setState({ loading: true });
+  setPrimaryButtonsBusy(true);
   try {
     const ANALYZE_TIMEOUT_MS = 9000;
     agentStore.setState((s) => ({
@@ -978,6 +1078,7 @@ async function analyze() {
     hideHeaderInsight();
     hideInboxSummary();
     if (emptyState) emptyState.style.display = "none";
+    showStatus({ title: "Analyzing", body: "Reading the active ticket and preparing the operator stack." }, false);
 
     if (copyBtn) {
       copyBtn.disabled = true;
@@ -1011,7 +1112,6 @@ async function analyze() {
       return;
     }
 
-    const thinkingPromise = playThinkingSequence(currentRunId, "single");
     const text = await extractText(tab.id);
 
     if (!text) {
@@ -1032,40 +1132,25 @@ async function analyze() {
 
     console.log("[xalvion] analyze: start", { timeoutMs: ANALYZE_TIMEOUT_MS, textLen: text.length });
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-    let res;
-    try {
-      res = await fetch("http://127.0.0.1:8000/analyze", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    console.log("[xalvion] analyze: response", { ok: res.ok, status: res.status });
-
+    const thinkingPromise = playThinkingSequence(currentRunId, "single");
+    const disarmSlowNudge = armSlowNetworkNudge(currentRunId, "single");
+    const result = await fetchJsonWithTimeout("http://127.0.0.1:8000/analyze", { text }, ANALYZE_TIMEOUT_MS);
+    disarmSlowNudge();
     await thinkingPromise;
 
-    if (!res.ok) {
-      let detail = "";
-      try {
-        // Best-effort; do not block failure rendering on body parsing.
-        detail = normalize(await res.text());
-      } catch (e) {
-        console.error("[xalvion] analyze: failed reading error body", e);
-      }
+    if (!result.ok) {
+      const isInvalidJson = result.kind === "invalid_json";
       hideThinkingPanel();
       showStatus(
         {
           kind: "error",
-          title: "Analyze failed",
-          body: `The operator service returned ${res.status}.${detail ? `\n\n${detail.slice(0, 240)}` : ""}`,
+          title: isInvalidJson ? "Unreadable response" : result.status === 0 ? "Analyze timed out" : "Analyze failed",
+          body:
+            result.status === 0
+              ? "The operator service didn’t respond in time. Try again."
+              : isInvalidJson
+                ? "The operator service returned an invalid payload. Restart it and try again."
+                : `The operator service returned ${result.status}. ${result.detail ? "Try again." : "Try again, or check the service logs."}`.trim(),
           action: { label: "Retry", onClick: analyze },
         },
         true
@@ -1074,40 +1159,14 @@ async function analyze() {
       return;
     }
 
-    showStatus("Generating decision...");
-    let data;
-    try {
-      // Some backends may mislabel content-type; parse defensively.
-      const raw = await res.text();
-      try {
-        data = JSON.parse(raw);
-      } catch (jsonErr) {
-        console.error("[xalvion] analyze: invalid JSON", { rawPreview: String(raw || "").slice(0, 240) }, jsonErr);
-        throw new Error("Invalid JSON returned from operator service.");
-      }
-    } catch (err) {
-      console.error("[xalvion] analyze: response parse failed", err);
-      hideThinkingPanel();
-      showStatus(
-        {
-          kind: "error",
-          title: "Analyze failed",
-          body: "The operator service returned an unreadable response. Try again.",
-          action: { label: "Retry", onClick: analyze },
-        },
-        true
-      );
-      if (emptyState) emptyState.style.display = "grid";
-      return;
-    }
-
+    const data = result.data;
     console.log("[xalvion] analyze: parsed", { keys: data && typeof data === "object" ? Object.keys(data).slice(0, 12) : [] });
     render(data);
     await recordSuccessfulOperatorRun(sessionStore.getState().planTier);
     usageChrome.notifyOperatorRunComplete?.(data);
     usageChrome.refreshUsageChrome();
     usageChrome.syncPrimaryRunButtons();
-    showStatus("Ready.");
+    showStatus({ title: "Decision ready", body: "Copy or insert when you’re satisfied with the operator brief." }, false);
   } catch (err) {
     const isAbort = err && typeof err === "object" && (err.name === "AbortError" || /aborted/i.test(String(err.message || "")));
     console.error("[xalvion] analyze: failed", err);
@@ -1126,12 +1185,16 @@ async function analyze() {
     if (emptyState) emptyState.style.display = "grid";
   } finally {
     uiStore.setState({ loading: false });
+    setPrimaryButtonsBusy(false);
     usageChrome.syncPrimaryRunButtons();
+    activeRunKind = "";
   }
 }
 
 async function scanInbox() {
   await ensureUsageReady();
+  if (isBusy()) return;
+  activeRunKind = "scan";
   lastPrimaryIntent = "scan";
   const preSnap = getUsageSnapshot(sessionStore.getState().planTier);
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
@@ -1146,6 +1209,7 @@ async function scanInbox() {
   }
 
   uiStore.setState({ loading: true });
+  setPrimaryButtonsBusy(true);
   try {
     agentStore.setState((s) => ({
       ...s,
@@ -1158,6 +1222,7 @@ async function scanInbox() {
     hideHeaderInsight();
     hideInboxSummary();
     if (emptyState) emptyState.style.display = "none";
+    showStatus({ title: "Scanning inbox", body: "Summarizing visible rows and flagging risk." }, false);
 
     if (copyBtn) {
       copyBtn.disabled = true;
@@ -1192,6 +1257,7 @@ async function scanInbox() {
     }
 
     const thinkingPromise = playThinkingSequence(currentRunId, "inbox");
+    const disarmSlowNudge = armSlowNetworkNudge(currentRunId, "inbox");
     let threads = await extractThreads(tab.id);
 
     const preLoopSnap = getUsageSnapshot(sessionStore.getState().planTier);
@@ -1235,20 +1301,15 @@ async function scanInbox() {
     for (let i = 0; i < threads.length; i += 1) {
       showStatus(`Analyzing ${i + 1}/${threads.length} visible tickets...`);
       try {
-        const res = await fetch("http://127.0.0.1:8000/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: threads[i] }),
-        });
-
-        if (res.ok) {
-          results.push(await res.json());
-        }
+        const THREAD_TIMEOUT_MS = 6500;
+        const r = await fetchJsonWithTimeout("http://127.0.0.1:8000/analyze", { text: threads[i] }, THREAD_TIMEOUT_MS);
+        if (r.ok && r.data) results.push(r.data);
       } catch (err) {
         console.error("Inbox ticket analyze failed:", err);
       }
     }
 
+    disarmSlowNudge();
     await thinkingPromise;
 
     hideThinkingPanel();
@@ -1297,7 +1358,9 @@ async function scanInbox() {
     if (emptyState) emptyState.style.display = "grid";
   } finally {
     uiStore.setState({ loading: false });
+    setPrimaryButtonsBusy(false);
     usageChrome.syncPrimaryRunButtons();
+    activeRunKind = "";
   }
 }
 
