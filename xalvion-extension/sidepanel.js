@@ -111,6 +111,7 @@ const approvalCompact = document.getElementById("approvalCompact");
 const approvalCompactCopy = document.getElementById("approvalCompactCopy");
 const consequenceSignal = document.getElementById("consequenceSignal");
 let trustStripEl = document.getElementById("trustStrip");
+let decisionMicrocopyEl = document.getElementById("decisionMicrocopy");
 const operatorBriefEl = document.getElementById("operatorBrief");
 const operatorBriefBody = document.getElementById("operatorBriefBody");
 
@@ -238,6 +239,38 @@ function ensureTrustStrip() {
   bar.insertAdjacentElement("afterend", el);
   trustStripEl = el;
   return trustStripEl;
+}
+
+function ensureDecisionMicrocopy() {
+  if (decisionMicrocopyEl) return decisionMicrocopyEl;
+  const panel = document.getElementById("resultPanel");
+  if (!panel) return null;
+  const bar = panel.querySelector(".consequence-bar") || panel.querySelector("#consequenceSignal") || panel;
+  if (!bar) return null;
+  const el = document.createElement("div");
+  el.id = "decisionMicrocopy";
+  el.className = "decision-microcopy";
+  el.style.display = "none";
+  // Prefer to sit immediately under the consequence bar/strip.
+  const anchor = trustStripEl || panel.querySelector("#trustStrip");
+  if (anchor && anchor.parentElement) {
+    anchor.insertAdjacentElement("beforebegin", el);
+  } else if (bar instanceof HTMLElement) {
+    bar.insertAdjacentElement("afterend", el);
+  } else {
+    panel.insertAdjacentElement("afterbegin", el);
+  }
+  decisionMicrocopyEl = el;
+  return decisionMicrocopyEl;
+}
+
+function setDecisionMicrocopy(text, tone = "") {
+  const el = ensureDecisionMicrocopy();
+  if (!el) return;
+  const t = String(text || "").trim();
+  el.textContent = t;
+  el.style.display = t ? "block" : "none";
+  el.dataset.tone = String(tone || "");
 }
 
 function renderTrustStrip(data) {
@@ -728,6 +761,33 @@ function render(data) {
   renderTrustStrip(data);
   renderOperatorBrief(data);
   renderApprovalCompact(data, reply);
+
+  // High-stakes microcopy + state tone (kept minimal, no layout changes).
+  const pendingGate = approvalGateActive(data);
+  const toolStatus = normalize(String(data.tool_status || "")).toLowerCase();
+  if (toolStatus === "rejected" || statusLower === "escalated" || statusLower === "rejected") {
+    setDecisionMicrocopy("Response held. Ticket escalated.", "risk");
+    if (resultPanel) resultPanel.dataset.decisionTone = "risk";
+  } else if (pendingGate) {
+    setDecisionMicrocopy("Approval required — execution is held until you approve.", "hold");
+    if (resultPanel) resultPanel.dataset.decisionTone = "hold";
+  } else {
+    const riskLc = normalize(String(decision.risk_level ?? triage.risk_level ?? data.risk_level ?? "")).toLowerCase();
+    const risky = riskLc === "high" || riskLc === "medium" || normalize(action).toLowerCase() === "review";
+    if (risky) {
+      setDecisionMicrocopy("Review recommended due to elevated risk.", "risk");
+      if (resultPanel) resultPanel.dataset.decisionTone = "risk";
+    } else {
+      setDecisionMicrocopy("This action is safe based on past outcomes.", "safe");
+      if (resultPanel) resultPanel.dataset.decisionTone = "safe";
+    }
+  }
+
+  // Subtle enter animation when a decision becomes ready.
+  if (resultPanel) {
+    resultPanel.classList.remove("xv-decision-ready");
+    window.requestAnimationFrame(() => resultPanel.classList.add("xv-decision-ready"));
+  }
 
   if (notePill) {
     if (note) {

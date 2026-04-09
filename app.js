@@ -550,6 +550,59 @@ if (typeof window.pulseRail !== "function") {
               font-size:11.5px !important;
             }
 
+            /* High-stakes decision microcopy + state intensity (no layout changes) */
+            body[data-ui="claude"] .decision-microcopy{
+              margin-top: 6px !important;
+              font-size: 12.5px !important;
+              line-height: 1.45 !important;
+              color: rgba(224,217,206,0.62) !important;
+              letter-spacing: -0.006em !important;
+            }
+            body[data-ui="claude"] .decision-microcopy[data-tone="safe"]{ color: rgba(196,226,199,0.78) !important; }
+            body[data-ui="claude"] .decision-microcopy[data-tone="risk"]{ color: rgba(255,198,198,0.76) !important; }
+            body[data-ui="claude"] .decision-microcopy[data-tone="hold"]{ color: rgba(210,204,255,0.78) !important; }
+
+            body[data-ui="claude"] .decision-panel.xv-decision-enter{
+              animation: xvDecisionFade 220ms ease both !important;
+            }
+            body[data-ui="claude"] .decision-panel--gate.xv-decision-enter,
+            body[data-ui="claude"] .decision-state-rejected.xv-decision-enter{
+              animation: xvDecisionFade 220ms ease both !important, xvDecisionEmphasis 520ms ease 40ms both !important;
+            }
+            @media (prefers-reduced-motion: reduce){
+              body[data-ui="claude"] .decision-panel.xv-decision-enter{ animation: none !important; }
+            }
+            @keyframes xvDecisionFade{
+              from{ opacity: 0; transform: translateY(3px); }
+              to{ opacity: 1; transform: translateY(0); }
+            }
+            @keyframes xvDecisionEmphasis{
+              0%{ filter: saturate(1); }
+              45%{ filter: saturate(1.08); }
+              100%{ filter: saturate(1); }
+            }
+
+            body[data-ui="claude"] .decision-panel--gate{
+              border-bottom-color: rgba(186,170,255,0.16) !important;
+            }
+            body[data-ui="claude"] .decision-panel--gate .consequence-signal{
+              box-shadow: 0 0 0 1px rgba(186,170,255,0.14) !important;
+              background: linear-gradient(135deg, rgba(124,90,252,0.16), rgba(255,255,255,0.02)) !important;
+              border-color: rgba(124,90,252,0.28) !important;
+              color: rgba(246,242,235,0.94) !important;
+              font-weight: 750 !important;
+            }
+            body[data-ui="claude"] .decision-panel--safe-clear .consequence-signal{
+              background: rgba(170,196,146,0.10) !important;
+              border-color: rgba(170,196,146,0.22) !important;
+              color: rgba(246,242,235,0.92) !important;
+            }
+            body[data-ui="claude"] .decision-state-rejected .consequence-signal{
+              background: rgba(210,133,133,0.10) !important;
+              border-color: rgba(210,133,133,0.22) !important;
+              color: rgba(246,242,235,0.92) !important;
+            }
+
             /* Editing state: unmistakably final customer response */
             body[data-ui="claude"] .decision-state-editing{ box-shadow: 0 0 0 1px rgba(209,190,162,0.14) !important; }
             body[data-ui="claude"] .edit-mode-sheet{
@@ -648,6 +701,58 @@ if (typeof window.pulseRail !== "function") {
       body {
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
+      }
+
+      /* High-stakes decision moments: consequential, controlled, premium (no layout changes) */
+      .decision-panel.xv-decision-enter{
+        animation: xvDecisionFade 220ms ease both;
+      }
+      .decision-panel--gate.xv-decision-enter,
+      .decision-state-rejected.xv-decision-enter{
+        animation: xvDecisionFade 220ms ease both, xvDecisionEmphasis 520ms ease 40ms both;
+      }
+      @media (prefers-reduced-motion: reduce){
+        .decision-panel.xv-decision-enter{ animation: none; }
+        .decision-panel--gate.xv-decision-enter,
+        .decision-state-rejected.xv-decision-enter{ animation: none; }
+      }
+      @keyframes xvDecisionFade{
+        from{ opacity: 0; transform: translateY(3px); }
+        to{ opacity: 1; transform: translateY(0); }
+      }
+      @keyframes xvDecisionEmphasis{
+        0%{ filter: saturate(1); }
+        45%{ filter: saturate(1.08); }
+        100%{ filter: saturate(1); }
+      }
+
+      .decision-microcopy{
+        margin-top: 6px;
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: var(--xv-text-dim);
+        letter-spacing: -0.006em;
+      }
+      .decision-microcopy[data-tone="safe"]{ color: rgba(142, 230, 188, 0.78); }
+      .decision-microcopy[data-tone="risk"]{ color: rgba(255, 174, 174, 0.78); }
+      .decision-microcopy[data-tone="hold"]{ color: rgba(205, 196, 255, 0.82); }
+
+      .decision-panel--gate .consequence-signal{
+        border-color: rgba(141, 108, 255, 0.34) !important;
+        background: linear-gradient(135deg, rgba(141, 108, 255, 0.16), rgba(255,255,255,0.02)) !important;
+        box-shadow: 0 0 0 1px rgba(141, 108, 255, 0.12);
+        color: rgba(244, 246, 255, 0.96);
+        font-weight: 780;
+      }
+      .decision-panel--safe-clear .consequence-signal{
+        border-color: rgba(56, 217, 150, 0.26) !important;
+        background: rgba(56, 217, 150, 0.10) !important;
+        color: rgba(244, 246, 255, 0.96);
+      }
+      .decision-state-rejected .consequence-signal{
+        border-color: rgba(255, 107, 107, 0.26) !important;
+        background: rgba(255, 107, 107, 0.10) !important;
+        color: rgba(244, 246, 255, 0.96);
       }
 
       #workspaceRoot {
@@ -4042,6 +4147,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         <span class="consequence-signal ${sig.cls}" data-role="consequence">${escapeHtml(sig.text)}</span>
         <div class="decision-controls" data-role="controls"></div>
       </div>
+      <div class="decision-microcopy" data-role="micro" style="display:none"></div>
       <div class="decision-trust-block">
         <div class="trust-strip" data-role="trust-strip" aria-label="Trust dominance"></div>
         <div class="trust-strip-detail" data-role="trust-detail" aria-hidden="true"></div>
@@ -4055,10 +4161,17 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     `;
     mountTarget.appendChild(panel);
 
+    // Decision-ready animation hook (fade-in) + state scoping for CSS.
+    panel.classList.remove("xv-decision-enter");
+    window.requestAnimationFrame(() => {
+      panel.classList.add("xv-decision-enter");
+    });
+
     const cons = panel.querySelector("[data-role='consequence']");
     if (cons && sig.title) cons.setAttribute("title", sig.title);
 
     const controls = panel.querySelector("[data-role='controls']");
+    const microEl = panel.querySelector("[data-role='micro']");
     const trustStripEl = panel.querySelector("[data-role='trust-strip']");
     const trustDetailEl = panel.querySelector("[data-role='trust-detail']");
     const govSurfaceEl = panel.querySelector("[data-role='governor']");
@@ -4067,6 +4180,25 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const errEl = panel.querySelector("[data-role='err']");
     const editWrap = panel.querySelector("[data-role='edit']");
     const nextWrap = panel.querySelector("[data-role='next']");
+
+    const setMicrocopy = (text, tone = "") => {
+      if (!microEl) return;
+      const t = String(text || "").trim();
+      microEl.textContent = t;
+      microEl.style.display = t ? "block" : "none";
+      microEl.dataset.tone = String(tone || "");
+    };
+
+    // Default decision microcopy (kept minimal, high-signal).
+    if (pendingGate || /signal-approval/.test(sig.cls)) {
+      setMicrocopy("Approval required — execution is held until you approve.", "hold");
+    } else if (/signal-review|signal-high-risk|signal-blocked/.test(sig.cls)) {
+      setMicrocopy("Review recommended due to elevated risk.", "risk");
+    } else if (/signal-safe/.test(sig.cls)) {
+      setMicrocopy("This action is safe based on past outcomes.", "safe");
+    } else {
+      setMicrocopy("");
+    }
 
     try {
       const fmt = globalThis.__XALVION_FORMAT__;
@@ -4177,6 +4309,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         noteEl.textContent = "";
         noteEl.style.display = "none";
         noteEl.dataset.tone = "";
+      }
+      if (pill === "Rejected") {
+        setMicrocopy("Response held. Ticket escalated.", "risk");
+      } else if (pill === "Approved" || pill === "Sent as edited") {
+        setMicrocopy("Verified and logged — safe to send.", "safe");
       }
 
       if (nextWrap) {

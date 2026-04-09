@@ -160,6 +160,36 @@ button:disabled {
   border-color: rgba(255,255,255,0.18);
 }
 
+/* Decision action hierarchy (Approve dominant, Edit secondary, Reject minimal) */
+#gateDoneBtn{
+  background: linear-gradient(135deg, var(--purple-1), var(--purple-2));
+  box-shadow: 0 10px 24px rgba(79,70,229,0.34);
+}
+#gateDoneBtn:hover{
+  box-shadow: 0 12px 28px rgba(79,70,229,0.40);
+}
+#gateEditBtn{
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  color: var(--text);
+  box-shadow: none;
+}
+#gateEditBtn:hover{
+  border-color: rgba(255,255,255,0.18);
+}
+/* If a reject control exists in the markup, keep it minimal-but-clear. */
+#gateRejectBtn,
+.reject-min{
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255, 107, 107, 0.26);
+  color: rgba(255, 200, 200, 0.92);
+  box-shadow: none;
+}
+#gateRejectBtn:hover,
+.reject-min:hover{
+  border-color: rgba(255, 107, 107, 0.34);
+}
+
 .status {
   display: none;
   padding: 10px 12px;
@@ -245,6 +275,56 @@ button:disabled {
 .panel.show {
   display: grid;
 }
+
+/* High-stakes decision moments (minimal, no layout changes) */
+.panel.xv-decision-ready{
+  animation: xvDecisionFade 220ms ease both;
+}
+.panel.xv-decision-ready[data-decision-tone="hold"],
+.panel.xv-decision-ready[data-decision-tone="risk"]{
+  animation: xvDecisionFade 220ms ease both, xvDecisionEmphasis 520ms ease 40ms both;
+}
+@media (prefers-reduced-motion: reduce){
+  .panel.xv-decision-ready{ animation: none; }
+  .panel.xv-decision-ready[data-decision-tone="hold"],
+  .panel.xv-decision-ready[data-decision-tone="risk"]{ animation: none; }
+}
+@keyframes xvDecisionFade{
+  from{ opacity: 0; transform: translateY(3px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+@keyframes xvDecisionEmphasis{
+  0%{ filter: saturate(1); }
+  45%{ filter: saturate(1.08); }
+  100%{ filter: saturate(1); }
+}
+
+.panel[data-decision-tone="hold"]{
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.14),
+    0 14px 40px rgba(0,0,0,0.35);
+}
+.panel[data-decision-tone="risk"]{
+  box-shadow:
+    0 0 0 1px rgba(255, 107, 107, 0.10),
+    0 14px 40px rgba(0,0,0,0.35);
+}
+.panel[data-decision-tone="safe"]{
+  box-shadow:
+    0 0 0 1px rgba(56, 217, 150, 0.10),
+    0 14px 40px rgba(0,0,0,0.35);
+}
+
+.decision-microcopy{
+  margin-top: -2px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  letter-spacing: -0.006em;
+}
+.decision-microcopy[data-tone="safe"]{ color: rgba(180, 250, 215, 0.82); }
+.decision-microcopy[data-tone="risk"]{ color: rgba(255, 200, 200, 0.80); }
+.decision-microcopy[data-tone="hold"]{ color: rgba(210, 202, 255, 0.86); }
 
 .badge-row {
   display: flex;
