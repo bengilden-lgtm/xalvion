@@ -242,7 +242,7 @@ export function createUsageChrome(deps) {
         await enrollFreeTier();
         refreshUsageChrome();
         syncPrimaryRunButtons();
-        showStatus("Free console enrolled — run counts continue on this device; quota resets on the rolling window.");
+        showStatus("Free access enabled — run counts are tracked on this device and reset on a rolling window.");
       });
     }
     if (els.upgradeDismissSoftBtn && !els.upgradeDismissSoftBtn.dataset.bound) {
@@ -251,7 +251,7 @@ export function createUsageChrome(deps) {
         const snap = getUsageSnapshot(currentPlanTier());
         if (Date.now() < postRunHighlightUntil) {
           clearPostRunMoment();
-          showStatus("Understood — we’ll keep the console quiet until the next capacity signal.");
+          showStatus("Got it — we’ll stay quiet until there’s a new capacity signal.");
           return;
         }
         await dismissSoftNudgeForPeriod();
@@ -262,7 +262,7 @@ export function createUsageChrome(deps) {
       els.upgradeProLink.dataset.bound = "1";
       els.upgradeProLink.addEventListener("click", (e) => {
         e.preventDefault();
-        showStatus("Pro opens from your workspace billing or plan console when connected.");
+        showStatus("Manage Pro from your workspace billing console.");
       });
     }
   }

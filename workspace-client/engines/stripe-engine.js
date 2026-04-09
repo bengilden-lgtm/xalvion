@@ -59,8 +59,8 @@ export function createStripeEngine({ refundStore, apiClient } = {}) {
 
       if (els.stripeIntegrationCopy) {
         els.stripeIntegrationCopy.textContent = connected
-          ? "Stripe is connected. Refund execution is now live for this workspace."
-          : "Connect Stripe to execute refunds instead of only preparing them.";
+          ? "Stripe is connected. Live refund execution is available for this workspace."
+          : "Connect Stripe to execute refunds from the workspace (instead of preparing drafts only).";
       }
 
       this.syncFromWorkspace({
@@ -86,7 +86,7 @@ export function createStripeEngine({ refundStore, apiClient } = {}) {
 
       if (els.openRefundModalBtn) {
         els.openRefundModalBtn.disabled = !allowed;
-        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Upgrade to unlock";
+        els.openRefundModalBtn.textContent = allowed ? "Open refunds" : "Upgrade to unlock";
       }
 
       if (els.executeRefundBtn) {
@@ -96,13 +96,13 @@ export function createStripeEngine({ refundStore, apiClient } = {}) {
       if (els.refundModalNote) {
         els.refundModalNote.textContent = allowed
           ? "Live refund execution is available on this plan. Use a PaymentIntent or Charge ID from Stripe."
-          : "Refund execution is locked until your plan allows live billing actions.";
+          : "Live refund execution is locked on this plan. Upgrade to enable billing actions from the workspace.";
       }
 
       if (els.refundCenterCopy) {
         els.refundCenterCopy.textContent = allowed
           ? "Open the refund UI, paste a PaymentIntent or Charge ID, and run a refund from the workspace."
-          : "You’re seeing decisions and approvals on Free — Pro unlocks one-click refund execution against Stripe without leaving this surface.";
+          : "Free shows decisions and approvals. Pro unlocks live Stripe refund execution without leaving the operator surface.";
       }
 
       if (els.refundUpgradeTease) {
@@ -115,7 +115,7 @@ export function createStripeEngine({ refundStore, apiClient } = {}) {
           ? "Execute refunds from the workspace · Available on Pro and Elite"
           : money > 0 || actions > 0
             ? `Your workspace already logged ${fm(money)} across ${actions} billing motions — Pro turns that into live Stripe execution here.`
-            : "Close the loop on Free → Pro: run real refunds from the workspace with Stripe connected — no console, no context switch.";
+            : "Close the loop on Free → Pro: execute refunds from the workspace with Stripe connected — no context switch.";
       }
 
     },

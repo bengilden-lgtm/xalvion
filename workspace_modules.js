@@ -685,7 +685,7 @@
         guestPreviewBody(freeMonthlyLimit, guestLimit) {
           const g = Number(guestLimit) || 0;
           const f = Number(freeMonthlyLimit) || 0;
-          return `You used all ${g} guest preview runs — the workflow is real. A free account unlocks ${f} runs/month with saved threads and approval gates.`;
+          return `You used all ${g} guest preview tickets — the workflow is real. A free account unlocks ${f} tickets/month with saved threads and approval gates.`;
         },
         workspaceValueLine(valueGenerated) {
           const v = valueGenerated && typeof valueGenerated === "object" ? valueGenerated : {};
@@ -797,7 +797,7 @@
             return {
               ...base,
               primary: "Higher-volume operating capacity is locked.",
-              secondary: "Upgrade for more monthly runs and fewer mid-shift ceilings — keep approvals and routing continuous.",
+              secondary: "Upgrade for more monthly tickets and fewer mid-shift ceilings — keep approvals and routing continuous.",
               cta: "Add headroom",
               tone: "urgency",
             };

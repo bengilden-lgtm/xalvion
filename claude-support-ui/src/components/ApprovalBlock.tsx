@@ -54,7 +54,7 @@ export function ApprovalBlock({ responseText }: ApprovalBlockProps) {
                 onClick={() => setAction('rejected')}
                 className="cursor-pointer rounded-lg bg-[#7f1d1d]/50 px-3 py-1.5 text-sm font-medium text-[#fecaca] ring-1 ring-[#7f1d1d]/50 transition-colors hover:bg-[#7f1d1d]/65"
               >
-                Rejected
+                Reject
               </button>
               <button
                 type="button"
@@ -78,7 +78,7 @@ export function ApprovalBlock({ responseText }: ApprovalBlockProps) {
         </div>
       </div>
       <p className="mt-3 text-[13px] font-normal italic text-[#9c9189]">
-        Response held. Ticket escalated.
+        Draft held for approval. Nothing sent to the customer.
       </p>
       <div className="mt-2 flex items-center gap-3">
         <button
@@ -100,13 +100,13 @@ export function ApprovalBlock({ responseText }: ApprovalBlockProps) {
       </div>
       {whyOpen && (
         <p className="mt-2 text-[13px] leading-relaxed text-[#9c9189]">
-          The reply references a refund above the agent threshold. Per policy,
-          a supervisor must confirm before the customer sees this message.
+          This reply includes a policy-sensitive action (for example, a refund above your approval
+          threshold). Approve to release the draft, or reject to route the case for manual follow-up.
         </p>
       )}
       <div className="mt-6 h-px w-full bg-white/5" aria-hidden />
       <p className="mt-3 text-[12px] font-normal text-[#6b6560]">
-        Ticket ID · preview run · no external sends
+        Preview · no customer message sent
       </p>
     </div>
   )

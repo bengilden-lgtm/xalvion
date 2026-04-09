@@ -59,9 +59,9 @@ export function createAnalyticsEngine({ sessionStore } = {}) {
       const tier = String(runtime.tier || "free").toLowerCase();
       const upgradeHint =
         tier === "free"
-          ? " Pro adds 500 runs/month + live refunds."
+          ? " Pro adds higher monthly capacity and live refunds."
           : tier === "pro"
-            ? " Elite adds 5k runs/month + advanced analytics."
+            ? " Elite adds higher capacity and deeper analytics."
             : "";
       const hasValue = tickets > 0 || money > 0 || actions > 0 || mins > 0;
       el.textContent = hasValue

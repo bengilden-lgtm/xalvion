@@ -26,10 +26,10 @@ def _tier_upgrade_unlocks(tier: str) -> str:
 def _me_capacity_message(tier: str, remaining: int) -> str:
     t = str(tier or "free").strip().lower()
     if t == "elite":
-        return "Elite tier: unlimited capacity"
+        return "Elite tier — full capacity"
     if t == "pro":
-        return f"Pro tier: {remaining} tickets remaining"
-    return f"Free tier: {remaining} tickets left this month"
+        return f"Pro tier — {remaining} tickets remaining"
+    return f"Free tier — {remaining} tickets left this month"
 
 
 def _user_billing_motion_rollups(db: Session, username: str) -> tuple[float, int]:
