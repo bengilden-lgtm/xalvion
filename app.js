@@ -2789,7 +2789,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
               <div class="assistant-context-line js-assistant-context" hidden></div>
               <div class="reply-prep-meta"><span class="reply-prep-time js-prepared-time" hidden></span></div>
               <div class="customer-message-label reply-hero-label">Suggested reply</div>
-              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>AI prepared this based on context, policy, and past outcomes</div>
+              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared with live policy checks, governor signals, and your workspace outcome ledger when history exists.</div>
               <div class="reply-text js-reply-text">${bodyHtml}</div>
             </div>
           </div>
@@ -3331,8 +3331,18 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const approval = getApprovalContext(data);
     if (approval.requiresApproval && !approval.approved) {
       el.hidden = false;
-      el.textContent = "Sensitive actions await your approval before they run.";
+      el.textContent =
+        "Governor holds this run — billing and policy-sensitive work stays staged until you approve, reject, or edit.";
     } else {
+      try {
+        const fmt = globalThis.__XALVION_FORMAT__;
+        const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
+        if (gov && gov.mode === "auto") {
+          el.hidden = false;
+          el.textContent = "Governor cleared this path — low-risk motion with no blocking policy signals on file.";
+          return;
+        }
+      } catch {}
       el.hidden = true;
       el.textContent = "";
     }
@@ -3497,14 +3507,22 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (!approval.requiresApproval || approval.approved) return null;
 
     const banner = document.createElement("div");
-    banner.className = "approval-banner";
+    banner.className = "approval-banner approval-banner--premium";
     const amountText = approval.amount > 0 ? ` ${formatMoney(approval.amount)}` : "";
     const actionText = approval.action && approval.action !== "none" ? `${approval.action}${amountText}` : "prepared action";
     const gateHint =
       !approval.canApprove && approval.ticketId
-        ? `<div class="approval-hint">Sign in as the ticket owner to enable Approve / Reject from this workspace.</div>`
+        ? `<div class="approval-hint">Sign in as the ticket owner to release this gate from the workspace.</div>`
         : "";
-    banner.innerHTML = `${ICONS.warn}<div><strong>Approval gate</strong><br>${escapeHtml(`Prepared ${actionText} — execution is held until an operator approves.`)}${gateHint}</div>`;
+    let govLine = "";
+    try {
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
+      if (gov && gov.mode && gov.mode !== "unknown" && gov.summary) {
+        govLine = `<div class="approval-banner-gov">${escapeHtml(gov.summary)}</div>`;
+      }
+    } catch {}
+    banner.innerHTML = `${ICONS.shield}<div class="approval-banner-body"><div class="approval-banner-eyebrow">Operator hold</div><strong class="approval-banner-title">Approval required</strong><div class="approval-banner-copy">${escapeHtml(`Prepared ${actionText}. Execution will not ship until you explicitly approve — Xalvion keeps consequential motion visible and reversible.`)}</div>${govLine}${gateHint}</div>`;
     return banner;
   }
 
@@ -3595,7 +3613,15 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         return {
           cls: gov.cls || "signal-review",
           text,
-          title: String(gov.summary || gov.title || ""),
+          title: String(
+            gov.summary ||
+              gov.title ||
+              (gov.mode === "blocked"
+                ? "Governor blocked execution under policy — resolve before send."
+                : gov.mode === "review"
+                  ? "Governor requires operator sign-off on this motion."
+                  : "Governor signals automation-safe criteria for this path.")
+          ),
         };
       }
     } catch {}
@@ -3606,21 +3632,21 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return {
         cls: "signal-high-risk signal-blocked",
         text: "⛔ Blocked by policy",
-        title: String(data.governor_reason || dec.governor_reason || "Blocked by governor policy"),
+        title: String(data.governor_reason || dec.governor_reason || "Governor blocked this execution — do not ship as drafted."),
       };
     }
     if (execMode === "review") {
       return {
         cls: "signal-approval",
         text: "⚡ Approval required",
-        title: String(data.governor_reason || dec.governor_reason || "Review required under governor policy"),
+        title: String(data.governor_reason || dec.governor_reason || "Governor requires explicit operator approval on this motion."),
       };
     }
     if (risk === "high") {
       return {
         cls: "signal-high-risk",
         text: "⚠ High risk",
-        title: "Elevated risk — review before customer send",
+        title: "Elevated risk profile — reconcile signals before any customer send.",
       };
     }
     const tier = String(data.execution_tier || "").toLowerCase();
@@ -3628,21 +3654,21 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return {
         cls: "signal-safe",
         text: "✓ Safe to automate",
-        title: "Meets all automation safety criteria"
+        title: "Automation safety criteria satisfied for this execution tier."
       };
     }
     if (tier === "assist_only") {
       return {
         cls: "signal-review",
         text: "○ Manual review",
-        title: "Risk signals require human decision"
+        title: "Assist-only tier — keep a human in the loop for this path."
       };
     }
     if (tier === "approval_required") {
       return {
         cls: "signal-approval",
         text: "⚡ Approval required",
-        title: String(data.governor_reason || dec.governor_reason || "Awaiting operator approval")
+        title: String(data.governor_reason || dec.governor_reason || "Consequential motion — approval is mandatory before execution.")
       };
     }
 
@@ -3652,11 +3678,44 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision"
     );
     const money = action === "refund" || action === "charge" || action === "credit";
-    if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
+    if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "Money movement staged — operator approval is required." };
     if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
-      return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
+      return { cls: "signal-review", text: "⚠ Review recommended", title: "Signals sit outside the safe band — review before send." };
     }
-    return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
+    return { cls: "signal-safe", text: "✓ Safe to send", title: "No approval gate on this path — routine operator verification is enough." };
+  }
+
+  function populateDecisionOutcomeIntelStrip(el, data) {
+    if (!el) return;
+    try {
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const raw = state.dashboardStats?.outcome_intelligence;
+      if (!raw || typeof raw !== "object") {
+        el.hidden = true;
+        el.innerHTML = "";
+        return;
+      }
+      const norm = fmt?.normalizeOutcomeIntelligence ? fmt.normalizeOutcomeIntelligence(raw) : null;
+      if (!norm) {
+        el.hidden = true;
+        el.innerHTML = "";
+        return;
+      }
+      const mix = fmt?.formatOutcomeSummaryLine ? fmt.formatOutcomeSummaryLine(norm) : "";
+      const hl = String(norm.latest?.headline || "").trim();
+      if (!mix && !hl) {
+        el.hidden = true;
+        el.innerHTML = "";
+        return;
+      }
+      el.hidden = false;
+      const primary = hl || mix;
+      const secondary = hl && mix && mix !== hl ? mix : "";
+      el.innerHTML = `<div class="decision-outcome-intel-inner"><span class="decision-outcome-intel__k">Outcome ledger</span><span class="decision-outcome-intel__p">${escapeHtml(primary)}</span>${secondary ? `<span class="decision-outcome-intel__s">${escapeHtml(secondary)}</span>` : ""}</div>`;
+    } catch {
+      el.hidden = true;
+      el.innerHTML = "";
+    }
   }
 
   function mountOperatorDecisionPanel(row, data, initialReply) {
@@ -3677,12 +3736,23 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     const panel = document.createElement("div");
     panel.className = "decision-panel";
+    if (pendingGate || /signal-approval|signal-high-risk|signal-blocked/.test(sig.cls)) {
+      panel.classList.add("decision-panel--gate");
+    } else if (/signal-safe/.test(sig.cls) && !pendingGate) {
+      panel.classList.add("decision-panel--safe-clear");
+    }
     panel.innerHTML = `
       <div class="decision-panel-top">
         <span class="consequence-signal ${sig.cls}" data-role="consequence">${escapeHtml(sig.text)}</span>
         <div class="decision-controls" data-role="controls"></div>
       </div>
-      <div class="decision-panel-note" data-role="trust">Nothing is sent without your approval</div>
+      <div class="decision-trust-block">
+        <div class="decision-panel-note decision-trust-lead" data-role="trust"></div>
+        <div class="decision-trust-posture" data-role="trust-posture"></div>
+        <div class="decision-trust-micro" data-role="trust-stats" aria-label="Workspace trust signals"></div>
+      </div>
+      <div class="xv-governor-surface" data-role="governor" hidden></div>
+      <div class="decision-outcome-intel" data-role="outcome-intel" hidden></div>
       <div class="decision-panel-note" data-role="note" style="display:none"></div>
       <div class="decision-panel-error" data-role="err" style="display:none"></div>
       <div class="edit-mode-container" data-role="edit" style="display:none"></div>
@@ -3695,47 +3765,94 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     const controls = panel.querySelector("[data-role='controls']");
     const trustEl = panel.querySelector("[data-role='trust']");
+    const trustPostureEl = panel.querySelector("[data-role='trust-posture']");
+    const trustStatsEl = panel.querySelector("[data-role='trust-stats']");
+    const govSurfaceEl = panel.querySelector("[data-role='governor']");
+    const outcomeIntelEl = panel.querySelector("[data-role='outcome-intel']");
     const noteEl = panel.querySelector("[data-role='note']");
     const errEl = panel.querySelector("[data-role='err']");
     const editWrap = panel.querySelector("[data-role='edit']");
     const nextWrap = panel.querySelector("[data-role='next']");
 
-    // File: app.js
-    // Governor visibility pass (optional): surface reason/factors/violations/next-step without changing layout structure.
+    try {
+      const fmt = globalThis.__XALVION_FORMAT__;
+      const trust =
+        fmt?.buildDecisionTrustPresentation
+          ? fmt.buildDecisionTrustPresentation(data, state.dashboardStats?.outcome_intelligence ?? undefined)
+          : null;
+      if (trustEl && trust) {
+        trustEl.textContent = trust.verdict || "";
+      }
+      if (trustPostureEl && trust) {
+        const bits = [trust.posture, trust.ledgerHint].filter(Boolean);
+        trustPostureEl.textContent = bits.join(" ");
+        trustPostureEl.style.display = bits.length ? "block" : "none";
+      }
+      if (trustStatsEl && trust && Array.isArray(trust.microLines) && trust.microLines.length) {
+        trustStatsEl.innerHTML = trust.microLines
+          .map(
+            (row) =>
+              `<div class="decision-trust-stat" data-trust-stat="${escapeHtml(row.key)}"><span class="decision-trust-stat__k">${escapeHtml(row.label)}</span><span class="decision-trust-stat__v">${escapeHtml(row.value)}</span></div>`
+          )
+          .join("");
+      } else if (trustStatsEl) {
+        trustStatsEl.innerHTML = "";
+      }
+    } catch {}
+    if (trustEl && !String(trustEl.textContent || "").trim()) {
+      trustEl.textContent = pendingGate
+        ? "Controlled release — approval is required before execution ships."
+        : /signal-safe/.test(sig.cls)
+          ? "This path reads safe under current signals — still apply your normal review."
+          : "Review the rationale, then approve or adjust before send.";
+    }
+
+    populateDecisionOutcomeIntelStrip(outcomeIntelEl, data);
+
+    // Governor reasoning: reason, risk score, factors, policy checks, next step — structured (does not replace terminal note).
     try {
       const fmt = globalThis.__XALVION_FORMAT__;
       const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
-      if (gov && gov.mode && gov.mode !== "unknown") {
-        if (trustEl && gov.summary) trustEl.textContent = gov.summary;
+      if (gov && gov.mode && gov.mode !== "unknown" && govSurfaceEl) {
+        const d = data;
+        const dec = d.decision || {};
+        const reasonLine = String(d.governor_reason || dec.governor_reason || gov.summary || "").trim();
         const riskText = String(gov.riskScoreLabel || gov.riskLabel || "").trim();
-        const factors = Array.isArray(gov.factors) ? gov.factors.slice(0, 3) : [];
-        const violations = Array.isArray(gov.violations) ? gov.violations.slice(0, 3) : [];
+        const factors = Array.isArray(gov.factors) ? gov.factors.slice(0, 8) : [];
+        const violations = Array.isArray(gov.violations) ? gov.violations.slice(0, 8) : [];
         const next = String(gov.nextStep || "").trim();
-        const blocks = [];
-        if (riskText) {
-          blocks.push(`<div class="governor-risk-row"><span class="governor-risk-chip">${escapeHtml(riskText)}</span></div>`);
+        const parts = [];
+        parts.push(`<div class="xv-governor-eyebrow">Governor assessment</div>`);
+        if (reasonLine) {
+          parts.push(`<div class="xv-governor-reason"><span class="xv-governor-k">Reason</span><span class="xv-governor-v">${escapeHtml(reasonLine)}</span></div>`);
         }
-        if (next) {
-          blocks.push(`<div class="governor-next-step">${escapeHtml(next)}</div>`);
+        if (riskText) {
+          parts.push(
+            `<div class="xv-governor-risk"><span class="xv-governor-k">Risk score</span><span class="governor-risk-chip">${escapeHtml(riskText)}</span></div>`
+          );
         }
         if (factors.length) {
-          blocks.push(
-            `<div class="governor-factors"><div class="governor-factors-label">Governor factors</div>${factors
+          parts.push(
+            `<div class="governor-factors"><div class="governor-factors-label">Factors</div>${factors
               .map((f) => `<div class="governor-factor">${escapeHtml(f)}</div>`)
               .join("")}</div>`
           );
         }
         if (violations.length) {
-          blocks.push(
+          parts.push(
             `<div class="governor-violations"><div class="governor-violations-label">Policy checks</div>${violations
               .map((v) => `<div class="governor-violation">${escapeHtml(v)}</div>`)
               .join("")}</div>`
           );
         }
-        if (noteEl && blocks.length) {
-          noteEl.innerHTML = blocks.join("");
-          noteEl.style.display = "block";
+        if (next) {
+          parts.push(`<div class="xv-governor-next"><span class="xv-governor-k">Next step</span><span class="xv-governor-next-v">${escapeHtml(next)}</span></div>`);
         }
+        govSurfaceEl.innerHTML = parts.join("");
+        govSurfaceEl.hidden = false;
+      } else if (govSurfaceEl) {
+        govSurfaceEl.innerHTML = "";
+        govSurfaceEl.hidden = true;
       }
     } catch {}
 
@@ -3909,7 +4026,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         ap.classList.remove("is-loading");
         ap.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.approve}</span><span class="op-action__label">Approve</span>`;
       };
-      ap.className = "op-action op-action--primary";
+      ap.className = pendingGate ? "op-action op-action--primary op-action--primary--hold" : "op-action op-action--primary";
       setApproveIdle();
       controls.append(rej, ed, ap);
 
@@ -4317,7 +4434,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     details.innerHTML = `
       <summary class="details-toggle">
-        <span>Why this decision</span>
+        <span>Operator rationale</span>
         <span class="chev">${ICONS.chevron}</span>
       </summary>
       <div class="details-panel">
@@ -4875,12 +4992,12 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     card = document.createElement("div");
     card.id = "xalvionOutcomeIntelCard";
-    card.className = "outcome-intel-card";
+    card.className = "outcome-intel-card outcome-intel-card--rail";
     card.innerHTML = `
       <div class="outcome-intel-head">
         <div>
           <div class="panel-title">Outcome intelligence</div>
-          <div class="panel-copy">What happened after actions — quality, value preserved, and stability signals.</div>
+          <div class="panel-copy">Ledger-backed view of what happens after decisions — quality mix, stability, and the pattern library you are building.</div>
         </div>
       </div>
 
@@ -4898,8 +5015,16 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       <div class="outcome-pattern" id="outcomeIntelPattern"></div>
     `;
 
-    if (els.railInner) els.railInner.appendChild(card);
-    else if (els.usageCard?.parentElement) els.usageCard.parentElement.appendChild(card);
+    const host = document.getElementById("outcomeIntelligenceRailHost");
+    if (host) {
+      host.appendChild(card);
+    } else if (els.latestRunRailCard?.parentElement) {
+      els.latestRunRailCard.insertAdjacentElement("afterend", card);
+    } else if (els.railInner) {
+      els.railInner.appendChild(card);
+    } else if (els.usageCard?.parentElement) {
+      els.usageCard.parentElement.appendChild(card);
+    }
 
     return card;
   }
@@ -5083,7 +5208,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     wrap.hidden = false;
     const action = approval.action && approval.action !== "none" ? approval.action : "prepared action";
     const amt = approval.amount > 0 ? formatMoney(approval.amount) : "";
-    sum.textContent = `Execution is held — ${action}${amt ? ` (${amt})` : ""} requires operator approval before it ships.`;
+    sum.textContent = `Operator hold active — ${action}${amt ? ` (${amt})` : ""} will not execute until you explicitly approve. Nothing sensitive ships on autopilot.`;
     if (meta) {
       meta.innerHTML = "";
       const chip = (text, ok) => {

@@ -206,6 +206,12 @@ svg{
   box-shadow: var(--shadow-1);
   margin-top: var(--s-4);
 }
+.rail-outcome-intel-host{
+  margin-top: var(--s-3);
+}
+.outcome-intel-card--rail{
+  margin-top: 0;
+}
 
 .outcome-intel-head{
   display:flex;
@@ -1639,6 +1645,169 @@ select.refund-select{ padding-right: 34px; }
   background: transparent;
   transition: border-color var(--t-med) var(--ease);
 }
+.decision-panel--gate{
+  border-top-color: color-mix(in oklab, var(--accent) 18%, var(--border));
+}
+.decision-panel--safe-clear{
+  border-top-color: color-mix(in oklab, var(--success) 16%, var(--border));
+}
+.decision-trust-block{
+  margin-top: 10px;
+}
+.decision-trust-lead{
+  margin-top: 0;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: color-mix(in oklab, var(--text) 92%, var(--text-muted));
+}
+.decision-trust-posture{
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 6px;
+  display: none;
+}
+.decision-trust-micro{
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 8px;
+}
+.decision-trust-micro:empty{ display: none; }
+.decision-trust-stat{
+  border: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+  border-radius: var(--r-md);
+  padding: 8px 10px;
+  background: color-mix(in oklab, white 2.5%, transparent);
+}
+.decision-trust-stat__k{
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.decision-trust-stat__v{
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text-2);
+  line-height: 1.35;
+}
+.xv-governor-surface{
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 75%, transparent);
+}
+.xv-governor-surface[hidden]{ display: none !important; }
+.xv-governor-eyebrow{
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-bottom: 8px;
+}
+.xv-governor-reason,
+.xv-governor-risk,
+.xv-governor-next{
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+.xv-governor-k{
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-4);
+  letter-spacing: 0.02em;
+}
+.xv-governor-v,
+.xv-governor-next-v{
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.decision-outcome-intel{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 35%, transparent);
+}
+.decision-outcome-intel[hidden]{ display: none !important; }
+.decision-outcome-intel-inner{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.decision-outcome-intel__k{
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.decision-outcome-intel__p{
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.decision-outcome-intel__s{
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.approval-banner--premium{
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--accent) 24%, var(--border));
+  background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 11%, transparent), color-mix(in oklab, var(--surface-soft) 42%, transparent));
+  margin-bottom: 10px;
+}
+.approval-banner--premium > svg{
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  opacity: 0.92;
+  color: color-mix(in oklab, var(--accent) 72%, var(--text-2));
+}
+.approval-banner-body{ min-width: 0; }
+.approval-banner-eyebrow{
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--accent) 50%, var(--text-muted));
+}
+.approval-banner-title{
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.approval-banner-copy{
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.approval-banner-gov{
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.45;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+}
 .decision-panel-top{
   display: flex;
   align-items: flex-start;
@@ -1752,6 +1921,12 @@ select.refund-select{ padding-right: 34px; }
 .op-action--primary:hover:not(:disabled){
   filter: brightness(1.05);
   border-color: color-mix(in oklab, var(--xv-accent-border) 90%, rgba(255,255,255,0.22));
+}
+.op-action--primary--hold{
+  font-weight: 700;
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--accent-ink) 22%, transparent),
+    var(--xv-cta-shadow);
 }
 .op-action.is-loading{
   pointer-events: none;

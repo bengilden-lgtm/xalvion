@@ -256,6 +256,148 @@
         if (!bits.length) bits.push(`${n} neutral`);
         return `Recent outcomes: ${bits.join(" · ")}`;
       },
+      /**
+       * Compact trust copy for a single operator decision. Uses only normalized outcome ledger
+       * fields and live governor / gate context — no invented benchmarks.
+       */
+      buildDecisionTrustPresentation(resultData, outcomeRaw) {
+        function safetyVerdictFallback(dataObj, gate) {
+          const c = Number(dataObj.confidence || 0);
+          if (gate) {
+            return "Financial or policy gate is active — only an explicit approval releases execution.";
+          }
+          if (c > 0 && c < 0.62) {
+            return "Model confidence is modest — scan triage signals before you send.";
+          }
+          return "No approval gate on this run — still apply your normal operator standard.";
+        }
+
+        const d = resultData && typeof resultData === "object" ? resultData : {};
+        const dec = d.sovereign_decision && typeof d.sovereign_decision === "object" ? d.sovereign_decision : d.decision || {};
+        const ticket = d.ticket || {};
+        const actionLog = d.action_log || ticket.action_log || {};
+        const requiresApproval = Boolean(
+          d.requires_approval ||
+            dec.requires_approval ||
+            d.execution?.requires_approval ||
+            ticket.requires_approval ||
+            actionLog.requires_approval
+        );
+        const approved = Boolean(ticket.approved || actionLog.approved);
+        const pendingGate = requiresApproval && !approved;
+
+        const rawOi =
+          outcomeRaw !== undefined && outcomeRaw !== null
+            ? outcomeRaw
+            : d.outcome_intelligence && typeof d.outcome_intelligence === "object"
+              ? d.outcome_intelligence
+              : null;
+        const norm =
+          rawOi && format.normalizeOutcomeIntelligence ? format.normalizeOutcomeIntelligence(rawOi) : null;
+        const summary = norm && norm.summary && typeof norm.summary === "object" ? norm.summary : {};
+        const best = norm && norm.bestPattern && typeof norm.bestPattern === "object" ? norm.bestPattern : null;
+
+        const gov = format.deriveGovernorPresentation(d);
+        const consec = format.deriveConsequencePresentation(d);
+
+        const autoOk = Math.max(0, Math.floor(Number(summary.auto_success || 0) || 0));
+        const assistedOk = Math.max(0, Math.floor(Number(summary.assisted_success || 0) || 0));
+        const failed = Math.max(0, Math.floor(Number(summary.failed || 0) || 0));
+        const reopened = Math.max(0, Math.floor(Number(summary.ticket_reopened || 0) || 0));
+        const successDenom = autoOk + assistedOk + failed;
+        const reopenDenom = autoOk + assistedOk + reopened;
+
+        const microLines = [];
+        const sampleN = best && Number(best.sample_count) > 0 ? Math.floor(Number(best.sample_count)) : 0;
+        if (sampleN > 0) {
+          microLines.push({
+            key: "similar",
+            label: "Comparable cases",
+            value: `${sampleN} in your pattern library`,
+          });
+        }
+        if (successDenom >= 5) {
+          const pct = Math.round((100 * (autoOk + assistedOk)) / successDenom);
+          microLines.push({
+            key: "success",
+            label: "Recorded success",
+            value: `${pct}% (${autoOk + assistedOk}/${successDenom} outcomes)`,
+          });
+        }
+        if (reopened > 0 && reopenDenom >= 3) {
+          const rpct = Math.round((100 * reopened) / reopenDenom);
+          microLines.push({
+            key: "reopen",
+            label: "Reopen rate (ledger)",
+            value: `${rpct}% (${reopened}/${reopenDenom})`,
+          });
+        } else if (reopened > 0) {
+          microLines.push({
+            key: "reopen",
+            label: "Reopens logged",
+            value: `${reopened} in workspace ledger`,
+          });
+        }
+
+        const hasLedger =
+          norm &&
+          (sampleN > 0 ||
+            successDenom > 0 ||
+            reopened > 0 ||
+            autoOk > 0 ||
+            assistedOk > 0 ||
+            failed > 0);
+        const ledgerSparse = !hasLedger;
+
+        let verdict = "";
+        let posture = "";
+        if (gov.mode === "blocked") {
+          verdict = "Review required before any customer-facing send.";
+          posture = gov.summary || gov.title || "Governor blocked this path under policy.";
+        } else if (pendingGate) {
+          verdict = "Controlled release — explicit approval is warranted for this motion.";
+          posture =
+            gov.summary ||
+            gov.title ||
+            "A financial or policy-sensitive action is staged; the operator gate stays closed until you approve.";
+        } else if (gov.mode === "review") {
+          verdict = "Governor marked this path for operator review before execution.";
+          posture =
+            gov.summary ||
+            gov.title ||
+            "Policy or risk posture requires human sign-off even when no billing gate is open.";
+        } else if (gov.mode === "auto") {
+          verdict = "Governor clearance — forward motion matches automation-safe criteria.";
+          posture = gov.summary || gov.title || "No blocking policy signals on this path.";
+        } else if (String(consec.cls || "").includes("signal-safe")) {
+          verdict = "Low execution risk on this path — routine verification is sufficient.";
+          posture = safetyVerdictFallback(d, pendingGate);
+        } else if (String(consec.cls || "").includes("signal-approval")) {
+          verdict = "Approval discipline applies — treat execution as consequential.";
+          posture = safetyVerdictFallback(d, pendingGate);
+        } else if (String(consec.cls || "").includes("signal-high-risk") || String(consec.cls || "").includes("blocked")) {
+          verdict = "Elevated risk — hold the line until you reconcile the signals.";
+          posture = safetyVerdictFallback(d, pendingGate);
+        } else {
+          verdict = "Standard operator verification — read once, then proceed.";
+          posture = safetyVerdictFallback(d, pendingGate);
+        }
+
+        let ledgerHint = "";
+        if (ledgerSparse) {
+          ledgerHint = "Outcome ledger is thin here — calibration is from live policy, governor, and this case.";
+        } else if (!ledgerSparse && successDenom < 5) {
+          ledgerHint = "Historical success rate appears once at least five outcomes are recorded in the ledger.";
+        }
+
+        return {
+          microLines: microLines.slice(0, 4),
+          verdict,
+          posture,
+          ledgerHint,
+          ledgerSparse,
+        };
+      },
       buildExplanationSummary(explanation) {
         if (!explanation || typeof explanation !== "object") return "";
         const s = explanation.summary;

@@ -1150,3 +1150,49 @@ textarea{ resize:vertical; }
   font-size:12px;
   font-weight:650;
 }
+
+/* Decision trust + governor surfaces (fallback / legacy index) */
+.rail-outcome-intel-host{ margin-top:10px; }
+.outcome-intel-card--rail{ margin-top:0; }
+.decision-panel--gate{ border-top-color: rgba(124,90,252,0.35) !important; }
+.decision-panel--safe-clear{ border-top-color: rgba(170,196,146,0.35) !important; }
+.decision-trust-block{ margin-top:10px; }
+.decision-trust-lead{ margin-top:0; font-weight:650; color:rgba(246,242,235,0.92); }
+.decision-trust-posture{ font-size:12px; color:var(--text-soft); line-height:1.5; margin-top:6px; display:none; }
+.decision-trust-micro{ margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:8px; }
+.decision-trust-micro:empty{ display:none; }
+.decision-trust-stat{
+  border:1px solid var(--line-soft);
+  border-radius:12px;
+  padding:8px 10px;
+  background:rgba(255,255,255,0.02);
+}
+.decision-trust-stat__k{ display:block; font-size:11px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:rgba(224,217,206,0.5); }
+.decision-trust-stat__v{ display:block; margin-top:4px; font-size:12.5px; font-weight:650; color:rgba(246,242,235,0.88); line-height:1.35; }
+.xv-governor-surface{ margin-top:12px; padding-top:12px; border-top:1px solid var(--line-soft); }
+.xv-governor-surface[hidden]{ display:none !important; }
+.xv-governor-eyebrow{ font-size:11px; font-weight:650; letter-spacing:0.12em; text-transform:uppercase; color:rgba(224,217,206,0.48); margin-bottom:8px; }
+.xv-governor-reason,.xv-governor-risk,.xv-governor-next{ display:grid; gap:4px; margin-top:8px; }
+.xv-governor-k{ font-size:11px; font-weight:650; color:rgba(224,217,206,0.52); letter-spacing:0.02em; }
+.xv-governor-v,.xv-governor-next-v{ font-size:12.5px; color:var(--text-soft); line-height:1.45; }
+.decision-outcome-intel{ margin-top:10px; padding:10px 12px; border-radius:12px; border:1px solid var(--line-soft); background:rgba(255,255,255,0.02); }
+.decision-outcome-intel[hidden]{ display:none !important; }
+.decision-outcome-intel-inner{ display:flex; flex-direction:column; gap:4px; }
+.decision-outcome-intel__k{ font-size:11px; font-weight:650; letter-spacing:0.1em; text-transform:uppercase; color:rgba(224,217,206,0.5); }
+.decision-outcome-intel__p{ font-size:12.5px; font-weight:650; color:rgba(246,242,235,0.9); line-height:1.45; }
+.decision-outcome-intel__s{ font-size:12px; color:var(--text-soft); line-height:1.45; }
+.approval-banner--premium{
+  align-items:flex-start;
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid rgba(124,90,252,0.35);
+  background:linear-gradient(135deg, rgba(124,90,252,0.12), rgba(255,255,255,0.02));
+  margin-bottom:10px;
+}
+.approval-banner--premium > svg{ width:22px; height:22px; flex-shrink:0; margin-top:2px; opacity:0.9; color:rgba(186,170,255,0.9); }
+.approval-banner-body{ min-width:0; }
+.approval-banner-eyebrow{ font-size:11px; font-weight:650; letter-spacing:0.12em; text-transform:uppercase; color:rgba(186,170,255,0.75); }
+.approval-banner-title{ display:block; margin-top:4px; font-size:14px; font-weight:700; color:rgba(246,242,235,0.94); }
+.approval-banner-copy{ margin-top:6px; font-size:12.5px; line-height:1.5; color:var(--text-soft); }
+.approval-banner-gov{ margin-top:8px; font-size:12.5px; color:var(--text-muted); line-height:1.45; padding-top:8px; border-top:1px solid var(--line-soft); }
+.op-action--primary--hold{ font-weight:700; box-shadow:0 0 0 1px rgba(245,243,255,0.22); }
