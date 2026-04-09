@@ -19,6 +19,8 @@
   --radius-md: 14px;
   --radius-lg: 18px;
   --radius-xl: 24px;
+  --topbar-h: 56px;
+  --scroll-safe-start: 14px;
   --rail-expanded: 248px;
   --rail-collapsed: 62px;
   --col-max: min(760px, 92vw);
@@ -95,12 +97,19 @@ button,input,textarea,select{ font:inherit; }
   -webkit-backdrop-filter: blur(10px);
 }
 .topbar-inner{
-  height:56px;
+  height:var(--topbar-h);
   display:grid;
   grid-template-columns: 1fr auto 1fr;
   align-items:center;
   gap:14px;
   padding:0 var(--pad-x);
+}
+
+/* Ensure programmatic scrolling never tucks content under the sticky top bar. */
+#messages,
+#sidebarScroll,
+#railScroll{
+  scroll-padding-top: calc(var(--topbar-h) + var(--scroll-safe-start));
 }
 .topbar-left,
 .topbar-right{

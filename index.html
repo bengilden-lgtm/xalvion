@@ -726,7 +726,11 @@
       function restoreScroll(area, key) {
         try {
           const stored = sessionStorage.getItem(key);
-          if (stored !== null) area.scrollTop = Number(stored) || 0;
+          if (stored === null) return;
+          const n = Number(stored);
+          const safeSnapPx = 48;
+          // Prevent "barely scrolled" restores that visually clip the first card at the top.
+          area.scrollTop = Number.isFinite(n) && n > safeSnapPx ? n : 0;
         } catch {}
       }
 
