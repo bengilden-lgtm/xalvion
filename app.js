@@ -7786,7 +7786,16 @@ function bindEvents() {
     renderRefundHistory([]);
     addEmptyState();
     hydrateRecentTickets().catch(() => {});
-    scrollMessagesToBottom(true);
+    // On initial front-screen render (idle state), never force a scroll-to-bottom.
+    // Only auto-stick when a real thread is present.
+    try {
+      const hasThread = Boolean(els.messages?.querySelector?.(".msg-group"));
+      if (hasThread) {
+        scrollMessagesToBottom(true);
+      } else if (els.messages) {
+        els.messages.scrollTop = 0;
+      }
+    } catch {}
     setSending(false);
 
     await healthCheck();

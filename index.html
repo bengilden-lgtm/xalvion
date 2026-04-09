@@ -714,6 +714,11 @@
         { areaId: "railScroll", shellId: "railScrollShell", key: "xalvion-scroll-rail" }
       ];
 
+      // Disable browser history scroll restoration; we control scroll anchors explicitly.
+      try {
+        if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+      } catch {}
+
       function updateFade(area, shell) {
         if (!area || !shell) return;
         const max = area.scrollHeight - area.clientHeight;
@@ -739,11 +744,18 @@
       }
 
       function bindScrollMemory() {
+        const workspaceRoot = document.getElementById("workspaceRoot");
+        const isFrontScreen = workspaceRoot?.classList?.contains("workspace-idle");
         scrollConfigs.forEach(({ areaId, shellId, key }) => {
           const area = document.getElementById(areaId);
           const shell = document.getElementById(shellId);
           if (!area || !shell) return;
-          restoreScroll(area, key);
+          // Never restore mid-scroll for the main thread on the front screen.
+          if (areaId === "messages" && isFrontScreen) {
+            area.scrollTop = 0;
+          } else {
+            restoreScroll(area, key);
+          }
           updateFade(area, shell);
           area.addEventListener("scroll", () => { updateFade(area, shell); saveScroll(area, key); }, { passive: true });
           window.addEventListener("resize", () => updateFade(area, shell));
