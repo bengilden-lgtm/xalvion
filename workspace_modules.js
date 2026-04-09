@@ -398,6 +398,83 @@
           ledgerSparse,
         };
       },
+      /**
+       * Trust Dominance Layer — compact horizontal strip under a decision title.
+       * Uses only real outcome_store aggregates (when sample threshold met) and deterministic
+       * expectation/memory factors (no fake stats).
+       */
+      buildTrustDominanceStrip(resultData) {
+        const d = resultData && typeof resultData === "object" ? resultData : {};
+        const dec =
+          d.sovereign_decision && typeof d.sovereign_decision === "object"
+            ? d.sovereign_decision
+            : d.decision && typeof d.decision === "object"
+              ? d.decision
+              : {};
+
+        const td = d.trust_dominance && typeof d.trust_dominance === "object" ? d.trust_dominance : null;
+
+        const similar = (() => {
+          const v = td?.similar_case_count ?? dec.similar_case_count;
+          const n = Math.floor(Number(v || 0));
+          return Number.isFinite(n) && n > 0 ? n : 0;
+        })();
+
+        const sr = (() => {
+          const v = td?.historical_success_rate ?? dec.historical_success_rate;
+          const n = Number(v);
+          return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
+        })();
+
+        const rr = (() => {
+          const v = dec.historical_reopen_rate;
+          const n = Number(v);
+          return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
+        })();
+
+        const reopenRisk = String(td?.reopen_risk || "").toLowerCase() || "unknown";
+        const band = String(td?.outcome_confidence_band || "").toLowerCase() || "uncertain";
+        const sparse = Boolean(td?.sparse_history || (similar < 5 || sr === null));
+        const conservativeNote = sparse ? String(td?.conservative_note || "limited history — conservative decision") : "";
+
+        const severity = (() => {
+          const s = String(td?.severity || "").toLowerCase();
+          if (s === "safe" || s === "review" || s === "risk") return s;
+          // Fallback: infer from reopenRisk + band.
+          if (reopenRisk === "high" || band === "uncertain") return "risk";
+          if (sr !== null && sr >= 0.88 && (reopenRisk === "low" || reopenRisk === "unknown") && band !== "uncertain" && !sparse) return "safe";
+          return "review";
+        })();
+
+        const tokens = [];
+        if (sr !== null && similar >= 5) {
+          tokens.push({ key: "success", label: `${Math.round(sr * 100)}% success`, tone: severity });
+        } else {
+          tokens.push({ key: "success", label: "Limited history", tone: "review" });
+        }
+        tokens.push({ key: "cases", label: `based on ${similar || 0} cases`, tone: "review" });
+        tokens.push({
+          key: "reopen",
+          label: `reopen risk: ${reopenRisk === "unknown" ? "—" : reopenRisk}`,
+          tone: reopenRisk === "high" ? "risk" : reopenRisk === "low" ? "safe" : "review",
+        });
+        tokens.push({
+          key: "band",
+          label: `outcome band: ${band === "tight" ? "tight" : band === "moderate" ? "moderate" : "uncertain"}`,
+          tone: band === "tight" ? "safe" : band === "moderate" ? "review" : "risk",
+        });
+
+        const why = Array.isArray(td?.why_factors) ? td.why_factors.map((x) => String(x || "").trim()).filter(Boolean) : [];
+
+        return {
+          severity,
+          tokens: tokens.slice(0, 4),
+          conservativeNote,
+          why: why.slice(0, 3),
+          raw: td,
+          rr,
+        };
+      },
       buildExplanationSummary(explanation) {
         if (!explanation || typeof explanation !== "object") return "";
         const s = explanation.summary;

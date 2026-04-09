@@ -1297,6 +1297,134 @@ def _attach_trust_layer(result: dict[str, Any]) -> tuple[dict[str, Any] | None, 
     return merged, key
 
 
+def _build_trust_dominance_layer(
+    *,
+    runtime_ticket: dict[str, Any] | None,
+    decision: dict[str, Any] | None,
+    user_memory: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """
+    Trust Dominance Layer — compact, UI-ready trust strip derived from:
+    - outcome_store.py: real outcomes aggregated by (issue_type, action)
+    - learning.py: deterministic pattern expectation for (issue_type, action, risk, tier)
+    - memory.py: deterministic user-level pattern flags (abuse/refund/review history)
+    Never invents stats. Returns sparse-safe conservative output.
+    """
+    t = runtime_ticket if isinstance(runtime_ticket, dict) else {}
+    d = decision if isinstance(decision, dict) else {}
+    mem = user_memory if isinstance(user_memory, dict) else {}
+
+    issue_type = str(t.get("issue_type") or t.get("type") or "general_support")
+    action = str(d.get("action") or "none").strip().lower() or "none"
+
+    stats: dict[str, Any] = {}
+    try:
+        from outcome_store import get_decision_outcome_stats
+
+        stats = get_decision_outcome_stats(issue_type, action, limit=300) or {}
+    except Exception:
+        stats = {}
+
+    similar_n = int(stats.get("similar_case_count", 0) or 0)
+    hist_sr = stats.get("historical_success_rate", None)
+    hist_rr = stats.get("historical_reopen_rate", None)
+    band_raw = str(stats.get("outcome_confidence_band", "medium") or "medium").lower()
+
+    # Normalize bands to UI language.
+    band_ui = "moderate"
+    if band_raw == "high":
+        band_ui = "tight"
+    elif band_raw == "low":
+        band_ui = "uncertain"
+    else:
+        band_ui = "moderate"
+
+    reopen_risk = "unknown"
+    if hist_rr is not None:
+        try:
+            rr = float(hist_rr)
+            if rr < 0.08:
+                reopen_risk = "low"
+            elif rr < 0.18:
+                reopen_risk = "medium"
+            else:
+                reopen_risk = "high"
+        except Exception:
+            reopen_risk = "unknown"
+
+    # learning.py expectation (pattern library) — deterministic.
+    pattern = None
+    try:
+        from learning import get_pattern_expectation
+
+        # get_pattern_expectation expects ticket dict with triage + plan_tier in meta.
+        pat_ticket = dict(t)
+        pat_ticket["issue_type"] = issue_type
+        pat_ticket["triage"] = pat_ticket.get("triage") or {}
+        if "plan_tier" not in pat_ticket:
+            pat_ticket["plan_tier"] = str((mem.get("plan_tier") or "free") or "free")
+        pattern = get_pattern_expectation(pat_ticket, d)
+    except Exception:
+        pattern = None
+
+    # memory.py flags — deterministic.
+    abuse_score = int(mem.get("abuse_score", 0) or 0)
+    refund_count = int(mem.get("refund_count", 0) or 0)
+    complaint_count = int(mem.get("complaint_count", 0) or 0)
+    review_count = int(mem.get("review_count", 0) or 0)
+    repeat_customer = bool(mem.get("repeat_customer", False))
+
+    sparse = bool(similar_n < 5 or hist_sr is None)
+    conservative_note = "limited history — conservative decision" if sparse else None
+
+    why: list[str] = []
+    if similar_n > 0:
+        why.append(f"Outcome ledger: {similar_n} similar {issue_type}:{action} cases")
+    if pattern and isinstance(pattern, dict):
+        exp = str(pattern.get("expectation") or "").strip().lower()
+        pn = int(pattern.get("sample_count", 0) or 0)
+        if exp in {"high", "medium", "low"} and pn > 0:
+            why.append(f"Learned pattern expectation: {exp} (n={pn})")
+    if abuse_score >= 2:
+        why.append("User pattern: elevated abuse/fraud caution flags")
+    elif refund_count >= 3 and action in {"refund", "credit"}:
+        why.append("User pattern: repeat refund/credit history")
+    elif complaint_count >= 4:
+        why.append("User pattern: elevated complaint history")
+    elif review_count >= 3:
+        why.append("User pattern: frequent manual review history")
+    elif repeat_customer:
+        why.append("User pattern: repeat customer history")
+
+    # Keep to top 3, high-signal only.
+    why_factors = [x for x in why if isinstance(x, str) and x.strip()][:3]
+
+    # Severity (color): safe / review / risk. Conservative by default.
+    severity = "review"
+    if reopen_risk == "high" or band_ui == "uncertain":
+        severity = "risk"
+    elif (hist_sr is not None and isinstance(hist_sr, (int, float)) and float(hist_sr) >= 0.88) and reopen_risk in {
+        "low",
+        "unknown",
+    } and band_ui in {"tight", "moderate"} and not sparse:
+        severity = "safe"
+
+    # Map edge cases: financial actions get slightly more conservative when history is sparse.
+    if sparse and action in {"refund", "charge"}:
+        severity = "risk" if severity != "safe" else severity
+
+    return {
+        "historical_success_rate": float(hist_sr) if isinstance(hist_sr, (int, float)) else None,
+        "similar_case_count": max(0, similar_n),
+        "reopen_risk": reopen_risk,
+        "outcome_confidence_band": band_ui,
+        "sparse_history": sparse,
+        "conservative_note": conservative_note,
+        "severity": severity,
+        "why_factors": why_factors,
+    }
+
+
 def serialize_support_result(
     result: dict[str, Any],
     user: User,
@@ -2878,6 +3006,48 @@ def analyze_extension_ticket(
                 result[k] = decision.get(k)
         
     except Exception:
+        pass
+
+    # Trust Dominance Layer (additive): derive from real outcomes + learning + memory.
+    try:
+        # For the extension surface, runtime_ticket is not persisted the same way as workspace.
+        # We still pass best-effort issue_type + triage + plan tier + user memory.
+        from memory import get_user_memory
+
+        mem = get_user_memory(str(username or "guest"))
+        rt = {
+            "issue_type": str(result.get("issue_type") or "general_support"),
+            "triage": dict(result.get("triage_metadata") or result.get("triage") or {}),
+            "plan_tier": str(plan_tier or mem.get("plan_tier") or "free"),
+        }
+        dec = dict(result.get("sovereign_decision") or {})
+        td = _build_trust_dominance_layer(runtime_ticket=rt, decision=dec, user_memory=mem)
+        result["trust_dominance"] = td
+
+        # Mirror outcome stats onto the sovereign_decision fields (used by clients / renderers).
+        if isinstance(td, dict):
+            # these are real/derived from outcome_store.get_decision_outcome_stats or sparse-safe None
+            if "similar_case_count" in td:
+                dec["similar_case_count"] = int(td.get("similar_case_count") or 0)
+            if "historical_success_rate" in td:
+                dec["historical_success_rate"] = td.get("historical_success_rate")
+            # reopen rate is real but may be None when sparse; pass through if present on stats
+            # (kept in trust_dominance for UI risk label even when numeric rate is hidden)
+            # outcome_confidence_band in SovereignDecision is low/medium/high; we keep it aligned with outcome_store
+            # by recomputing from the stored band in stats when available.
+            try:
+                from outcome_store import get_decision_outcome_stats
+
+                stats = get_decision_outcome_stats(rt["issue_type"], str(dec.get("action") or "none"), limit=300) or {}
+                dec["historical_reopen_rate"] = stats.get("historical_reopen_rate", None)
+                dec["outcome_confidence_band"] = stats.get("outcome_confidence_band", None)
+            except Exception:
+                dec["historical_reopen_rate"] = None
+                dec["outcome_confidence_band"] = None
+
+        result["sovereign_decision"] = dec
+    except Exception:
+        # Never fail the analyze path if trust dominance derivation fails.
         pass
 
     if user:

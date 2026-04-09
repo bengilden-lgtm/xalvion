@@ -1677,47 +1677,74 @@ select.refund-select{ padding-right: 34px; }
 .decision-trust-block{
   margin-top: 10px;
 }
-.decision-trust-lead{
+
+/* Trust Dominance Layer — compact horizontal strip (no extra scrolling) */
+.trust-strip{
   margin-top: 0;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  color: color-mix(in oklab, var(--text) 92%, var(--text-muted));
-}
-.decision-trust-posture{
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.5;
-  margin-top: 6px;
-  display: none;
-}
-.decision-trust-micro{
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  display: flex;
+  align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  padding: 6px 0 0 0;
 }
-.decision-trust-micro:empty{ display: none; }
-.decision-trust-stat{
-  border: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+.trust-strip:empty{ display:none; }
+.trust-pill{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  background: color-mix(in oklab, var(--bg2) 52%, transparent);
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.trust-pill.tone-safe{
+  border-color: color-mix(in oklab, var(--success) 22%, var(--line));
+  background: color-mix(in oklab, var(--success) 6%, transparent);
+  color: color-mix(in oklab, var(--success) 78%, var(--text-2));
+}
+.trust-pill.tone-review{
+  border-color: color-mix(in oklab, var(--warning) 18%, var(--line));
+  background: color-mix(in oklab, var(--warning) 6%, transparent);
+  color: color-mix(in oklab, var(--warning) 78%, var(--text-2));
+}
+.trust-pill.tone-risk{
+  border-color: color-mix(in oklab, var(--danger) 20%, var(--line));
+  background: color-mix(in oklab, var(--danger) 6%, transparent);
+  color: color-mix(in oklab, var(--danger) 80%, var(--text-2));
+}
+
+.trust-strip-detail{
+  display:none;
+  margin-top: 8px;
+  padding: 10px 12px;
   border-radius: var(--r-md);
-  padding: 8px 10px;
-  background: color-mix(in oklab, white 2.5%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 18%, transparent);
 }
-.decision-trust-stat__k{
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-4);
+.trust-strip-detail-inner{
+  display:grid;
+  gap: 6px;
 }
-.decision-trust-stat__v{
-  display: block;
-  margin-top: 4px;
+.trust-strip-why{
   font-size: 12.5px;
-  font-weight: 650;
-  color: var(--text-2);
-  line-height: 1.35;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.trust-strip.tone-risk + .trust-strip-detail{
+  border-color: color-mix(in oklab, var(--danger) 14%, var(--border));
+}
+
+/* Hover/expand: show WHY without UI clutter */
+.decision-trust-block:hover .trust-strip-detail{
+  display:block;
 }
 .xv-governor-surface{
   margin-top: 12px;

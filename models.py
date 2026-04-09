@@ -138,6 +138,22 @@ class OutputEnvelope(BaseModel):
     audit_log: str = ""
 
 
+class TrustDominance(BaseModel):
+    """
+    Compact, UI-ready trust strip payload.
+    Must be derived from real outcome_store rows and deterministic expectations.
+    """
+
+    historical_success_rate: float | None = None  # 0..1 when enough samples exist
+    similar_case_count: int = 0
+    reopen_risk: Literal["low", "medium", "high", "unknown"] = "unknown"
+    outcome_confidence_band: Literal["tight", "moderate", "uncertain"] = "uncertain"
+    sparse_history: bool = True
+    conservative_note: str | None = None
+    severity: Literal["safe", "review", "risk"] = "review"
+    why_factors: list[str] = Field(default_factory=list)
+
+
 class CanonicalAgentResponse(BaseModel):
     reply: str
     final: str
@@ -166,3 +182,5 @@ class CanonicalAgentResponse(BaseModel):
     # Enterprise trust / audit (additive; safe for clients — no secrets or raw tool payloads)
     outcome_key: str | None = None
     audit_summary: dict[str, Any] | None = None
+    # Trust dominance layer (additive, compact)
+    trust_dominance: TrustDominance | None = None

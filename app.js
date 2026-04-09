@@ -4043,9 +4043,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         <div class="decision-controls" data-role="controls"></div>
       </div>
       <div class="decision-trust-block">
-        <div class="decision-panel-note decision-trust-lead" data-role="trust"></div>
-        <div class="decision-trust-posture" data-role="trust-posture"></div>
-        <div class="decision-trust-micro" data-role="trust-stats" aria-label="Workspace trust signals"></div>
+        <div class="trust-strip" data-role="trust-strip" aria-label="Trust dominance"></div>
+        <div class="trust-strip-detail" data-role="trust-detail" aria-hidden="true"></div>
       </div>
       <div class="xv-governor-surface" data-role="governor" hidden></div>
       <div class="decision-outcome-intel" data-role="outcome-intel" hidden></div>
@@ -4060,9 +4059,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (cons && sig.title) cons.setAttribute("title", sig.title);
 
     const controls = panel.querySelector("[data-role='controls']");
-    const trustEl = panel.querySelector("[data-role='trust']");
-    const trustPostureEl = panel.querySelector("[data-role='trust-posture']");
-    const trustStatsEl = panel.querySelector("[data-role='trust-stats']");
+    const trustStripEl = panel.querySelector("[data-role='trust-strip']");
+    const trustDetailEl = panel.querySelector("[data-role='trust-detail']");
     const govSurfaceEl = panel.querySelector("[data-role='governor']");
     const outcomeIntelEl = panel.querySelector("[data-role='outcome-intel']");
     const noteEl = panel.querySelector("[data-role='note']");
@@ -4072,36 +4070,42 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     try {
       const fmt = globalThis.__XALVION_FORMAT__;
-      const trust =
-        fmt?.buildDecisionTrustPresentation
-          ? fmt.buildDecisionTrustPresentation(data, state.dashboardStats?.outcome_intelligence ?? undefined)
+      const strip =
+        fmt?.buildTrustDominanceStrip
+          ? fmt.buildTrustDominanceStrip(data)
           : null;
-      if (trustEl && trust) {
-        trustEl.textContent = trust.verdict || "";
-      }
-      if (trustPostureEl && trust) {
-        const bits = [trust.posture, trust.ledgerHint].filter(Boolean);
-        trustPostureEl.textContent = bits.join(" ");
-        trustPostureEl.style.display = bits.length ? "block" : "none";
-      }
-      if (trustStatsEl && trust && Array.isArray(trust.microLines) && trust.microLines.length) {
-        trustStatsEl.innerHTML = trust.microLines
-          .map(
-            (row) =>
-              `<div class="decision-trust-stat" data-trust-stat="${escapeHtml(row.key)}"><span class="decision-trust-stat__k">${escapeHtml(row.label)}</span><span class="decision-trust-stat__v">${escapeHtml(row.value)}</span></div>`
-          )
+      if (trustStripEl && strip && Array.isArray(strip.tokens) && strip.tokens.length) {
+        trustStripEl.className = `trust-strip tone-${escapeHtml(strip.severity || "review")}`;
+        trustStripEl.innerHTML = strip.tokens
+          .map((t) => `<span class="trust-pill tone-${escapeHtml(t.tone || "review")}" data-token="${escapeHtml(t.key)}">${escapeHtml(t.label)}</span>`)
           .join("");
-      } else if (trustStatsEl) {
-        trustStatsEl.innerHTML = "";
+        const detailLines = []
+          .concat(strip.conservativeNote ? [strip.conservativeNote] : [])
+          .concat(Array.isArray(strip.why) ? strip.why : []);
+        if (trustDetailEl) {
+          trustDetailEl.innerHTML = detailLines.length
+            ? `<div class="trust-strip-detail-inner">${detailLines
+                .slice(0, 3)
+                .map((x) => `<div class="trust-strip-why">• ${escapeHtml(x)}</div>`)
+                .join("")}</div>`
+            : "";
+          trustDetailEl.style.display = detailLines.length ? "block" : "none";
+        }
+        if (detailLines.length) {
+          trustStripEl.setAttribute("title", detailLines.slice(0, 3).join("\n"));
+        } else {
+          trustStripEl.removeAttribute("title");
+        }
+      } else if (trustStripEl) {
+        trustStripEl.className = "trust-strip tone-review";
+        trustStripEl.innerHTML = `<span class="trust-pill tone-review">limited history — conservative decision</span>`;
+        trustStripEl.setAttribute("title", "limited history — conservative decision");
+        if (trustDetailEl) {
+          trustDetailEl.innerHTML = "";
+          trustDetailEl.style.display = "none";
+        }
       }
     } catch {}
-    if (trustEl && !String(trustEl.textContent || "").trim()) {
-      trustEl.textContent = pendingGate
-        ? "Controlled release — approval is required before execution ships."
-        : /signal-safe/.test(sig.cls)
-          ? "This path reads safe under current signals — still apply your normal review."
-          : "Review the rationale, then approve or adjust before send.";
-    }
 
     populateDecisionOutcomeIntelStrip(outcomeIntelEl, data);
 

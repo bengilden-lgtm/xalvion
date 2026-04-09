@@ -375,6 +375,47 @@ button:disabled {
   transition: width 0.18s ease;
 }
 
+/* Trust Dominance Layer — compact horizontal strip */
+.trust-strip{
+  display:flex;
+  align-items:center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  padding-top: 2px;
+}
+.trust-pill{
+  display:inline-flex;
+  align-items:center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.trust-pill.tone-safe{
+  border-color: rgba(56, 217, 150, 0.22);
+  background: rgba(56, 217, 150, 0.08);
+  color: rgba(180, 250, 215, 0.92);
+}
+.trust-pill.tone-review{
+  border-color: rgba(250, 204, 21, 0.22);
+  background: rgba(250, 204, 21, 0.07);
+  color: #fde68a;
+}
+.trust-pill.tone-risk{
+  border-color: rgba(255, 107, 107, 0.24);
+  background: rgba(255, 107, 107, 0.08);
+  color: #ffb3b3;
+}
+
 .footer-note {
   font-size: 11px;
   color: var(--muted);

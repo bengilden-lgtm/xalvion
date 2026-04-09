@@ -1001,6 +1001,32 @@ textarea{ resize:vertical; }
   font-weight:600;
 }
 
+/* Trust Dominance Layer (legacy fallback) */
+.trust-strip{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
+  overflow:hidden;
+  padding-top: 2px;
+}
+.trust-pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:26px;
+  padding:0 10px;
+  border-radius:999px;
+  border:1px solid var(--line-soft);
+  background:rgba(255,255,255,0.02);
+  color:var(--text-soft);
+  font-size:12px;
+  font-weight:650;
+  white-space:nowrap;
+}
+.trust-pill.tone-safe{ border-color: rgba(170,196,146,0.22); background: rgba(170,196,146,0.10); color: rgba(246,242,235,0.90); }
+.trust-pill.tone-review{ border-color: rgba(209,190,162,0.22); background: rgba(209,190,162,0.10); color: rgba(246,242,235,0.90); }
+.trust-pill.tone-risk{ border-color: rgba(210,133,133,0.24); background: rgba(210,133,133,0.10); color: rgba(246,242,235,0.90); }
+
 /* Governor visibility (fallback stylesheet only) */
 .signal-blocked{
   border-color: rgba(210,133,133,0.26) !important;

@@ -260,3 +260,73 @@ export function renderOperatorBrief({
   } catch {}
 }
 
+function _coerceRate(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
+}
+
+export function normalizeTrustDominance(data) {
+  const d = data && typeof data === "object" ? data : {};
+  const td = d.trust_dominance && typeof d.trust_dominance === "object" ? d.trust_dominance : {};
+  const dec = d.sovereign_decision && typeof d.sovereign_decision === "object" ? d.sovereign_decision : d.decision || {};
+
+  const similar = Math.max(0, Math.floor(Number(td.similar_case_count ?? dec.similar_case_count ?? 0) || 0));
+  const sr = _coerceRate(td.historical_success_rate ?? dec.historical_success_rate);
+  const reopenRiskRaw = String(td.reopen_risk || "unknown").toLowerCase();
+  const reopenRisk = reopenRiskRaw === "low" || reopenRiskRaw === "medium" || reopenRiskRaw === "high" ? reopenRiskRaw : "unknown";
+  const bandRaw = String(td.outcome_confidence_band || "uncertain").toLowerCase();
+  const band = bandRaw === "tight" || bandRaw === "moderate" || bandRaw === "uncertain" ? bandRaw : "uncertain";
+  const sparse = Boolean(td.sparse_history ?? (similar < 5 || sr === null));
+  const severityRaw = String(td.severity || "").toLowerCase();
+  const severity = severityRaw === "safe" || severityRaw === "review" || severityRaw === "risk"
+    ? severityRaw
+    : reopenRisk === "high" || band === "uncertain"
+      ? "risk"
+      : sr !== null && sr >= 0.88 && !sparse && (reopenRisk === "low" || reopenRisk === "unknown") && band !== "uncertain"
+        ? "safe"
+        : "review";
+
+  const why = Array.isArray(td.why_factors) ? td.why_factors.map((x) => String(x || "").trim()).filter(Boolean).slice(0, 3) : [];
+  const note = sparse ? String(td.conservative_note || "limited history — conservative decision") : "";
+
+  return { similar, sr, reopenRisk, band, sparse, severity, why, note };
+}
+
+export function renderTrustDominanceStrip({ data, mountEl }) {
+  if (!mountEl) return;
+  const norm = normalizeTrustDominance(data);
+  const tokens = [];
+
+  if (norm.sr !== null && norm.similar >= 5) {
+    tokens.push({ key: "success", label: `${Math.round(norm.sr * 100)}% success`, tone: norm.severity });
+  } else {
+    tokens.push({ key: "success", label: "Limited history", tone: "review" });
+  }
+  tokens.push({ key: "cases", label: `based on ${norm.similar} cases`, tone: "review" });
+  tokens.push({
+    key: "reopen",
+    label: `reopen risk: ${norm.reopenRisk === "unknown" ? "—" : norm.reopenRisk}`,
+    tone: norm.reopenRisk === "high" ? "risk" : norm.reopenRisk === "low" ? "safe" : "review",
+  });
+  tokens.push({
+    key: "band",
+    label: `outcome band: ${norm.band}`,
+    tone: norm.band === "tight" ? "safe" : norm.band === "moderate" ? "review" : "risk",
+  });
+
+  mountEl.className = `trust-strip tone-${norm.severity}`;
+  mountEl.innerHTML = tokens
+    .slice(0, 4)
+    .map((t) => `<span class="trust-pill tone-${t.tone}" data-token="${t.key}">${t.label}</span>`)
+    .join("");
+
+  const detailLines = []
+    .concat(norm.note ? [norm.note] : [])
+    .concat(norm.why || []);
+  if (detailLines.length) {
+    mountEl.setAttribute("title", detailLines.slice(0, 3).join("\n"));
+  } else {
+    mountEl.removeAttribute("title");
+  }
+}
+

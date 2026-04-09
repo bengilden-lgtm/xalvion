@@ -8,7 +8,11 @@
 import { createChromeContext } from "./chrome-context.js";
 import { insertIntoGmail } from "./adapters/chrome-compose.js";
 import { createUsageChrome } from "./ui/usage-chrome.js";
-import { renderConsequenceBar as renderConsequenceBarGov, renderOperatorBrief as renderOperatorBriefGov } from "./renderers/governor-trust.js";
+import {
+  renderConsequenceBar as renderConsequenceBarGov,
+  renderOperatorBrief as renderOperatorBriefGov,
+  renderTrustDominanceStrip as renderTrustDominanceStripGov,
+} from "./renderers/governor-trust.js";
 import {
   applyStructuredExplainabilityToData,
   buildHeaderInsight,
@@ -106,6 +110,7 @@ const gateDoneBtn = document.getElementById("gateDoneBtn");
 const approvalCompact = document.getElementById("approvalCompact");
 const approvalCompactCopy = document.getElementById("approvalCompactCopy");
 const consequenceSignal = document.getElementById("consequenceSignal");
+let trustStripEl = document.getElementById("trustStrip");
 const operatorBriefEl = document.getElementById("operatorBrief");
 const operatorBriefBody = document.getElementById("operatorBriefBody");
 
@@ -219,6 +224,26 @@ function renderConsequenceBar(data) {
     deriveConsequencePresentation,
     getDecisionData,
   });
+}
+
+function ensureTrustStrip() {
+  if (trustStripEl) return trustStripEl;
+  // Insert directly under the consequence bar to stay high-signal and compact.
+  const panel = document.getElementById("resultPanel");
+  const bar = panel?.querySelector(".consequence-bar");
+  if (!panel || !bar) return null;
+  const el = document.createElement("div");
+  el.id = "trustStrip";
+  el.className = "trust-strip tone-review";
+  bar.insertAdjacentElement("afterend", el);
+  trustStripEl = el;
+  return trustStripEl;
+}
+
+function renderTrustStrip(data) {
+  const el = ensureTrustStrip();
+  if (!el) return;
+  renderTrustDominanceStripGov({ data, mountEl: el });
 }
 
 function renderApprovalCompact(data, reply) {
@@ -700,6 +725,7 @@ function render(data) {
   setConfidence(confidence);
 
   renderConsequenceBar(data);
+  renderTrustStrip(data);
   renderOperatorBrief(data);
   renderApprovalCompact(data, reply);
 
