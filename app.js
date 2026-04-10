@@ -5563,7 +5563,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   function createDetailsPanel(data = {}) {
     const details = document.createElement("details");
     details.className = "details-wrap operator-brief-details";
-    details.open = true;
+    details.open = false;
 
     const decision = data.decision || {};
     const output = data.output || {};
