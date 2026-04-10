@@ -4216,6 +4216,13 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (node.querySelector(".typing, .xv-thinking-block")) {
       swapThinkingToContent(node, html);
     } else {
+      const incoming = (text || "").trim();
+      const existing = (node.textContent || "").trim();
+      if (incoming && existing && existing === incoming) {
+        node.closest?.(".msg-card")?.classList.add("xv-soft-fade-in");
+        window.setTimeout(() => node.closest?.(".msg-card")?.classList.remove("xv-soft-fade-in"), 260);
+        return;
+      }
       node.innerHTML = html;
       node.closest?.(".msg-card")?.classList.add("xv-soft-fade-in");
       window.setTimeout(() => node.closest?.(".msg-card")?.classList.remove("xv-soft-fade-in"), 260);
@@ -6635,6 +6642,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       state.latestRun = data;
       setLastSessionNow();
 
+      const _copyNode = getAssistantCopyNode(row);
+      if (_copyNode && _copyNode.textContent && !_copyNode.querySelector(".typing, .xv-thinking-block")) {
+        _copyNode.innerHTML = "";
+      }
       const replyText = data.reply || data.response || data.final || "No response returned.";
       setAssistantCopy(row, replyText);
       const elapsedMs =

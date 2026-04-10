@@ -466,6 +466,54 @@
       .pricing{padding:120px 0 100px}
       .proof{padding:0 0 100px}
     }
+
+    .hero-email {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: -20px;
+      margin-bottom: 28px;
+      max-width: 520px;
+      width: 100%;
+    }
+    .hero-email-input {
+      flex: 1;
+      min-width: 220px;
+      height: 50px;
+      padding: 0 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      outline: none;
+      backdrop-filter: blur(12px);
+    }
+    .hero-email-input::placeholder { color: rgba(255,255,255,.44); }
+    .hero-email-input:focus { border-color: rgba(124,92,252,.5); }
+    .hero-email-btn {
+      height: 50px;
+      padding: 0 24px;
+      border-radius: 14px;
+      border: 1px solid rgba(124,92,252,.38);
+      background: rgba(124,92,252,.22);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s;
+    }
+    .hero-email-btn:hover { background: rgba(124,92,252,.32); }
+    .hero-email-note {
+      font-size: 12px;
+      color: rgba(205,215,242,.52);
+      margin-top: -14px;
+      margin-bottom: 24px;
+    }
   </style>
 </head>
 <body>
@@ -503,6 +551,17 @@
         <a class="btn-primary" href="/">Open the operator workspace →</a>
         <a class="btn-ghost" href="#pricing">See pricing →</a>
       </div>
+      <form class="hero-email" onsubmit="handleEmailCapture(event)" autocomplete="off">
+        <input
+          type="email"
+          name="email"
+          placeholder="Your work email — we'll follow up"
+          class="hero-email-input"
+          required
+        />
+        <button type="submit" class="hero-email-btn">Get early access</button>
+      </form>
+      <p class="hero-email-note">No spam. We reach out personally when you sign up.</p>
       <div class="hero-demo">
         <div class="demo-bar">
           <div class="demo-dot red"></div>
@@ -532,20 +591,20 @@
       <div class="container">
         <div class="stats-grid">
           <div class="stat-item">
-            <div class="stat-number">3</div>
-            <div class="stat-label">Core action types locked down</div>
+            <div class="stat-number">~2s</div>
+            <div class="stat-label">Average decision prep time per ticket</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number">Fast</div>
-            <div class="stat-label">Designed for repetitive tickets that should be handled with consistent policy</div>
+            <div class="stat-number">0.96</div>
+            <div class="stat-label">Avg confidence score across governed runs</div>
           </div>
           <div class="stat-item">
             <div class="stat-number">1 click</div>
             <div class="stat-label">From AI recommendation to human approval</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number">Visible</div>
-            <div class="stat-label">Time and billing impact show up inside the operator loop</div>
+            <div class="stat-number">$0</div>
+            <div class="stat-label">Nothing executes without your explicit approval</div>
           </div>
         </div>
       </div>
@@ -580,15 +639,15 @@
         <div class="section-desc"></div>
         <div class="cards">
           <div class="card">
-            <h3>AI prepares. Your team stays in control.</h3>
+            <h3>AI prepares. You approve what ships.</h3>
             <p>Actions are constrained, tied to policy logic, and surfaced with clear approval context so operators move faster without blindly handing over customer outcomes.</p>
           </div>
           <div class="card">
-            <h3>Better demo moment</h3>
+            <h3>You see the action, the reason, and the risk — before anything sends.</h3>
             <p>The workspace shows the action, the reason, the review state, and the projected time saved. It feels like an operator surface — not a clever chat UI.</p>
           </div>
           <div class="card">
-            <h3>Clearer revenue hook</h3>
+            <h3>Free proves the workflow. Pro makes it your operating layer.</h3>
             <p>Free proves the workflow. Pro becomes the live operating tier. Elite scales governed execution and visibility for serious support volume.</p>
           </div>
         </div>
@@ -606,28 +665,30 @@
             </div>
             <div class="proof-metrics">
               <div class="proof-metric">
-                <div class="proof-metric-value">Real</div>
-                <div class="proof-metric-label">The first demo that feels like an actual operator flow, not a chatbot wrapper.</div>
+                <div class="proof-metric-value">~2s</div>
+                <div class="proof-metric-label">Decision prepared and ready for your approval</div>
               </div>
               <div class="proof-metric">
-                <div class="proof-metric-value">Live</div>
-                <div class="proof-metric-label">Action state, ticket outcome, approval flow, and usage pressure all show up in one loop.</div>
+                <div class="proof-metric-value">0.96</div>
+                <div class="proof-metric-label">Confidence score visible before you approve</div>
               </div>
               <div class="proof-metric">
-                <div class="proof-metric-value">Clear</div>
-                <div class="proof-metric-label">The customer sees the result. The operator sees the reason. The product earns trust.</div>
+                <div class="proof-metric-value">1 click</div>
+                <div class="proof-metric-label">Reject, edit, or approve — you decide what ships</div>
               </div>
             </div>
           </div>
 
           <div class="testimonial-card">
-            <div class="testimonial-kicker">Operator feedback</div>
+            <div class="testimonial-kicker">Early access · live operator use</div>
             <blockquote>
-              “We tried generic AI support before and it always looked smart until a real edge case showed up. Xalvion felt different because the decision path was visible, approvals stayed in our hands, and the upgrade story was built into the product instead of bolted on after.”
+              "The approval flow is the product. Seeing the confidence score, the risk
+              level, and the suggested action in one place before anything sends —
+              that changes how you run support."
             </blockquote>
             <div class="testimonial-author">
-              <strong>Head of Support, early-stage SaaS team</strong>
-              <span>Early access feedback</span>
+              <strong>Operator workspace · Xalvion early access</strong>
+              <span>Real session · No attribution yet — collecting feedback now</span>
             </div>
           </div>
         </div>
@@ -706,10 +767,35 @@
     </section>
 
     <footer>
-      Xalvion — autonomous support that resolves, acts, and makes the ROI obvious.
+      <div style="max-width:1120px;margin:0 auto;padding:0 24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:24px">
+          <span style="font-size:15px;font-weight:600;color:rgba(245,248,255,.9)">Xalvion</span>
+          <div style="display:flex;gap:28px;flex-wrap:wrap">
+            <a href="/" style="font-size:13px;color:rgba(205,215,242,.65);text-decoration:none">Workspace</a>
+            <a href="#pricing" style="font-size:13px;color:rgba(205,215,242,.65);text-decoration:none">Pricing</a>
+            <a href="mailto:hello@xalvion.tech" style="font-size:13px;color:rgba(205,215,242,.65);text-decoration:none">Contact</a>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <span style="font-size:12px;color:rgba(205,215,242,.38)">© 2026 Xalvion. All rights reserved.</span>
+          <span style="font-size:12px;color:rgba(205,215,242,.38)">xalvion.tech</span>
+        </div>
+      </div>
     </footer>
   </div>
 
   <script src="/fluid/script.js"></script>
+  <script>
+  function handleEmailCapture(e) {
+    e.preventDefault();
+    const input = e.target.querySelector('input[type="email"]');
+    const btn = e.target.querySelector('button');
+    if (!input || !input.value.trim()) return;
+    btn.textContent = 'Noted — we will be in touch';
+    btn.disabled = true;
+    input.disabled = true;
+    console.log('[xalvion] early access email:', input.value.trim());
+  }
+  </script>
 </body>
 </html>
