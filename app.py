@@ -39,7 +39,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -165,6 +165,14 @@ except Exception as _outcome_store_imp_err:
 
 load_dotenv(override=True)
 
+from public_urls import (
+    build_allowed_cors_origins,
+    parse_extra_allowed_origins,
+    resolve_api_public_origin,
+    resolve_cors_origin_regex,
+    resolve_frontend_public_origin,
+)
+
 logger = logging.getLogger("xalvion.api")
 
 STARTUP_ISSUES: list[str] = []
@@ -207,15 +215,18 @@ ALLOW_DIRECT_BILLING_BYPASS = (
     os.getenv("ALLOW_DIRECT_BILLING_BYPASS", "false").strip().lower() == "true"
 )
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:8001").rstrip("/")
-# Public URL of this FastAPI app (OAuth callback must land on the API, not only a static host).
-APP_ORIGIN = os.getenv("APP_ORIGIN", "").strip().rstrip("/") or FRONTEND_URL
+# Public browser workspace / Stripe return URLs (checkout success/cancel, Connect UX redirects).
+FRONTEND_URL = resolve_frontend_public_origin()
+# Public base URL of this API (Stripe Connect callback, extension target, CORS self-origin).
+API_PUBLIC_ORIGIN = resolve_api_public_origin()
+# Back-compat: historically APP_ORIGIN meant "this FastAPI app's public URL".
+APP_ORIGIN = API_PUBLIC_ORIGIN
 CHECKOUT_SUCCESS_URL = os.getenv("CHECKOUT_SUCCESS_URL", f"{FRONTEND_URL}?checkout=success")
 CHECKOUT_CANCEL_URL = os.getenv("CHECKOUT_CANCEL_URL", f"{FRONTEND_URL}?checkout=cancel")
 STRIPE_CONNECT_CLIENT_ID = os.getenv("STRIPE_CONNECT_CLIENT_ID", "").strip()
 STRIPE_CONNECT_REDIRECT_URI = os.getenv(
     "STRIPE_CONNECT_REDIRECT_URI",
-    f"{APP_ORIGIN}/integrations/stripe/callback",
+    f"{API_PUBLIC_ORIGIN}/integrations/stripe/callback",
 ).strip()
 
 STREAM_CHUNK_SIZE = int(os.getenv("STREAM_CHUNK_SIZE", "18"))
@@ -335,29 +346,16 @@ if os.path.isdir(FLUID_DIR):
 if os.path.isdir(WORKSPACE_CLIENT_DIR):
     app.mount("/workspace-client", StaticFiles(directory=WORKSPACE_CLIENT_DIR), name="workspace_client")
 
-_ALLOWED_ORIGINS = [
-    "http://localhost:5500",
-    "http://127.0.0.1:5500",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://localhost:8001",
-    "http://127.0.0.1:8001",
-    "https://www.xalvion.tech",
-    "https://xalvion.tech",
-]
-
-for origin in [FRONTEND_URL, APP_ORIGIN] + [
-    x.strip().rstrip("/")
-    for x in os.getenv("ALLOWED_ORIGINS", "").split(",")
-    if x.strip()
-]:
-    if origin and origin not in _ALLOWED_ORIGINS:
-        _ALLOWED_ORIGINS.append(origin)
+_ALLOWED_ORIGINS = build_allowed_cors_origins(
+    FRONTEND_URL,
+    API_PUBLIC_ORIGIN,
+    parse_extra_allowed_origins(),
+)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https://([a-z0-9-]+\.)?xalvion\.tech$|^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origin_regex=resolve_cors_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -2420,6 +2418,18 @@ def serve_index():
     return JSONResponse({"status": "ok", "service": "xalvion-sovereign-brain", "warning": "index.html not found"})
 
 
+@app.get("/workspace-bootstrap.js")
+def serve_workspace_bootstrap():
+    """Sets window.__XALVION_API_BASE__ for split frontend/API hosting (empty = same-origin)."""
+    base = os.getenv("WORKSPACE_API_BASE_URL", "").strip().rstrip("/")
+    payload = json.dumps(base)
+    return Response(
+        content=f"window.__XALVION_API_BASE__={payload};",
+        media_type="application/javascript; charset=utf-8",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/debug/refund-mode")
 def debug_refund_mode():
     return {
@@ -3342,4 +3352,6 @@ def public_metrics(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000)
+
+    _bind_port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("app:app", host="0.0.0.0", port=_bind_port)

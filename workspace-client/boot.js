@@ -10,6 +10,15 @@ import { createStripeEngine } from "./engines/stripe-engine.js";
 import { createInboxScanEngine } from "./engines/inbox-scan-engine.js";
 import { createChromeContext } from "./adapters/chrome-context.js";
 
+function resolveWorkspaceApiBase() {
+  if (typeof globalThis === "undefined") return "";
+  const v = globalThis.__XALVION_API_BASE__;
+  if (v == null || String(v).trim() === "") return "";
+  return String(v).replace(/\/+$/, "");
+}
+
+const _workspaceApiBase = resolveWorkspaceApiBase();
+
 const sessionStore = createSessionStore();
 const agentStore = createAgentStore();
 const uiStore = createUiStore();
@@ -25,7 +34,7 @@ const inboxScanEngine = createInboxScanEngine({ chromeContext });
 function createBoundApi(getToken, onUnauthorized) {
   return createApiClient({
     getToken,
-    baseUrl: "",
+    baseUrl: _workspaceApiBase,
     onUnauthorized,
   });
 }

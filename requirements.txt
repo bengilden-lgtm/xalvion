@@ -16,6 +16,8 @@ openai>=1.30.0,<2.0
 
 # --- Database ---
 sqlalchemy>=2.0.30,<3.0
+# Postgres driver (use DATABASE_URL=postgresql+psycopg2://... on Railway / Render / Fly)
+psycopg2-binary>=2.9.9,<3.0
 
 # --- Auth ---
 python-jose[cryptography]>=3.3.0,<4.0

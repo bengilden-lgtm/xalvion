@@ -1,11 +1,32 @@
 /**
- * Local operator (FastAPI) — authoritative origin and lightweight reachability checks.
- * Align with README (`uvicorn … --port 8000`) and manifest host_permissions.
+ * Operator (FastAPI) — authoritative origin and lightweight reachability checks.
+ * Origin is defined in operator-config.js (edit for production releases).
  */
-export const LOCAL_OPERATOR_ORIGIN = "http://127.0.0.1:8000";
-export const LOCAL_OPERATOR_ANALYZE_URL = `${LOCAL_OPERATOR_ORIGIN}/analyze`;
-export const LOCAL_OPERATOR_HEALTH_URL = `${LOCAL_OPERATOR_ORIGIN}/health`;
-export const OPERATOR_HOST_PORT_LABEL = "127.0.0.1:8000";
+import { OPERATOR_API_ORIGIN } from "./operator-config.js";
+
+export const OPERATOR_ANALYZE_URL = `${OPERATOR_API_ORIGIN}/analyze`;
+export const OPERATOR_HEALTH_URL = `${OPERATOR_API_ORIGIN}/health`;
+
+/** Human-readable host for error copy (e.g. api.example.com or 127.0.0.1:8000). */
+export function getOperatorConnectionLabel() {
+  try {
+    const u = new URL(OPERATOR_API_ORIGIN);
+    return u.host || OPERATOR_API_ORIGIN;
+  } catch {
+    return OPERATOR_API_ORIGIN.replace(/^https?:\/\//i, "");
+  }
+}
+
+export const OPERATOR_CONNECTION_LABEL = getOperatorConnectionLabel();
+
+/** @deprecated Use OPERATOR_API_ORIGIN — kept for any external imports. */
+export const LOCAL_OPERATOR_ORIGIN = OPERATOR_API_ORIGIN;
+/** @deprecated Use OPERATOR_ANALYZE_URL */
+export const LOCAL_OPERATOR_ANALYZE_URL = OPERATOR_ANALYZE_URL;
+/** @deprecated Use OPERATOR_HEALTH_URL */
+export const LOCAL_OPERATOR_HEALTH_URL = OPERATOR_HEALTH_URL;
+/** @deprecated Use OPERATOR_CONNECTION_LABEL */
+export const OPERATOR_HOST_PORT_LABEL = OPERATOR_CONNECTION_LABEL;
 
 const HEALTH_TIMEOUT_MS = 4000;
 
@@ -17,7 +38,7 @@ export async function pingOperatorHealth(timeoutMs = HEALTH_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(LOCAL_OPERATOR_HEALTH_URL, {
+    const res = await fetch(OPERATOR_HEALTH_URL, {
       method: "GET",
       signal: controller.signal,
     });
@@ -51,13 +72,13 @@ export function describeOperatorHealthFailure(health) {
   }
   if (k === "timeout") {
     return {
-      title: `Operator app not responding on ${OPERATOR_HOST_PORT_LABEL}`,
+      title: `Operator app not responding (${OPERATOR_CONNECTION_LABEL})`,
       body: "The health check timed out. If the backend is starting up, wait a few seconds and tap Retry.",
     };
   }
   return {
-    title: `Operator app not reachable on ${OPERATOR_HOST_PORT_LABEL}`,
-    body: `Start the backend (uvicorn on ${OPERATOR_HOST_PORT_LABEL}; see README), then tap Retry.`,
+    title: `Operator app not reachable (${OPERATOR_CONNECTION_LABEL})`,
+    body: `Start the hosted or local API (see README / operator-config.js), then tap Retry.`,
   };
 }
 
@@ -72,13 +93,13 @@ export function describeOperatorAnalyzeFailure(result, opts = {}) {
   if (k === "timeout") {
     return {
       title: "Request timed out",
-      body: `The operator on ${OPERATOR_HOST_PORT_LABEL} took too long to answer. Check that the app is running, then tap Retry.`,
+      body: `The operator at ${OPERATOR_CONNECTION_LABEL} took too long to answer. Check that the API is running, then tap Retry.`,
     };
   }
   if (k === "network") {
     return {
-      title: `Operator app not reachable on ${OPERATOR_HOST_PORT_LABEL}`,
-      body: `We could not connect to the operator API. Confirm uvicorn is listening on ${OPERATOR_HOST_PORT_LABEL}, then try again.`,
+      title: `Operator app not reachable (${OPERATOR_CONNECTION_LABEL})`,
+      body: `We could not connect to the operator API. Confirm the URL in operator-config.js matches your deployment, then try again.`,
     };
   }
   if (k === "http_error") {

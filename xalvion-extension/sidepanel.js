@@ -8,8 +8,8 @@
 import { createChromeContext } from "./chrome-context.js";
 import { insertIntoGmail } from "./adapters/chrome-compose.js";
 import {
-  LOCAL_OPERATOR_ANALYZE_URL,
-  OPERATOR_HOST_PORT_LABEL,
+  OPERATOR_ANALYZE_URL,
+  OPERATOR_CONNECTION_LABEL,
   describeOperatorAnalyzeFailure,
   describeOperatorHealthFailure,
   pingOperatorHealth,
@@ -1230,7 +1230,7 @@ async function analyze() {
 
     disarmSlowNudge = armSlowNetworkNudge(currentRunId, "single");
     thinkingPromise = playThinkingSequence(currentRunId, "single");
-    const result = await fetchJsonWithTimeout(LOCAL_OPERATOR_ANALYZE_URL, { text }, ANALYZE_FETCH_TIMEOUT_MS);
+    const result = await fetchJsonWithTimeout(OPERATOR_ANALYZE_URL, { text }, ANALYZE_FETCH_TIMEOUT_MS);
 
     disarmSlowNudge();
     if (!result.ok) {
@@ -1315,7 +1315,7 @@ async function analyze() {
       {
         kind: "error",
         title: "Something went wrong",
-        body: `Try Analyze again. If this keeps happening, confirm the operator app is listening on ${OPERATOR_HOST_PORT_LABEL}.`,
+        body: `Try Analyze again. If this keeps happening, confirm the operator API is reachable at ${OPERATOR_CONNECTION_LABEL}.`,
         action: { label: "Retry", onClick: analyze },
       },
       true
@@ -1464,7 +1464,7 @@ async function scanInbox() {
       for (let i = 0; i < threads.length; i += 1) {
         showStatus(`Analyzing ${i + 1}/${threads.length} visible tickets…`);
         const r = await fetchJsonWithTimeout(
-          LOCAL_OPERATOR_ANALYZE_URL,
+          OPERATOR_ANALYZE_URL,
           { text: threads[i] },
           INBOX_THREAD_FETCH_TIMEOUT_MS
         );
@@ -1532,7 +1532,7 @@ async function scanInbox() {
       {
         kind: "error",
         title: "Inbox scan didn’t finish",
-        body: `Try again in a moment. If this repeats, confirm the operator app is listening on ${OPERATOR_HOST_PORT_LABEL}.`,
+        body: `Try again in a moment. If this repeats, confirm the operator API is reachable at ${OPERATOR_CONNECTION_LABEL}.`,
         action: { label: "Retry", onClick: scanInbox },
       },
       true

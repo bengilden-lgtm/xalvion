@@ -4,7 +4,14 @@
 
   const __auth = globalThis.__XALVION_WORKSPACE_MODULES__?.auth || null;
 
-  const API = "";
+  function resolveWorkspaceApiBase() {
+    if (typeof window === "undefined") return "";
+    const v = window.__XALVION_API_BASE__;
+    if (v == null || String(v).trim() === "") return "";
+    return String(v).replace(/\/+$/, "");
+  }
+
+  const API = resolveWorkspaceApiBase();
   const TOKEN_KEY = "xalvion_token";
   const USER_KEY = "xalvion_user";
   const TIER_KEY = "xalvion_tier";
