@@ -205,7 +205,11 @@ if (typeof window.pulseRail !== "function") {
     /** Inbox auto-pull snapshot (additive queue intelligence layer). */
     inboxSnapshot: null,
     inboxLastPulledAt: 0,
-    inboxPullFailures: 0
+    inboxPullFailures: 0,
+    /** Short-lived composer status flash after a successful run (value moment, non-blocking). */
+    composerFlashUntil: 0,
+    composerFlashText: "",
+    _composerFlashTimer: null
   };
 
   function getValueSnapshot() {
@@ -2669,6 +2673,71 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     el.removeAttribute("data-conversion-moment");
   }
 
+  function clearComposerFlash() {
+    state.composerFlashUntil = 0;
+    state.composerFlashText = "";
+    if (state._composerFlashTimer) {
+      try {
+        window.clearTimeout(state._composerFlashTimer);
+      } catch {}
+      state._composerFlashTimer = null;
+    }
+    els.composerStatusLine?.classList.remove("composer-status-outcome");
+  }
+
+  function flashComposerStatus(text, ms = 12000) {
+    const t = String(text || "").trim();
+    if (!t || !els.composerStatusLine) return;
+    clearComposerFlash();
+    const dur = Math.max(3200, Math.min(20000, Number(ms) || 12000));
+    state.composerFlashUntil = Date.now() + dur;
+    state.composerFlashText = t;
+    if (!state.sending) {
+      els.composerStatusLine.textContent = t;
+      els.composerStatusLine.classList.add("composer-status-outcome");
+      syncComposerAriaDescribedBy();
+    }
+    state._composerFlashTimer = window.setTimeout(() => {
+      state._composerFlashTimer = null;
+      state.composerFlashUntil = 0;
+      state.composerFlashText = "";
+      els.composerStatusLine?.classList.remove("composer-status-outcome");
+      refreshComposerIdleHint();
+    }, dur);
+  }
+
+  function buildPostRunComposerFlash(data, elapsedSec) {
+    if (!data || typeof data !== "object") return "";
+    const sig = deriveConsequenceSignal(data);
+    const approval = getApprovalContext(data);
+    const action = String(data.decision?.action || data.action || "none").toLowerCase();
+    const moneyActs = action === "refund" || action === "credit" || action === "charge";
+    const sec = Number(elapsedSec);
+    const timeBit = Number.isFinite(sec) && sec >= 0.45 ? ` · ${sec.toFixed(1)}s` : "";
+    const tst = String(data.tool_status || "").toLowerCase();
+    if (tst === "error" || tst === "blocked_input") return "";
+
+    if (approval.requiresApproval && !approval.approved && moneyActs) {
+      return `Reply prepared${timeBit} · billing held until you approve`;
+    }
+    if (/signal-blocked/.test(sig.cls)) {
+      return `Draft prepared${timeBit} · policy blocked execution — review before send`;
+    }
+    if (/signal-approval/.test(sig.cls) && !approval.approved) {
+      return `Reply prepared${timeBit} · approval required before execution`;
+    }
+    if (/signal-review|signal-high-risk/.test(sig.cls)) {
+      return `Reply prepared${timeBit} · quick scan recommended`;
+    }
+    if (/signal-safe/.test(sig.cls)) {
+      return `Reply prepared${timeBit} · copy when satisfied`;
+    }
+    if (action === "none" || action === "review") {
+      return `Reply prepared${timeBit} · you decide the next move`;
+    }
+    return `Reply prepared${timeBit} · operator approval retained`;
+  }
+
   function maybeShowPostRunValueMoment(data) {
     if (!data || typeof data !== "object") return;
     const tier = String(state.tier || "free").toLowerCase();
@@ -2713,11 +2782,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const el = els.composerValueMoment;
     if (!el) return;
     const isPro = tierLc === "pro";
-    const headline = isPro ? "Strong run — add Elite headroom before the next spike" : "Strong run — match capacity to what you just cleared";
+    const headline = isPro ? "You’re operating at depth — add Elite before volume spikes" : "Strong run — unlock capacity that matches this pace";
     const sub = isPro
-      ? "You’re clearly at operating depth. Elite raises included runs and automation ceiling so volume doesn’t stall mid-shift."
-      : "High-confidence work deserves runway — Pro adds included runs, live Stripe execution, and integrations while keeping approvals in place.";
-    const cta = isPro ? "See Elite" : "See Pro";
+      ? "Elite raises included runs and team headroom so routing and execution don’t hit a ceiling mid-shift — same approval loop."
+      : "Pro adds monthly runway, live Stripe execution when connected, and integrations — you still approve every consequential move.";
+    const cta = isPro ? "Compare Elite" : "Compare Pro";
     const target = isPro ? "elite" : "pro";
     el.dataset.conversionMoment = "post_high_value_run";
     el.hidden = false;
@@ -3329,8 +3398,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           <div class="customer-message-block">
             <div class="reply-body">
               <div class="assistant-context-line js-assistant-context" hidden></div>
-              <div class="reply-prep-meta"><span class="reply-prep-time js-prepared-time" hidden></span></div>
-              <div class="customer-message-label reply-hero-label">Suggested reply</div>
+            <div class="reply-prep-meta">
+              <span class="run-value-summary js-run-value-summary" hidden aria-live="polite"></span>
+              <span class="reply-prep-time js-prepared-time" hidden></span>
+            </div>
+            <div class="customer-message-label reply-hero-label">Suggested reply</div>
               <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared with live policy checks, governor signals, and your workspace outcome ledger when history exists.</div>
               <div class="reply-text js-reply-text">${bodyHtml}</div>
             </div>
@@ -3447,40 +3519,43 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         : "";
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-card-onboarding" role="status">
-        <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""} — ready to handle tickets?`)}</h2>
-        <p class="cld-welcome-prompt onboarding-subline">Incoming tickets are routed here automatically. Paste a ticket any time as a fallback.</p>
-        <div class="xv-inbox-layer xv-inbox-layer--claude" id="xvInboxLayer" aria-label="Queue intelligence">
-          <div class="xv-inbox-grid">
-            <div class="xv-inbox-panel" data-panel="incoming">
-              <div class="xv-inbox-panel-head">
-                <div class="xv-inbox-title">Incoming tickets</div>
-                <div class="xv-inbox-sub" id="xvInboxMeta" aria-live="polite">Pulling now…</div>
+        <div class="xv-empty-hero">
+          <p class="xv-empty-kicker" translate="no">What this is</p>
+          <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""}`)}</h2>
+          <p class="cld-welcome-lead">Xalvion prepares the best support action and a customer-ready reply. <strong>You approve</strong> before money moves or tools run.</p>
+          <p class="cld-welcome-prompt onboarding-subline">Paste a message in the box below, or expand the queue to grab the next case.</p>
+        </div>
+        <details class="xv-queue-details">
+          <summary class="xv-queue-details-summary">Queue &amp; routing <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
+          <div class="xv-inbox-layer xv-inbox-layer--claude" id="xvInboxLayer" aria-label="Queue intelligence">
+            <div class="xv-inbox-grid">
+              <div class="xv-inbox-panel" data-panel="incoming">
+                <div class="xv-inbox-panel-head">
+                  <div class="xv-inbox-title">Incoming tickets</div>
+                  <div class="xv-inbox-sub" id="xvInboxMeta" aria-live="polite">Pulling now…</div>
+                </div>
+                <div class="xv-inbox-list" id="xvInboxIncoming"></div>
               </div>
-              <div class="xv-inbox-list" id="xvInboxIncoming"></div>
-            </div>
-        <div class="xv-inbox-panel" data-panel="recommended">
-              <div class="xv-inbox-panel-head">
-            <div class="xv-inbox-title">Recommended next action</div>
-                <div class="xv-inbox-sub">Operator-first routing</div>
-            <span class="xv-inbox-prompt-pill" aria-hidden="true">Start here</span>
+              <div class="xv-inbox-panel" data-panel="recommended">
+                <div class="xv-inbox-panel-head">
+                  <div class="xv-inbox-title">Recommended next action</div>
+                  <div class="xv-inbox-sub">Operator-first routing</div>
+                  <span class="xv-inbox-prompt-pill" aria-hidden="true">Start here</span>
+                </div>
+                <div class="xv-inbox-reco" id="xvInboxRecommended"></div>
               </div>
-              <div class="xv-inbox-reco" id="xvInboxRecommended"></div>
-            </div>
-            <div class="xv-inbox-panel" data-panel="risk">
-              <div class="xv-inbox-panel-head">
-                <div class="xv-inbox-title">High-risk cases</div>
-                <div class="xv-inbox-sub">Churn · refund · urgency</div>
+              <div class="xv-inbox-panel" data-panel="risk">
+                <div class="xv-inbox-panel-head">
+                  <div class="xv-inbox-title">High-risk cases</div>
+                  <div class="xv-inbox-sub">Churn · refund · urgency</div>
+                </div>
+                <div class="xv-inbox-list" id="xvInboxHighRisk"></div>
               </div>
-              <div class="xv-inbox-list" id="xvInboxHighRisk"></div>
             </div>
           </div>
-        </div>
+        </details>
         ${subMomentum}
         ${recentList}
-        <div class="onboarding-example" aria-hidden="true">
-          <div class="onboarding-example-label">Operator habit</div>
-          <div class="onboarding-example-text">Use Xalvion before replying to any customer</div>
-        </div>
       </div>`;
     }
 
@@ -3490,41 +3565,46 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     return `
       <div class="empty-card empty-card-premium empty-card-launch">
-        <p class="empty-launch-directive">Make a support decision</p>
-        <p class="empty-launch-outcome">AI prepares the reply and the next action</p>
-        <p class="empty-launch-review">Review, edit, or approve before anything executes</p>
+        <div class="xv-empty-hero xv-empty-hero--legacy">
+          <p class="empty-launch-directive">Turn tickets into approved replies</p>
+          <p class="empty-launch-outcome">Xalvion drafts the reply and the next best action</p>
+          <p class="empty-launch-review">You stay in control — edit, approve, or reject before execution</p>
+        </div>
         <div class="empty-flow-strip" aria-hidden="true">
           <span>Analyze ticket</span>
           <span>Prepare action</span>
           <span>Approve &amp; execute</span>
         </div>
-        <div class="xv-inbox-layer" id="xvInboxLayer" aria-label="Queue intelligence">
-          <div class="xv-inbox-grid">
-            <div class="xv-inbox-panel" data-panel="incoming">
-              <div class="xv-inbox-panel-head">
-                <div class="xv-inbox-title">Incoming tickets</div>
-                <div class="xv-inbox-sub" id="xvInboxMeta" aria-live="polite">Pulling now…</div>
+        <details class="xv-queue-details">
+          <summary class="xv-queue-details-summary">Queue &amp; routing <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
+          <div class="xv-inbox-layer" id="xvInboxLayer" aria-label="Queue intelligence">
+            <div class="xv-inbox-grid">
+              <div class="xv-inbox-panel" data-panel="incoming">
+                <div class="xv-inbox-panel-head">
+                  <div class="xv-inbox-title">Incoming tickets</div>
+                  <div class="xv-inbox-sub" id="xvInboxMeta" aria-live="polite">Pulling now…</div>
+                </div>
+                <div class="xv-inbox-list" id="xvInboxIncoming"></div>
               </div>
-              <div class="xv-inbox-list" id="xvInboxIncoming"></div>
-            </div>
-        <div class="xv-inbox-panel" data-panel="recommended">
-              <div class="xv-inbox-panel-head">
-            <div class="xv-inbox-title">Recommended next action</div>
-                <div class="xv-inbox-sub">Operator-first routing</div>
-            <span class="xv-inbox-prompt-pill" aria-hidden="true">Start here</span>
+              <div class="xv-inbox-panel" data-panel="recommended">
+                <div class="xv-inbox-panel-head">
+                  <div class="xv-inbox-title">Recommended next action</div>
+                  <div class="xv-inbox-sub">Operator-first routing</div>
+                  <span class="xv-inbox-prompt-pill" aria-hidden="true">Start here</span>
+                </div>
+                <div class="xv-inbox-reco" id="xvInboxRecommended"></div>
               </div>
-              <div class="xv-inbox-reco" id="xvInboxRecommended"></div>
-            </div>
-            <div class="xv-inbox-panel" data-panel="risk">
-              <div class="xv-inbox-panel-head">
-                <div class="xv-inbox-title">High-risk cases</div>
-                <div class="xv-inbox-sub">Churn · refund · urgency</div>
+              <div class="xv-inbox-panel" data-panel="risk">
+                <div class="xv-inbox-panel-head">
+                  <div class="xv-inbox-title">High-risk cases</div>
+                  <div class="xv-inbox-sub">Churn · refund · urgency</div>
+                </div>
+                <div class="xv-inbox-list" id="xvInboxHighRisk"></div>
               </div>
-              <div class="xv-inbox-list" id="xvInboxHighRisk"></div>
             </div>
+            <div class="xv-inbox-footer-hint">Manual paste still works — paste a ticket below any time.</div>
           </div>
-          <div class="xv-inbox-footer-hint">Manual paste still works — paste a ticket below any time.</div>
-        </div>
+        </details>
         <details class="empty-actions empty-actions-intent quick-examples" aria-label="Quick examples">
           <summary class="chip quick-examples-trigger" role="button" aria-label="Quick examples">Quick examples</summary>
           <div class="quick-examples-panel" role="group" aria-label="Quick example tickets">
@@ -3649,6 +3729,13 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     riskNode.innerHTML = highRisk.length
       ? highRisk.slice(0, 4).map(buildInboxTicketButton).join("")
       : `<div class="xv-inbox-empty">No high-risk tickets detected right now.</div>`;
+
+    const chip = document.getElementById("xvQueueSummaryChip");
+    if (chip) {
+      const nQueued = incoming.length + highRisk.length + (recommended ? 1 : 0);
+      chip.textContent =
+        nQueued > 0 ? `${nQueued} case${nQueued === 1 ? "" : "s"} surfaced` : "No queue yet · paste a ticket below";
+    }
 
     host.querySelectorAll("[data-act='inbox-open']").forEach((btn) => {
       btn.addEventListener(
@@ -4226,15 +4313,14 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const approval = getApprovalContext(data);
     if (approval.requiresApproval && !approval.approved) {
       el.hidden = false;
-      el.textContent =
-        "Governor holds this run — billing and policy-sensitive work stays staged until you approve, reject, or edit.";
+      el.textContent = "Billing-sensitive motion is staged — nothing executes until you approve, edit, or reject.";
     } else {
       try {
         const fmt = globalThis.__XALVION_FORMAT__;
         const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
         if (gov && gov.mode === "auto") {
           el.hidden = false;
-          el.textContent = "Governor cleared this path — low-risk motion with no blocking policy signals on file.";
+          el.textContent = "Low-risk path — routine operator check, then send when satisfied.";
           return;
         }
       } catch {}
@@ -4266,6 +4352,44 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       paymentIntentId: normalizeReference("pi_"),
       chargeId: normalizeReference("ch_"),
     };
+  }
+
+  function syncRunValueSummary(row, data) {
+    const el = row?.querySelector?.(".js-run-value-summary");
+    if (!el) return;
+    if (!data || typeof data !== "object") {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    const sig = deriveConsequenceSignal(data);
+    const approval = getApprovalContext(data);
+    const action = String(data.decision?.action || data.action || "none").toLowerCase();
+    const moneyActs = action === "refund" || action === "credit" || action === "charge";
+    const tst = String(data.tool_status || "").toLowerCase();
+    if (tst === "error" || tst === "blocked_input") {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+
+    let line = "Reply prepared";
+    if (approval.requiresApproval && !approval.approved && moneyActs) {
+      line = "Suggested reply ready · billing needs your approval";
+    } else if (/signal-blocked/.test(sig.cls)) {
+      line = "Reply drafted · execution blocked by policy";
+    } else if (/signal-approval/.test(sig.cls) && !approval.approved) {
+      line = "Suggested reply ready · approval required";
+    } else if (/signal-review|signal-high-risk/.test(sig.cls)) {
+      line = "Suggested reply ready · review recommended";
+    } else if (/signal-safe/.test(sig.cls)) {
+      line = "Suggested reply ready · safe to copy after your check";
+    } else if (action === "review") {
+      line = "Suggested reply ready · human follow-up";
+    }
+
+    el.textContent = line;
+    el.hidden = false;
   }
 
   function operatorPostureLabel(data = {}) {
@@ -4417,7 +4541,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         govLine = `<div class="approval-banner-gov">${escapeHtml(gov.summary)}</div>`;
       }
     } catch {}
-    banner.innerHTML = `${ICONS.shield}<div class="approval-banner-body"><div class="approval-banner-eyebrow">Operator hold</div><strong class="approval-banner-title">Approval required</strong><div class="approval-banner-copy">${escapeHtml(`Prepared ${actionText}. Execution will not ship until you explicitly approve — Xalvion keeps consequential motion visible and reversible.`)}</div>${govLine}${gateHint}</div>`;
+    banner.innerHTML = `${ICONS.shield}<div class="approval-banner-body"><div class="approval-banner-eyebrow">Your decision</div><strong class="approval-banner-title">Approval required</strong><div class="approval-banner-copy">${escapeHtml(`Prepared ${actionText}. Nothing executes until you approve — the motion stays visible and reversible.`)}</div>${govLine}${gateHint}</div>`;
     return banner;
   }
 
@@ -4499,12 +4623,12 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       if (gov && gov.mode && gov.mode !== "unknown") {
         const text =
           gov.mode === "blocked"
-            ? "⛔ Blocked by policy"
+            ? "Blocked"
             : gov.mode === "review"
-              ? "⚡ Approval required"
+              ? "Approval required"
               : gov.mode === "auto"
-                ? "✓ Safe to automate"
-                : "○ Manual review";
+                ? "Safe to automate"
+                : "Manual review";
         return {
           cls: gov.cls || "signal-review",
           text,
@@ -4526,21 +4650,21 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (execMode === "blocked") {
       return {
         cls: "signal-high-risk signal-blocked",
-        text: "⛔ Blocked by policy",
+        text: "Blocked",
         title: String(data.governor_reason || dec.governor_reason || "Governor blocked this execution — do not ship as drafted."),
       };
     }
     if (execMode === "review") {
       return {
         cls: "signal-approval",
-        text: "⚡ Approval required",
+        text: "Approval required",
         title: String(data.governor_reason || dec.governor_reason || "Governor requires explicit operator approval on this motion."),
       };
     }
     if (risk === "high") {
       return {
         cls: "signal-high-risk",
-        text: "⚠ High risk",
+        text: "High risk",
         title: "Elevated risk profile — reconcile signals before any customer send.",
       };
     }
@@ -4548,21 +4672,21 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (tier === "safe_autopilot_ready") {
       return {
         cls: "signal-safe",
-        text: "✓ Safe to automate",
+        text: "Safe to automate",
         title: "Automation safety criteria satisfied for this execution tier."
       };
     }
     if (tier === "assist_only") {
       return {
         cls: "signal-review",
-        text: "○ Manual review",
+        text: "Manual review",
         title: "Assist-only tier — keep a human in the loop for this path."
       };
     }
     if (tier === "approval_required") {
       return {
         cls: "signal-approval",
-        text: "⚡ Approval required",
+        text: "Approval required",
         title: String(data.governor_reason || dec.governor_reason || "Consequential motion — approval is mandatory before execution.")
       };
     }
@@ -4573,11 +4697,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision"
     );
     const money = action === "refund" || action === "charge" || action === "credit";
-    if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "Money movement staged — operator approval is required." };
+    if (req && money) return { cls: "signal-approval", text: "Approval required", title: "Money movement staged — operator approval is required." };
     if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
-      return { cls: "signal-review", text: "⚠ Review recommended", title: "Signals sit outside the safe band — review before send." };
+      return { cls: "signal-review", text: "Review recommended", title: "Signals sit outside the safe band — review before send." };
     }
-    return { cls: "signal-safe", text: "✓ Safe to send", title: "No approval gate on this path — routine operator verification is enough." };
+    return { cls: "signal-safe", text: "Safe to send", title: "No approval gate on this path — routine operator verification is enough." };
   }
 
   function populateDecisionOutcomeIntelStrip(el, data) {
@@ -4606,7 +4730,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       el.hidden = false;
       const primary = hl || mix;
       const secondary = hl && mix && mix !== hl ? mix : "";
-      el.innerHTML = `<div class="decision-outcome-intel-inner"><span class="decision-outcome-intel__k">Outcome ledger</span><span class="decision-outcome-intel__p">${escapeHtml(primary)}</span>${secondary ? `<span class="decision-outcome-intel__s">${escapeHtml(secondary)}</span>` : ""}</div>`;
+      el.innerHTML = `<details class="decision-outcome-intel-fold"><summary class="decision-outcome-intel-fold-summary">Outcome intelligence</summary><div class="decision-outcome-intel-inner"><span class="decision-outcome-intel__k">Ledger</span><span class="decision-outcome-intel__p">${escapeHtml(primary)}</span>${secondary ? `<span class="decision-outcome-intel__s">${escapeHtml(secondary)}</span>` : ""}</div></details>`;
     } catch {
       el.hidden = true;
       el.innerHTML = "";
@@ -4685,11 +4809,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     // Default decision microcopy (kept minimal, high-signal).
     if (pendingGate || /signal-approval/.test(sig.cls)) {
-      setMicrocopy("Approval required — execution is held until you approve.", "hold");
+      setMicrocopy("Held for your approval — execution stays off until you release it.", "hold");
     } else if (/signal-review|signal-high-risk|signal-blocked/.test(sig.cls)) {
-      setMicrocopy("Review recommended due to elevated risk.", "risk");
+      setMicrocopy("Elevated risk — read the reply and signals before you send.", "risk");
     } else if (/signal-safe/.test(sig.cls)) {
-      setMicrocopy("This action is safe based on past outcomes.", "safe");
+      setMicrocopy("Aligned with prior safe outcomes — still your send.", "safe");
     } else {
       setMicrocopy("");
     }
@@ -4774,7 +4898,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         if (next) {
           parts.push(`<div class="xv-governor-next"><span class="xv-governor-k">Next step</span><span class="xv-governor-next-v">${escapeHtml(next)}</span></div>`);
         }
-        govSurfaceEl.innerHTML = parts.join("");
+        govSurfaceEl.innerHTML = `<details class="xv-governor-fold"><summary class="xv-governor-fold-summary">Governor &amp; policy detail</summary><div class="xv-governor-fold-body">${parts.join("")}</div></details>`;
         govSurfaceEl.hidden = false;
       } else if (govSurfaceEl) {
         govSurfaceEl.innerHTML = "";
@@ -5210,6 +5334,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       host?.appendChild(nextBrief);
     }
     mountOperatorDecisionPanel(row, normalized, replyText);
+    syncRunValueSummary(row, normalized);
     syncAssistantContextLine(row, normalized);
   }
 
@@ -5656,6 +5781,12 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
   function refreshComposerIdleHint() {
     if (!els.composerStatusLine || state.sending) return;
+    if (Date.now() < (state.composerFlashUntil || 0) && String(state.composerFlashText || "").trim()) {
+      els.composerStatusLine.textContent = state.composerFlashText;
+      els.composerStatusLine.classList.add("composer-status-outcome");
+      syncComposerAriaDescribedBy();
+      return;
+    }
     const hasThread = Boolean(els.messages?.querySelector(".msg-group"));
     if (isClaudeShell() && hasThread) {
       const m = momentumLine();
@@ -5700,6 +5831,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     els.workspaceRoot?.setAttribute("aria-busy", state.sending ? "true" : "false");
 
     if (els.composerStatusLine) {
+      if (state.sending) els.composerStatusLine.classList.remove("composer-status-outcome");
       els.composerStatusLine.textContent = state.sending
         ? isClaudeShell()
           ? "Drafting…"
@@ -6396,6 +6528,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (!payload.message || state.sending) return;
 
     clearComposerValueMoment();
+    clearComposerFlash();
 
     if (!enforceWorkspaceLimit()) return;
     const startedAt =
@@ -6509,9 +6642,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         mountOperatorDecisionPanel(row, data, replyText);
       }
       row.querySelector(".msg-card")?.removeAttribute("data-placeholder");
+      syncRunValueSummary(row, data);
       syncReplyReinforcement(row);
       pulsePreparedReplyReveal(row);
       syncAssistantContextLine(row, data);
+      flashComposerStatus(buildPostRunComposerFlash(data, elapsedMs / 1000), 12000);
 
       updateStatsFromResult(data);
       updateRevenueCard(data);

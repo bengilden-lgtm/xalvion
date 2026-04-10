@@ -14,15 +14,48 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
     func: async (reply) => {
       const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+      function collectDocuments(root, depth = 0, maxDepth = 4) {
+        const out = [root];
+        if (depth >= maxDepth) return out;
+        const frames = root.querySelectorAll("iframe");
+        for (let i = 0; i < frames.length; i += 1) {
+          try {
+            const doc = frames[i].contentDocument;
+            if (doc) out.push(...collectDocuments(doc, depth + 1, maxDepth));
+          } catch (_) {
+            /* cross-origin */
+          }
+        }
+        return out;
+      }
+
+      function getComposerFromDocument(doc) {
+        if (!doc || !doc.querySelector) return null;
+        const selectors = [
+          'div[aria-label="Message Body"]',
+          'div[aria-label^="Message Body"]',
+          'div[aria-label*="Message Body"]',
+          'div[role="textbox"][g_editable="true"]',
+          'div[contenteditable="true"][role="textbox"]',
+          'div[contenteditable="true"][aria-label*="Message Body"]',
+          'div[contenteditable="true"][aria-label*="Compose"]',
+        ];
+        for (let s = 0; s < selectors.length; s += 1) {
+          const el = doc.querySelector(selectors[s]);
+          if (el && el.getAttribute("contenteditable") !== "false") return el;
+        }
+        const editable = doc.querySelector('div[contenteditable="true"]');
+        if (editable && editable.getAttribute("contenteditable") !== "false") return editable;
+        return null;
+      }
+
       function getComposer() {
-        return (
-          document.querySelector('div[aria-label="Message Body"]') ||
-          document.querySelector('div[aria-label^="Message Body"]') ||
-          document.querySelector('div[role="textbox"][g_editable="true"]') ||
-          document.querySelector('div[contenteditable="true"][role="textbox"]') ||
-          document.querySelector('div[contenteditable="true"][aria-label*="Message Body"]') ||
-          document.querySelector('div[contenteditable="true"]')
-        );
+        const docs = collectDocuments(document);
+        for (let d = 0; d < docs.length; d += 1) {
+          const c = getComposerFromDocument(docs[d]);
+          if (c) return c;
+        }
+        return null;
       }
 
       function findReplyButton() {
@@ -35,8 +68,8 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
           '[aria-label*="Reply"]',
         ];
 
-        for (const selector of selectors) {
-          const found = document.querySelector(selector);
+        for (let i = 0; i < selectors.length; i += 1) {
+          const found = document.querySelector(selectors[i]);
           if (found) return found;
         }
 
@@ -62,7 +95,8 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
           document.querySelector('div[role="button"][gh="cm"]') ||
           document.querySelector('div[role="button"][aria-label="Compose"]') ||
           document.querySelector('div[role="button"][aria-label^="Compose"]') ||
-          document.querySelector('[aria-label="Compose"]')
+          document.querySelector('[aria-label="Compose"]') ||
+          document.querySelector('[aria-label^="Compose"]')
         );
       }
 
@@ -126,8 +160,8 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
             } catch (_) {}
           }
 
-          for (let i = 0; i < 8; i += 1) {
-            await wait(250);
+          for (let i = 0; i < 14; i += 1) {
+            await wait(i < 4 ? 120 : 220);
             composer = getComposer();
             if (composer) break;
           }
@@ -146,8 +180,8 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
             } catch (_) {}
           }
 
-          for (let i = 0; i < 10; i += 1) {
-            await wait(300);
+          for (let i = 0; i < 16; i += 1) {
+            await wait(i < 4 ? 140 : 260);
             composer = getComposer();
             if (composer) break;
           }
@@ -157,11 +191,15 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
       if (!composer) {
         return {
           ok: false,
-          detail: "No Gmail reply composer found.",
+          detail: "No Gmail compose field found. Open a reply or compose window, then try again.",
         };
       }
 
       insertTextIntoComposer(composer, reply);
+
+      try {
+        composer.scrollIntoView({ block: "nearest", inline: "nearest" });
+      } catch (_) {}
 
       return { ok: true };
     },

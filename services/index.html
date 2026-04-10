@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Instrument+Sans:ital,wght@0,400;0,450;0,500;0,550;0,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/png" href="/static/favicon.png" />
   <link rel="shortcut icon" href="/static/favicon.ico" />
-  <link rel="stylesheet" href="/styles.css?v=claude-polish-4" />
+  <link rel="stylesheet" href="/styles.css?v=elite-op-1" />
 </head>
 <body data-ui="claude">
   <div class="workspace-atmosphere" aria-hidden="true">
@@ -34,7 +34,7 @@
             <span class="command-brand-tag command-brand-tag--strip" aria-hidden="true">Operator workspace</span>
           </span>
         </a>
-        <span id="commandModeLine" class="command-mode-pill" translate="no">AI prepares · you approve</span>
+        <span id="commandModeLine" class="command-mode-pill" translate="no">AI prepares the best action · you stay in control</span>
       </div>
       <div class="command-strip-center command-strip-center--align">
         <div class="command-status-chip command-status-chip--stack" role="status" aria-live="polite">
@@ -157,17 +157,20 @@
                       <div class="composer-input-row composer-input-wrap composer-field">
                         <div class="composer-input-shell">
                           <div class="composer-field-inner">
-                            <textarea id="messageInput" placeholder="Paste a ticket or describe the issue…" autocomplete="off"></textarea>
+                            <textarea id="messageInput" placeholder="Paste a customer message — Xalvion drafts a reply; you approve before anything ships." autocomplete="off"></textarea>
                             <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                           </div>
                         </div>
                       </div>
-                      <div class="quick-actions">
-                        <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
-                        <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
-                        <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
-                        <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
-                      </div>
+                      <details class="composer-quick-patterns">
+                        <summary class="composer-quick-patterns-summary">Example openers <span class="opt-hint">optional</span></summary>
+                        <div class="quick-actions" role="group" aria-label="Example ticket openers">
+                          <button class="chip" data-fill="A customer says: I was charged twice." type="button">Duplicate charge</button>
+                          <button class="chip" data-fill="A customer says: My package is late and I am annoyed." type="button">Late package</button>
+                          <button class="chip" data-fill="A customer says: Order arrived damaged and I want this fixed now." type="button">Damaged order</button>
+                          <button class="chip" data-fill="A customer says: Where is my order?" type="button">Where is my order</button>
+                        </div>
+                      </details>
                       <details class="composer-stripe-fold">
                         <summary class="composer-stripe-fold-summary">Stripe IDs <span class="opt-hint">optional</span></summary>
                         <div class="stripe-context-row muted-copy composer-stripe-fields">
@@ -189,7 +192,7 @@
                   <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(840px, 100%);">
                     <div class="cld-cap-pill" id="plansSurfaceStatusPill" translate="no">Plans</div>
                     <h2 class="cld-welcome-headline" style="margin-top:10px;">Choose capacity that matches your workload.</h2>
-                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Plans include monthly ticket capacity. When you exceed the limit, you can keep operating — additional usage is billed.</p>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Higher tiers unlock live Stripe execution, deeper integrations, and more monthly runway — the same approval-first workflow at every level.</p>
                     <div class="trust-chip-row" aria-hidden="true" style="margin-top:12px;">
                       <span class="trust-chip">Nothing is sent without approval</span>
                       <span class="trust-chip">Secure billing via Stripe</span>
@@ -581,7 +584,7 @@
 
   <script type="module" src="/workspace-client/boot.js"></script>
   <script src="/workspace_modules.js"></script>
-  <script src="/app.js?v=claude-polish-4"></script>
+  <script src="/app.js?v=elite-op-1"></script>
   <script>
     (() => {
       function bindMoreJumpers() {
