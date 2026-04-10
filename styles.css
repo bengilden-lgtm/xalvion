@@ -864,6 +864,17 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
   display:flex;
   justify-content:center;
   width:100%;
+  position: fixed;
+  bottom: 0;
+  left: 57px;   /* clears the sidebar width */
+  right: 0;
+  padding: 12px 32px 20px;
+  background: linear-gradient(
+    to top,
+    var(--bg, #1a1814) 70%,
+    transparent
+  );
+  z-index: 10;
 }
 .composer,
 .composer-chat,
@@ -881,35 +892,45 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
 .composer-field{
   width:100%;
   display:flex;
-  align-items:flex-end;
-  gap:12px;
-  padding:10px;
-  border-radius:28px;
+  position: relative;
+  align-items:center;
+  gap:0;
+  padding:0;
+  border-radius:999px;
   border:1px solid rgba(246,242,235,0.09);
   background: var(--bg-elev);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+  overflow:hidden;
 }
 #messageInput{
-  min-height:52px;
-  max-height:220px;
-  resize:none;
-  overflow:auto;
-  padding:10px 12px;
+  border-radius: 999px;
+  padding: 12px 52px 12px 20px;
+  min-height: 48px;
+  max-height: 48px;
+  height: 48px;
+  font-size: 14px;
+  line-height: 1.4;
+  resize: none;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
   border:none !important;
   background:transparent !important;
   box-shadow:none !important;
   color:rgba(246,242,235,0.94);
-  font-size:16px;
-  line-height:1.6;
 }
 #messageInput::placeholder{ color:rgba(224,217,206,0.42); }
 .send-btn,
 #sendBtn{
-  width:42px;
-  height:42px;
-  min-width:42px;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
   padding:0;
-  border-radius:999px;
+  border-radius: 50%;
   border:1px solid rgba(209,190,162,0.36) !important;
   background: var(--accent) !important;
   color: var(--accent-ink) !important;
@@ -928,6 +949,20 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
 
 .quick-examples{
   margin:12px 0 0;
+}
+
+/* Keep composer helpers inside fixed dock, below pill */
+#workspaceComposerDock .quick-examples,
+#workspaceComposerDock .composer-stripe-fold{
+  padding-top: 8px;
+  font-size: 12px;
+}
+
+#workspaceComposerDock .quick-examples{ margin:0; }
+#workspaceComposerDock .composer-stripe-fold{
+  margin-top:0;
+  border-top:0;
+  padding-top:8px;
 }
 
 .quick-examples > summary{
