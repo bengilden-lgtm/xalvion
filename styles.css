@@ -602,6 +602,36 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
   border:none;
   background:transparent;
 }
+
+#messages,
+#messagesZone,
+.messages-shell{
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124,92,252,.45) rgba(255,255,255,.04);
+}
+
+#messages::-webkit-scrollbar,
+#messagesZone::-webkit-scrollbar,
+.messages-shell::-webkit-scrollbar{
+  width: 6px;
+}
+#messages::-webkit-scrollbar-track,
+#messagesZone::-webkit-scrollbar-track,
+.messages-shell::-webkit-scrollbar-track{
+  background: rgba(255,255,255,.03);
+  border-radius: 999px;
+}
+#messages::-webkit-scrollbar-thumb,
+#messagesZone::-webkit-scrollbar-thumb,
+.messages-shell::-webkit-scrollbar-thumb{
+  background: rgba(124,92,252,.4);
+  border-radius: 999px;
+}
+#messages::-webkit-scrollbar-thumb:hover,
+#messagesZone::-webkit-scrollbar-thumb:hover,
+.messages-shell::-webkit-scrollbar-thumb:hover{
+  background: rgba(124,92,252,.65);
+}
 #messages,
 .messages{
   display:flex;
@@ -749,7 +779,11 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
 .js-reply-text{
   max-width: 70ch;
   font-size:16px;
-  line-height:1.72;
+  max-height: none;
+  overflow: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.65;
   letter-spacing:-0.012em;
   color:rgba(246,242,235,0.94);
 }

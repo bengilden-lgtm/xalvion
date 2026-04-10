@@ -4212,7 +4212,13 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   function setAssistantCopy(row, text) {
     const node = getAssistantCopyNode(row);
     if (!node) return;
-    const html = escapeHtml(text || "").replace(/\n/g, "<br>");
+    const normalized = (text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .replace(/\n{3,}/g, "\n\n");
+    const html = escapeHtml(normalized)
+      .replace(/\n\n/g, "<br><br>")
+      .replace(/\n/g, "<br>");
     if (node.querySelector(".typing, .xv-thinking-block")) {
       swapThinkingToContent(node, html);
     } else {
@@ -4234,23 +4240,35 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   function appendAssistantChunk(row, chunk) {
     const node = getAssistantCopyNode(row);
     if (!node) return;
-
     if (node.querySelector(".typing, .xv-thinking-block")) {
-      // Fade out thinking, then begin streaming into the real node.
       swapThinkingToContent(node, "");
       window.setTimeout(() => {
-        const current = node.textContent || "";
-        node.innerHTML = escapeHtml(current + chunk).replace(/\n/g, "<br>");
+        const current = node.innerText || node.textContent || "";
+        const combined = (current + chunk).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        node.innerHTML = escapeHtml(combined)
+          .replace(/\n\n/g, "<br><br>")
+          .replace(/\n/g, "<br>");
         syncReplyReinforcement(row);
         scrollMessagesToBottom();
       }, 170);
       return;
     }
 
-    const current = node.textContent || "";
-    node.innerHTML = escapeHtml(current + chunk).replace(/\n/g, "<br>");
-    syncReplyReinforcement(row);
-    scrollMessagesToBottom();
+    if (node._chunkRafId) cancelAnimationFrame(node._chunkRafId);
+    node._pendingChunk = (node._pendingChunk || "") + chunk;
+
+    node._chunkRafId = requestAnimationFrame(() => {
+      const pending = node._pendingChunk || "";
+      node._pendingChunk = "";
+      node._chunkRafId = null;
+      const current = node.innerText || node.textContent || "";
+      const combined = (current + pending).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      node.innerHTML = escapeHtml(combined)
+        .replace(/\n\n/g, "<br><br>")
+        .replace(/\n/g, "<br>");
+      syncReplyReinforcement(row);
+      scrollMessagesToBottom();
+    });
   }
 
   function createMetaChip({ icon, text, tone = "" }) {
