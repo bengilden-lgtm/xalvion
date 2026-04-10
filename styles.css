@@ -1574,3 +1574,17 @@ textarea{ resize:vertical; }
 #messagesZone {
   padding-bottom: 180px !important;
 }
+
+.composer-field {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 57px !important;
+  right: 0 !important;
+  z-index: 100 !important;
+  background-color: #1a1814 !important;
+  padding: 12px 32px 20px !important;
+}
+
+#messageInput {
+  border-radius: 999px !important;
+}
