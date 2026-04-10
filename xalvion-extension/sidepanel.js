@@ -1573,8 +1573,8 @@ if (insertBtn) {
         showStatus(
           {
             kind: "error",
-            title: "Insert failed",
-            body: res.detail || "Could not find a Gmail composer to insert into.",
+            title: "Couldn’t place in Gmail",
+            body: res.detail || "Open a reply or compose field in Gmail, then try again.",
           },
           true
         );
@@ -1582,8 +1582,8 @@ if (insertBtn) {
       }
 
       const original = insertBtn.textContent;
-      insertBtn.textContent = "Inserted ✓";
-      showStatus({ title: "Inserted into Gmail", body: "Reply placed into the active composer." }, false);
+      insertBtn.textContent = "Placed ✓";
+      showStatus({ title: "In your composer", body: "The reply is in the active Gmail field — review, then send." }, false);
 
       setTimeout(() => {
         insertBtn.textContent = original;
@@ -1593,8 +1593,8 @@ if (insertBtn) {
       showStatus(
         {
           kind: "error",
-          title: "Couldn’t insert into Gmail",
-          body: "Open a reply/compose box in Gmail, then try again. (Copy remains available as fallback.)",
+          title: "Couldn’t reach Gmail",
+          body: "Open Gmail with a reply or compose box visible, then try again. Copy still works if you prefer.",
         },
         true
       );

@@ -65,45 +65,54 @@ export function deriveConsequencePresentation(data) {
   if (!data || typeof data !== "object") data = {};
   const dec = getDecisionData(data);
   const triage = getTriageData(data);
-  const risk = String(dec.risk_level || triage.risk_level || data.risk_level || "").toLowerCase();
+  const govRisk = String(data.governor_risk_level || dec.governor_risk_level || "").toLowerCase();
+  const risk = String(govRisk || dec.risk_level || triage.risk_level || data.risk_level || "").toLowerCase();
+  const execMode = String(data.execution_mode || dec.execution_mode || "").toLowerCase();
+  if (execMode === "blocked") {
+    return {
+      cls: "signal-high-risk",
+      text: "Blocked",
+      title: String(data.governor_reason || dec.governor_reason || "Blocked under policy"),
+    };
+  }
   if (risk === "high") {
     return {
       cls: "signal-high-risk",
-      text: "⚠ High risk",
+      text: "High risk",
       title: "Elevated risk — review before customer send",
     };
   }
-  const tier = String(data.execution_tier || "").toLowerCase();
+  const tier = String(data.execution_tier || dec.execution_tier || "").toLowerCase();
   if (tier === "safe_autopilot_ready") {
     return {
       cls: "signal-safe",
-      text: "✓ Safe to automate",
-      title: "Meets all automation safety criteria",
+      text: "Safe to automate",
+      title: "Automation safety criteria met",
     };
   }
   if (tier === "assist_only") {
     return {
       cls: "signal-review",
-      text: "○ Manual review",
-      title: "Risk signals require human decision",
+      text: "Manual review",
+      title: "Keep a human in the loop on this path",
     };
   }
   if (tier === "approval_required") {
     return {
       cls: "signal-approval",
-      text: "⚡ Approval required",
-      title: "Awaiting operator approval",
+      text: "Approval required",
+      title: String(data.governor_reason || dec.governor_reason || "Awaiting operator approval"),
     };
   }
   const action = String(dec.action || data.action || "none").toLowerCase();
   const actionRisk = String(dec.risk_level || triage.risk_level || "medium").toLowerCase();
   const req = Boolean(data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision");
   const money = action === "refund" || action === "charge" || action === "credit";
-  if (req && money) return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
+  if (req && money) return { cls: "signal-approval", text: "Approval required", title: "" };
   if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
-    return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
+    return { cls: "signal-review", text: "Review recommended", title: "" };
   }
-  return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
+  return { cls: "signal-safe", text: "Safe to send", title: "" };
 }
 
 export function approvalGateActive(data) {
@@ -121,12 +130,12 @@ export function getApprovalCompactCopyText(data) {
   const dec = getDecisionData(data);
   const pres = deriveConsequencePresentation(data);
   if (pres.cls === "signal-high-risk") {
-    return "High risk — hold or edit until you are satisfied.";
+    return "Higher risk — edit or hold until you are comfortable sending.";
   }
   if (dec.requires_approval || data.requires_approval || pres.cls === "signal-approval") {
-    return "Approval-class motion — confirm the customer-ready text before copy or insert.";
+    return "This move needs your sign-off — read the reply, then copy or place it.";
   }
-  return "Review posture — skim brief and reply before sending.";
+  return "Quick read recommended — then copy or place when it sounds right.";
 }
 
 export function inferDisplayAction(data, reply, issueType) {

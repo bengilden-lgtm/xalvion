@@ -78,7 +78,7 @@
   /* Layout — tighter rail, wider reading column */
   --sidebar-expanded: 264px;
   --sidebar-collapsed: 52px;
-  --thread-max: min(760px, 92vw);
+  --thread-max: min(784px, 92vw);
   --stage-pad: 16px;
   --composer-pad-x: 2px;
   --empty-hero-offset: 2vh;
@@ -384,6 +384,18 @@ svg{
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   transition: border-color var(--t-med) var(--ease), background var(--t-med) var(--ease);
+}
+#workspaceRoot.workspace-active .command-strip{
+  background: color-mix(in oklab, var(--surface) 72%, var(--bg));
+  border-bottom-color: color-mix(in oklab, var(--border) 65%, transparent);
+}
+#workspaceRoot.workspace-active .command-mode-pill{
+  opacity: 0.82;
+  border-color: color-mix(in oklab, var(--xv-pill-border) 72%, transparent);
+}
+#workspaceRoot.workspace-active .command-status-chip{
+  opacity: 0.88;
+  border-color: color-mix(in oklab, var(--xv-pill-border) 65%, var(--line));
 }
 
 .command-strip-left,
@@ -699,6 +711,10 @@ select.refund-select{ padding-right: 34px; }
 }
 #sidebarShell[data-sidebar-collapsed="false"]{
   width: var(--sidebar-expanded);
+}
+#workspaceRoot.workspace-active #sidebarShell{
+  border-right-color: color-mix(in oklab, var(--border) 58%, transparent);
+  background: color-mix(in oklab, var(--surface) 90%, var(--bg));
 }
 
 .sidebar-chrome{
@@ -1233,6 +1249,11 @@ select.refund-select{ padding-right: 34px; }
 .messages-shell.shell-live{
   border: none;
 }
+#workspaceRoot.workspace-active .messages-shell{
+  border-radius: var(--r-lg);
+  background: color-mix(in oklab, var(--surface) 14%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, white 4%, transparent);
+}
 .messages{
   height: 100%;
   max-height: 100%;
@@ -1386,6 +1407,12 @@ select.refund-select{ padding-right: 34px; }
   color: var(--text-2);
   white-space: normal;
   word-break: break-word;
+}
+#workspaceRoot.workspace-active .msg-card.assistant .reply-text{
+  font-size: 16px;
+  line-height: 1.62;
+  letter-spacing: -0.015em;
+  color: var(--text);
 }
 .reply-text a{ text-decoration: underline; text-decoration-color: color-mix(in oklab, var(--text-3) 55%, transparent); }
 .reply-text code{
@@ -1691,8 +1718,8 @@ select.refund-select{ padding-right: 34px; }
 
 /* Decision + details panels — flat review strip, premium actions */
 .decision-panel{
-  margin: 8px 0 0 0;
-  padding: 10px 0 4px 0;
+  margin: 12px 0 0 0;
+  padding: 12px 0 6px 0;
   border: none;
   border-radius: 0;
   border-top: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
@@ -1778,9 +1805,10 @@ select.refund-select{ padding-right: 34px; }
   display:block;
 }
 .xv-governor-surface{
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid color-mix(in oklab, var(--border) 75%, transparent);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+  opacity: 0.94;
 }
 .xv-governor-surface[hidden]{ display: none !important; }
 .xv-governor-eyebrow{
@@ -1845,8 +1873,8 @@ select.refund-select{ padding-right: 34px; }
 .decision-outcome-intel-fold{
   margin-top: 10px;
   border-radius: var(--r-md);
-  border: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
-  background: color-mix(in oklab, var(--surface-soft) 22%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 12%, transparent);
 }
 .decision-outcome-intel-fold-summary{
   cursor: pointer;
@@ -1992,11 +2020,11 @@ select.refund-select{ padding-right: 34px; }
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 38px;
+  padding: 0 16px;
   border-radius: var(--r-pill);
   font-size: 13px;
-  font-weight: 560;
+  font-weight: 600;
   font-family: var(--font-sans);
   letter-spacing: 0.01em;
   border: 1px solid transparent;
@@ -2878,11 +2906,16 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
 .composer-value-moment{
   width: min(var(--thread-max), 96vw);
   margin: 0 auto 10px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--border));
-  background: color-mix(in oklab, var(--surface-soft) 35%, transparent);
-  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--border));
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklab, var(--accent) 8%, transparent),
+    color-mix(in oklab, var(--surface-soft) 22%, transparent)
+  );
+  padding: 14px 16px;
   color: var(--text-2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
 }
 .composer-value-moment[hidden]{ display: none !important; }
 .composer-value-moment__inner{ display: grid; gap: 8px; }
@@ -3025,11 +3058,11 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px 5px 12px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-  border: 1px solid rgba(255,255,255,0.11);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  padding: 7px 10px 7px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.018));
+  border: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
   transition: border-color var(--t-med) var(--ease), box-shadow var(--t-med) var(--ease), background var(--t-med) var(--ease);
 }
 .composer-field-inner:focus-within{
@@ -3051,7 +3084,9 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
   box-shadow: none;
 }
 body[data-ui="claude"] #messageInput{
-  min-height: 34px;
+  min-height: 44px;
+  font-size: 15px;
+  letter-spacing: -0.01em;
 }
 #messageInput::placeholder{
   color: color-mix(in oklab, var(--text-4) 88%, transparent);
@@ -3075,10 +3110,10 @@ body[data-ui="claude"] #messageInput{
 
 .send-btn,
 #sendBtn{
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
-  min-height: 30px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
   flex-shrink: 0;
   border-radius: 999px;
   border: 1px solid var(--xv-accent-border);

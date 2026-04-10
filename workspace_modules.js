@@ -264,12 +264,12 @@
         function safetyVerdictFallback(dataObj, gate) {
           const c = Number(dataObj.confidence || 0);
           if (gate) {
-            return "Financial or policy gate is active — only an explicit approval releases execution.";
+            return "A billing or policy gate is on — only your approval releases the next step.";
           }
           if (c > 0 && c < 0.62) {
-            return "Model confidence is modest — scan triage signals before you send.";
+            return "Confidence is moderate — give the signals a quick read before send.";
           }
-          return "No approval gate on this run — still apply your normal operator standard.";
+          return "No billing gate on this run — your usual quality bar still applies.";
         }
 
         const d = resultData && typeof resultData === "object" ? resultData : {};
@@ -312,7 +312,7 @@
         if (sampleN > 0) {
           microLines.push({
             key: "similar",
-            label: "Comparable cases",
+            label: "Similar cases",
             value: `${sampleN} in your pattern library`,
           });
         }
@@ -352,42 +352,42 @@
         let verdict = "";
         let posture = "";
         if (gov.mode === "blocked") {
-          verdict = "Review required before any customer-facing send.";
-          posture = gov.summary || gov.title || "Governor blocked this path under policy.";
+          verdict = "Pause before send — policy is blocking this path.";
+          posture = gov.summary || gov.title || "Policy stopped this motion; resolve before anything goes to the customer.";
         } else if (pendingGate) {
-          verdict = "Controlled release — explicit approval is warranted for this motion.";
+          verdict = "Held for your approval — this motion is consequential.";
           posture =
             gov.summary ||
             gov.title ||
-            "A financial or policy-sensitive action is staged; the operator gate stays closed until you approve.";
+            "Billing or policy sensitivity is staged; it stays parked until you release it.";
         } else if (gov.mode === "review") {
-          verdict = "Governor marked this path for operator review before execution.";
+          verdict = "Policy wants a human read before execution.";
           posture =
             gov.summary ||
             gov.title ||
-            "Policy or risk posture requires human sign-off even when no billing gate is open.";
+            "Sign-off is required even when no billing hold is open.";
         } else if (gov.mode === "auto") {
-          verdict = "Governor clearance — forward motion matches automation-safe criteria.";
-          posture = gov.summary || gov.title || "No blocking policy signals on this path.";
+          verdict = "Policy read: this path clears automation-safe checks.";
+          posture = gov.summary || gov.title || "No blocking policy flags on this path.";
         } else if (String(consec.cls || "").includes("signal-safe")) {
-          verdict = "Low execution risk on this path — routine verification is sufficient.";
+          verdict = "Looks routine by the signals — a standard read is enough.";
           posture = safetyVerdictFallback(d, pendingGate);
         } else if (String(consec.cls || "").includes("signal-approval")) {
-          verdict = "Approval discipline applies — treat execution as consequential.";
+          verdict = "Treat the next step as consequential — approval discipline applies.";
           posture = safetyVerdictFallback(d, pendingGate);
         } else if (String(consec.cls || "").includes("signal-high-risk") || String(consec.cls || "").includes("blocked")) {
-          verdict = "Elevated risk — hold the line until you reconcile the signals.";
+          verdict = "Higher risk posture — reconcile the signals before you send.";
           posture = safetyVerdictFallback(d, pendingGate);
         } else {
-          verdict = "Standard operator verification — read once, then proceed.";
+          verdict = "Read once, then proceed with your normal bar.";
           posture = safetyVerdictFallback(d, pendingGate);
         }
 
         let ledgerHint = "";
         if (ledgerSparse) {
-          ledgerHint = "Outcome ledger is thin here — calibration is from live policy, governor, and this case.";
+          ledgerHint = "Few comparable outcomes on file — lean on live policy and this case.";
         } else if (!ledgerSparse && successDenom < 5) {
-          ledgerHint = "Historical success rate appears once at least five outcomes are recorded in the ledger.";
+          ledgerHint = "Success trends firm up after a handful of logged outcomes.";
         }
 
         return {
@@ -435,7 +435,7 @@
         const reopenRisk = String(td?.reopen_risk || "").toLowerCase() || "unknown";
         const band = String(td?.outcome_confidence_band || "").toLowerCase() || "uncertain";
         const sparse = Boolean(td?.sparse_history || (similar < 5 || sr === null));
-        const conservativeNote = sparse ? String(td?.conservative_note || "limited history — conservative decision") : "";
+        const conservativeNote = sparse ? String(td?.conservative_note || "Limited history — staying conservative") : "";
 
         const severity = (() => {
           const s = String(td?.severity || "").toLowerCase();
@@ -448,19 +448,24 @@
 
         const tokens = [];
         if (sr !== null && similar >= 5) {
-          tokens.push({ key: "success", label: `${Math.round(sr * 100)}% success`, tone: severity });
+          tokens.push({ key: "success", label: `${Math.round(sr * 100)}% resolved`, tone: severity });
         } else {
-          tokens.push({ key: "success", label: "Limited history", tone: "review" });
+          tokens.push({ key: "success", label: "Thin history", tone: "review" });
         }
-        tokens.push({ key: "cases", label: `based on ${similar || 0} cases`, tone: "review" });
+        tokens.push({ key: "cases", label: `${similar || 0} similar cases`, tone: "review" });
         tokens.push({
           key: "reopen",
-          label: `reopen risk: ${reopenRisk === "unknown" ? "—" : reopenRisk}`,
+          label: `Reopen: ${reopenRisk === "unknown" ? "—" : reopenRisk}`,
           tone: reopenRisk === "high" ? "risk" : reopenRisk === "low" ? "safe" : "review",
         });
         tokens.push({
           key: "band",
-          label: `outcome band: ${band === "tight" ? "tight" : band === "moderate" ? "moderate" : "uncertain"}`,
+          label:
+            band === "tight"
+              ? "Confidence: high"
+              : band === "moderate"
+                ? "Confidence: moderate"
+                : "Confidence: open",
           tone: band === "tight" ? "safe" : band === "moderate" ? "review" : "risk",
         });
 
@@ -484,18 +489,18 @@
         const t = String(tier || "").toLowerCase();
         const risk = String(riskLevel || "").toLowerCase();
         if (risk === "high") {
-          return { label: "⚠ High risk", variant: "high_risk", cls: "signal-high-risk" };
+          return { label: "High risk", variant: "high_risk", cls: "signal-high-risk" };
         }
         if (t === "safe_autopilot_ready" && !requiresApproval) {
-          return { label: "✓ Safe to automate", variant: "safe", cls: "signal-safe" };
+          return { label: "Safe to automate", variant: "safe", cls: "signal-safe" };
         }
         if (t === "approval_required" || requiresApproval) {
-          return { label: "⚡ Approval required", variant: "approval", cls: "signal-approval" };
+          return { label: "Approval required", variant: "approval", cls: "signal-approval" };
         }
         if (t === "assist_only") {
-          return { label: "○ Manual review", variant: "review", cls: "signal-review" };
+          return { label: "Manual review", variant: "review", cls: "signal-review" };
         }
-        return { label: "○ Manual review", variant: "review", cls: "signal-review" };
+        return { label: "Manual review", variant: "review", cls: "signal-review" };
       },
       /**
        * Mirrors main workspace `deriveConsequenceSignal` (app.js) for API-shaped payloads.
@@ -516,14 +521,14 @@
         if (execMode === "blocked") {
           return {
             cls: "signal-high-risk",
-            text: "⛔ Blocked",
-            title: String(d.governor_reason || dec.governor_reason || "Blocked by governor policy"),
+            text: "Blocked",
+            title: String(d.governor_reason || dec.governor_reason || "Blocked under policy"),
           };
         }
         if (risk === "high") {
           return {
             cls: "signal-high-risk",
-            text: "⚠ High risk",
+            text: "High risk",
             title: "Elevated risk — review before customer send",
           };
         }
@@ -531,21 +536,21 @@
         if (tier === "safe_autopilot_ready") {
           return {
             cls: "signal-safe",
-            text: "✓ Safe to automate",
-            title: "Meets all automation safety criteria",
+            text: "Safe to automate",
+            title: "Automation safety criteria met",
           };
         }
         if (tier === "assist_only") {
           return {
             cls: "signal-review",
-            text: "○ Manual review",
-            title: "Risk signals require human decision",
+            text: "Manual review",
+            title: "Keep a human in the loop on this path",
           };
         }
         if (tier === "approval_required") {
           return {
             cls: "signal-approval",
-            text: "⚡ Approval required",
+            text: "Approval required",
             title: String(d.governor_reason || dec.governor_reason || "Awaiting operator approval"),
           };
         }
@@ -554,12 +559,12 @@
         const req = Boolean(d.requires_approval || dec.requires_approval || d.decision_state === "pending_decision");
         const money = action === "refund" || action === "charge" || action === "credit";
         if (req && money) {
-          return { cls: "signal-approval", text: "⚡ Approval required", title: "" };
+          return { cls: "signal-approval", text: "Approval required", title: "" };
         }
         if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
-          return { cls: "signal-review", text: "⚠ Review recommended", title: "" };
+          return { cls: "signal-review", text: "Review recommended", title: "" };
         }
-        return { cls: "signal-safe", text: "✓ Safe to send", title: "" };
+        return { cls: "signal-safe", text: "Safe to send", title: "" };
       },
       normalizeGovernorFactors(value) {
         if (!value) return [];
@@ -779,11 +784,11 @@
       planCopy(tier) {
         switch (String(tier || "free").toLowerCase()) {
           case "pro":
-            return "Priority handling, larger usage limits, and a more serious operating surface for real support volume.";
+            return "Live execution when you connect Stripe, 500 tickets/month, approval-first automation.";
           case "elite":
-            return "Maximum capacity, premium control, and the strongest Xalvion operator environment.";
+            return "5k tickets/month, team headroom, deepest outcome signals — for high-throughput support.";
           default:
-            return "Entry access with clear capacity limits and a visible upgrade path when usage pressure builds.";
+            return "Start free with clear limits; upgrade when volume makes it obvious.";
         }
       },
       tierBadge(tier) {
@@ -832,9 +837,9 @@
 
       function buildPlanComparisonHint(tier) {
         const t = normTier(tier);
-        if (t === "guest") return "Create a free account to save threads, keep continuity, and expand capacity.";
-        if (t === "free") return "Pro unlocks live Stripe execution, higher capacity, and stronger governance surfaces.";
-        if (t === "pro") return "Elite adds higher-volume operating capacity, deeper outcome visibility, and team-level controls.";
+        if (t === "guest") return "Free account: saved threads, monthly tickets, same approval-first flow.";
+        if (t === "free") return "Pro: live Stripe execution when connected, 500 tickets/month, uninterrupted shifts.";
+        if (t === "pro") return "Elite: 5k tickets/month, team headroom, deeper outcome readouts for serious volume.";
         return "";
       }
 
@@ -855,43 +860,43 @@
           case "refund_execution":
             return {
               ...base,
-              primary: "Live refund execution is gated on Pro.",
+              primary: "Live refunds are a Pro capability.",
               secondary: stripeConnected
-                ? "Pro turns prepared refund decisions into audited Stripe execution — without leaving the operator workspace."
-                : "Connect Stripe, then Pro turns prepared refund decisions into audited execution.",
+                ? "Pro runs prepared refunds in Stripe with audit trail — from the same console."
+                : "Connect Stripe on Pro to execute refunds you have already approved.",
               cta: "Unlock live execution",
               tone: "premium",
             };
           case "advanced_analytics":
             return {
               ...base,
-              primary: "Advanced analytics are a higher-tier surface.",
-              secondary: "Upgrade to see outcome mix, risk holds, and billing value surfaced — tied back to operator decisions.",
-              cta: t === "free" ? "Unlock Pro analytics" : "Unlock Elite analytics",
+              primary: "Deeper analytics unlock on Pro / Elite.",
+              secondary: "See outcome mix, holds, and billing motion tied to the decisions you already made.",
+              cta: t === "free" ? "See Pro analytics" : "See Elite analytics",
               tone: "value",
             };
           case "high_capacity":
             return {
               ...base,
-              primary: "Higher-volume operating capacity is locked.",
-              secondary: "Upgrade for more monthly tickets and fewer mid-shift ceilings — keep approvals and routing continuous.",
+              primary: "You are at the included-volume ceiling.",
+              secondary: "Move up a tier before tickets queue behind a hard limit — approvals stay the same.",
               cta: "Add headroom",
               tone: "urgency",
             };
           case "team_ops":
             return {
               ...base,
-              primary: "Team-level operating controls are locked.",
-              secondary: "Upgrade to scale governed support execution across seats with clearer accountability surfaces.",
-              cta: "View team tiers",
+              primary: "Team controls are on Elite.",
+              secondary: "Seat-level accountability and throughput for orgs running real queue depth.",
+              cta: "View Elite",
               tone: "premium",
             };
           case "outcome_intelligence":
             return {
               ...base,
-              primary: "Outcome intelligence deepens on higher tiers.",
-              secondary: "Upgrade for stronger outcome visibility and tighter feedback loops — so the operator layer gets measurably better over time.",
-              cta: "Unlock outcome intelligence",
+              primary: "Richer outcome history is a paid tier feature.",
+              secondary: "See how similar cases resolved so the next approval call is faster and calmer.",
+              cta: "Unlock deeper context",
               tone: "value",
             };
           default:
@@ -962,16 +967,16 @@
 
         if (t === "free") {
           return {
-            primary: "You’re already using Xalvion like an operations layer.",
-            secondary: "Pro turns prepared decisions into live execution and gives you uninterrupted capacity.",
+            primary: "You are already running this like production support.",
+            secondary: "Pro is where live execution and 500-ticket months stay ahead of the queue.",
             cta: "Unlock Pro",
             tone: "premium",
           };
         }
 
         return {
-          primary: "This workspace is generating measurable value.",
-          secondary: "Elite adds higher-volume operating capacity and deeper outcome visibility for serious support teams.",
+          primary: "This workspace is earning its keep.",
+          secondary: "Elite is built for teams that cannot afford a mid-shift capacity wall.",
           cta: "View Elite",
           tone: "premium",
         };
@@ -1000,7 +1005,7 @@
 
         if (t === "guest") {
           return {
-            primary: proof ? `Workspace value so far: ${proof}.` : "Preview the operator workflow with real controls.",
+            primary: proof ? `Session impact: ${proof}.` : "Preview the operator workflow with real controls.",
             secondary: proof
               ? "Create a free account to save threads, keep operator continuity, and expand runs."
               : "Create a free account to save threads and keep operator continuity across runs.",
@@ -1017,7 +1022,7 @@
                 ? "Pro turns prepared billing decisions into live Stripe execution — with governance and auditability."
                 : "Connect Stripe, then Pro unlocks live execution with governance and auditability.";
           return {
-            primary: proof ? `Workspace value so far: ${proof}.` : "Run governed support decisioning with visible risk and approvals.",
+            primary: proof ? `Session impact: ${proof}.` : "Run governed support with visible risk and approvals.",
             secondary: [outcomeLine, secondary].filter(Boolean).join(" "),
             cta: "Unlock Pro",
             tone: proof ? "value" : outcomeTone(latestOutcomeTier),
@@ -1026,7 +1031,7 @@
 
         if (t === "pro") {
           return {
-            primary: proof ? `Workspace value so far: ${proof}.` : "Live operating tier: governed decisions with execution-ready workflow.",
+            primary: proof ? `Session impact: ${proof}.` : "Live tier: governed decisions with execution when you connect tools.",
             secondary: [outcomeLine, "Elite adds higher-volume operating capacity and deeper outcome visibility for serious support orgs."].filter(Boolean).join(" "),
             cta: "View Elite",
             tone: proof ? "premium" : outcomeTone(latestOutcomeTier),
@@ -1034,7 +1039,7 @@
         }
 
         return {
-          primary: proof ? `Workspace value so far: ${proof}.` : "Maximum capacity and premium control surfaces.",
+          primary: proof ? `Session impact: ${proof}.` : "Maximum capacity and premium control surfaces.",
           secondary: outcomeLine,
           cta: "",
           tone: "premium",

@@ -59,13 +59,13 @@ export function createAnalyticsEngine({ sessionStore } = {}) {
       const tier = String(runtime.tier || "free").toLowerCase();
       const upgradeHint =
         tier === "free"
-          ? " Pro adds higher monthly capacity and live refunds."
+          ? " Pro: 500 tickets/month + live Stripe execution when connected."
           : tier === "pro"
-            ? " Elite adds higher capacity and deeper analytics."
+            ? " Elite: 5k tickets/month + team-scale headroom."
             : "";
       const hasValue = tickets > 0 || money > 0 || actions > 0 || mins > 0;
       el.textContent = hasValue
-        ? `Workspace value so far: ${tickets} tickets · ${formatMoney(money)} through billing actions (${actions} motions) · ~${mins} min saved.${upgradeHint}`
+        ? `Session impact: ${tickets} tickets · ${formatMoney(money)} in billing · ${actions} actions · ~${mins} min back.${upgradeHint}`
         : "";
       el.style.display = hasValue ? "block" : "none";
     },

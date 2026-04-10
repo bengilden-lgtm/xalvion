@@ -191,7 +191,7 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
       if (!composer) {
         return {
           ok: false,
-          detail: "No Gmail compose field found. Open a reply or compose window, then try again.",
+          detail: "No Gmail compose field found — open Reply or Compose, click into the message body, then retry.",
         };
       }
 

@@ -2718,24 +2718,24 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (tst === "error" || tst === "blocked_input") return "";
 
     if (approval.requiresApproval && !approval.approved && moneyActs) {
-      return `Reply prepared${timeBit} · billing held until you approve`;
+      return `Draft ready${timeBit} · billing on hold until you approve`;
     }
     if (/signal-blocked/.test(sig.cls)) {
-      return `Draft prepared${timeBit} · policy blocked execution — review before send`;
+      return `Draft ready${timeBit} · policy blocked — read before send`;
     }
     if (/signal-approval/.test(sig.cls) && !approval.approved) {
-      return `Reply prepared${timeBit} · approval required before execution`;
+      return `Draft ready${timeBit} · sign-off required before execution`;
     }
     if (/signal-review|signal-high-risk/.test(sig.cls)) {
-      return `Reply prepared${timeBit} · quick scan recommended`;
+      return `Draft ready${timeBit} · give it a careful read`;
     }
     if (/signal-safe/.test(sig.cls)) {
-      return `Reply prepared${timeBit} · copy when satisfied`;
+      return `Draft ready${timeBit} · send when it reads right`;
     }
     if (action === "none" || action === "review") {
-      return `Reply prepared${timeBit} · you decide the next move`;
+      return `Draft ready${timeBit} · you choose the next move`;
     }
-    return `Reply prepared${timeBit} · operator approval retained`;
+    return `Draft ready${timeBit} · approval stays with you`;
   }
 
   function maybeShowPostRunValueMoment(data) {
@@ -2771,8 +2771,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       state.usageInlineCtaUntil = Date.now() + 90 * 1000;
       setUsageInlineCta({
         tone: "safe",
-        copy: `High-confidence path detected. Unlock full automation + higher-confidence decisions.`,
-        cta: tier === "pro" ? "Unlock Elite automation" : "Unlock Pro automation",
+        copy: `Clean run — you’re seeing what paid tiers scale: faster throughput with the same approval bar.`,
+        cta: tier === "pro" ? "Scale with Elite" : "Scale with Pro",
         targetTier: target,
       });
     }
@@ -2782,17 +2782,17 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const el = els.composerValueMoment;
     if (!el) return;
     const isPro = tierLc === "pro";
-    const headline = isPro ? "You’re operating at depth — add Elite before volume spikes" : "Strong run — unlock capacity that matches this pace";
+    const headline = isPro ? "You’re running at a serious pace — Elite is built for that" : "That was a strong cycle — capacity should match it";
     const sub = isPro
-      ? "Elite raises included runs and team headroom so routing and execution don’t hit a ceiling mid-shift — same approval loop."
-      : "Pro adds monthly runway, live Stripe execution when connected, and integrations — you still approve every consequential move.";
-    const cta = isPro ? "Compare Elite" : "Compare Pro";
+      ? "Elite adds included volume and team headroom so you are not throttling mid-queue — approvals and audit stay exactly as they are."
+      : "Pro adds monthly runway plus live Stripe execution when connected — same human gate on every consequential move.";
+    const cta = isPro ? "See Elite" : "See Pro";
     const target = isPro ? "elite" : "pro";
     el.dataset.conversionMoment = "post_high_value_run";
     el.hidden = false;
     el.innerHTML = `
     <div class="composer-value-moment__inner">
-      <div class="composer-value-moment__eyebrow">Outcome</div>
+      <div class="composer-value-moment__eyebrow">After this run</div>
       <div class="composer-value-moment__title">${escapeHtml(headline)}</div>
       <p class="composer-value-moment__detail">${escapeHtml(sub)}</p>
       <div class="composer-value-moment__actions">
@@ -3237,7 +3237,9 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
   function updateTopbarStatus() {
     syncCommandAuthChip();
     if (els.commandModeLine) {
-      els.commandModeLine.textContent = state.latestRun ? "Live run" : "Operator";
+      els.commandModeLine.textContent = state.latestRun
+        ? "Session active"
+        : "Drafts and actions prepared · you approve what ships";
     }
     syncCommandStripCapacity();
 
@@ -3393,8 +3395,6 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         ? `<div class="msg-body assistant-canvas">
         <div class="stream-trace-host"></div>
         <div class="assistant-result-stack">
-          <div class="assistant-decision-slot" data-slot="decision"></div>
-          <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="customer-message-block">
             <div class="reply-body">
               <div class="assistant-context-line js-assistant-context" hidden></div>
@@ -3403,10 +3403,12 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
               <span class="reply-prep-time js-prepared-time" hidden></span>
             </div>
             <div class="customer-message-label reply-hero-label">Suggested reply</div>
-              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Prepared with live policy checks, governor signals, and your workspace outcome ledger when history exists.</div>
+              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Drafted with policy and risk checks; your approval still governs what ships.</div>
               <div class="reply-text js-reply-text">${bodyHtml}</div>
             </div>
           </div>
+          <div class="assistant-decision-slot" data-slot="decision"></div>
+          <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="assistant-footer js-assistant-footer"></div>
         </div>
       </div>`
@@ -3520,14 +3522,14 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-card-onboarding" role="status">
         <div class="xv-empty-hero">
-          <p class="xv-empty-kicker" translate="no">What this is</p>
+          <p class="xv-empty-kicker" translate="no">Operator console</p>
           <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""}`)}</h2>
-          <p class="cld-welcome-lead">Xalvion prepares the best support action and a customer-ready reply. <strong>You approve</strong> before money moves or tools run.</p>
-          <p class="cld-welcome-prompt onboarding-subline">Paste a message in the box below, or expand the queue to grab the next case.</p>
+          <p class="cld-welcome-lead">Paste a customer message — Xalvion drafts the reply and next action. <strong>You approve</strong> before billing or tools run.</p>
+          <p class="cld-welcome-prompt onboarding-subline">Start in the composer below, or open the queue when you want the next case surfaced for you.</p>
         </div>
         <details class="xv-queue-details">
-          <summary class="xv-queue-details-summary">Queue &amp; routing <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
-          <div class="xv-inbox-layer xv-inbox-layer--claude" id="xvInboxLayer" aria-label="Queue intelligence">
+          <summary class="xv-queue-details-summary">Queue <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
+          <div class="xv-inbox-layer xv-inbox-layer--claude" id="xvInboxLayer" aria-label="Ticket queue">
             <div class="xv-inbox-grid">
               <div class="xv-inbox-panel" data-panel="incoming">
                 <div class="xv-inbox-panel-head">
@@ -3566,9 +3568,9 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     return `
       <div class="empty-card empty-card-premium empty-card-launch">
         <div class="xv-empty-hero xv-empty-hero--legacy">
-          <p class="empty-launch-directive">Turn tickets into approved replies</p>
-          <p class="empty-launch-outcome">Xalvion drafts the reply and the next best action</p>
-          <p class="empty-launch-review">You stay in control — edit, approve, or reject before execution</p>
+          <p class="empty-launch-directive">One thread, one decision</p>
+          <p class="empty-launch-outcome">Paste a ticket — get a customer-ready reply and the next best move</p>
+          <p class="empty-launch-review">You edit, approve, or stop it before anything executes</p>
         </div>
         <div class="empty-flow-strip" aria-hidden="true">
           <span>Analyze ticket</span>
@@ -3576,8 +3578,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           <span>Approve &amp; execute</span>
         </div>
         <details class="xv-queue-details">
-          <summary class="xv-queue-details-summary">Queue &amp; routing <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
-          <div class="xv-inbox-layer" id="xvInboxLayer" aria-label="Queue intelligence">
+          <summary class="xv-queue-details-summary">Queue <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
+          <div class="xv-inbox-layer" id="xvInboxLayer" aria-label="Ticket queue">
             <div class="xv-inbox-grid">
               <div class="xv-inbox-panel" data-panel="incoming">
                 <div class="xv-inbox-panel-head">
@@ -3615,7 +3617,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         </details>
         <div class="empty-actions empty-actions-launch">
           <span class="empty-chip-hint">${chipHintGuest}</span>
-          <span class="empty-chip-hint empty-chip-hint-secondary">Approval-safe actions stay gated until you decide</span>
+          <span class="empty-chip-hint empty-chip-hint-secondary">Consequential moves stay gated until you decide</span>
         </div>
       </div>`;
   }
@@ -4373,19 +4375,19 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return;
     }
 
-    let line = "Reply prepared";
+    let line = "Draft ready — your read, your send";
     if (approval.requiresApproval && !approval.approved && moneyActs) {
-      line = "Suggested reply ready · billing needs your approval";
+      line = "Draft ready — billing waits on your approval";
     } else if (/signal-blocked/.test(sig.cls)) {
-      line = "Reply drafted · execution blocked by policy";
+      line = "Draft ready — policy is holding execution";
     } else if (/signal-approval/.test(sig.cls) && !approval.approved) {
-      line = "Suggested reply ready · approval required";
+      line = "Draft ready — needs your sign-off";
     } else if (/signal-review|signal-high-risk/.test(sig.cls)) {
-      line = "Suggested reply ready · review recommended";
+      line = "Draft ready — give it a careful read";
     } else if (/signal-safe/.test(sig.cls)) {
-      line = "Suggested reply ready · safe to copy after your check";
+      line = "Draft ready — routine path, still your send";
     } else if (action === "review") {
-      line = "Suggested reply ready · human follow-up";
+      line = "Draft ready — plan a human follow-up";
     }
 
     el.textContent = line;
@@ -4636,10 +4638,10 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
             gov.summary ||
               gov.title ||
               (gov.mode === "blocked"
-                ? "Governor blocked execution under policy — resolve before send."
+                ? "Policy blocked this path — resolve before anything customer-facing ships."
                 : gov.mode === "review"
-                  ? "Governor requires operator sign-off on this motion."
-                  : "Governor signals automation-safe criteria for this path.")
+                  ? "Policy asks for your sign-off on this motion."
+                  : "Policy read: this path meets automation-safe criteria.")
           ),
         };
       }
@@ -4651,14 +4653,14 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return {
         cls: "signal-high-risk signal-blocked",
         text: "Blocked",
-        title: String(data.governor_reason || dec.governor_reason || "Governor blocked this execution — do not ship as drafted."),
+        title: String(data.governor_reason || dec.governor_reason || "Blocked under policy — do not ship as drafted."),
       };
     }
     if (execMode === "review") {
       return {
         cls: "signal-approval",
         text: "Approval required",
-        title: String(data.governor_reason || dec.governor_reason || "Governor requires explicit operator approval on this motion."),
+        title: String(data.governor_reason || dec.governor_reason || "Explicit approval required on this motion."),
       };
     }
     if (risk === "high") {
@@ -4673,7 +4675,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return {
         cls: "signal-safe",
         text: "Safe to automate",
-        title: "Automation safety criteria satisfied for this execution tier."
+        title: "Automation safety checks passed for this tier."
       };
     }
     if (tier === "assist_only") {
@@ -4701,7 +4703,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
       return { cls: "signal-review", text: "Review recommended", title: "Signals sit outside the safe band — review before send." };
     }
-    return { cls: "signal-safe", text: "Safe to send", title: "No approval gate on this path — routine operator verification is enough." };
+    return { cls: "signal-safe", text: "Safe to send", title: "No billing gate here — a quick read is enough before send." };
   }
 
   function populateDecisionOutcomeIntelStrip(el, data) {
@@ -4730,7 +4732,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       el.hidden = false;
       const primary = hl || mix;
       const secondary = hl && mix && mix !== hl ? mix : "";
-      el.innerHTML = `<details class="decision-outcome-intel-fold"><summary class="decision-outcome-intel-fold-summary">Outcome intelligence</summary><div class="decision-outcome-intel-inner"><span class="decision-outcome-intel__k">Ledger</span><span class="decision-outcome-intel__p">${escapeHtml(primary)}</span>${secondary ? `<span class="decision-outcome-intel__s">${escapeHtml(secondary)}</span>` : ""}</div></details>`;
+      el.innerHTML = `<details class="decision-outcome-intel-fold"><summary class="decision-outcome-intel-fold-summary">Similar outcomes</summary><div class="decision-outcome-intel-inner"><span class="decision-outcome-intel__k">Context</span><span class="decision-outcome-intel__p">${escapeHtml(primary)}</span>${secondary ? `<span class="decision-outcome-intel__s">${escapeHtml(secondary)}</span>` : ""}</div></details>`;
     } catch {
       el.hidden = true;
       el.innerHTML = "";
@@ -4767,7 +4769,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       </div>
       <div class="decision-microcopy" data-role="micro" style="display:none"></div>
       <div class="decision-trust-block">
-        <div class="trust-strip" data-role="trust-strip" aria-label="Trust dominance"></div>
+        <div class="trust-strip" data-role="trust-strip" aria-label="Confidence context"></div>
         <div class="trust-strip-detail" data-role="trust-detail" aria-hidden="true"></div>
       </div>
       <div class="xv-governor-surface" data-role="governor" hidden></div>
@@ -4809,11 +4811,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     // Default decision microcopy (kept minimal, high-signal).
     if (pendingGate || /signal-approval/.test(sig.cls)) {
-      setMicrocopy("Held for your approval — execution stays off until you release it.", "hold");
+      setMicrocopy("Waiting on you — nothing executes until you release it.", "hold");
     } else if (/signal-review|signal-high-risk|signal-blocked/.test(sig.cls)) {
-      setMicrocopy("Elevated risk — read the reply and signals before you send.", "risk");
+      setMicrocopy("Take an extra beat — read the reply before it goes out.", "risk");
     } else if (/signal-safe/.test(sig.cls)) {
-      setMicrocopy("Aligned with prior safe outcomes — still your send.", "safe");
+      setMicrocopy("Looks routine by policy — still your send.", "safe");
     } else {
       setMicrocopy("");
     }
@@ -4848,8 +4850,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         }
       } else if (trustStripEl) {
         trustStripEl.className = "trust-strip tone-review";
-        trustStripEl.innerHTML = `<span class="trust-pill tone-review">limited history — conservative decision</span>`;
-        trustStripEl.setAttribute("title", "limited history — conservative decision");
+        trustStripEl.innerHTML = `<span class="trust-pill tone-review">Limited history — we stay conservative</span>`;
+        trustStripEl.setAttribute("title", "Limited comparable history — treat this as a cautious read.");
         if (trustDetailEl) {
           trustDetailEl.innerHTML = "";
           trustDetailEl.style.display = "none";
@@ -4872,7 +4874,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         const violations = Array.isArray(gov.violations) ? gov.violations.slice(0, 8) : [];
         const next = String(gov.nextStep || "").trim();
         const parts = [];
-        parts.push(`<div class="xv-governor-eyebrow">Governor assessment</div>`);
+        parts.push(`<div class="xv-governor-eyebrow">Assessment</div>`);
         if (reasonLine) {
           parts.push(`<div class="xv-governor-reason"><span class="xv-governor-k">Reason</span><span class="xv-governor-v">${escapeHtml(reasonLine)}</span></div>`);
         }
@@ -4898,7 +4900,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         if (next) {
           parts.push(`<div class="xv-governor-next"><span class="xv-governor-k">Next step</span><span class="xv-governor-next-v">${escapeHtml(next)}</span></div>`);
         }
-        govSurfaceEl.innerHTML = `<details class="xv-governor-fold"><summary class="xv-governor-fold-summary">Governor &amp; policy detail</summary><div class="xv-governor-fold-body">${parts.join("")}</div></details>`;
+        govSurfaceEl.innerHTML = `<details class="xv-governor-fold"><summary class="xv-governor-fold-summary">Why this assessment</summary><div class="xv-governor-fold-body">${parts.join("")}</div></details>`;
         govSurfaceEl.hidden = false;
       } else if (govSurfaceEl) {
         govSurfaceEl.innerHTML = "";
@@ -4931,7 +4933,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       if (pill === "Rejected") {
         setMicrocopy("Response held. Ticket escalated.", "risk");
       } else if (pill === "Approved" || pill === "Sent as edited") {
-        setMicrocopy("Verified and logged — safe to send.", "safe");
+        setMicrocopy("Logged and cleared — send when you are ready.", "safe");
       }
 
       if (nextWrap) {
@@ -4963,18 +4965,18 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         : null;
       const volumeHint =
         !postValueNudge && n >= 5
-          ? "You’re moving serious volume — add headroom so billing execution and routing don’t stall mid-shift"
+          ? "High throughput here — add plan headroom before queues hit a hard cap"
           : "";
       const canShowAutomation = !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev";
       const automationBlock = canShowAutomation
         ? `<div class="xv-next-nudge">
             <div class="xv-next-nudge-copy">${
               tierLc === "pro"
-                ? "Elite adds runway for high-volume weeks — same approvals, more included capacity."
-                : "Pro turns prepared actions into live execution when you’re ready — approvals stay in the loop."
+                ? "Elite is for weeks when volume spikes — same approval discipline, more included runway."
+                : "Pro is where prepared billing moves can execute live — you still sign off on every one."
             }</div>
             <button type="button" class="xv-next-nudge-cta" data-act="enable-automation">${
-              tierLc === "pro" ? "See Elite" : "See Pro"
+              tierLc === "pro" ? "Compare Elite" : "Compare Pro"
             }</button>
           </div>`
         : "";
@@ -4999,8 +5001,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
       return `
         <div class="xv-next-success" role="status" aria-live="polite">
-          <div class="xv-next-success-title">Response approved <span aria-hidden="true">✓</span></div>
-          <div class="xv-next-success-sub">Final, logged, and ready to send</div>
+          <div class="xv-next-success-title">Approved <span aria-hidden="true">✓</span></div>
+          <div class="xv-next-success-sub">On the record — paste or send on your timeline</div>
           <div class="xv-next-audit" aria-label="Approval log">
             ${audit.ticketId ? `<span class="xv-next-audit-chip">Ticket #${escapeHtml(String(audit.ticketId))}</span>` : ""}
             ${audit.action ? `<span class="xv-next-audit-chip">${escapeHtml(audit.action)}</span>` : ""}
@@ -5019,7 +5021,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           <div class="xv-next-meta">
             ${momentum ? `<span class="xv-next-meta-chip">${escapeHtml(momentum)}</span>` : ""}
             ${mins > 0 ? `<span class="xv-next-meta-chip">Estimated time saved: ${escapeHtml(String(mins))} min</span>` : ""}
-            <span class="xv-next-meta-chip">Governed operator workflow — approvals stay visible, outcomes stay measurable</span>
+            <span class="xv-next-meta-chip">Human approval stayed in the loop — risk controlled, time reclaimed</span>
           </div>
         </div>
 
@@ -5188,7 +5190,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
               updateLatestRunCard(normalized);
               updateSystemNarrative(normalized);
               updateTopbarStatus();
-              setNotice("success", "Approved", response.message || "Edited reply saved.");
+              setNotice("success", "Approved", response.message || "Saved — your edit is what ships when you send.");
             } catch (error) {
               showErr(error.message || "Approve failed.");
               [rej, ed, ap].forEach((b) => {
@@ -5281,7 +5283,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
             updateLatestRunCard(normalized);
             updateSystemNarrative(normalized);
             updateTopbarStatus();
-            setNotice("success", "Approved", response.message || "Operator approved.");
+            setNotice("success", "Approved", response.message || "Execution released under your approval.");
           } catch (error) {
             showErr(error.message || "Approve failed.");
             [rej, ed, ap].forEach((b) => {
@@ -5292,7 +5294,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           return;
         }
         setTerminal("Approved", "Final response cleared. Ready to send.");
-        setNotice("success", "Cleared", "Operator cleared this response — copy when ready.");
+        setNotice("success", "Cleared", "No billing gate — copy or send when it reads right to you.");
       });
     };
 
