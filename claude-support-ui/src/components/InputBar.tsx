@@ -28,12 +28,12 @@ export function InputBar({
   }
 
   return (
-    <div className="sticky bottom-0 shrink-0">
+    <div className="shrink-0 bg-[#1a1814]">
       <div
         className="pointer-events-none h-10 bg-gradient-to-b from-transparent to-[#0f0e0c]"
         aria-hidden
       />
-      <div className="pointer-events-auto px-4 pb-5">
+      <div className="pointer-events-auto px-8 pb-5 pt-3">
         <form onSubmit={handleSubmit} className="mx-auto max-w-[720px]">
           <div className="relative rounded-2xl bg-white/[0.03] p-2 ring-1 ring-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur">
             <input
@@ -41,7 +41,7 @@ export function InputBar({
               value={value}
               onChange={(e) => onChange(e.target.value)}
               placeholder="How can I help with this ticket?"
-              className="w-full rounded-xl bg-transparent py-3 pl-3 pr-12 text-sm font-normal text-[#e8e3dc] placeholder:text-[#6b6560] outline-none focus:ring-2 focus:ring-[#7c3aed]/60 focus:ring-offset-0"
+              className="w-full rounded-full bg-transparent py-3 pl-3 pr-12 text-sm font-normal text-[#e8e3dc] placeholder:text-[#6b6560] outline-none focus:ring-2 focus:ring-[#7c3aed]/60 focus:ring-offset-0"
               aria-label="Ticket message"
             />
             <button

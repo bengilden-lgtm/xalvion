@@ -24,9 +24,9 @@ export function MainPanel({
   activeTicket,
 }: MainPanelProps) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <main className="min-h-0 flex-1">
-        <div className="mx-auto max-w-[740px] px-6 pb-10 pt-10">
+    <div className="flex h-[calc(100vh-57px)] min-h-0 min-w-0 flex-col">
+      <main className="flex min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex min-h-0 w-full max-w-[740px] flex-col px-6 pb-10 pt-10">
           <header className="text-center">
             <h1 className="text-[28px] font-semibold leading-tight text-[#e8e3dc]">
               Paste a support ticket
@@ -41,7 +41,7 @@ export function MainPanel({
           </header>
 
           {!activeTicket ? (
-            <section className="mt-14 flex min-h-[calc(100vh-360px)] flex-col items-center justify-center text-center">
+            <section className="mt-14 flex flex-1 flex-col items-center justify-center text-center">
               <p className="text-2xl font-normal text-[#e8e3dc]">
                 {greetingPhrase()}
               </p>
