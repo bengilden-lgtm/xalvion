@@ -25,7 +25,7 @@ export function MainPanel({
 }: MainPanelProps) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main className="min-h-0 flex-1">
         <div className="mx-auto max-w-[740px] px-6 pb-10 pt-10">
           <header className="text-center">
             <h1 className="text-[28px] font-semibold leading-tight text-[#e8e3dc]">
