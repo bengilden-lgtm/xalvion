@@ -7969,6 +7969,14 @@ function bindEvents() {
           if (btn.hidden || btn.disabled) return;
           e.preventDefault();
           e.stopImmediatePropagation();
+          if (!isAuthenticated()) {
+            openAccessDrawer("account");
+            setAccessMode("signup");
+            window.setTimeout(() => {
+              els.usernameInput?.focus?.();
+            }, 90);
+            return;
+          }
           refreshUpgradeValueSummary();
           startUpgradeFromButton(btn, btn.dataset.upgrade || "");
         },
