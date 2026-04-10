@@ -4186,8 +4186,33 @@ details > summary{ user-select:none; }
 .xv-recent-title{
   font-size: 12px;
   letter-spacing: .12em;
-  text-transform: uppercase;
   color: var(--text-4);
+}
+
+.home-stat-primary {
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(245,248,255,.96);
+  display: block;
+}
+.home-stat-secondary {
+  font-size: 13px;
+  color: rgba(205,215,242,.55);
+  display: block;
+  margin-top: 2px;
+}
+
+[data-issue-category="billing"] {
+  border-left: 3px solid rgba(239,68,68,0.55) !important;
+}
+[data-issue-category="damage"] {
+  border-left: 3px solid rgba(251,146,60,0.55) !important;
+}
+[data-issue-category="shipping"] {
+  border-left: 3px solid rgba(59,130,246,0.55) !important;
+}
+[data-issue-category="general"] {
+  border-left: 3px solid rgba(255,255,255,0.10) !important;
 }
 .xv-recent-cta{
   border-radius: var(--r-pill);

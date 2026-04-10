@@ -312,6 +312,23 @@ if (typeof window.pulseRail !== "function") {
     return Math.max(0, Math.round(n * 3));
   }
 
+  function formatIssueType(raw) {
+    if (!raw) return "";
+    return String(raw)
+      .replace(/_/g, " ")
+      .replace(/\./g, " · ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim();
+  }
+
+  function categoriseIssue(type) {
+    const t = String(type).toLowerCase();
+    if (t.includes("billing") || t.includes("charge") || t.includes("refund")) return "billing";
+    if (t.includes("damage") || t.includes("damaged")) return "damage";
+    if (t.includes("shipping") || t.includes("late") || t.includes("package")) return "shipping";
+    return "general";
+  }
+
   async function fetchRecentTickets(limit = 5) {
     try {
       const res = await fetch(`${API}/tickets/recent?limit=${encodeURIComponent(String(limit))}`, {
@@ -656,6 +673,16 @@ if (typeof window.pulseRail !== "function") {
               letter-spacing:0.06em !important;
               text-transform:uppercase !important;
               font-size:11.5px !important;
+            }
+            body[data-ui="claude"] .decision-state-rejected .decision-state-pill {
+              border-color: rgba(239,68,68,0.45) !important;
+              background: rgba(239,68,68,0.12) !important;
+              color: rgba(252,165,165,1) !important;
+            }
+            body[data-ui="claude"] .decision-state-approved .decision-state-pill {
+              border-color: rgba(34,197,94,0.45) !important;
+              background: rgba(34,197,94,0.12) !important;
+              color: rgba(134,239,172,1) !important;
             }
 
             /* High-stakes decision microcopy + state intensity (no layout changes) */
@@ -1804,9 +1831,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     return `$${Number.isFinite(num) ? num.toFixed(0) : "0"}`;
   }
 
-  function relativeTime(date = new Date()) {
-    const d = date instanceof Date ? date : new Date(date);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  function formatMessageTimestamp(date) {
+    const d = new Date(date);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return isToday
+      ? time
+      : `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
   }
 
   function planCopy(tier) {
@@ -3425,7 +3457,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const card = document.createElement("div");
     card.className = `msg-card ${role === "user" ? "user" : "assistant"}`;
 
-    const when = relativeTime(new Date());
+    const when = formatMessageTimestamp(new Date());
     const headLabel = role === "user" ? getUserBadge() : getAssistantBadge();
 
     const assistantBody =
@@ -3525,14 +3557,21 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const hasRecents = recents.length > 0;
       const momentum = momentumLine();
       const savedMin = estimateTimeSavedMinutes();
+      const nTickets = effectiveTicketCount();
+      const ticketWord = nTickets === 1 ? "ticket" : "tickets";
       const subMomentum =
-        momentum
-          ? `<div class="xv-momentum-line">${escapeHtml(momentum)}${savedMin > 0 ? ` <span class="xv-momentum-sub">Estimated time saved: ${savedMin} minutes</span>` : ""}</div>`
-          : "";
+        savedMin > 0 && nTickets > 0
+          ? `<div class="xv-momentum-line">
+              <span class="home-stat-primary">${escapeHtml(`${savedMin} minutes saved`)}</span>
+              <span class="home-stat-secondary">${escapeHtml(`across ${nTickets} ${ticketWord} handled`)}</span>
+            </div>`
+          : momentum
+            ? `<div class="xv-momentum-line">${escapeHtml(momentum)}</div>`
+            : "";
       const recentList = hasRecents
         ? `<div class="xv-recent-block" aria-label="Recent tickets">
             <div class="xv-recent-head">
-              <div class="xv-recent-title">Continue where you left off</div>
+              <div class="xv-recent-title">Pick up where you left off</div>
               <button type="button" class="xv-recent-cta" data-act="continue-last">Continue last case</button>
             </div>
             <div class="xv-recent-list">
@@ -3542,9 +3581,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
                   const id = Number(t.id || 0) || 0;
                   const msg = String(t.customer_message || "").trim();
                   const preview = msg ? msg.replace(/\s+/g, " ").slice(0, 110) : String(t.subject || "").slice(0, 110);
-                  const meta = [t.issue_type, t.queue].filter(Boolean).join(" · ");
+                  const meta = [formatIssueType(t.issue_type), t.queue].filter(Boolean).join(" · ");
+                  const issueCategory = categoriseIssue(t.issue_type || "");
                   return `
-                    <button type="button" class="xv-recent-item" data-act="recent-open" data-ticket-id="${escapeHtml(String(id || ""))}">
+                    <button type="button" class="xv-recent-item" data-act="recent-open" data-ticket-id="${escapeHtml(String(id || ""))}" data-issue-category="${escapeHtml(issueCategory)}">
                       <div class="xv-recent-item-top">
                         <span class="xv-recent-item-id">#${escapeHtml(String(id || "—"))}</span>
                         <span class="xv-recent-item-meta">${escapeHtml(meta || "Recent")}</span>
@@ -3706,11 +3746,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const subject = String(item?.subject || "").trim();
     const preview = (msg || subject).replace(/\s+/g, " ").slice(0, 120);
     const metaLeft = formatInboxId(item?.id);
-    const metaRight = [item?.issue_type, item?.queue].filter(Boolean).join(" · ");
+    const metaRight = [formatIssueType(item?.issue_type), item?.queue].filter(Boolean).join(" · ");
     const tone = inboxTone(item);
     const badge = inboxBadgeLabel(item);
+    const issueCategory = categoriseIssue(item?.issue_type || "");
     return `
-      <button type="button" class="xv-inbox-item" data-act="inbox-open" data-inbox-id="${escapeHtml(String(item?.id || ""))}">
+      <button type="button" class="xv-inbox-item" data-act="inbox-open" data-inbox-id="${escapeHtml(String(item?.id || ""))}" data-issue-category="${escapeHtml(issueCategory)}">
         <div class="xv-inbox-item-top">
           <span class="xv-inbox-item-id">${escapeHtml(metaLeft)}</span>
           <span class="xv-inbox-item-meta">${escapeHtml(metaRight || "Incoming")}</span>
@@ -3752,8 +3793,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const title = inboxBadgeLabel(recommended);
       const msg = String(recommended.customer_message || "").trim();
       const preview = msg.replace(/\s+/g, " ").slice(0, 150);
+      const issueCategory = categoriseIssue(recommended?.issue_type || "");
       recNode.innerHTML = `
-        <button type="button" class="xv-inbox-reco-btn" data-act="inbox-open" data-inbox-id="${escapeHtml(String(recommended.id || ""))}">
+        <button type="button" class="xv-inbox-reco-btn" data-act="inbox-open" data-inbox-id="${escapeHtml(String(recommended.id || ""))}" data-issue-category="${escapeHtml(issueCategory)}">
           <div class="xv-inbox-reco-top">
             <span class="meta-chip ${escapeHtml(tone)}">${ICONS.pulse}<span>${escapeHtml(title)}</span></span>
             <span class="xv-inbox-reco-id">${escapeHtml(formatInboxId(recommended.id))}</span>
@@ -5643,7 +5685,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         </div>
         <div class="xv-dsumm-cell" style="text-align:center">
           <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Confidence</div>
-          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(formatMetric(decision.confidence || 0, 2))}</div>
+          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${(() => {
+            const c = Number(decision.confidence || data.confidence || 0);
+            return c > 0 ? escapeHtml(String(c.toFixed(2))) : "—";
+          })()}</div>
         </div>
         <div class="xv-dsumm-cell" style="text-align:center">
           <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Risk</div>
@@ -6401,8 +6446,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (els.railRunSummary) {
       const it = String(
         data.issue_type || data.meta?.issue_type || data.decision?.issue_type || "general_support"
-      ).replace(/_/g, " ");
-      els.railRunSummary.textContent = `${it} · ${displayActionLabel(data)} · conf ${formatMetric(data.confidence || 0, 2)}`;
+      );
+      els.railRunSummary.textContent = `${formatIssueType(it)} · ${displayActionLabel(data)} · conf ${formatMetric(data.confidence || 0, 2)}`;
     }
     syncApprovalRail(data);
   }
