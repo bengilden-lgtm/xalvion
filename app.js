@@ -8187,6 +8187,33 @@ function bindEvents() {
 
     ensureInjectedStyles();
     ensureCrmStyles();
+
+    // Force composer dock to bottom of viewport (per operator workspace UX).
+    // Wrapper includes input + "Example openers" + "Stripe IDs".
+    try {
+      const dock = document.getElementById("workspaceComposerDock");
+      if (dock) {
+        dock.style.position = "fixed";
+        dock.style.bottom = "0";
+        dock.style.left = "57px";
+        dock.style.right = "0";
+        dock.style.zIndex = "50";
+        dock.style.padding = "12px 32px 20px";
+        dock.style.backgroundColor = "#1a1814";
+      }
+      if (els.messageInput) {
+        els.messageInput.style.borderRadius = "999px";
+        els.messageInput.style.height = "48px";
+        els.messageInput.style.minHeight = "unset";
+        els.messageInput.style.maxHeight = "48px";
+      }
+      if (els.messages) {
+        els.messages.style.paddingBottom = "140px";
+      }
+    } catch {
+      /* no-op */
+    }
+
     ensurePreviewClientId();
     hydrateStripeCallbackState();
     buildKeyboardOverlay();
