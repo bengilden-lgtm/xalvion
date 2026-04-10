@@ -1146,7 +1146,7 @@ select.refund-select{ padding-right: 34px; }
   min-height: 0;
   display:flex;
   flex: 1;
-  justify-content: center;
+  justify-content: stretch;
   align-self: stretch;
   overflow: hidden;
 }
@@ -1163,8 +1163,8 @@ select.refund-select{ padding-right: 34px; }
 .main-stage-ambient{ display:none; }
 
 .xv-stage-scaffold{
-  width: min(var(--thread-max), 100%);
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   min-height: 0;
   flex: 1;
   display:flex;
@@ -1274,6 +1274,11 @@ select.refund-select{ padding-right: 34px; }
   flex-direction: column;
   gap: 12px;
   scroll-behavior: smooth;
+}
+.messages > *{
+  width: min(var(--thread-max), 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 .messages:has(> .empty-state){
   justify-content: center;
