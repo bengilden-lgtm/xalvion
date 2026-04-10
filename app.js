@@ -8169,6 +8169,26 @@ function bindEvents() {
     ensureCrmStyles();
 
     // (intentionally no forced dock/input positioning or sizing here)
+    try {
+      const dock = document.getElementById("workspaceComposerDock");
+      if (dock) {
+        dock.style.position = "fixed";
+        dock.style.bottom = "0";
+        dock.style.left = "57px";
+        dock.style.right = "0";
+        dock.style.zIndex = "100";
+        dock.style.backgroundColor = "#1a1814";
+        dock.style.padding = "12px 32px 20px";
+      }
+
+      if (els.messageInput) {
+        els.messageInput.style.borderRadius = "999px";
+      }
+
+      if (els.messagesZone) {
+        els.messagesZone.style.paddingBottom = "180px";
+      }
+    } catch {}
 
     ensurePreviewClientId();
     hydrateStripeCallbackState();
