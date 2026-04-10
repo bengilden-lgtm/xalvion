@@ -1970,6 +1970,13 @@ select.refund-select{ padding-right: 34px; }
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: inherit;
+  backdrop-filter: blur(12px);
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 .decision-controls{
   display: flex;

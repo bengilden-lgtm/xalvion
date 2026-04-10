@@ -5482,7 +5482,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   function createDetailsPanel(data = {}) {
     const details = document.createElement("details");
     details.className = "details-wrap operator-brief-details";
-    details.open = false;
+    details.open = true;
 
     const decision = data.decision || {};
     const output = data.output || {};
@@ -5577,8 +5577,33 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     `;
 
     details.innerHTML = `
+      <div class="xv-decision-summary-strip" style="
+        display:grid;
+        grid-template-columns:repeat(4,1fr);
+        gap:8px;
+        padding:12px 14px 10px;
+        border-bottom:1px solid rgba(255,255,255,.07);
+        margin-bottom:2px;
+      ">
+        <div class="xv-dsumm-cell" style="text-align:center">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Action</div>
+          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(displayActionLabel(data))}</div>
+        </div>
+        <div class="xv-dsumm-cell" style="text-align:center">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Confidence</div>
+          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(formatMetric(decision.confidence || 0, 2))}</div>
+        </div>
+        <div class="xv-dsumm-cell" style="text-align:center">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Risk</div>
+          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(riskLabel(data))}</div>
+        </div>
+        <div class="xv-dsumm-cell" style="text-align:center">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Value</div>
+          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(formatMoney(impact.money_saved || impact.amount || data.amount || 0))}</div>
+        </div>
+      </div>
       <summary class="details-toggle">
-        <span>Operator rationale</span>
+        <span>Decision brief</span>
         <span class="chev">${ICONS.chevron}</span>
       </summary>
       <div class="details-panel">

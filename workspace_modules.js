@@ -413,6 +413,9 @@
               : {};
 
         const td = d.trust_dominance && typeof d.trust_dominance === "object" ? d.trust_dominance : null;
+        const conf = Number(
+          td?.confidence_score ?? td?.confidence ?? dec.confidence ?? d.confidence
+        );
 
         const similar = (() => {
           const v = td?.similar_case_count ?? dec.similar_case_count;
@@ -460,12 +463,7 @@
         });
         tokens.push({
           key: "band",
-          label:
-            band === "tight"
-              ? "Confidence: high"
-              : band === "moderate"
-                ? "Confidence: moderate"
-                : "Confidence: open",
+          label: `Confidence: ${Number.isFinite(conf) && conf > 0 ? conf.toFixed(2) : "—"}`,
           tone: band === "tight" ? "safe" : band === "moderate" ? "review" : "risk",
         });
 

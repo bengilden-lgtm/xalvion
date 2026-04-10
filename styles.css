@@ -822,6 +822,21 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
   gap:10px;
   flex-wrap:wrap;
 }
+.decision-panel-top{
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: inherit;
+  backdrop-filter: blur(12px);
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.details-toggle{
+  list-style: none;
+}
+.details-toggle::-webkit-details-marker{
+  display: none;
+}
 .decision-panel-title,
 .decision-panel-note,
 .decision-panel-error,
