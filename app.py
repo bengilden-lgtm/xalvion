@@ -341,6 +341,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals()
 _SERVICES_DIR = os.path.join(BASE_DIR, "services")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 FAVICON_PNG_PATH = os.path.join(STATIC_DIR, "favicon.png")
+FAVICON_SVG_PATH = os.path.join(STATIC_DIR, "favicon.svg")
 INDEX_PATH = (
     os.path.join(_SERVICES_DIR, "index.html")
     if os.path.isfile(os.path.join(_SERVICES_DIR, "index.html"))
@@ -2425,6 +2426,17 @@ def serve_static_favicon_png():
         return FileResponse(
             FAVICON_PNG_PATH,
             media_type="image/png",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    raise HTTPException(status_code=404, detail="favicon not found")
+
+
+@app.get("/static/favicon.svg")
+def serve_static_favicon_svg():
+    if os.path.exists(FAVICON_SVG_PATH):
+        return FileResponse(
+            FAVICON_SVG_PATH,
+            media_type="image/svg+xml",
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
         )
     raise HTTPException(status_code=404, detail="favicon not found")
