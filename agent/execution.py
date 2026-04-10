@@ -12,7 +12,10 @@ from actions import (
 from tools import process_refund, issue_credit
 
 ALLOWED_ACTIONS = {"none", "refund", "credit", "review", "charge"}
+# Maximum amount allowed for automated refunds (safety constraint).
 MAX_REFUND = int(MAX_AUTO_REFUND_AMOUNT)
+# Maximum amount allowed for automated charges (distinct from refunds; semantics differ).
+MAX_CHARGE = int(MAX_AUTO_REFUND_AMOUNT)
 MAX_CREDIT = int(MAX_AUTO_CREDIT_AMOUNT)
 
 
@@ -36,7 +39,7 @@ def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
     elif action == "credit":
         amount = min(amount, MAX_CREDIT)
     elif action == "charge":
-        amount = min(amount, MAX_REFUND)
+        amount = min(amount, MAX_CHARGE)
     else:
         amount = 0
 

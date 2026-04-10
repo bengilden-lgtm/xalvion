@@ -6,6 +6,8 @@ queries to the stronger one.  Called by agent.py::choose_model().
 """
 from __future__ import annotations
 
+import re
+
 _CHEAP_KEYWORDS = frozenset([
     "status",
     "where is my order",
@@ -42,10 +44,10 @@ def route_task(user_input: str) -> str:
     """
     text = (user_input or "").lower()
 
-    if any(kw in text for kw in _EXPENSIVE_KEYWORDS):
+    if any(re.search(r"\b" + re.escape(kw) + r"\b", text) for kw in _EXPENSIVE_KEYWORDS):
         return "expensive"
 
-    if any(kw in text for kw in _CHEAP_KEYWORDS):
+    if any(re.search(r"\b" + re.escape(kw) + r"\b", text) for kw in _CHEAP_KEYWORDS):
         return "cheap"
 
     # Default: use the stronger model for anything unrecognised

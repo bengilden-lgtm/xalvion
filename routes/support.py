@@ -10,7 +10,7 @@ from sqlalchemy import case as _case, func
 from sqlalchemy.orm import Session
 
 import app as app_mod
-from routes.auth import _me_capacity_message, _tier_upgrade_unlocks
+from app_utils import _me_capacity_message, _tier_upgrade_unlocks
 
 router = APIRouter(tags=["support"])
 

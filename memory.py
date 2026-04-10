@@ -8,6 +8,7 @@ from state_store import load_state, mutate_state, save_state
 
 MEMORY_STATE_KEY = "memory_v1"
 MAX_HISTORY = 40
+_DECAY_WINDOW_SECONDS = 1_000_000.0
 
 
 def _now() -> float:
@@ -78,7 +79,7 @@ def apply_decay(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     now = _now()
     for item in history:
         age = max(0.0, now - float(item.get("timestamp", now)))
-        decay_factor = max(0.55, 1.0 - (age / 320000.0))
+        decay_factor = max(0.55, 1.0 - (age / _DECAY_WINDOW_SECONDS))
         item["importance"] = round(float(item.get("importance", 1.0)) * decay_factor, 4)
     return history
 

@@ -1,6 +1,7 @@
 """
 Local dev entrypoint — respects PORT (Railway/Render/Fly) and optional UVICORN_RELOAD=true.
 """
+# Single worker required for SQLite + file-based brain.json. Set DATABASE_URL to Postgres before increasing WEB_CONCURRENCY.
 from __future__ import annotations
 
 import os

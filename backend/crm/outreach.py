@@ -15,11 +15,9 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import threading
 import uuid
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from fastapi import Depends, HTTPException
@@ -68,14 +66,6 @@ def register_outreach_crm_routes(
     - Keep routes, params, and response shapes stable.
     - Do not import `app.py`; pass dependencies in from the orchestrator.
     """
-
-    outreach_queue_path = os.path.join(base_dir, "outreach_queue.json")
-
-    # Thread-level lock for outreach_queue.json file I/O.
-    # IMPORTANT: This protects against intra-process concurrency only.
-    # If running multiple Uvicorn worker processes (gunicorn --workers N),
-    # migrate outreach queue persistence to the SQLite DB.
-    outreach_queue_lock = threading.Lock()
 
     lead_status_order = {"new", "contacted", "replied", "closed"}
     lead_stage_order = {"lead", "contacted", "replied", "demo", "closed"}
@@ -199,7 +189,7 @@ def register_outreach_crm_routes(
             return max(0.0, min(1000000.0, value))
 
     def _crm_now() -> datetime:
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)
 
     def _crm_now_iso() -> str:
         return _crm_now().isoformat()
@@ -235,139 +225,50 @@ def register_outreach_crm_routes(
         mapping = {"new": "lead", "contacted": "contacted", "replied": "replied", "closed": "closed"}
         return mapping.get(status_norm, "lead")
 
-    def _read_outreach_queue() -> list[dict[str, Any]]:
-        # DB-first persistence.
-        # One-time best-effort import from legacy JSON file if DB is empty.
+    def _lead_from_row(row: OutreachLeadRow) -> dict[str, Any] | None:
         try:
-            db = SessionLocal()
-            try:
-                total = db.query(func.count(OutreachLeadRow.id)).scalar() or 0
-                if int(total) <= 0 and os.path.exists(outreach_queue_path):
-                    with outreach_queue_lock:
-                        try:
-                            with open(outreach_queue_path, "r", encoding="utf-8") as f:
-                                legacy = json.load(f)
-                        except Exception as exc:
-                            legacy = None
-                            logger.error("crm_legacy_json_read_failed detail=%s", str(exc)[:500], exc_info=True)
-                    if isinstance(legacy, list) and legacy:
-                        now_iso = _crm_now_iso()
-                        for item in legacy:
-                            if not isinstance(item, dict):
-                                continue
-                            lead_id = str(item.get("id") or "").strip() or uuid.uuid4().hex
-                            normalized = _serialize_lead({**item, "id": lead_id})
-                            row = OutreachLeadRow(
-                                id=str(lead_id)[:64],
-                                payload_json=json.dumps(normalized, ensure_ascii=False, default=str),
-                                created_at=str(normalized.get("created_at") or now_iso)[:40],
-                                updated_at=now_iso[:40],
-                                status=str(normalized.get("status") or "new")[:16],
-                                stage=str(normalized.get("stage") or "lead")[:16],
-                                score=int(normalized.get("score", 1) or 1),
-                                source=str(normalized.get("source") or "manual")[:32],
-                                follow_up_due=(str(normalized.get("follow_up_due"))[:40] if normalized.get("follow_up_due") else None),
-                                converted_at=(str(normalized.get("converted_at"))[:40] if normalized.get("converted_at") else None),
-                                value=float(normalized.get("value", 0.0) or 0.0),
-                                converted_value=float(normalized.get("converted_value", 0.0) or 0.0),
-                            )
-                            # Upsert semantics: last write wins, matches legacy behavior.
-                            existing = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == row.id).first()
-                            if existing:
-                                for k, v in row.__dict__.items():
-                                    if k.startswith("_"):
-                                        continue
-                                    setattr(existing, k, v)
-                            else:
-                                db.add(row)
-                        db.commit()
+            payload = json.loads(str(row.payload_json or "{}"))
+            if not isinstance(payload, dict):
+                payload = {}
+        except Exception:
+            payload = {}
+        if not payload:
+            return None
+        return _serialize_lead(payload)
 
-                rows = db.query(OutreachLeadRow).all()
-                leads: list[dict[str, Any]] = []
-                for r in rows:
-                    try:
-                        payload = json.loads(str(r.payload_json or "{}"))
-                        if isinstance(payload, dict):
-                            leads.append(payload)
-                    except Exception:
-                        logger.error("crm_payload_deserialize_failed lead_id=%s", str(getattr(r, "id", ""))[:64], exc_info=True)
-                return leads
-            finally:
-                db.close()
-        except Exception as exc:
-            # Loud failure; fallback to legacy file read to preserve runtime behavior.
-            logger.error("crm_db_read_failed detail=%s", str(exc)[:500], exc_info=True)
-
-        with outreach_queue_lock:
-            try:
-                if not os.path.exists(outreach_queue_path):
-                    return []
-                with open(outreach_queue_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                return data if isinstance(data, list) else []
-            except Exception as exc:
-                logger.error("crm_legacy_read_failed detail=%s", str(exc)[:500], exc_info=True)
-                return []
-
-    def _write_outreach_queue(leads: list[dict[str, Any]]) -> None:
-        # DB-backed persistence; legacy JSON is no longer the source of truth.
+    def _persist_lead(db, lead: dict[str, Any]) -> dict[str, Any]:
         now_iso = _crm_now_iso()
-        try:
-            db = SessionLocal()
-            try:
-                seen: set[str] = set()
-                for item in leads:
-                    if not isinstance(item, dict):
-                        continue
-                    lead_id = str(item.get("id") or "").strip()
-                    if not lead_id:
-                        continue
-                    seen.add(lead_id)
-                    normalized = _serialize_lead(item)
-                    row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
-                    payload = json.dumps(normalized, ensure_ascii=False, default=str)
-                    if row is None:
-                        row = OutreachLeadRow(id=str(lead_id)[:64])
-                        db.add(row)
-                    row.payload_json = payload
-                    row.created_at = str(normalized.get("created_at") or now_iso)[:40]
-                    row.updated_at = now_iso[:40]
-                    row.status = str(normalized.get("status") or "new")[:16]
-                    row.stage = str(normalized.get("stage") or "lead")[:16]
-                    try:
-                        row.score = int(normalized.get("score", 1) or 1)
-                    except Exception:
-                        row.score = 1
-                    row.source = str(normalized.get("source") or "manual")[:32]
-                    row.follow_up_due = str(normalized.get("follow_up_due"))[:40] if normalized.get("follow_up_due") else None
-                    row.converted_at = str(normalized.get("converted_at"))[:40] if normalized.get("converted_at") else None
-                    try:
-                        row.value = float(normalized.get("value", 0.0) or 0.0)
-                    except Exception:
-                        row.value = 0.0
-                    try:
-                        row.converted_value = float(normalized.get("converted_value", 0.0) or 0.0)
-                    except Exception:
-                        row.converted_value = 0.0
+        normalized = _serialize_lead(lead)
+        lead_id = str(normalized.get("id") or "").strip() or uuid.uuid4().hex
+        normalized["id"] = lead_id
 
-                # Legacy behavior: writing the full list replaces the prior file contents.
-                # DB equivalent: remove rows not present in the current list snapshot.
-                if leads is not None:
-                    if seen:
-                        db.query(OutreachLeadRow).filter(~OutreachLeadRow.id.in_([str(x)[:64] for x in seen])).delete(synchronize_session=False)
-                    else:
-                        db.query(OutreachLeadRow).delete(synchronize_session=False)
-                db.commit()
-            finally:
-                db.close()
-        except Exception as exc:
-            logger.error("crm_db_write_failed detail=%s", str(exc)[:500], exc_info=True)
-            # Fallback to legacy JSON persistence to preserve behavior if DB fails.
-            tmp_path = outreach_queue_path + ".tmp"
-            with outreach_queue_lock:
-                with open(tmp_path, "w", encoding="utf-8") as f:
-                    json.dump(leads, f, indent=2, ensure_ascii=False)
-                os.replace(tmp_path, outreach_queue_path)
+        row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+        if row is None:
+            row = OutreachLeadRow(id=str(lead_id)[:64])
+            db.add(row)
+
+        row.payload_json = json.dumps(normalized, ensure_ascii=False, default=str)
+        row.created_at = str(normalized.get("created_at") or now_iso)[:40]
+        row.updated_at = now_iso[:40]
+        row.status = str(normalized.get("status") or "new")[:16]
+        row.stage = str(normalized.get("stage") or "lead")[:16]
+        try:
+            row.score = int(normalized.get("score", 1) or 1)
+        except Exception:
+            row.score = 1
+        row.source = str(normalized.get("source") or "manual")[:32]
+        row.follow_up_due = str(normalized.get("follow_up_due"))[:40] if normalized.get("follow_up_due") else None
+        row.converted_at = str(normalized.get("converted_at"))[:40] if normalized.get("converted_at") else None
+        try:
+            row.value = float(normalized.get("value", 0.0) or 0.0)
+        except Exception:
+            row.value = 0.0
+        try:
+            row.converted_value = float(normalized.get("converted_value", 0.0) or 0.0)
+        except Exception:
+            row.converted_value = 0.0
+
+        return normalized
 
     def _lead_score(text: str, source: str = "manual") -> int:
         lowered = (text or "").lower()
@@ -583,7 +484,16 @@ def register_outreach_crm_routes(
         }
 
     def _get_sorted_leads() -> list[dict[str, Any]]:
-        leads = [_serialize_lead(item) for item in _read_outreach_queue()]
+        db = SessionLocal()
+        try:
+            rows = db.query(OutreachLeadRow).all()
+            leads: list[dict[str, Any]] = []
+            for r in rows:
+                lead = _lead_from_row(r)
+                if lead:
+                    leads.append(lead)
+        finally:
+            db.close()
         stage_rank = {"demo": 0, "replied": 1, "contacted": 2, "lead": 3, "closed": 4}
         leads.sort(
             key=lambda item: (
@@ -705,25 +615,27 @@ def register_outreach_crm_routes(
         }
 
     def _snooze_lead_reminder(lead_id: str, days: int = 1, note: str | None = None) -> dict[str, Any] | None:
-        leads = _read_outreach_queue()
-        updated_lead = None
-        now_iso = _crm_now_iso()
-        new_due = (_crm_now() + timedelta(days=max(1, min(14, int(days or 1))))).isoformat()
-
-        for lead in leads:
-            if str(lead.get("id", "")) != str(lead_id):
-                continue
+        db = SessionLocal()
+        try:
+            row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+            if not row:
+                return None
+            lead = _lead_from_row(row) or {}
+            now_iso = _crm_now_iso()
+            new_due = (_crm_now() + timedelta(days=max(1, min(14, int(days or 1))))).isoformat()
             lead["follow_up_due"] = new_due
             if note:
                 notes = list(lead.get("notes") or [])
                 notes.append({"text": str(note)[:300], "timestamp": now_iso})
                 lead["notes"] = notes[-12:]
-            updated_lead = _serialize_lead(lead)
-            break
-
-        if updated_lead is not None:
-            _write_outreach_queue(leads)
-        return updated_lead
+            updated_lead = _persist_lead(db, lead)
+            db.commit()
+            return updated_lead
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def _update_lead_status(
         lead_id: str,
@@ -731,13 +643,13 @@ def register_outreach_crm_routes(
         note: str | None = None,
         stage: str | None = None,
     ) -> dict[str, Any] | None:
-        leads = _read_outreach_queue()
-        now_iso = _crm_now_iso()
-        updated_lead = None
-
-        for lead in leads:
-            if str(lead.get("id", "")) != str(lead_id):
-                continue
+        db = SessionLocal()
+        try:
+            row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+            if not row:
+                return None
+            lead = _lead_from_row(row) or {}
+            now_iso = _crm_now_iso()
 
             current_status = _normalize_lead_status(str(lead.get("status", "new") or "new"))
             current_stage = _normalize_lead_stage(str(lead.get("stage", "") or ""), current_status)
@@ -779,12 +691,14 @@ def register_outreach_crm_routes(
                 notes.append({"text": str(note)[:300], "timestamp": now_iso})
                 lead["notes"] = notes[-12:]
 
-            updated_lead = _serialize_lead(lead)
-            break
-
-        if updated_lead is not None:
-            _write_outreach_queue(leads)
-        return updated_lead
+            updated_lead = _persist_lead(db, lead)
+            db.commit()
+            return updated_lead
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     @app.get("/leads")
     def list_outreach_leads(user=Depends(require_authenticated_user)):  # noqa: ANN001
@@ -821,10 +735,16 @@ def register_outreach_crm_routes(
 
     @app.post("/leads/add")
     def add_outreach_lead(req: LeadAddRequest, user=Depends(require_authenticated_user)):  # noqa: ANN001
-        leads = _read_outreach_queue()
         record = _build_lead_record(req.username, req.text, req.source or "manual")
-        leads.append(record)
-        _write_outreach_queue(leads)
+        db = SessionLocal()
+        try:
+            record = _persist_lead(db, record)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
         all_leads = _get_sorted_leads()
         return {
             "lead": _serialize_lead(record),
@@ -929,12 +849,13 @@ def register_outreach_crm_routes(
         req: LeadConvertRequest,
         user=Depends(require_authenticated_user),
     ):
-        leads = _read_outreach_queue()
-        now_iso = _crm_now_iso()
-        updated = None
-        for lead in leads:
-            if str(lead.get("id", "")) != str(lead_id):
-                continue
+        db = SessionLocal()
+        try:
+            row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Lead not found")
+            lead = _lead_from_row(row) or {}
+            now_iso = _crm_now_iso()
             lead["stage"] = "closed"
             lead["status"] = "closed"
             lead["converted_value"] = round(float(req.value or 0), 2)
@@ -946,11 +867,16 @@ def register_outreach_crm_routes(
                 notes = list(lead.get("notes") or [])
                 notes.append({"text": str(req.note)[:300], "timestamp": now_iso})
                 lead["notes"] = notes[-12:]
-            updated = _serialize_lead(lead)
-            break
-        if not updated:
-            raise HTTPException(status_code=404, detail="Lead not found")
-        _write_outreach_queue(leads)
+            updated = _persist_lead(db, lead)
+            db.commit()
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
         all_leads = _get_sorted_leads()
         return {
             "lead": updated,

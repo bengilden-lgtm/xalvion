@@ -106,40 +106,68 @@ def get_metrics() -> dict[str, Any]:
     global _metrics_failure_logged
     db = SessionLocal()
     try:
-        total = db.query(AnalyticsEvent).count()
+        total = int(db.query(func.count(AnalyticsEvent.id)).scalar() or 0)
         if not total:
             out = dict(_DEFAULT_METRICS)
             out["total_interactions"] = 0
             return out
 
-        avg_conf = db.query(func.avg(AnalyticsEvent.confidence)).scalar() or 0.0
-        avg_qual = db.query(func.avg(AnalyticsEvent.quality)).scalar() or 0.0
-        total_refunds = db.query(AnalyticsEvent).filter(AnalyticsEvent.action == "refund").count()
-        total_credits = db.query(AnalyticsEvent).filter(AnalyticsEvent.action == "credit").count()
-        review_n = db.query(AnalyticsEvent).filter(AnalyticsEvent.action == "review").count()
-        money_moved = (
-            db.query(func.sum(AnalyticsEvent.amount))
-            .filter(AnalyticsEvent.action.in_(["refund", "credit"]))
-            .scalar()
-            or 0.0
-        )
-        refund_cost = (
-            db.query(func.sum(AnalyticsEvent.amount))
-            .filter(AnalyticsEvent.action == "refund")
-            .scalar()
-            or 0.0
-        )
-        credit_volume = (
-            db.query(func.sum(AnalyticsEvent.amount))
-            .filter(AnalyticsEvent.action == "credit")
-            .scalar()
-            or 0.0
-        )
-        auto_safe_n = db.query(AnalyticsEvent).filter(
-            AnalyticsEvent.action.in_(["none", "credit"]),
-            AnalyticsEvent.quality >= 0.85,
-            AnalyticsEvent.confidence >= 0.82,
-        ).count()
+        try:
+            avg_conf = db.query(func.avg(AnalyticsEvent.confidence)).scalar() or 0.0
+        except OperationalError:
+            avg_conf = 0.0
+        try:
+            avg_qual = db.query(func.avg(AnalyticsEvent.quality)).scalar() or 0.0
+        except OperationalError:
+            avg_qual = 0.0
+
+        # Older schemas may not have action/amount columns. Preserve total_interactions regardless.
+        try:
+            total_refunds = int(db.query(func.count(AnalyticsEvent.id)).filter(AnalyticsEvent.action == "refund").scalar() or 0)
+            total_credits = int(db.query(func.count(AnalyticsEvent.id)).filter(AnalyticsEvent.action == "credit").scalar() or 0)
+            review_n = int(db.query(func.count(AnalyticsEvent.id)).filter(AnalyticsEvent.action == "review").scalar() or 0)
+        except OperationalError:
+            total_refunds = 0
+            total_credits = 0
+            review_n = 0
+
+        try:
+            money_moved = (
+                db.query(func.sum(AnalyticsEvent.amount))
+                .filter(AnalyticsEvent.action.in_(["refund", "credit"]))
+                .scalar()
+                or 0.0
+            )
+            refund_cost = (
+                db.query(func.sum(AnalyticsEvent.amount))
+                .filter(AnalyticsEvent.action == "refund")
+                .scalar()
+                or 0.0
+            )
+            credit_volume = (
+                db.query(func.sum(AnalyticsEvent.amount))
+                .filter(AnalyticsEvent.action == "credit")
+                .scalar()
+                or 0.0
+            )
+        except OperationalError:
+            money_moved = 0.0
+            refund_cost = 0.0
+            credit_volume = 0.0
+
+        try:
+            auto_safe_n = int(
+                db.query(func.count(AnalyticsEvent.id))
+                .filter(
+                    AnalyticsEvent.action.in_(["none", "credit"]),
+                    AnalyticsEvent.quality >= 0.85,
+                    AnalyticsEvent.confidence >= 0.82,
+                )
+                .scalar()
+                or 0
+            )
+        except OperationalError:
+            auto_safe_n = 0
         review_rate = round(review_n / max(1, total) * 100, 2)
         auto_safe_rate = round(auto_safe_n / max(1, total) * 100, 2)
         revenue_saved = round(float(credit_volume) * 2.05 + max(0, total - review_n) * 0.35, 2)
@@ -175,9 +203,9 @@ def get_metrics() -> dict[str, Any]:
                 recent_risk_events = None
 
             try:
-                total = float(ost.get("total", 0) or 0)
+                outcome_total = float(ost.get("total", 0) or 0)
                 human = float(ost.get("human_approved", 0) or 0)
-                reviewed_motion_rate = round((human / max(1.0, total)) * 100, 2)
+                reviewed_motion_rate = round((human / max(1.0, outcome_total)) * 100, 2)
             except Exception:
                 reviewed_motion_rate = None
         except Exception:

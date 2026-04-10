@@ -3,13 +3,23 @@ from __future__ import annotations
 from typing import Any
 
 from actions import build_ticket as build_support_ticket
+from app_utils import (
+    _clamp,
+    _now_iso,
+    _safe_channel,
+    _safe_priority,
+    _safe_queue,
+    _safe_risk,
+    _safe_source,
+    _safe_status,
+    get_plan_name,
+)
+from orm_models import ActionLog, Ticket
 from sqlalchemy.orm import Session
 
 
 def create_ticket_record(db: Session, user: Any, req: Any) -> Any:
-    import app as _app
-
-    now = _app._now_iso()
+    now = _now_iso()
     bootstrap_ticket = build_support_ticket(
         req.message,
         user_id=str(getattr(user, "username", "unknown") or "unknown"),
@@ -17,19 +27,19 @@ def create_ticket_record(db: Session, user: Any, req: Any) -> Any:
             "sentiment": req.sentiment if req.sentiment is not None else 5,
             "ltv": req.ltv if req.ltv is not None else 0,
             "order_status": req.order_status if req.order_status is not None else "unknown",
-            "plan_tier": _app.get_plan_name(user),
+            "plan_tier": get_plan_name(user),
             "operator_mode": "balanced",
-            "channel": _app._safe_channel(req.channel),
-            "source": _app._safe_source(req.source),
+            "channel": _safe_channel(req.channel),
+            "source": _safe_source(req.source),
             "customer_history": {},
         },
     )
-    ticket = _app.Ticket(
+    ticket = Ticket(
         created_at=now,
         updated_at=now,
         username=str(getattr(user, "username", "unknown") or "unknown"),
-        channel=_app._safe_channel(req.channel),
-        source=_app._safe_source(req.source),
+        channel=_safe_channel(req.channel),
+        source=_safe_source(req.source),
         subject=(req.message or "")[:300],
         customer_message=(req.message or "")[:10000],
         status="new",
@@ -45,8 +55,6 @@ def create_ticket_record(db: Session, user: Any, req: Any) -> Any:
 
 
 def update_ticket_from_result(db: Session, ticket: Any, result: dict[str, Any]) -> Any:
-    import app as _app
-
     decision = result.get("decision") or {}
     triage = result.get("triage") or {}
     output = result.get("output") or {}
@@ -64,11 +72,11 @@ def update_ticket_from_result(db: Session, ticket: Any, result: dict[str, Any]) 
     if raw_queue == "resolved":
         status = "resolved"
 
-    ticket.updated_at = _app._now_iso()
-    ticket.status = _app._safe_status(status)
-    ticket.queue = _app._safe_queue(raw_queue)
-    ticket.priority = _app._safe_priority(decision.get("priority") or (result.get("meta") or {}).get("priority") or "medium")
-    ticket.risk_level = _app._safe_risk(decision.get("risk_level") or "medium")
+    ticket.updated_at = _now_iso()
+    ticket.status = _safe_status(status)
+    ticket.queue = _safe_queue(raw_queue)
+    ticket.priority = _safe_priority(decision.get("priority") or (result.get("meta") or {}).get("priority") or "medium")
+    ticket.risk_level = _safe_risk(decision.get("risk_level") or "medium")
     ticket.issue_type = str(result.get("issue_type", "general_support") or "general_support")[:64]
     ticket.final_reply = str(result.get("reply", result.get("final", "")) or "")[:8000]
     ticket.internal_note = str(output.get("internal_note") or "")[:2000]
@@ -78,11 +86,11 @@ def update_ticket_from_result(db: Session, ticket: Any, result: dict[str, Any]) 
     ticket.quality = float(result.get("quality", 0) or 0)
     ticket.requires_approval = int(bool(decision.get("requires_approval", False)))
     ticket.approved = 0
-    ticket.urgency = _app._clamp(triage.get("urgency", 0), 0, 99)
-    ticket.churn_risk = _app._clamp(triage.get("churn_risk", 0), 0, 99)
-    ticket.refund_likelihood = _app._clamp(triage.get("refund_likelihood", 0), 0, 99)
-    ticket.abuse_likelihood = _app._clamp(triage.get("abuse_likelihood", 0), 0, 99)
-    ticket.complexity = _app._clamp(triage.get("complexity", 0), 0, 99)
+    ticket.urgency = _clamp(triage.get("urgency", 0), 0, 99)
+    ticket.churn_risk = _clamp(triage.get("churn_risk", 0), 0, 99)
+    ticket.refund_likelihood = _clamp(triage.get("refund_likelihood", 0), 0, 99)
+    ticket.abuse_likelihood = _clamp(triage.get("abuse_likelihood", 0), 0, 99)
+    ticket.complexity = _clamp(triage.get("complexity", 0), 0, 99)
 
     db.commit()
     db.refresh(ticket)
@@ -105,10 +113,8 @@ def log_action(
     requires_approval: bool = False,
     approved: bool = False,
 ) -> Any:
-    import app as _app
-
-    entry = _app.ActionLog(
-        timestamp=_app._now_iso(),
+    entry = ActionLog(
+        timestamp=_now_iso(),
         username=username,
         ticket_id=ticket_id,
         action=action,
@@ -160,13 +166,11 @@ def serialize_ticket(ticket: Any) -> dict[str, Any]:
 
 
 def serialize_ticket_with_log(ticket: Any, db: Session) -> dict[str, Any]:
-    import app as _app
-
     base = serialize_ticket(ticket)
     log = (
-        db.query(_app.ActionLog)
-        .filter(_app.ActionLog.ticket_id == ticket.id)
-        .order_by(_app.ActionLog.id.desc())
+        db.query(ActionLog)
+        .filter(ActionLog.ticket_id == ticket.id)
+        .order_by(ActionLog.id.desc())
         .first()
     )
     if log:

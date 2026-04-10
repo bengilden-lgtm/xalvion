@@ -11,6 +11,7 @@ export function createUiStore() {
 
   return {
     get: () => ({ ...state }),
+    getState: () => state,
     set(patch) {
       state = { ...state, ...patch };
       listeners.forEach((fn) => {
@@ -20,6 +21,9 @@ export function createUiStore() {
           /* no-op */
         }
       });
+    },
+    setState(patch) {
+      this.set(patch);
     },
     subscribe(fn) {
       listeners.add(fn);

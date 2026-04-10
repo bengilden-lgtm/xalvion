@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time as _time_mod
 from typing import Any
 
@@ -13,6 +14,8 @@ import app as app_mod
 router = APIRouter(tags=["dashboard"])
 
 logger = logging.getLogger("xalvion.api")
+
+_dashboard_cache_lock = threading.Lock()
 
 
 def _dashboard_summary_fallback(user: app_mod.User, db: Session, file_metrics: dict[str, Any]) -> dict[str, Any]:
@@ -178,9 +181,11 @@ def dashboard_summary(
                 "actions_taken":      actions_done,
             },
         }
-        app_mod._dashboard_cache.clear()
-        app_mod._dashboard_cache.update(result)
-        app_mod._dashboard_cache_ts = _now
+        # Cache is per-process; no effect under multi-worker deployments.
+        with _dashboard_cache_lock:
+            app_mod._dashboard_cache.clear()
+            app_mod._dashboard_cache.update(result)
+            app_mod._dashboard_cache_ts = _now
         return result
     except Exception as exc:
         app_mod._log_throttled_db_issue("GET /dashboard/summary", exc)

@@ -16,6 +16,7 @@ export function createSessionStore(initial = {}) {
 
   return {
     get: () => ({ ...state }),
+    getState: () => state,
     set(patch) {
       const next = { ...state, ...patch };
       state = next;
@@ -26,6 +27,9 @@ export function createSessionStore(initial = {}) {
           /* no-op */
         }
       });
+    },
+    setState(patch) {
+      this.set(patch);
     },
     subscribe(fn) {
       listeners.add(fn);

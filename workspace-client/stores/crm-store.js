@@ -12,6 +12,7 @@ export function createCrmStore(initial = {}) {
 
   return {
     get: () => ({ ...state }),
+    getState: () => state,
     set(patch) {
       state = { ...state, ...patch };
       listeners.forEach((fn) => {
@@ -21,6 +22,9 @@ export function createCrmStore(initial = {}) {
           /* no-op */
         }
       });
+    },
+    setState(patch) {
+      this.set(patch);
     },
     subscribe(fn) {
       listeners.add(fn);

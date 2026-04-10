@@ -72,6 +72,26 @@ from actions import (
 from db import Base, SessionLocal, engine, init_db
 from memory import get_user_memory
 from utils import normalize_ticket, safe_execute
+from app_utils import (
+    VALID_CHANNELS,
+    VALID_PRIORITIES,
+    VALID_QUEUES,
+    VALID_RISKS,
+    VALID_SOURCES,
+    VALID_STATUSES,
+    _clamp,
+    _me_capacity_message,
+    _now_iso,
+    _safe_channel,
+    _safe_priority,
+    _safe_queue,
+    _safe_risk,
+    _safe_source,
+    _safe_status,
+    _tier_upgrade_unlocks,
+    get_plan_name,
+)
+from orm_models import ActionLog, Ticket, User
 
 try:
     from learning import learn_from_ticket
@@ -371,10 +391,6 @@ _rate_log: dict[str, list[float]] = {}
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,64}$")
 
 
-def _now_iso() -> str:
-    return datetime.utcnow().isoformat()
-
-
 @contextmanager
 def db_session() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -386,81 +402,6 @@ def db_session() -> Generator[Session, None, None]:
 # =============================================================================
 # 3. MODELS
 # =============================================================================
-
-
-class User(Base):
-    __tablename__ = "users"
-
-    username = Column(String, primary_key=True, index=True)
-    password = Column(String, nullable=False)
-    usage = Column(Integer, default=0, nullable=False)
-    tier = Column(String, default="free", nullable=False)
-    stripe_connected = Column(Integer, default=0, nullable=False)
-    stripe_account_id = Column(String, nullable=True)
-    stripe_livemode = Column(Integer, default=0, nullable=False)
-    stripe_scope = Column(String, nullable=True)
-
-
-class ActionLog(Base):
-    __tablename__ = "action_logs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(String, nullable=False, index=True)
-    username = Column(String, nullable=False, index=True)
-    ticket_id = Column(Integer, nullable=True, index=True)
-    action = Column(String, nullable=False)
-    amount = Column(Float, default=0.0)
-    issue_type = Column(String, default="general_support")
-    reason = Column(String, default="")
-    status = Column(String, default="executed")
-    confidence = Column(Float, default=0.0)
-    quality = Column(Float, default=0.0)
-    message_snippet = Column(Text, default="")
-    requires_approval = Column(Integer, default=0)
-    approved = Column(Integer, default=0)
-
-    __table_args__ = (
-        Index("ix_actionlog_ticket", "ticket_id"),
-        Index("ix_actionlog_user_ts", "username", "timestamp"),
-    )
-
-
-class Ticket(Base):
-    __tablename__ = "tickets"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    created_at = Column(String, nullable=False)
-    updated_at = Column(String, nullable=False)
-    username = Column(String, nullable=False, index=True)
-    channel = Column(String, default="web")
-    source = Column(String, default="workspace")
-    status = Column(String, default="new", index=True)
-    queue = Column(String, default="new", index=True)
-    priority = Column(String, default="medium", index=True)
-    risk_level = Column(String, default="medium", index=True)
-    issue_type = Column(String, default="general_support", index=True)
-    subject = Column(Text, default="")
-    customer_message = Column(Text, default="")
-    final_reply = Column(Text, default="")
-    internal_note = Column(Text, default="")
-    action = Column(String, default="none")
-    amount = Column(Float, default=0.0)
-    confidence = Column(Float, default=0.0)
-    quality = Column(Float, default=0.0)
-    requires_approval = Column(Integer, default=0)
-    approved = Column(Integer, default=0)
-    churn_risk = Column(Integer, default=0)
-    refund_likelihood = Column(Integer, default=0)
-    abuse_likelihood = Column(Integer, default=0)
-    complexity = Column(Integer, default=0)
-    urgency = Column(Integer, default=0)
-
-    __table_args__ = (
-        Index("ix_ticket_user_status", "username", "status"),
-        Index("ix_ticket_queue_priority", "queue", "priority"),
-        Index("ix_ticket_churn", "churn_risk"),
-        Index("ix_ticket_issue_type", "issue_type"),
-    )
 
 
 class OperatorState(Base):
@@ -580,54 +521,12 @@ def _startup_database() -> None:
 # 4. ENUM CONSTANTS & VALIDATORS
 # =============================================================================
 
-VALID_QUEUES = {"new", "waiting", "escalated", "refund_risk", "vip", "resolved"}
-VALID_STATUSES = {"new", "waiting", "escalated", "resolved", "failed"}
-VALID_PRIORITIES = {"low", "medium", "high"}
-VALID_RISKS = {"low", "medium", "high"}
 VALID_OP_MODES = {"conservative", "balanced", "delight", "fraud_aware"}
-VALID_CHANNELS = {"web", "email", "api", "chat", "mobile"}
-VALID_SOURCES = {"workspace", "sdk", "api", "webhook", "import"}
-
-def _safe_queue(value: Any, default: str = "new") -> str:
-    v = str(value or default).strip().lower()
-    return v if v in VALID_QUEUES else default
-
-
-def _safe_status(value: Any, default: str = "new") -> str:
-    v = str(value or default).strip().lower()
-    return v if v in VALID_STATUSES else default
-
-
-def _safe_priority(value: Any, default: str = "medium") -> str:
-    v = str(value or default).strip().lower()
-    return v if v in VALID_PRIORITIES else default
-
-
-def _safe_risk(value: Any, default: str = "medium") -> str:
-    v = str(value or default).strip().lower()
-    return v if v in VALID_RISKS else default
 
 
 def _safe_op_mode(value: Any, default: str = "balanced") -> str:
     v = str(value or default).strip().lower()
     return v if v in VALID_OP_MODES else default
-
-
-def _safe_channel(value: Any, default: str = "web") -> str:
-    v = str(value or default).strip().lower()
-    return v if v in VALID_CHANNELS else default
-
-
-def _safe_source(value: Any, default: str = "workspace") -> str:
-    v = str(value or default).strip().lower()
-    return v if v in VALID_SOURCES else default
-
-
-def _clamp(value: Any, lo: int, hi: int) -> int:
-    try:
-        return max(lo, min(hi, int(value or 0)))
-    except (TypeError, ValueError):
-        return lo
 
 # =============================================================================
 # 5. PYDANTIC SCHEMAS
@@ -915,14 +814,6 @@ def check_rate_limit(user_id: str) -> bool:
 # =============================================================================
 # 7. PLAN & USAGE HELPERS
 # =============================================================================
-
-
-def get_plan_name(user: User | None) -> str:
-    if not user:
-        return "free"
-    tier = (getattr(user, "tier", None) or "free").strip().lower()
-    return tier if tier in PLAN_CONFIG else "free"
-
 
 def get_public_plan_name(user: User | None) -> str:
     tier = get_plan_name(user)

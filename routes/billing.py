@@ -96,9 +96,17 @@ def stripe_connect_callback(
         )
 
         user.stripe_connected = 1
-        user.stripe_account_id = token_response["stripe_user_id"]
-        user.stripe_livemode = 1 if bool(token_response["livemode"]) else 0
-        user.stripe_scope = str(token_response["scope"]) if token_response["scope"] else ""
+        if isinstance(token_response, dict) and token_response.get("error"):
+            logger.error("stripe_connect_oauth_error error=%s", str(token_response.get("error"))[:500])
+            return app_mod.RedirectResponse(
+                url=f"{app_mod.FRONTEND_URL}?stripe=error&detail={quote_plus('Could not complete Stripe connection. Please try again.')}",
+                status_code=303,
+            )
+
+        user.stripe_account_id = token_response.get("stripe_user_id") if isinstance(token_response, dict) else None
+        user.stripe_livemode = 1 if bool(token_response.get("livemode")) else 0
+        scope_val = token_response.get("scope") if isinstance(token_response, dict) else None
+        user.stripe_scope = str(scope_val) if scope_val else ""
 
         db.commit()
 
@@ -108,8 +116,9 @@ def stripe_connect_callback(
         )
     except Exception as exc:
         db.rollback()
+        logger.exception("stripe_connect_callback_failed")
         return app_mod.RedirectResponse(
-            url=f"{app_mod.FRONTEND_URL}?stripe=error&detail={quote_plus(str(exc))}",
+            url=f"{app_mod.FRONTEND_URL}?stripe=error&detail={quote_plus('Could not complete Stripe connection. Please try again.')}",
             status_code=303,
         )
 
@@ -229,6 +238,8 @@ def upgrade_plan(
 
 @router.post("/stripe/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)):
+    if not app_mod.STRIPE_WEBHOOK_SECRET and getattr(app_mod, "ENVIRONMENT", "development") == "production":
+        raise HTTPException(status_code=500, detail="Stripe webhook secret not configured")
     if not app_mod.STRIPE_KEY:
         raise HTTPException(status_code=500, detail="Stripe not configured")
 

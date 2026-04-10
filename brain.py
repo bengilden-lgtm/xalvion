@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any, Dict, List
 
 from state_store import load_state, save_state
 
 BRAIN_STATE_KEY = "brain_v1"
+
+_brain_lock = threading.Lock()
 
 
 def default_brain() -> Dict[str, Any]:
@@ -34,7 +37,9 @@ def default_brain() -> Dict[str, Any]:
 
 
 def save_brain(brain: Dict[str, Any]) -> None:
-    save_state(BRAIN_STATE_KEY, brain)
+    # brain.json is not safe for multi-worker deployments; migrate to DB for production scale.
+    with _brain_lock:
+        save_state(BRAIN_STATE_KEY, brain)
 
 
 def normalize_rule(rule: Any) -> Dict[str, Any] | None:

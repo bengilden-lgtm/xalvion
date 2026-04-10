@@ -27,7 +27,6 @@ const refundStore = createRefundStore();
 
 const analyticsEngine = createAnalyticsEngine({ sessionStore });
 const agentVisualizer = createAgentVisualizer({ agentStore });
-const stripeEngine = createStripeEngine({ refundStore, apiClient: null });
 const chromeContext = createChromeContext();
 const inboxScanEngine = createInboxScanEngine({ chromeContext });
 
@@ -38,6 +37,8 @@ function createBoundApi(getToken, onUnauthorized) {
     onUnauthorized,
   });
 }
+
+const stripeEngine = createStripeEngine({ refundStore, apiClient: createBoundApi(() => "", () => {}) });
 
 globalThis.__XALVION_PHASE2__ = {
   version: 2,

@@ -8,7 +8,7 @@ FIX: The original called add_rule() on a local brain copy without saving.
 """
 from __future__ import annotations
 
-from brain import add_rule, load_brain, save_brain
+from brain import add_rule, load_brain
 
 
 def process_feedback(user_input: str, response: str, quality: float) -> None:
@@ -27,6 +27,3 @@ def process_feedback(user_input: str, response: str, quality: float) -> None:
             "condition": {},
             "action": {"type": "none", "amount": 0},
         })
-
-    # add_rule calls save_brain internally — explicit save kept as safety net
-    save_brain(brain)
