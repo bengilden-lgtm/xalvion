@@ -6,7 +6,7 @@ import time as _time_mod
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from sqlalchemy import case as _case, func as _func
 from sqlalchemy.orm import Session
 
 import app as app_mod
@@ -108,30 +108,56 @@ def dashboard_summary(
         return cached
 
     try:
-        total_tickets = db.query(app_mod.Ticket).count()
-        auto_resolved = db.query(app_mod.Ticket).filter(app_mod.Ticket.status == "resolved").count()
-        escalated = db.query(app_mod.Ticket).filter(app_mod.Ticket.status.in_(["waiting", "escalated"])).count()
-        failed_count = db.query(app_mod.Ticket).filter(app_mod.Ticket.status == "failed").count()
-        high_risk = db.query(app_mod.Ticket).filter(app_mod.Ticket.churn_risk >= 60).count()
+        _tkt = db.query(
+            _func.count(app_mod.Ticket.id).label("total"),
+            _func.count(_case((app_mod.Ticket.status == "resolved", 1), else_=None)).label("resolved"),
+            _func.count(_case((app_mod.Ticket.status.in_(["waiting", "escalated"]), 1), else_=None)).label("escalated"),
+            _func.count(_case((app_mod.Ticket.status == "failed", 1), else_=None)).label("failed"),
+            _func.count(_case((app_mod.Ticket.churn_risk >= 60, 1), else_=None)).label("high_risk"),
+        ).one_or_none()
+
+        if _tkt is None:
+            total_tickets = auto_resolved = escalated = failed_count = high_risk = 0
+        else:
+            total_tickets = int(_tkt.total or 0)
+            auto_resolved = int(_tkt.resolved or 0)
+            escalated = int(_tkt.escalated or 0)
+            failed_count = int(_tkt.failed or 0)
+            high_risk = int(_tkt.high_risk or 0)
+
         pending_approvals = db.query(app_mod.ActionLog).filter(
             app_mod.ActionLog.requires_approval == 1,
             app_mod.ActionLog.approved == 0,
         ).count()
 
-        refund_total = float(db.query(func.sum(app_mod.ActionLog.amount)).filter(app_mod.ActionLog.action == "refund").scalar() or 0)
-        credit_total = float(db.query(func.sum(app_mod.ActionLog.amount)).filter(app_mod.ActionLog.action == "credit").scalar() or 0)
-        actions_done = db.query(app_mod.ActionLog).filter(app_mod.ActionLog.action.in_(["refund", "credit"])).count()
-        approved_count = db.query(app_mod.ActionLog).filter(app_mod.ActionLog.approved == 1).count()
+        _act = db.query(
+            _func.coalesce(_func.sum(_case((app_mod.ActionLog.action == "refund", app_mod.ActionLog.amount), else_=0)), 0).label("refund_total"),
+            _func.coalesce(_func.sum(_case((app_mod.ActionLog.action == "credit", app_mod.ActionLog.amount), else_=0)), 0).label("credit_total"),
+            _func.count(_case((app_mod.ActionLog.action.in_(["refund", "credit"]), 1), else_=None)).label("actions_done"),
+            _func.count(_case((app_mod.ActionLog.approved == 1, 1), else_=None)).label("approved_count"),
+            _func.avg(_case((app_mod.ActionLog.confidence > 0, app_mod.ActionLog.confidence), else_=None)).label("avg_conf"),
+            _func.avg(_case((app_mod.ActionLog.quality > 0, app_mod.ActionLog.quality), else_=None)).label("avg_qual"),
+        ).one_or_none()
 
-        db_avg_conf = float(db.query(func.avg(app_mod.ActionLog.confidence)).filter(app_mod.ActionLog.confidence > 0).scalar() or 0)
-        db_avg_qual = float(db.query(func.avg(app_mod.ActionLog.quality)).filter(app_mod.ActionLog.quality > 0).scalar() or 0)
+        if _act is None:
+            refund_total = credit_total = 0.0
+            actions_done = approved_count = 0
+            db_avg_conf = db_avg_qual = 0.0
+        else:
+            refund_total = float(_act.refund_total or 0)
+            credit_total = float(_act.credit_total or 0)
+            actions_done = int(_act.actions_done or 0)
+            approved_count = int(_act.approved_count or 0)
+            db_avg_conf = float(_act.avg_conf or 0)
+            db_avg_qual = float(_act.avg_qual or 0)
+
         avg_confidence = file_metrics.get("avg_confidence") or round(db_avg_conf, 4)
         avg_quality = file_metrics.get("avg_quality") or round(db_avg_qual, 4)
 
-        queue_rows = db.query(app_mod.Ticket.queue, func.count(app_mod.Ticket.id)).group_by(app_mod.Ticket.queue).all()
-        prio_rows = db.query(app_mod.Ticket.priority, func.count(app_mod.Ticket.id)).group_by(app_mod.Ticket.priority).all()
-        risk_rows = db.query(app_mod.Ticket.risk_level, func.count(app_mod.Ticket.id)).group_by(app_mod.Ticket.risk_level).all()
-        status_rows = db.query(app_mod.Ticket.status, func.count(app_mod.Ticket.id)).group_by(app_mod.Ticket.status).all()
+        queue_rows = db.query(app_mod.Ticket.queue, _func.count(app_mod.Ticket.id)).group_by(app_mod.Ticket.queue).all()
+        prio_rows = db.query(app_mod.Ticket.priority, _func.count(app_mod.Ticket.id)).group_by(app_mod.Ticket.priority).all()
+        risk_rows = db.query(app_mod.Ticket.risk_level, _func.count(app_mod.Ticket.id)).group_by(app_mod.Ticket.risk_level).all()
+        status_rows = db.query(app_mod.Ticket.status, _func.count(app_mod.Ticket.id)).group_by(app_mod.Ticket.status).all()
 
         by_queue = {app_mod._safe_queue(q or "new"): int(c) for q, c in queue_rows}
         by_priority = {app_mod._safe_priority(p or "medium"): int(c) for p, c in prio_rows}
