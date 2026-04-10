@@ -245,8 +245,11 @@ CHECKOUT_SUCCESS_URL = os.getenv("CHECKOUT_SUCCESS_URL", f"{FRONTEND_URL}?checko
 CHECKOUT_CANCEL_URL = os.getenv("CHECKOUT_CANCEL_URL", f"{FRONTEND_URL}?checkout=cancel")
 STRIPE_CONNECT_CLIENT_ID = os.getenv("STRIPE_CONNECT_CLIENT_ID", "").strip()
 STRIPE_CONNECT_REDIRECT_URI = os.getenv(
-    "STRIPE_CONNECT_REDIRECT_URI",
-    f"{API_PUBLIC_ORIGIN}/integrations/stripe/callback",
+    "STRIPE_REDIRECT_URI",
+    os.getenv(
+        "STRIPE_CONNECT_REDIRECT_URI",
+        "https://xalvion.tech/integrations/stripe/callback",
+    ),
 ).strip()
 
 STREAM_CHUNK_SIZE = int(os.getenv("STREAM_CHUNK_SIZE", "18"))
