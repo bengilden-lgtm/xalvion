@@ -4232,6 +4232,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   function setAssistantCopy(row, text) {
     const node = getAssistantCopyNode(row);
     if (!node) return;
+    // Clear any streamed content before setting final reply
+    if (!node.querySelector(".typing, .xv-thinking-block")) {
+      node.innerHTML = "";
+    }
     const normalized = (text || "")
       .replace(/\r\n/g, "\n")
       .replace(/\r/g, "\n")
@@ -5143,7 +5147,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const tst = String(data.tool_status || "").toLowerCase();
     const st = String(data.status || ticket.status || "").toLowerCase();
     if (tst === "rejected" || st === "escalated") {
-      setTerminal("Rejected", "Response held. Ticket escalated.");
+      setTerminal("Rejected", "");
       return;
     }
     if (approval.approved) {
@@ -5523,6 +5527,19 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const output = data.output || {};
     const impact = data.impact || {};
     const toolStatus = String(data.tool_status || data.execution?.status || "resolved");
+    const translateToolStatus = (s) => {
+      const map = {
+        local_fast_path: "Local decision · no external tool called",
+        stripe_live:     "Stripe · live execution",
+        stripe_draft:    "Stripe · draft prepared",
+        resolved:        "Resolved",
+        review:          "Held for review",
+        escalated:       "Escalated",
+        blocked:         "Blocked by policy",
+      };
+      return map[String(s).toLowerCase()] || String(s).replace(/_/g, " ");
+    };
+    const toolStatusDisplay = translateToolStatus(toolStatus);
     const internalNote = String(output.internal_note || "").trim();
     const policyNote = String(data.reason || decision.reason || "").trim();
     const trace = thinkingTraceSnippet(data, 5);
@@ -5648,7 +5665,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           ${createDetailBox("Queue", queueLabel(decision.queue || "new"))}
           ${createDetailBox("Risk", riskLabel(data))}
           ${createDetailBox("Priority", String(decision.priority || "medium"))}
-          ${createDetailBox("Tool status", toolStatus)}
+          ${createDetailBox("Tool status", toolStatusDisplay)}
           ${createDetailBox("Value surfaced", formatMoney(impact.money_saved || impact.amount || data.amount || 0))}
         </div>
         ${policyNote && policyNote !== internalNote ? `<div class="details-note">${escapeHtml(policyNote)}</div>` : ""}
