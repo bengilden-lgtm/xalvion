@@ -1571,7 +1571,7 @@ textarea{ resize:vertical; }
   border-radius: 999px !important;
 }
 
-#messagesZone {
+#messages-zone-UNUSED {
   padding-bottom: 180px !important;
 }
 
@@ -1587,4 +1587,9 @@ textarea{ resize:vertical; }
 
 #messageInput {
   border-radius: 999px !important;
+}
+
+/* CORRECT scroll padding - uses real container ID */
+#messages {
+  padding-bottom: 180px !important;
 }
