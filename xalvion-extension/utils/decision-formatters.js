@@ -47,6 +47,11 @@ export function normalize(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** True when `/analyze` JSON is safe to pass into the sidepanel renderer (object payload). */
+export function isRenderableAnalyzePayload(data) {
+  return data != null && typeof data === "object" && !Array.isArray(data);
+}
+
 export function safe(value, fallback = "-") {
   const v = normalize(String(value ?? ""));
   return v || fallback;
