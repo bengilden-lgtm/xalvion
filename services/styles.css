@@ -378,7 +378,7 @@ svg{
   display:flex;
   align-items: center;
   gap: var(--s-3);
-  padding: max(8px, env(safe-area-inset-top, 0px)) 12px 8px 12px;
+  padding: max(8px, env(safe-area-inset-top, 0px)) 12px 8px 18px;
   background: rgba(4,5,13,.75);
   border-bottom: 1px solid rgba(255,255,255,.11);
   backdrop-filter: blur(20px);
