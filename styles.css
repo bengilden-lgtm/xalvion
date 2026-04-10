@@ -91,10 +91,10 @@ button,input,textarea,select{ font:inherit; }
   position:sticky;
   top:0;
   z-index:40;
-  border-bottom:1px solid var(--line-soft);
-  background: rgba(43,39,35,0.82);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  border-bottom:1px solid rgba(255,255,255,.11);
+  background: rgba(4,5,13,.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 .topbar-inner{
   height:var(--topbar-h);
@@ -149,8 +149,8 @@ button,input,textarea,select{ font:inherit; }
   min-height:34px;
   padding:0 12px;
   border-radius:999px;
-  border:1px solid var(--line-soft);
-  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(124,92,252,.28);
+  background: rgba(124,92,252,.08);
   color:var(--text-muted);
   font-size:12.5px;
 }
