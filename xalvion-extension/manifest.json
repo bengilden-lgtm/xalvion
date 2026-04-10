@@ -22,6 +22,7 @@
     "https://*.railway.app/*",
     "https://*.onrender.com/*",
     "https://*.fly.dev/*",
+    "https://api.xalvion.tech/*",
     "https://*.xalvion.tech/*"
   ],
 
