@@ -1147,6 +1147,13 @@ select:focus{ border-color: rgba(246,242,235,0.16); box-shadow:0 0 0 4px rgba(24
 
 /* Basic fallbacks for older class names that still appear */
 .glass{ background:transparent !important; box-shadow:none !important; border:none !important; }
+#commandStrip.glass{
+  background: rgba(4,5,13,.92) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(255,255,255,.11) !important;
+  box-shadow: none !important;
+}
 .scroll-shell{ position:relative; }
 .scroll-area{ overflow:auto; min-height:0; }
 .messages-zone{ min-height:0; }
