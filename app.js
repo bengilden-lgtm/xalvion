@@ -1243,13 +1243,20 @@ if (typeof window.pulseRail !== "function") {
       textarea,
       #messageInput,
       .message-input {
-        min-height: 56px;
-        padding: 12px 12px !important;
+        border-radius: 999px !important;
+        padding: 12px 52px 12px 20px !important;
+        min-height: 48px !important;
+        max-height: 48px !important;
+        height: 48px !important;
+        font-size: 14px !important;
+        line-height: 1.4 !important;
+        resize: none !important;
+        overflow: hidden !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
         background: rgba(255,255,255,0.040) !important;
         border: 1px solid rgba(255,255,255,0.052) !important;
-        border-radius: 15px !important;
         color: var(--xv-text) !important;
-        font-size: 16px !important;
       }
 
       textarea::placeholder,
@@ -1260,8 +1267,12 @@ if (typeof window.pulseRail !== "function") {
 
       .composer-input-row,
       .composer-input-wrap {
-        gap: 10px !important;
-        align-items: flex-end !important;
+        position: relative !important;
+        gap: 0 !important;
+        align-items: center !important;
+        padding: 0 !important;
+        border-radius: 999px !important;
+        overflow: hidden !important;
       }
 
       .composer .quick-actions {
@@ -1364,12 +1375,32 @@ if (typeof window.pulseRail !== "function") {
 
       #sendBtn,
       .send-btn {
-        width: 44px;
-        height: 44px;
-        border-radius: 13px !important;
+        position: absolute !important;
+        right: 8px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
         background: linear-gradient(135deg, #8d6cff, #6f58ff) !important;
         border: none !important;
         box-shadow: 0 8px 18px rgba(111, 88, 255, 0.18) !important;
+      }
+
+      #workspaceComposerDock {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 57px !important;
+        right: 0 !important;
+        padding: 12px 32px 20px !important;
+        background: linear-gradient(to top, var(--bg, #1a1814) 70%, transparent) !important;
+        z-index: 10 !important;
+      }
+
+      #workspaceComposerDock .quick-examples,
+      #workspaceComposerDock .composer-stripe-fold {
+        padding-top: 8px !important;
+        font-size: 12px !important;
       }
 
       @media (max-width: 1200px) {
