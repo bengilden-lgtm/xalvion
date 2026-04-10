@@ -415,6 +415,11 @@ svg{
   padding: 6px 8px;
   border-radius: var(--r-sm);
 }
+.command-brand svg{
+  display:block;
+  height: 38px;
+  width: auto;
+}
 .command-brand:hover{ background: color-mix(in oklab, white 5%, transparent); }
 .command-brand-mark{
   width: 18px;
