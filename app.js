@@ -558,7 +558,7 @@ if (typeof window.pulseRail !== "function") {
               padding: clamp(10px, 2vh, 18px) clamp(12px, 2.5vw, 22px) 8px !important;
             }
             body[data-ui="claude"] #messages{
-              padding: 6px 0 56px !important;
+              padding: 6px 0 160px !important;
               gap: 12px !important;
             }
 
@@ -1006,7 +1006,7 @@ if (typeof window.pulseRail !== "function") {
         display: flex;
         flex-direction: column;
         gap: 16px;
-        padding: 24px 24px 120px;
+        padding: 24px 24px 160px;
         max-width: 1120px;
         margin: 0 auto;
         background: transparent !important;
@@ -1245,7 +1245,7 @@ if (typeof window.pulseRail !== "function") {
       .message-input {
         border-radius: 999px !important;
         padding: 12px 52px 12px 20px !important;
-        min-height: 48px !important;
+        min-height: unset !important;
         max-height: 48px !important;
         height: 48px !important;
         font-size: 14px !important;
@@ -1392,9 +1392,9 @@ if (typeof window.pulseRail !== "function") {
         bottom: 0 !important;
         left: 57px !important;
         right: 0 !important;
-        padding: 12px 32px 20px !important;
-        background: linear-gradient(to top, var(--bg, #1a1814) 70%, transparent) !important;
-        z-index: 10 !important;
+        padding: 16px 32px 24px !important;
+        background: #1a1814 !important;
+        z-index: 20 !important;
       }
 
       #workspaceComposerDock .quick-examples,
@@ -1405,7 +1405,7 @@ if (typeof window.pulseRail !== "function") {
 
       @media (max-width: 1200px) {
         #messages {
-          padding: 24px 20px 120px;
+          padding: 24px 20px 160px;
         }
         .empty-card {
           width: 100%;
