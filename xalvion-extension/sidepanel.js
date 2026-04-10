@@ -895,16 +895,16 @@ function render(data) {
     setDecisionMicrocopy("Response held. Ticket escalated.", "risk");
     if (resultPanel) resultPanel.dataset.decisionTone = "risk";
   } else if (pendingGate) {
-    setDecisionMicrocopy("Approval required — execution is held until you approve.", "hold");
+    setDecisionMicrocopy("Approval required — nothing moves until you decide.", "hold");
     if (resultPanel) resultPanel.dataset.decisionTone = "hold";
   } else {
     const riskLc = normalize(String(decision.risk_level ?? triage.risk_level ?? data.risk_level ?? "")).toLowerCase();
     const risky = riskLc === "high" || riskLc === "medium" || normalize(action).toLowerCase() === "review";
     if (risky) {
-      setDecisionMicrocopy("Review recommended due to elevated risk.", "risk");
+      setDecisionMicrocopy("Higher risk — read carefully before you send.", "risk");
       if (resultPanel) resultPanel.dataset.decisionTone = "risk";
     } else {
-      setDecisionMicrocopy("This action is safe based on past outcomes.", "safe");
+      setDecisionMicrocopy("Matches similar safe outcomes — still your send.", "safe");
       if (resultPanel) resultPanel.dataset.decisionTone = "safe";
     }
   }
@@ -968,7 +968,7 @@ function render(data) {
   if (resultPanel) {
     const cards = Array.from(resultPanel.querySelectorAll(".card"));
     cards.forEach((card, index) => {
-      card.style.animationDelay = `${Math.min(index * 0.02, 0.22)}s`;
+      card.style.animationDelay = `${Math.min(index * 0.012, 0.12)}s`;
     });
   }
 
@@ -995,9 +995,9 @@ function render(data) {
   showPanel();
 
   if (impact?.agent_minutes_saved > 0) {
-    showStatus(`⚡ Saved ${impact.agent_minutes_saved} agent minutes`);
+    showStatus(`~${impact.agent_minutes_saved} min back on this ticket`);
   } else {
-    showStatus("Ready.");
+    showStatus("Reply ready.");
   }
 
   usageChrome.refreshUsageChrome();
@@ -1084,7 +1084,7 @@ async function analyze() {
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
     usageChrome.notifyGateAttempt?.("analyze");
     showStatus(
-      "Included capacity is used for this window. Keep working without interruption — copy/insert and approvals stay available while you add runway.",
+      "Included runs used for this window — copy, insert, and approvals still work. Add runway to go unlimited.",
       false
     );
     usageChrome.refreshUsageChrome();
@@ -1256,7 +1256,7 @@ async function analyze() {
     usageChrome.notifyOperatorRunComplete?.(data);
     usageChrome.refreshUsageChrome();
     usageChrome.syncPrimaryRunButtons();
-    showStatus({ title: "Decision ready", body: "Copy or insert when you’re satisfied with the operator brief." }, false);
+    showStatus({ title: "Reply ready", body: "Copy or insert — you’re in control of what ships." }, false);
   } catch (err) {
     disarmSlowNudge();
     agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
@@ -1291,7 +1291,7 @@ async function scanInbox() {
   if (preSnap.hardLimited && !preSnap.hasProAccess) {
     usageChrome.notifyGateAttempt?.("scan");
     showStatus(
-      "Included capacity is used for this window. Keep handling threads without interruption — copy/insert and approvals stay available while you add runway.",
+      "Included runs used — copy, insert, and approvals still work. Add runway to keep threads uninterrupted.",
       false
     );
     usageChrome.refreshUsageChrome();
@@ -1363,7 +1363,7 @@ async function scanInbox() {
           agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
           usageChrome.notifyGateAttempt?.("scan");
           showStatus(
-            "Included capacity is used for this window. Continue operating — copy/insert and approvals stay available while you add runway.",
+            "Included runs used — keep operating; copy, insert, and approvals stay on. Add runway when you’re ready.",
             false
           );
           if (emptyState) emptyState.style.display = "grid";
@@ -1438,14 +1438,14 @@ async function scanInbox() {
     const summary = buildInboxSummary(results);
     const summaryText =
       `${summary.total} tickets scanned\n` +
-      `⚡ ${summary.auto} safe to auto-resolve\n` +
-      `🧠 ${summary.review} need review\n` +
-      `⚠️ ${summary.risk} high-risk cases\n` +
-      `💰 Estimated time saved: ${summary.minutesSaved} min`;
+      `⚡ ${summary.auto} look routine to close\n` +
+      `🧠 ${summary.review} need a closer read\n` +
+      `⚠️ ${summary.risk} higher-risk\n` +
+      `~${summary.minutesSaved} min estimated back`;
 
     showInboxSummary(summaryText);
-    showHeaderInsight(`Inbox scan complete — ${summary.auto}/${summary.total} visible tickets look safe to automate.`);
-    showStatus(`Inbox analysis complete. Estimated time saved: ${summary.minutesSaved} min`);
+    showHeaderInsight(`Inbox scan done — ${summary.auto}/${summary.total} visible rows look routine to clear.`);
+    showStatus(`Inbox done — ~${summary.minutesSaved} min estimated back`);
   } catch (err) {
     disarmSlowNudge();
     agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
@@ -1488,7 +1488,7 @@ if (gateDoneBtn) {
   gateDoneBtn.addEventListener("click", () => {
     setReplyEditing(false);
     if (approvalCompact) approvalCompact.classList.remove("is-visible");
-    showStatus("Review logged — copy or insert when ready.");
+    showStatus("Logged — copy or insert when you’re ready.");
   });
 }
 
@@ -1529,11 +1529,11 @@ if (copyBtn) {
       await navigator.clipboard.writeText(lastReply);
       const original = copyBtn.textContent;
       copyBtn.textContent = "Copied ✓";
-      showStatus({ title: "Copied", body: "Final reply is in your clipboard." }, false);
+      showStatus({ title: "Copied", body: "Paste into your reply when ready." }, false);
 
       setTimeout(() => {
         copyBtn.textContent = original;
-      }, 1200);
+      }, 780);
     } catch (err) {
       console.error("Copy failed:", err);
       showStatus(
@@ -1582,12 +1582,12 @@ if (insertBtn) {
       }
 
       const original = insertBtn.textContent;
-      insertBtn.textContent = "Placed ✓";
-      showStatus({ title: "In your composer", body: "The reply is in the active Gmail field — review, then send." }, false);
+      insertBtn.textContent = "Inserted ✓";
+      showStatus({ title: "Inserted into reply", body: "Ready to send — give it a final read." }, false);
 
       setTimeout(() => {
         insertBtn.textContent = original;
-      }, 1200);
+      }, 780);
     } catch (err) {
       console.error("Insert failed:", err);
       showStatus(

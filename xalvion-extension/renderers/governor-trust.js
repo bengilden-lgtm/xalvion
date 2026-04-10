@@ -151,15 +151,15 @@ export function deriveGovernorPresentation(data, getDecisionData) {
   if (mode === "blocked") {
     label = "Blocked by policy";
     cls = "signal-high-risk signal-blocked";
-    title = govReason || "Blocked by governor policy";
+    title = govReason || "Blocked under policy";
   } else if (mode === "review") {
     label = "Approval required";
     cls = "signal-approval";
-    title = govReason || "Review required under governor policy";
+    title = govReason || "Review required under policy";
   } else if (mode === "auto") {
-    label = "Safe to automate";
+    label = "Routine path";
     cls = "signal-safe";
-    title = govReason || "Meets automation safety criteria";
+    title = govReason || "Policy check passed — still your send";
   }
 
   const summary = govReason
@@ -211,8 +211,8 @@ export function renderConsequenceBar({
           : gov.mode === "review"
             ? "⚡ Approval required"
             : gov.mode === "auto"
-              ? "✓ Safe to automate"
-              : "○ Manual review";
+              ? "✓ Routine path"
+              : "○ Review recommended";
       return { cls: gov.cls || "signal-review", text, title: gov.summary || gov.title || "" };
     }
     return deriveConsequencePresentation(data);

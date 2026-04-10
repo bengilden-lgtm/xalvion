@@ -86,14 +86,14 @@ export function deriveConsequencePresentation(data) {
   if (tier === "safe_autopilot_ready") {
     return {
       cls: "signal-safe",
-      text: "Safe to automate",
-      title: "Automation safety criteria met",
+      text: "Routine path",
+      title: "Policy check passed — still your send",
     };
   }
   if (tier === "assist_only") {
     return {
       cls: "signal-review",
-      text: "Manual review",
+      text: "Review recommended",
       title: "Keep a human in the loop on this path",
     };
   }
@@ -101,7 +101,7 @@ export function deriveConsequencePresentation(data) {
     return {
       cls: "signal-approval",
       text: "Approval required",
-      title: String(data.governor_reason || dec.governor_reason || "Awaiting operator approval"),
+      title: String(data.governor_reason || dec.governor_reason || "Awaiting your approval"),
     };
   }
   const action = String(dec.action || data.action || "none").toLowerCase();
@@ -112,7 +112,7 @@ export function deriveConsequencePresentation(data) {
   if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
     return { cls: "signal-review", text: "Review recommended", title: "" };
   }
-  return { cls: "signal-safe", text: "Safe to send", title: "" };
+  return { cls: "signal-safe", text: "Routine path", title: "No billing hold — quick read, then send" };
 }
 
 export function approvalGateActive(data) {
@@ -133,9 +133,9 @@ export function getApprovalCompactCopyText(data) {
     return "Higher risk — edit or hold until you are comfortable sending.";
   }
   if (dec.requires_approval || data.requires_approval || pres.cls === "signal-approval") {
-    return "This move needs your sign-off — read the reply, then copy or place it.";
+    return "Approval required — read the reply, then copy or insert when you’re ready.";
   }
-  return "Quick read recommended — then copy or place when it sounds right.";
+  return "Quick read — then copy or insert when it sounds right.";
 }
 
 export function inferDisplayAction(data, reply, issueType) {
@@ -258,7 +258,7 @@ export function formatMemorySummary(memorySummary) {
   if (memorySummary.summary) lines.push(`• ${memorySummary.summary}`);
   if (memorySummary.pattern) lines.push(`• Pattern: ${memorySummary.pattern}`);
   if (memorySummary.samples !== undefined) lines.push(`• Samples: ${memorySummary.samples}`);
-  if (memorySummary.avg_confidence !== undefined) lines.push(`• Avg confidence: ${memorySummary.avg_confidence}`);
+  if (memorySummary.avg_confidence !== undefined) lines.push(`• Avg confidence level: ${memorySummary.avg_confidence}`);
   if (memorySummary.same_action_rate !== undefined) lines.push(`• Same action rate: ${memorySummary.same_action_rate}`);
   if (memorySummary.issue_count !== undefined) lines.push(`• Similar issues: ${memorySummary.issue_count}`);
   if (memorySummary.same_action_count !== undefined) lines.push(`• Same action path: ${memorySummary.same_action_count}`);
@@ -273,7 +273,7 @@ export function formatSessionImpact(sessionImpact) {
   if (sessionImpact.tickets_resolved !== undefined) lines.push(`• Tickets resolved: ${sessionImpact.tickets_resolved}`);
   if (sessionImpact.agent_minutes_saved !== undefined) lines.push(`• Agent minutes saved: ${sessionImpact.agent_minutes_saved}`);
   if (sessionImpact.value_generated !== undefined) lines.push(`• Value generated: $${Number(sessionImpact.value_generated).toFixed(2)}`);
-  if (sessionImpact.avg_confidence !== undefined) lines.push(`• Avg confidence: ${sessionImpact.avg_confidence}`);
+  if (sessionImpact.avg_confidence !== undefined) lines.push(`• Avg confidence level: ${sessionImpact.avg_confidence}`);
   return lines.join("\n");
 }
 
@@ -310,21 +310,21 @@ export function buildOperatorBriefLines(data) {
 
   const posture =
     requiresApproval
-      ? "Approval gate active — operator release required"
+      ? "Awaiting your approval — release required"
       : execTier
-        ? `Execution tier: ${execTier.replace(/_/g, " ")}`
-        : "No approval gate — standard operator verification";
+        ? `Path: ${execTier.replace(/_/g, " ")}`
+        : "No hold — standard operator verification";
 
   const operatorCheck = requiresApproval
-    ? "Confirm customer-safe wording + money/policy facts, then approve or reject."
-    : "Skim for factual correctness, then copy/insert.";
+    ? "Confirm customer-safe wording and money/policy facts, then approve or reject."
+    : "Skim for accuracy, then copy or insert.";
 
   return [
     { label: "Mission", value: `${safe(action)} · ${safe(issueType)}${timeSaved ? ` · est. ${timeSaved} saved` : ""}` },
     { label: "Posture", value: posture },
     { label: "Status · queue", value: `${status} · ${queue}` },
-    { label: "Risk · confidence", value: `${risk} · ${conf}` },
-    ...(governorReason ? [{ label: "Governor", value: governorReason }] : []),
+    { label: "Risk · confidence level", value: `${risk} · ${conf}` },
+    ...(governorReason ? [{ label: "Policy note", value: governorReason }] : []),
     { label: "Operator check", value: operatorCheck },
   ];
 }

@@ -163,24 +163,24 @@ export function buildHeaderInsight(data) {
 
   if (requiresApproval) {
     return governorReason
-      ? `Approval gate active — ${governorReason}`
-      : "Approval gate active — review brief, then approve/reject or edit the final customer response.";
+      ? `Your approval needed — ${governorReason}`
+      : "Your approval needed — read the brief, then approve, reject, or edit the customer reply.";
   }
 
   if (status === "resolved" && action && samples > 0 && Number.isFinite(confidence) && confidence > 0) {
-    return `Resolved using ${samples} similar past tickets at ${confidence.toFixed(2)} confidence.`;
+    return `Closed on a path backed by ${samples} similar tickets (confidence level ${confidence.toFixed(2)}).`;
   }
 
   if (status === "resolved" && action) {
-    return `High-confidence path selected: ${action}.`;
+    return `Closed on a strong path: ${action}.`;
   }
 
   if ((status === "waiting" || status === "pending") && action) {
-    return `Decision prepared: ${action}. Human review is still required.`;
+    return `Next step prepared: ${action} — still needs your read.`;
   }
 
   if (status === "escalated") {
-    return "Escalated for review because this case falls outside the low-risk automation path.";
+    return "Escalated — this case sits outside the routine path.";
   }
 
   return "Decision prepared using ticket context, policy fit, and learned behavior.";

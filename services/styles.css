@@ -1581,7 +1581,7 @@ select.refund-select{ padding-right: 34px; }
 
 /* Prepared reveal (keep subtle, not glowy) */
 .customer-message-block.xv-prepared-reveal{
-  animation: preparedPulse 1.2s var(--ease) 1;
+  animation: preparedPulse 0.78s var(--ease) 1;
 }
 @keyframes preparedPulse{
   0%{ filter: none; }
@@ -1974,7 +1974,7 @@ select.refund-select{ padding-right: 34px; }
 .decision-controls{
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -2079,9 +2079,13 @@ select.refund-select{ padding-right: 34px; }
   border-color: color-mix(in oklab, var(--xv-accent-border) 90%, rgba(255,255,255,0.22));
 }
 .op-action--primary--hold{
-  font-weight: 700;
+  font-weight: 750;
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 13.5px;
   box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--accent-ink) 22%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--accent-ink) 26%, transparent),
+    0 8px 26px color-mix(in oklab, var(--accent) 14%, transparent),
     var(--xv-cta-shadow);
 }
 .op-action.is-loading{
@@ -3036,7 +3040,8 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
 }
 .composer-status-line.composer-status-outcome{
   color: color-mix(in oklab, var(--success) 55%, var(--text-2));
-  font-weight: 550;
+  font-weight: 560;
+  transition: color var(--t-fast) var(--ease), font-weight var(--t-fast) var(--ease);
 }
 .composer-inline-hint{ color: inherit; }
 

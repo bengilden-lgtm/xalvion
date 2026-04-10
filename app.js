@@ -578,9 +578,12 @@ if (typeof window.pulseRail !== "function") {
             /* Operator workflow: command-center hierarchy (no layout changes) */
             body[data-ui="claude"] .decision-controls{
               display:flex !important;
-              gap:8px !important;
+              gap:11px !important;
               flex-wrap:wrap !important;
               align-items:center !important;
+            }
+            body[data-ui="claude"] .decision-panel-top{
+              margin-bottom:2px !important;
             }
             body[data-ui="claude"] .op-action{
               display:inline-flex !important;
@@ -599,11 +602,15 @@ if (typeof window.pulseRail !== "function") {
             body[data-ui="claude"] .op-action__label{ font-weight:650 !important; }
             body[data-ui="claude"] .op-action--primary{
               border:none !important;
-              background: rgba(209,190,162,0.18) !important;
-              box-shadow: 0 0 0 1px rgba(209,190,162,0.18) !important;
+              background: rgba(209,190,162,0.22) !important;
+              box-shadow: 0 0 0 1px rgba(209,190,162,0.22) !important;
             }
-            body[data-ui="claude"] .op-action--primary:hover{ background: rgba(209,190,162,0.24) !important; }
-            body[data-ui="claude"] .op-action--primary--hold{ box-shadow: 0 0 0 1px rgba(186,170,255,0.20) !important; }
+            body[data-ui="claude"] .op-action--primary:hover{ background: rgba(209,190,162,0.30) !important; }
+            body[data-ui="claude"] .op-action--primary--hold{
+              box-shadow: 0 0 0 1px rgba(186,170,255,0.28), 0 6px 22px rgba(124,90,252,0.12) !important;
+              min-height:34px !important;
+              padding:0 14px !important;
+            }
             body[data-ui="claude"] .op-action--ghost-danger{
               border-color: rgba(210,133,133,0.22) !important;
               background: rgba(210,133,133,0.08) !important;
@@ -637,11 +644,11 @@ if (typeof window.pulseRail !== "function") {
             body[data-ui="claude"] .decision-microcopy[data-tone="hold"]{ color: rgba(210,204,255,0.78) !important; }
 
             body[data-ui="claude"] .decision-panel.xv-decision-enter{
-              animation: xvDecisionFade 220ms ease both !important;
+              animation: xvDecisionFade 155ms ease both !important;
             }
             body[data-ui="claude"] .decision-panel--gate.xv-decision-enter,
             body[data-ui="claude"] .decision-state-rejected.xv-decision-enter{
-              animation: xvDecisionFade 220ms ease both !important, xvDecisionEmphasis 520ms ease 40ms both !important;
+              animation: xvDecisionFade 155ms ease both !important, xvDecisionEmphasis 360ms ease 24ms both !important;
             }
             @media (prefers-reduced-motion: reduce){
               body[data-ui="claude"] .decision-panel.xv-decision-enter{ animation: none !important; }
@@ -779,11 +786,11 @@ if (typeof window.pulseRail !== "function") {
 
       /* High-stakes decision moments: consequential, controlled, premium (no layout changes) */
       .decision-panel.xv-decision-enter{
-        animation: xvDecisionFade 220ms ease both;
+        animation: xvDecisionFade 155ms ease both;
       }
       .decision-panel--gate.xv-decision-enter,
       .decision-state-rejected.xv-decision-enter{
-        animation: xvDecisionFade 220ms ease both, xvDecisionEmphasis 520ms ease 40ms both;
+        animation: xvDecisionFade 155ms ease both, xvDecisionEmphasis 360ms ease 24ms both;
       }
       @media (prefers-reduced-motion: reduce){
         .decision-panel.xv-decision-enter{ animation: none; }
@@ -1452,11 +1459,11 @@ if (typeof window.pulseRail !== "function") {
       return {
         key: `guest-${getEffectiveUsage(state.usage)}`,
         eyebrow: "Preview capacity",
-        title: "Preview runs are allocated — keep working in operator mode",
-        detail: `${proof}Create a free account for ${FREE_USAGE_LIMIT} included runs/month, saved threads, and the same approval-first workspace.`,
-        body: `You’ve reached the preview run allowance.
+        title: "Preview allowance used — you can still keep going",
+        detail: `${proof}Free account: ${FREE_USAGE_LIMIT} included runs/month, saved threads, same approval-first workflow.`,
+        body: `You’ve used every preview run.
 
-You can continue — additional usage is tracked. Create a free account for ${FREE_USAGE_LIMIT} included runs/month, saved threads, and a stable workflow for support teams.`
+You can continue — overage is tracked. A free account unlocks ${FREE_USAGE_LIMIT} included runs/month, saved threads, and a calmer support rhythm.`
       };
     }
 
@@ -1467,22 +1474,22 @@ You can continue — additional usage is tracked. Create a free account for ${FR
       return {
         key: `pro-${getEffectiveUsage(state.usage)}`,
         eyebrow: "Included capacity",
-        title: "You’ve reached included Pro runs — overage continues to bill",
-        detail: `${proof}Elite adds 5,000 included runs/month and headroom so execution and routing don’t stall when volume spikes.`,
-        body: `${proof}You’ve reached your included Pro capacity.
+        title: "Pro included runs used — overage still runs",
+        detail: `${proof}Elite: 5,000 included runs/month so volume never stalls mid-shift.`,
+        body: `${proof}You’ve used your included Pro runs for this window.
 
-You can continue running tickets — additional usage will be billed. Elite adds higher included runs, deeper analytics, and room to scale without another ceiling mid-shift.`
+Keep working — overage bills cleanly. Elite adds headroom so tickets never queue behind a hard cap.`
       };
     }
 
     return {
       key: `free-${getEffectiveUsage(state.usage)}`,
       eyebrow: "Included capacity",
-      title: "Included Free runs are used — you can keep operating on overage",
-      detail: `${proof}Upgrade to Pro for 500 included runs/month, live Stripe execution from the workspace, and integrations that match real support volume.`,
-      body: `${proof}You’ve reached your included Free capacity.
+      title: "Free included runs used — flow doesn’t stop",
+      detail: `${proof}Pro: 500 included runs/month, live Stripe execution when connected, built for real queue depth.`,
+      body: `${proof}You’ve used your included Free runs.
 
-You can continue running tickets — additional usage will be billed. Pro keeps the operator loop running with more included runs, live Stripe execution, and integration access for support teams.`
+Keep operating — overage is tracked. Pro removes friction: more included runs, live execution, integrations that match how you actually support.`
     };
   }
 
@@ -1506,7 +1513,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       const usageLine = billable > 0 ? `${valueLine} · ${within} / ${lim} included · ${billable} billable` : `${valueLine} · ${used} / ${lim} included`;
       const tierLc = String(state.tier || "free").toLowerCase();
       const primaryLabel =
-        !isAuthenticated() ? "Create free account" : tierLc === "pro" ? "Add Elite headroom" : "Upgrade for continuity";
+        !isAuthenticated()
+          ? "Create free account"
+          : tierLc === "pro"
+            ? "Remove limits on Elite"
+            : "Unlock live execution";
       const secondaryLabel = isAuthenticated() ? "Compare plans" : "Log in";
       const eyebrowSafe = eyebrow || (!isAuthenticated() ? "Preview" : "Capacity");
       banner.dataset.conversionMoment = !isAuthenticated() ? "preview_cap" : tierLc === "pro" ? "included_pro" : "included_free";
@@ -1963,8 +1974,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         state.usageInlineCtaUntil = Date.now() + 120 * 1000;
         setUsageInlineCta({
           tone: "neutral",
-          copy: "Unlock live Stripe execution + audited trails for billing decisions.",
-          cta: "See Pro",
+          copy: "You approved the motion — Pro runs it live in Stripe with a clean audit trail.",
+          cta: "Unlock live execution",
           targetTier: "pro",
         });
       }
@@ -2685,11 +2696,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     els.composerStatusLine?.classList.remove("composer-status-outcome");
   }
 
-  function flashComposerStatus(text, ms = 12000) {
+  function flashComposerStatus(text, ms = 10000) {
     const t = String(text || "").trim();
     if (!t || !els.composerStatusLine) return;
     clearComposerFlash();
-    const dur = Math.max(3200, Math.min(20000, Number(ms) || 12000));
+    const dur = Math.max(2600, Math.min(18000, Number(ms) || 10000));
     state.composerFlashUntil = Date.now() + dur;
     state.composerFlashText = t;
     if (!state.sending) {
@@ -2718,24 +2729,24 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (tst === "error" || tst === "blocked_input") return "";
 
     if (approval.requiresApproval && !approval.approved && moneyActs) {
-      return `Draft ready${timeBit} · billing on hold until you approve`;
+      return `Reply ready${timeBit} · approval required — high-impact action`;
     }
     if (/signal-blocked/.test(sig.cls)) {
-      return `Draft ready${timeBit} · policy blocked — read before send`;
+      return `Reply ready${timeBit} · blocked — prevented risky execution`;
     }
     if (/signal-approval/.test(sig.cls) && !approval.approved) {
-      return `Draft ready${timeBit} · sign-off required before execution`;
+      return `Reply ready${timeBit} · approval required — your sign-off releases it`;
     }
     if (/signal-review|signal-high-risk/.test(sig.cls)) {
-      return `Draft ready${timeBit} · give it a careful read`;
+      return `Reply ready${timeBit} · give it a careful read before send`;
     }
     if (/signal-safe/.test(sig.cls)) {
-      return `Draft ready${timeBit} · send when it reads right`;
+      return `Reply ready${timeBit} · handled safely — you stay in control`;
     }
     if (action === "none" || action === "review") {
-      return `Draft ready${timeBit} · you choose the next move`;
+      return `Reply ready${timeBit} · you choose the next move`;
     }
-    return `Draft ready${timeBit} · approval stays with you`;
+    return `Reply ready${timeBit} · you stay in control`;
   }
 
   function maybeShowPostRunValueMoment(data) {
@@ -2763,16 +2774,16 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       state.usageInlineCtaUntil = Date.now() + 90 * 1000;
       setUsageInlineCta({
         tone: "risk",
-        copy: `This run addressed churn pressure. ${valueProof}`,
-        cta: tier === "pro" ? "Add Elite headroom" : "Upgrade for continuity",
+        copy: `That run protected a fragile customer. ${valueProof}`,
+        cta: tier === "pro" ? "Remove limits on Elite" : "Run more tickets without stopping",
         targetTier: target,
       });
     } else if (govMode === "auto") {
       state.usageInlineCtaUntil = Date.now() + 90 * 1000;
       setUsageInlineCta({
         tone: "safe",
-        copy: `Clean run — you’re seeing what paid tiers scale: faster throughput with the same approval bar.`,
-        cta: tier === "pro" ? "Scale with Elite" : "Scale with Pro",
+        copy: `Policy check passed — paid tiers keep this flow uninterrupted at higher volume.`,
+        cta: tier === "pro" ? "Unlock Elite headroom" : "Unlock live execution",
         targetTier: target,
       });
     }
@@ -2782,11 +2793,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const el = els.composerValueMoment;
     if (!el) return;
     const isPro = tierLc === "pro";
-    const headline = isPro ? "You’re running at a serious pace — Elite is built for that" : "That was a strong cycle — capacity should match it";
+    const headline = isPro ? "You’re clearing the queue — Elite keeps that rhythm" : "Strong run — don’t let capacity cut the streak";
     const sub = isPro
-      ? "Elite adds included volume and team headroom so you are not throttling mid-queue — approvals and audit stay exactly as they are."
-      : "Pro adds monthly runway plus live Stripe execution when connected — same human gate on every consequential move.";
-    const cta = isPro ? "See Elite" : "See Pro";
+      ? "Elite adds runway and team headroom so you never hit a wall mid-shift — same approvals, same audit trail."
+      : "Pro unlocks live Stripe execution when connected and 500 included runs — remove limits and keep flow uninterrupted.";
+    const cta = isPro ? "See Elite" : "Unlock Pro";
     const target = isPro ? "elite" : "pro";
     el.dataset.conversionMoment = "post_high_value_run";
     el.hidden = false;
@@ -3285,7 +3296,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       `${displayActionLabel(data)}`,
       `${displayQueueLabel({ decision })}`,
       `${String(decision.risk_level || triage.risk_level || "medium")} risk`,
-      `${approval.requiresApproval && !approval.approved ? "approval gate" : operatorPostureLabel(data)}`
+      `${approval.requiresApproval && !approval.approved ? "awaiting your approval" : operatorPostureLabel(data)}`
     ];
 
     els.systemPanelCopy.textContent = `${parts.join(" · ")}. ${explainWhyAction(data)}`;
@@ -3332,7 +3343,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     block.classList.remove("xv-prepared-reveal");
     void block.offsetWidth;
     block.classList.add("xv-prepared-reveal");
-    window.setTimeout(() => block.classList.remove("xv-prepared-reveal"), 1400);
+    window.setTimeout(() => block.classList.remove("xv-prepared-reveal"), 880);
   }
 
   function createTypingMarkup() {
@@ -3376,8 +3387,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       node.innerHTML = nextHtml;
       node.classList.remove("xv-fade-out");
       node.closest?.(".msg-card")?.classList.add("xv-soft-fade-in");
-      window.setTimeout(() => node.closest?.(".msg-card")?.classList.remove("xv-soft-fade-in"), 260);
-    }, 160);
+      window.setTimeout(() => node.closest?.(".msg-card")?.classList.remove("xv-soft-fade-in"), 180);
+    }, 95);
   }
 
   function createMessageGroup(role, bodyHtml, isPlaceholder = false) {
@@ -4315,14 +4326,14 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const approval = getApprovalContext(data);
     if (approval.requiresApproval && !approval.approved) {
       el.hidden = false;
-      el.textContent = "Billing-sensitive motion is staged — nothing executes until you approve, edit, or reject.";
+      el.textContent = "Money or policy is on the line — nothing ships until you approve, edit, or reject.";
     } else {
       try {
         const fmt = globalThis.__XALVION_FORMAT__;
         const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
         if (gov && gov.mode === "auto") {
           el.hidden = false;
-          el.textContent = "Low-risk path — routine operator check, then send when satisfied.";
+          el.textContent = "Routine path — quick operator check, then send when it reads right.";
           return;
         }
       } catch {}
@@ -4375,19 +4386,19 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return;
     }
 
-    let line = "Draft ready — your read, your send";
+    let line = "Reply ready — you stay in control";
     if (approval.requiresApproval && !approval.approved && moneyActs) {
-      line = "Draft ready — billing waits on your approval";
+      line = "Reply ready — approval required for billing impact";
     } else if (/signal-blocked/.test(sig.cls)) {
-      line = "Draft ready — policy is holding execution";
+      line = "Blocked — prevented risky execution";
     } else if (/signal-approval/.test(sig.cls) && !approval.approved) {
-      line = "Draft ready — needs your sign-off";
+      line = "Approval required — high-impact action";
     } else if (/signal-review|signal-high-risk/.test(sig.cls)) {
-      line = "Draft ready — give it a careful read";
+      line = "Reply ready — read carefully before send";
     } else if (/signal-safe/.test(sig.cls)) {
-      line = "Draft ready — routine path, still your send";
+      line = "Handled safely — routine path, your send";
     } else if (action === "review") {
-      line = "Draft ready — plan a human follow-up";
+      line = "Reply ready — own the follow-up";
     }
 
     el.textContent = line;
@@ -4401,14 +4412,14 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       if (gov && gov.mode && gov.mode !== "unknown") {
         if (gov.mode === "blocked") return "Blocked by policy";
         if (gov.mode === "review") return "Approval required";
-        if (gov.mode === "auto") return "Safe to automate";
+        if (gov.mode === "auto") return "Routine path";
       }
     } catch {}
     const approval = getApprovalContext(data);
-    if (approval.requiresApproval && !approval.approved) return "Approval gate";
+    if (approval.requiresApproval && !approval.approved) return "Awaiting your approval";
     const action = String(data.action || data.decision?.action || "none").toLowerCase();
     if (action === "review") return "Human review";
-    if (Number(data.confidence || 0) > 0 && Number(data.confidence || 0) < 0.62) return "Verify signals";
+    if (Number(data.confidence || 0) > 0 && Number(data.confidence || 0) < 0.62) return "Verify signals first";
     return "Clear to send";
   }
 
@@ -4473,8 +4484,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
       if (gov && gov.mode && gov.mode !== "unknown") {
         if (gov.mode === "blocked") return "Blocked by policy — do not execute as proposed.";
-        if (gov.mode === "review") return "Approval required under policy — verify factors, then approve.";
-        if (gov.mode === "auto") return "Governor indicates the action is safe to automate.";
+        if (gov.mode === "review") return "Policy requires your approval — verify details, then release.";
+        if (gov.mode === "auto") return "Policy check passed — routine path; still your send.";
       }
     } catch {}
     const approval = getApprovalContext(data);
@@ -4483,9 +4494,9 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (approval.requiresApproval && !approval.approved) {
       return "Financial or policy gate active — explicit approval before execution.";
     }
-    if (tone === "risky") return "Confidence is low — read signals before customer send.";
-    if (tone === "review") return "Borderline confidence — quick scan recommended.";
-    return "Posture is safe to continue with standard operator review.";
+    if (tone === "risky") return "Confidence level is low — read signals before customer send.";
+    if (tone === "review") return "Borderline confidence level — quick scan recommended.";
+    return "Looks safe to continue with your usual operator read.";
   }
 
   function nextOperatorStepLine(data = {}) {
@@ -4501,7 +4512,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return "Refine the reply if needed, then approve or reject the prepared action.";
     }
     if (approval.requiresApproval && !approval.approved && !approval.canApprove) {
-      return "Sign in with the ticket owner account to release the approval gate.";
+      return "Sign in as the ticket owner to approve or reject this action.";
     }
     const action = String(data.action || data.decision?.action || "none").toLowerCase();
     if (action === "review") return "Copy the reply into your helpdesk thread and own the follow-up.";
@@ -4533,7 +4544,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     const actionText = approval.action && approval.action !== "none" ? `${approval.action}${amountText}` : "prepared action";
     const gateHint =
       !approval.canApprove && approval.ticketId
-        ? `<div class="approval-hint">Sign in as the ticket owner to release this gate from the workspace.</div>`
+        ? `<div class="approval-hint">Sign in as the ticket owner to approve or reject from the workspace.</div>`
         : "";
     let govLine = "";
     try {
@@ -4543,7 +4554,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         govLine = `<div class="approval-banner-gov">${escapeHtml(gov.summary)}</div>`;
       }
     } catch {}
-    banner.innerHTML = `${ICONS.shield}<div class="approval-banner-body"><div class="approval-banner-eyebrow">Your decision</div><strong class="approval-banner-title">Approval required</strong><div class="approval-banner-copy">${escapeHtml(`Prepared ${actionText}. Nothing executes until you approve — the motion stays visible and reversible.`)}</div>${govLine}${gateHint}</div>`;
+    banner.innerHTML = `${ICONS.shield}<div class="approval-banner-body"><div class="approval-banner-eyebrow">Your decision</div><strong class="approval-banner-title">Approval required — high-impact action</strong><div class="approval-banner-copy">${escapeHtml(`Prepared ${actionText}. Nothing ships until you choose — approve, edit, or reject. The motion stays visible and reversible.`)}</div>${govLine}${gateHint}</div>`;
     return banner;
   }
 
@@ -4629,8 +4640,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
             : gov.mode === "review"
               ? "Approval required"
               : gov.mode === "auto"
-                ? "Safe to automate"
-                : "Manual review";
+                ? "Routine path"
+                : "Review recommended";
         return {
           cls: gov.cls || "signal-review",
           text,
@@ -4638,10 +4649,10 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
             gov.summary ||
               gov.title ||
               (gov.mode === "blocked"
-                ? "Policy blocked this path — resolve before anything customer-facing ships."
+                ? "Blocked — resolve before anything customer-facing ships."
                 : gov.mode === "review"
-                  ? "Policy asks for your sign-off on this motion."
-                  : "Policy read: this path meets automation-safe criteria.")
+                  ? "Approval required — high-impact action needs your sign-off."
+                  : "Handled safely — policy read looks routine for this path.")
           ),
         };
       }
@@ -4660,36 +4671,36 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return {
         cls: "signal-approval",
         text: "Approval required",
-        title: String(data.governor_reason || dec.governor_reason || "Explicit approval required on this motion."),
+        title: String(data.governor_reason || dec.governor_reason || "Explicit approval required before this ships."),
       };
     }
     if (risk === "high") {
       return {
         cls: "signal-high-risk",
         text: "High risk",
-        title: "Elevated risk profile — reconcile signals before any customer send.",
+        title: "Elevated risk — reconcile signals before any customer send.",
       };
     }
     const tier = String(data.execution_tier || "").toLowerCase();
     if (tier === "safe_autopilot_ready") {
       return {
         cls: "signal-safe",
-        text: "Safe to automate",
-        title: "Automation safety checks passed for this tier."
+        text: "Routine path",
+        title: "Policy checks passed — still your send."
       };
     }
     if (tier === "assist_only") {
       return {
         cls: "signal-review",
-        text: "Manual review",
-        title: "Assist-only tier — keep a human in the loop for this path."
+        text: "Review recommended",
+        title: "Assist-only path — keep a human in the loop."
       };
     }
     if (tier === "approval_required") {
       return {
         cls: "signal-approval",
         text: "Approval required",
-        title: String(data.governor_reason || dec.governor_reason || "Consequential motion — approval is mandatory before execution.")
+        title: String(data.governor_reason || dec.governor_reason || "Consequential motion — your approval is mandatory.")
       };
     }
 
@@ -4699,11 +4710,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       data.requires_approval || dec.requires_approval || data.decision_state === "pending_decision"
     );
     const money = action === "refund" || action === "charge" || action === "credit";
-    if (req && money) return { cls: "signal-approval", text: "Approval required", title: "Money movement staged — operator approval is required." };
+    if (req && money) return { cls: "signal-approval", text: "Approval required", title: "Money movement staged — your approval is required." };
     if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
-      return { cls: "signal-review", text: "Review recommended", title: "Signals sit outside the safe band — review before send." };
+      return { cls: "signal-review", text: "Review recommended", title: "Signals warrant a careful read before send." };
     }
-    return { cls: "signal-safe", text: "Safe to send", title: "No billing gate here — a quick read is enough before send." };
+    return { cls: "signal-safe", text: "Routine path", title: "No billing hold — quick read, then send when satisfied." };
   }
 
   function populateDecisionOutcomeIntelStrip(el, data) {
@@ -4769,7 +4780,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       </div>
       <div class="decision-microcopy" data-role="micro" style="display:none"></div>
       <div class="decision-trust-block">
-        <div class="trust-strip" data-role="trust-strip" aria-label="Confidence context"></div>
+        <div class="trust-strip" data-role="trust-strip" aria-label="Readiness signals"></div>
         <div class="trust-strip-detail" data-role="trust-detail" aria-hidden="true"></div>
       </div>
       <div class="xv-governor-surface" data-role="governor" hidden></div>
@@ -4811,11 +4822,11 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
 
     // Default decision microcopy (kept minimal, high-signal).
     if (pendingGate || /signal-approval/.test(sig.cls)) {
-      setMicrocopy("Waiting on you — nothing executes until you release it.", "hold");
+      setMicrocopy("This is your call — nothing moves until you approve, edit, or reject.", "hold");
     } else if (/signal-review|signal-high-risk|signal-blocked/.test(sig.cls)) {
-      setMicrocopy("Take an extra beat — read the reply before it goes out.", "risk");
+      setMicrocopy("Pause — read the reply before it reaches the customer.", "risk");
     } else if (/signal-safe/.test(sig.cls)) {
-      setMicrocopy("Looks routine by policy — still your send.", "safe");
+      setMicrocopy("Handled safely by policy — still your send.", "safe");
     } else {
       setMicrocopy("");
     }
@@ -4874,13 +4885,13 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         const violations = Array.isArray(gov.violations) ? gov.violations.slice(0, 8) : [];
         const next = String(gov.nextStep || "").trim();
         const parts = [];
-        parts.push(`<div class="xv-governor-eyebrow">Assessment</div>`);
+        parts.push(`<div class="xv-governor-eyebrow">Policy read</div>`);
         if (reasonLine) {
           parts.push(`<div class="xv-governor-reason"><span class="xv-governor-k">Reason</span><span class="xv-governor-v">${escapeHtml(reasonLine)}</span></div>`);
         }
         if (riskText) {
-          parts.push(
-            `<div class="xv-governor-risk"><span class="xv-governor-k">Risk score</span><span class="governor-risk-chip">${escapeHtml(riskText)}</span></div>`
+            parts.push(
+            `<div class="xv-governor-risk"><span class="xv-governor-k">Risk level</span><span class="governor-risk-chip">${escapeHtml(riskText)}</span></div>`
           );
         }
         if (factors.length) {
@@ -4900,7 +4911,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         if (next) {
           parts.push(`<div class="xv-governor-next"><span class="xv-governor-k">Next step</span><span class="xv-governor-next-v">${escapeHtml(next)}</span></div>`);
         }
-        govSurfaceEl.innerHTML = `<details class="xv-governor-fold"><summary class="xv-governor-fold-summary">Why this assessment</summary><div class="xv-governor-fold-body">${parts.join("")}</div></details>`;
+        govSurfaceEl.innerHTML = `<details class="xv-governor-fold"><summary class="xv-governor-fold-summary">Why we landed here</summary><div class="xv-governor-fold-body">${parts.join("")}</div></details>`;
         govSurfaceEl.hidden = false;
       } else if (govSurfaceEl) {
         govSurfaceEl.innerHTML = "";
@@ -4933,7 +4944,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       if (pill === "Rejected") {
         setMicrocopy("Response held. Ticket escalated.", "risk");
       } else if (pill === "Approved" || pill === "Sent as edited") {
-        setMicrocopy("Logged and cleared — send when you are ready.", "safe");
+        setMicrocopy("On the record — send when you are ready.", "safe");
       }
 
       if (nextWrap) {
@@ -4965,18 +4976,18 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         : null;
       const volumeHint =
         !postValueNudge && n >= 5
-          ? "High throughput here — add plan headroom before queues hit a hard cap"
+          ? "You’re on a roll — add headroom before a hard cap slows the queue"
           : "";
       const canShowAutomation = !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev";
       const automationBlock = canShowAutomation
         ? `<div class="xv-next-nudge">
             <div class="xv-next-nudge-copy">${
               tierLc === "pro"
-                ? "Elite is for weeks when volume spikes — same approval discipline, more included runway."
-                : "Pro is where prepared billing moves can execute live — you still sign off on every one."
+                ? "Volume week ahead? Elite keeps approvals the same — with runway that doesn’t quit."
+                : "Unlock live execution on Pro — you still sign off on every billing move."
             }</div>
             <button type="button" class="xv-next-nudge-cta" data-act="enable-automation">${
-              tierLc === "pro" ? "Compare Elite" : "Compare Pro"
+              tierLc === "pro" ? "See Elite" : "Unlock Pro"
             }</button>
           </div>`
         : "";
@@ -5002,7 +5013,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return `
         <div class="xv-next-success" role="status" aria-live="polite">
           <div class="xv-next-success-title">Approved <span aria-hidden="true">✓</span></div>
-          <div class="xv-next-success-sub">On the record — paste or send on your timeline</div>
+          <div class="xv-next-success-sub">On the record — ready to send when you are</div>
           <div class="xv-next-audit" aria-label="Approval log">
             ${audit.ticketId ? `<span class="xv-next-audit-chip">Ticket #${escapeHtml(String(audit.ticketId))}</span>` : ""}
             ${audit.action ? `<span class="xv-next-audit-chip">${escapeHtml(audit.action)}</span>` : ""}
@@ -5021,7 +5032,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           <div class="xv-next-meta">
             ${momentum ? `<span class="xv-next-meta-chip">${escapeHtml(momentum)}</span>` : ""}
             ${mins > 0 ? `<span class="xv-next-meta-chip">Estimated time saved: ${escapeHtml(String(mins))} min</span>` : ""}
-            <span class="xv-next-meta-chip">Human approval stayed in the loop — risk controlled, time reclaimed</span>
+            <span class="xv-next-meta-chip">You stayed in control — time back, risk bounded</span>
           </div>
         </div>
 
@@ -5084,7 +5095,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       return;
     }
     if (approval.approved) {
-      setTerminal("Approved", "Ready to send");
+      setTerminal("Approved", "Reply ready — send when satisfied.");
       return;
     }
 
@@ -5100,11 +5111,15 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       ed.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.edit}</span><span class="op-action__label">Edit</span>`;
       const ap = document.createElement("button");
       ap.type = "button";
+      const approveLabel = pendingGate ? "Approve & release" : "Approve";
       const setApproveIdle = () => {
         ap.classList.remove("is-loading");
-        ap.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.approve}</span><span class="op-action__label">Approve</span>`;
+        ap.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.approve}</span><span class="op-action__label">${approveLabel}</span>`;
       };
       ap.className = pendingGate ? "op-action op-action--primary op-action--primary--hold" : "op-action op-action--primary";
+      ap.title = pendingGate
+        ? "Releases the staged action under your account — only when you are sure."
+        : "Confirms you are satisfied with the prepared path.";
       setApproveIdle();
       controls.append(rej, ed, ap);
 
@@ -5119,7 +5134,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           <div class="edit-mode-sheet">
             <div class="edit-mode-header">
               <div class="edit-mode-title">Editing final customer response</div>
-              <p class="edit-mode-sub">You are editing the exact text the customer will see. The governor gate (if present) stays locked until you approve.</p>
+              <p class="edit-mode-sub">You are editing the exact text the customer will see. Any billing or policy hold stays locked until you approve.</p>
             </div>
             <div class="original-response-block">
               <div class="original-response-label">Original prepared reply</div>
@@ -5190,7 +5205,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
               updateLatestRunCard(normalized);
               updateSystemNarrative(normalized);
               updateTopbarStatus();
-              setNotice("success", "Approved", response.message || "Saved — your edit is what ships when you send.");
+              setNotice("success", "Approved", response.message || "Your edit is what ships — paste or send when ready.");
             } catch (error) {
               showErr(error.message || "Approve failed.");
               [rej, ed, ap].forEach((b) => {
@@ -5209,7 +5224,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
               editWrap.innerHTML = "";
               panel.classList.remove("decision-state-editing");
               setTerminal("Edited", "Copy the card text when you send to the customer.");
-              setNotice("info", "Reply updated", "No server gate on this run — text updated on the card.");
+              setNotice("info", "Reply updated", "No server hold on this run — text updated on the card.");
             }, 120);
           }
         });
@@ -5283,7 +5298,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
             updateLatestRunCard(normalized);
             updateSystemNarrative(normalized);
             updateTopbarStatus();
-            setNotice("success", "Approved", response.message || "Execution released under your approval.");
+            setNotice("success", "Approved", response.message || "Action released — on your approval.");
           } catch (error) {
             showErr(error.message || "Approve failed.");
             [rej, ed, ap].forEach((b) => {
@@ -5293,8 +5308,8 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
           }
           return;
         }
-        setTerminal("Approved", "Final response cleared. Ready to send.");
-        setNotice("success", "Cleared", "No billing gate — copy or send when it reads right to you.");
+        setTerminal("Approved", "Reply ready — send when it reads right.");
+        setNotice("success", "Cleared", "No billing hold — copy or send on your timeline.");
       });
     };
 
@@ -5357,7 +5372,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
         copyBtn.innerHTML = ICONS.check;
         window.setTimeout(() => {
           copyBtn.innerHTML = ICONS.copy;
-        }, 1200);
+        }, 780);
       } catch {}
     });
 
@@ -6291,14 +6306,14 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (override === null) {
       wrap.hidden = true;
       if (meta) meta.innerHTML = "";
-      sum.textContent = "No approval gate on the latest run.";
+      sum.textContent = "Last run cleared — nothing waiting on approval.";
       return;
     }
     const target = override !== undefined ? override : state.latestRun;
     if (!target || typeof target !== "object") {
       wrap.hidden = true;
       if (meta) meta.innerHTML = "";
-      sum.textContent = "No approval gate on the latest run.";
+      sum.textContent = "Last run cleared — nothing waiting on approval.";
       return;
     }
     const approval = getApprovalContext(target);
@@ -6306,13 +6321,13 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
     if (!pending) {
       wrap.hidden = true;
       if (meta) meta.innerHTML = "";
-      sum.textContent = "No approval gate on the latest run.";
+      sum.textContent = "Last run cleared — nothing waiting on approval.";
       return;
     }
     wrap.hidden = false;
     const action = approval.action && approval.action !== "none" ? approval.action : "prepared action";
     const amt = approval.amount > 0 ? formatMoney(approval.amount) : "";
-    sum.textContent = `Operator hold active — ${action}${amt ? ` (${amt})` : ""} will not execute until you explicitly approve. Nothing sensitive ships on autopilot.`;
+    sum.textContent = `Your decision pending — ${action}${amt ? ` (${amt})` : ""} stays staged until you approve. Nothing customer-facing ships without you.`;
     if (meta) {
       meta.innerHTML = "";
       const chip = (text, ok) => {
@@ -6648,7 +6663,7 @@ You can continue running tickets — additional usage will be billed. Pro keeps 
       syncReplyReinforcement(row);
       pulsePreparedReplyReveal(row);
       syncAssistantContextLine(row, data);
-      flashComposerStatus(buildPostRunComposerFlash(data, elapsedMs / 1000), 12000);
+      flashComposerStatus(buildPostRunComposerFlash(data, elapsedMs / 1000), 10000);
 
       updateStatsFromResult(data);
       updateRevenueCard(data);

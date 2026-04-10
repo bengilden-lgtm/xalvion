@@ -287,11 +287,11 @@ button:disabled {
 
 /* High-stakes decision moments (minimal, no layout changes) */
 .panel.xv-decision-ready{
-  animation: xvDecisionFade 220ms ease both;
+  animation: xvDecisionFade 155ms ease both;
 }
 .panel.xv-decision-ready[data-decision-tone="hold"],
 .panel.xv-decision-ready[data-decision-tone="risk"]{
-  animation: xvDecisionFade 220ms ease both, xvDecisionEmphasis 520ms ease 40ms both;
+  animation: xvDecisionFade 155ms ease both, xvDecisionEmphasis 360ms ease 24ms both;
 }
 @media (prefers-reduced-motion: reduce){
   .panel.xv-decision-ready{ animation: none; }

@@ -104,9 +104,9 @@
       },
       formatExecutionTier(tier) {
         const map = {
-          safe_autopilot_ready: "Safe to automate",
+          safe_autopilot_ready: "Routine path",
           approval_required: "Approval required",
-          assist_only: "Manual review",
+          assist_only: "Review recommended",
         };
         const k = String(tier || "").toLowerCase();
         return map[k] || "Unknown";
@@ -492,15 +492,15 @@
           return { label: "High risk", variant: "high_risk", cls: "signal-high-risk" };
         }
         if (t === "safe_autopilot_ready" && !requiresApproval) {
-          return { label: "Safe to automate", variant: "safe", cls: "signal-safe" };
+          return { label: "Routine path", variant: "safe", cls: "signal-safe" };
         }
         if (t === "approval_required" || requiresApproval) {
           return { label: "Approval required", variant: "approval", cls: "signal-approval" };
         }
         if (t === "assist_only") {
-          return { label: "Manual review", variant: "review", cls: "signal-review" };
+          return { label: "Review recommended", variant: "review", cls: "signal-review" };
         }
-        return { label: "Manual review", variant: "review", cls: "signal-review" };
+        return { label: "Review recommended", variant: "review", cls: "signal-review" };
       },
       /**
        * Mirrors main workspace `deriveConsequenceSignal` (app.js) for API-shaped payloads.
@@ -536,14 +536,14 @@
         if (tier === "safe_autopilot_ready") {
           return {
             cls: "signal-safe",
-            text: "Safe to automate",
-            title: "Automation safety criteria met",
+            text: "Routine path",
+            title: "Policy check passed — still your send",
           };
         }
         if (tier === "assist_only") {
           return {
             cls: "signal-review",
-            text: "Manual review",
+            text: "Review recommended",
             title: "Keep a human in the loop on this path",
           };
         }
@@ -551,7 +551,7 @@
           return {
             cls: "signal-approval",
             text: "Approval required",
-            title: String(d.governor_reason || dec.governor_reason || "Awaiting operator approval"),
+            title: String(d.governor_reason || dec.governor_reason || "Awaiting your approval"),
           };
         }
         const action = String(d.action || dec.action || "none").toLowerCase();
@@ -564,7 +564,7 @@
         if (action === "review" || actionRisk === "high" || actionRisk === "medium") {
           return { cls: "signal-review", text: "Review recommended", title: "" };
         }
-        return { cls: "signal-safe", text: "Safe to send", title: "" };
+        return { cls: "signal-safe", text: "Routine path", title: "No billing hold — quick read, then send" };
       },
       normalizeGovernorFactors(value) {
         if (!value) return [];
@@ -700,15 +700,15 @@
         if (mode === "blocked") {
           label = "Blocked by policy";
           cls = "signal-high-risk signal-blocked";
-          title = govReason || "Blocked by governor policy";
+          title = govReason || "Blocked under policy";
         } else if (mode === "review") {
           label = "Approval required";
           cls = "signal-approval";
-          title = govReason || "Review required under governor policy";
+          title = govReason || "Review required under policy";
         } else if (mode === "auto") {
-          label = "Safe to automate";
+          label = "Routine path";
           cls = "signal-safe";
-          title = govReason || "Meets automation safety criteria";
+          title = govReason || "Policy check passed — still your send";
         }
 
         // Backwards-compatible fallback when no governor fields exist at all.
@@ -788,7 +788,7 @@
           case "elite":
             return "5k tickets/month, team headroom, deepest outcome signals — for high-throughput support.";
           default:
-            return "Start free with clear limits; upgrade when volume makes it obvious.";
+            return "Start free with clear limits; upgrade when the queue proves it.";
         }
       },
       tierBadge(tier) {
@@ -878,9 +878,9 @@
           case "high_capacity":
             return {
               ...base,
-              primary: "You are at the included-volume ceiling.",
-              secondary: "Move up a tier before tickets queue behind a hard limit — approvals stay the same.",
-              cta: "Add headroom",
+              primary: "You’ve hit included volume for this window.",
+              secondary: "Run more tickets without stopping — add headroom before a hard cap slows you down.",
+              cta: "Remove limits",
               tone: "urgency",
             };
           case "team_ops":
@@ -894,9 +894,9 @@
           case "outcome_intelligence":
             return {
               ...base,
-              primary: "Richer outcome history is a paid tier feature.",
-              secondary: "See how similar cases resolved so the next approval call is faster and calmer.",
-              cta: "Unlock deeper context",
+              primary: "Similar-outcome history unlocks on paid tiers.",
+              secondary: "See how comparable cases closed — faster, calmer approval calls next time.",
+              cta: "See similar outcomes",
               tone: "value",
             };
           default:
@@ -932,23 +932,23 @@
 
         if (atLimit) {
           return {
-            primary: "This plan is at capacity for the current window.",
+            primary: "Included runs for this window are used up.",
             secondary:
               tickets || money || minutes
-                ? `You’ve already generated value here — ${tickets ? `${tickets} tickets` : "tickets"}${money ? ` · ${format.formatMoney(money)} surfaced` : ""}${minutes ? ` · ~${minutes} min saved` : ""}. Add headroom to keep execution continuous.`
-                : "Add headroom so approvals, routing, and execution don’t stall mid-shift.",
-            cta: t === "pro" ? "Add Elite headroom" : "Unlock Pro capacity",
+                ? `You’ve already earned it here — ${tickets ? `${tickets} tickets` : "work"}${money ? ` · ${format.formatMoney(money)} surfaced` : ""}${minutes ? ` · ~${minutes} min back` : ""}. Add runway so the queue never stalls.`
+                : "Add runway so approvals and execution never stall mid-shift.",
+            cta: t === "pro" ? "Unlock Elite runway" : "Unlock Pro capacity",
             tone: "urgency",
           };
         }
 
         return {
-          primary: "Approaching this plan’s operating ceiling.",
+          primary: "You’re close to this plan’s ceiling.",
           secondary:
             tickets || money || minutes
-              ? `You’re using real capacity — ${tickets ? `${tickets} tickets` : "tickets"}${money ? ` · ${format.formatMoney(money)} in billing motions` : ""}${minutes ? ` · ~${minutes} min back` : ""}.`
-              : "Upgrade before the ceiling so workflows stay uninterrupted.",
-          cta: t === "pro" ? "Plan ahead with Elite" : "Upgrade for continuity",
+              ? `Real volume showing — ${tickets ? `${tickets} tickets` : "tickets"}${money ? ` · ${format.formatMoney(money)} in billing motions` : ""}${minutes ? ` · ~${minutes} min back` : ""}.`
+              : "Upgrade before you bump the cap — keep flow uninterrupted.",
+          cta: t === "pro" ? "Plan with Elite" : "Remove limits",
           tone: "neutral",
         };
       }
@@ -967,17 +967,17 @@
 
         if (t === "free") {
           return {
-            primary: "You are already running this like production support.",
-            secondary: "Pro is where live execution and 500-ticket months stay ahead of the queue.",
-            cta: "Unlock Pro",
+            primary: "You’re already running this like production support.",
+            secondary: "That pace deserves Pro — live execution and 500 included runs so the queue never waits on you.",
+            cta: "Unlock live execution",
             tone: "premium",
           };
         }
 
         return {
-          primary: "This workspace is earning its keep.",
-          secondary: "Elite is built for teams that cannot afford a mid-shift capacity wall.",
-          cta: "View Elite",
+          primary: "This workspace is paying for itself.",
+          secondary: "Elite is for teams that can’t afford a mid-shift wall — same control, serious runway.",
+          cta: "Remove limits on Elite",
           tone: "premium",
         };
       }
@@ -1019,8 +1019,8 @@
             refundCenterAllowed
               ? "Pro unlocks higher capacity and uninterrupted execution."
               : stripeConnected
-                ? "Pro turns prepared billing decisions into live Stripe execution — with governance and auditability."
-                : "Connect Stripe, then Pro unlocks live execution with governance and auditability.";
+                ? "Pro turns approved billing moves into live Stripe execution — with audit you can stand behind."
+                : "Connect Stripe, then Pro runs approved moves live — with audit you can stand behind.";
           return {
             primary: proof ? `Session impact: ${proof}.` : "Run governed support with visible risk and approvals.",
             secondary: [outcomeLine, secondary].filter(Boolean).join(" "),
