@@ -31,3 +31,5 @@ const fromGlobal =
     : "";
 
 export const OPERATOR_API_ORIGIN = normalizeOrigin(fromGlobal || DEFAULT_OPERATOR_API_ORIGIN);
+
+const XALVION_ANALYZE_SECRET = "2ee34f109fede5549ada2d72802e5c01bdccd4ce5e2aa2edc5b3bc655eb4cf61";
