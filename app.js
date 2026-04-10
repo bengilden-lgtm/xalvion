@@ -5153,7 +5153,25 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         ? "Releases the staged action under your account — only when you are sure."
         : "Confirms you are satisfied with the prepared path.";
       setApproveIdle();
-      controls.append(rej, ed, ap);
+      const cp = document.createElement("button");
+      cp.type = "button";
+      cp.className = "op-action op-action--secondary";
+      cp.setAttribute("aria-label", "Copy reply");
+      cp.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.copy}</span><span class="op-action__label">Copy</span>`;
+
+      cp.addEventListener("click", async () => {
+        try {
+          const text = getCopyTextFromRow(row, initialReply) || originalAi || "";
+          if (!text) return;
+          await navigator.clipboard.writeText(text);
+          cp.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.check}</span><span class="op-action__label">Copied</span>`;
+          window.setTimeout(() => {
+            cp.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.copy}</span><span class="op-action__label">Copy</span>`;
+          }, 1800);
+        } catch (_) {}
+      });
+
+      controls.append(rej, ed, ap, cp);
 
       ed.addEventListener("click", () => {
         showErr("");
@@ -5356,9 +5374,6 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const briefSlot = row.querySelector("[data-slot='brief']");
     if (footer) {
       footer.innerHTML = "";
-      const toolsWrap = document.createElement("div");
-      addCopyControl(toolsWrap, replyText, row);
-      footer.appendChild(toolsWrap);
       footer.appendChild(wrapAssistantMetaFold(createMetaRow(normalized)));
     }
     const nextBrief = createDetailsPanel(normalized);
@@ -6700,9 +6715,6 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const briefSlot = row.querySelector("[data-slot='brief']");
       if (footer) {
         footer.innerHTML = "";
-        const toolsWrap = document.createElement("div");
-        addCopyControl(toolsWrap, replyText, row);
-        footer.appendChild(toolsWrap);
         footer.appendChild(wrapAssistantMetaFold(createMetaRow(data)));
 
         if (briefSlot) {
