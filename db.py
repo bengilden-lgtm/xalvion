@@ -127,7 +127,39 @@ Base = declarative_base()
 _init_lock = Lock()
 
 
+def validate_db_config() -> None:
+    import os as _os
+    import warnings as _warnings
+    try:
+        workers = int(_os.getenv("WEB_CONCURRENCY", "1") or 1)
+    except Exception:
+        workers = 1
+    if _IS_SQLITE and workers > 1:
+        _warnings.warn(
+            "SQLite with WEB_CONCURRENCY > 1 is unsafe. "
+            "Set DATABASE_URL to a Postgres connection string before scaling workers.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
+
 def init_db() -> None:
-    """Create all tables registered on Base (idempotent). Thread-safe."""
+    """Create all tables registered on Base (idempotent). Thread-safe.
+    
+    Handles the multi-worker race gracefully: if another worker already
+    created a type or table, the duplicate/already-exists error is caught
+    and ignored. Any other error is re-raised as before.
+    """
     with _init_lock:
-        Base.metadata.create_all(bind=engine)
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception as e:
+            err = str(e).lower()
+            if "already exists" in err or "duplicate" in err:
+                pass  # another worker already created tables — safe to ignore
+            else:
+                raise
+        try:
+            validate_db_config()
+        except Exception:
+            pass
