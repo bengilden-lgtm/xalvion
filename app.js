@@ -1244,19 +1244,6 @@ if (typeof window.pulseRail !== "function") {
       #messageInput,
       .message-input {
         border-radius: 999px !important;
-        padding: 12px 52px 12px 20px !important;
-        min-height: unset !important;
-        max-height: 48px !important;
-        height: 48px !important;
-        font-size: 14px !important;
-        line-height: 1.4 !important;
-        resize: none !important;
-        overflow: hidden !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-        background: rgba(255,255,255,0.040) !important;
-        border: 1px solid rgba(255,255,255,0.052) !important;
-        color: var(--xv-text) !important;
       }
 
       textarea::placeholder,
@@ -1267,12 +1254,7 @@ if (typeof window.pulseRail !== "function") {
 
       .composer-input-row,
       .composer-input-wrap {
-        position: relative !important;
-        gap: 0 !important;
-        align-items: center !important;
-        padding: 0 !important;
         border-radius: 999px !important;
-        overflow: hidden !important;
       }
 
       .composer .quick-actions {
@@ -1388,13 +1370,11 @@ if (typeof window.pulseRail !== "function") {
       }
 
       #workspaceComposerDock {
-        position: fixed !important;
+        position: sticky !important;
         bottom: 0 !important;
-        left: 57px !important;
-        right: 0 !important;
-        padding: 16px 32px 24px !important;
-        background: #1a1814 !important;
-        z-index: 20 !important;
+        background-color: #1a1814 !important;
+        padding-top: 8px !important;
+        padding-bottom: 16px !important;
       }
 
       #workspaceComposerDock .quick-examples,
@@ -8188,31 +8168,7 @@ function bindEvents() {
     ensureInjectedStyles();
     ensureCrmStyles();
 
-    // Force composer dock to bottom of viewport (per operator workspace UX).
-    // Wrapper includes input + "Example openers" + "Stripe IDs".
-    try {
-      const dock = document.getElementById("workspaceComposerDock");
-      if (dock) {
-        dock.style.position = "fixed";
-        dock.style.bottom = "0";
-        dock.style.left = "57px";
-        dock.style.right = "0";
-        dock.style.zIndex = "50";
-        dock.style.padding = "12px 32px 20px";
-        dock.style.backgroundColor = "#1a1814";
-      }
-      if (els.messageInput) {
-        els.messageInput.style.borderRadius = "999px";
-        els.messageInput.style.height = "48px";
-        els.messageInput.style.minHeight = "unset";
-        els.messageInput.style.maxHeight = "48px";
-      }
-      if (els.messages) {
-        els.messages.style.paddingBottom = "140px";
-      }
-    } catch {
-      /* no-op */
-    }
+    // (intentionally no forced dock/input positioning or sizing here)
 
     ensurePreviewClientId();
     hydrateStripeCallbackState();
