@@ -9,7 +9,11 @@
 
 export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !== "undefined" ? chrome : null) {
   if (!chromeApi?.scripting) {
-    return { ok: false, detail: "Couldn’t reach Gmail from this extension. Try again after focusing the tab." };
+    return {
+      ok: false,
+      code: "no_scripting",
+      detail: "Couldn’t reach Gmail from this extension. Try again after focusing the tab.",
+    };
   }
 
   const [res] = await chromeApi.scripting.executeScript({
@@ -20,7 +24,8 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
 
       const FAIL_NO_COMPOSE =
         "Couldn’t find an active reply box. Open Reply or Compose in Gmail, click in the message body, then try again.";
-      const FAIL_DISCONNECTED = "That compose window closed before we could finish. Open the reply again, then try Insert once more.";
+      const FAIL_DISCONNECTED =
+        "That compose window closed before we could finish. Open the reply again, then try Insert once more.";
 
       function collectDocuments(root, depth = 0, maxDepth = 5) {
         const out = [];
@@ -165,7 +170,7 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
 
       function insertTextIntoComposer(composer, value) {
         if (!composer || !composer.isConnected) {
-          return { ok: false, detail: FAIL_DISCONNECTED };
+          return { ok: false, code: "compose_disconnected", detail: FAIL_DISCONNECTED };
         }
 
         const doc = composer.ownerDocument || document;
@@ -231,7 +236,7 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
         } catch (_) {}
 
         if (!composer.isConnected) {
-          return { ok: false, detail: FAIL_DISCONNECTED };
+          return { ok: false, code: "compose_disconnected", detail: FAIL_DISCONNECTED };
         }
 
         return { ok: true };
@@ -321,7 +326,7 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
       }
 
       if (!composer || !composer.isConnected) {
-        return { ok: false, detail: FAIL_NO_COMPOSE };
+        return { ok: false, code: "no_compose", detail: FAIL_NO_COMPOSE };
       }
 
       const ins = insertTextIntoComposer(composer, reply);
@@ -335,5 +340,11 @@ export async function insertIntoGmail(tabId, text, chromeApi = typeof chrome !==
     },
   });
 
-  return res?.result || { ok: false, detail: "Insert didn’t finish. Copy the reply and paste it into Gmail manually." };
+  return (
+    res?.result || {
+      ok: false,
+      code: "unknown",
+      detail: "Insert didn’t finish. Copy the reply and paste it into Gmail manually.",
+    }
+  );
 }

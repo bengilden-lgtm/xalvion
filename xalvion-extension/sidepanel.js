@@ -7,6 +7,13 @@
  */
 import { createChromeContext } from "./chrome-context.js";
 import { insertIntoGmail } from "./adapters/chrome-compose.js";
+import {
+  LOCAL_OPERATOR_ANALYZE_URL,
+  OPERATOR_HOST_PORT_LABEL,
+  describeOperatorAnalyzeFailure,
+  describeOperatorHealthFailure,
+  pingOperatorHealth,
+} from "./operator-api.js";
 import { createUsageChrome } from "./ui/usage-chrome.js";
 import {
   renderConsequenceBar as renderConsequenceBarGov,
@@ -1191,8 +1198,8 @@ async function analyze() {
       showStatus(
         {
           kind: "error",
-          title: "No readable ticket content",
-          body: "Try opening a specific message/thread view, then run Analyze again.",
+          title: "Nothing to analyze on this page",
+          body: "Open a Gmail thread or ticket view so we can read the message text. You do not need a reply box open for Analyze.",
           action: { label: "Retry", onClick: analyze },
         },
         true
@@ -1203,9 +1210,27 @@ async function analyze() {
 
     console.log("[xalvion:analyze] phase:fetch_start", { runId: currentRunId, timeoutMs: ANALYZE_FETCH_TIMEOUT_MS, textLen: text.length });
 
+    const health = await pingOperatorHealth();
+    if (!health.ok) {
+      agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
+      hideThinkingPanel();
+      const { title, body } = describeOperatorHealthFailure(health);
+      showStatus(
+        {
+          kind: "error",
+          title,
+          body,
+          action: { label: "Retry", onClick: analyze },
+        },
+        true
+      );
+      if (emptyState) emptyState.style.display = "grid";
+      return;
+    }
+
     disarmSlowNudge = armSlowNetworkNudge(currentRunId, "single");
     thinkingPromise = playThinkingSequence(currentRunId, "single");
-    const result = await fetchJsonWithTimeout("http://127.0.0.1:8000/analyze", { text }, ANALYZE_FETCH_TIMEOUT_MS);
+    const result = await fetchJsonWithTimeout(LOCAL_OPERATOR_ANALYZE_URL, { text }, ANALYZE_FETCH_TIMEOUT_MS);
 
     disarmSlowNudge();
     if (!result.ok) {
@@ -1222,25 +1247,7 @@ async function analyze() {
     });
 
     if (!result.ok) {
-      const k = result.kind || "";
-      const title =
-        k === "timeout"
-          ? "Request timed out"
-          : k === "network"
-            ? "Can’t reach the operator"
-            : k === "invalid_json"
-              ? "Unexpected response"
-              : "Analyze didn’t complete";
-      const body =
-        k === "timeout"
-          ? "The operator took too long to answer. Check that the app is running, then tap Retry."
-          : k === "network"
-            ? "We couldn’t reach the operator on this device. Confirm the app is running, then try again."
-            : k === "invalid_json"
-              ? "The operator returned data we couldn’t read. Try again after a moment."
-              : result.status
-                ? `Something went wrong (${result.status}). Try again in a moment.`
-                : "Something went wrong. Try again in a moment.";
+      const { title, body } = describeOperatorAnalyzeFailure(result, { actionLabel: "Analyze" });
       showStatus(
         {
           kind: "error",
@@ -1308,7 +1315,7 @@ async function analyze() {
       {
         kind: "error",
         title: "Something went wrong",
-        body: "Try Analyze again. If this keeps happening, confirm the operator app is running.",
+        body: `Try Analyze again. If this keeps happening, confirm the operator app is listening on ${OPERATOR_HOST_PORT_LABEL}.`,
         action: { label: "Retry", onClick: analyze },
       },
       true
@@ -1394,6 +1401,7 @@ async function scanInbox() {
     thinkingPromise = playThinkingSequence(currentRunId, "inbox");
 
     const results = [];
+    let firstFailure = null;
     try {
       let threads = await extractThreads(tab.id);
 
@@ -1433,16 +1441,37 @@ async function scanInbox() {
 
       console.log("[xalvion:scan] phase:rows_ready", { runId: currentRunId, rows: threads.length });
 
+      const health = await pingOperatorHealth();
+      if (!health.ok) {
+        agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
+        disarmSlowNudge();
+        await awaitThinkingSequenceCapped(thinkingPromise, 600);
+        hideThinkingPanel();
+        const { title, body } = describeOperatorHealthFailure(health);
+        showStatus(
+          {
+            kind: "error",
+            title,
+            body,
+            action: { label: "Retry", onClick: scanInbox },
+          },
+          true
+        );
+        if (emptyState) emptyState.style.display = "grid";
+        return;
+      }
+
       for (let i = 0; i < threads.length; i += 1) {
         showStatus(`Analyzing ${i + 1}/${threads.length} visible tickets…`);
         const r = await fetchJsonWithTimeout(
-          "http://127.0.0.1:8000/analyze",
+          LOCAL_OPERATOR_ANALYZE_URL,
           { text: threads[i] },
           INBOX_THREAD_FETCH_TIMEOUT_MS
         );
         if (r.ok && isRenderableAnalyzePayload(r.data)) {
           results.push(r.data);
         } else {
+          if (!firstFailure) firstFailure = r;
           console.warn("[xalvion:scan] row_skipped", { index: i, ok: r.ok, kind: r.kind || "", status: r.status });
         }
       }
@@ -1455,11 +1484,17 @@ async function scanInbox() {
     console.log("[xalvion:scan] phase:loop_done", { runId: currentRunId, resultCount: results.length });
 
     if (!results.length) {
+      const fromFetch =
+        firstFailure && !firstFailure.ok
+          ? describeOperatorAnalyzeFailure(firstFailure, { actionLabel: "Scan inbox" })
+          : null;
       showStatus(
         {
           kind: "error",
-          title: "No inbox results",
-          body: "We couldn’t get a decision for the visible rows. Confirm the operator app is running, then try Scan again.",
+          title: fromFetch ? fromFetch.title : "No inbox results",
+          body: fromFetch
+            ? fromFetch.body
+            : "We couldn’t get a decision for the visible rows. Confirm the operator app is running, then try Scan again.",
           action: { label: "Retry", onClick: scanInbox },
         },
         true
@@ -1497,7 +1532,7 @@ async function scanInbox() {
       {
         kind: "error",
         title: "Inbox scan didn’t finish",
-        body: "Try again in a moment. If this repeats, confirm the operator app is running.",
+        body: `Try again in a moment. If this repeats, confirm the operator app is listening on ${OPERATOR_HOST_PORT_LABEL}.`,
         action: { label: "Retry", onClick: scanInbox },
       },
       true
@@ -1570,7 +1605,10 @@ if (copyBtn) {
       await navigator.clipboard.writeText(lastReply);
       const original = copyBtn.textContent;
       copyBtn.textContent = "Copied ✓";
-      showStatus({ title: "Copied", body: "Paste into your reply when ready." }, false);
+      showStatus(
+        { title: "Copied", body: "Draft copied — paste into Gmail manually when you’re ready." },
+        false
+      );
 
       setTimeout(() => {
         copyBtn.textContent = original;
@@ -1615,16 +1653,27 @@ if (insertBtn) {
       const res = await insertIntoGmail(tab.id, lastReply, chromeApi);
 
       if (!res.ok) {
-        showStatus(
-          {
-            kind: "error",
-            title: "Couldn’t place text in Gmail",
-            body:
-              res.detail ||
-              "Couldn’t find an active reply box. Open Reply or Compose, click in the message body, then try Insert again. You can also use Copy and paste into Gmail manually.",
-          },
-          true
-        );
+        const code = res.code || "";
+        const detail = (res.detail && String(res.detail).trim()) || "";
+        let title = "Couldn’t place text in Gmail";
+        let body = detail;
+        if (code === "no_compose") {
+          title = "Open a reply box in Gmail, then try Insert";
+          body =
+            detail ||
+            "Click Reply or Compose in Gmail, then click inside the message body before tapping Insert here.";
+        } else if (code === "compose_disconnected") {
+          title = "Compose closed before Insert finished";
+          body = detail || "That compose window closed. Open the reply again, then try Insert.";
+        } else if (!body) {
+          body =
+            "Focus the Gmail tab, open a reply or compose box, then try Insert again. Use Copy in this panel if you need the draft on your clipboard — then paste into Gmail manually.";
+        }
+        const copyHint =
+          code === "no_compose" || code === "compose_disconnected"
+            ? " Or use Copy in this panel, then paste into Gmail manually."
+            : "";
+        showStatus({ kind: "error", title, body: body + copyHint }, true);
         return;
       }
 
