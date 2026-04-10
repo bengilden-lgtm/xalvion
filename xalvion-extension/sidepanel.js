@@ -353,8 +353,38 @@ function renderConsequenceBar(data) {
   });
 }
 
+function dedupeExtensionNodesById(id) {
+  const safe = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id.replace(/"/g, '\\"');
+  let nodes;
+  try {
+    nodes = Array.from(document.querySelectorAll(`[id="${safe}"]`));
+  } catch (_) {
+    nodes = [];
+    const all = document.querySelectorAll("[id]");
+    for (let i = 0; i < all.length; i += 1) {
+      if (all[i].id === id) nodes.push(all[i]);
+    }
+  }
+  for (let i = 1; i < nodes.length; i += 1) {
+    try {
+      nodes[i].remove();
+    } catch (_) {}
+  }
+  return nodes[0] || null;
+}
+
 function ensureTrustStrip() {
-  if (trustStripEl) return trustStripEl;
+  dedupeExtensionNodesById("trustStrip");
+  if (trustStripEl && trustStripEl.isConnected && trustStripEl.id === "trustStrip") {
+    return trustStripEl;
+  }
+  const fromDom = document.getElementById("trustStrip");
+  if (fromDom && fromDom.isConnected) {
+    trustStripEl = fromDom;
+    return trustStripEl;
+  }
+  trustStripEl = null;
+
   // Insert directly under the consequence bar to stay high-signal and compact.
   const panel = document.getElementById("resultPanel");
   const bar = panel?.querySelector(".consequence-bar");
@@ -368,7 +398,17 @@ function ensureTrustStrip() {
 }
 
 function ensureDecisionMicrocopy() {
-  if (decisionMicrocopyEl) return decisionMicrocopyEl;
+  dedupeExtensionNodesById("decisionMicrocopy");
+  if (decisionMicrocopyEl && decisionMicrocopyEl.isConnected && decisionMicrocopyEl.id === "decisionMicrocopy") {
+    return decisionMicrocopyEl;
+  }
+  const fromDom = document.getElementById("decisionMicrocopy");
+  if (fromDom && fromDom.isConnected) {
+    decisionMicrocopyEl = fromDom;
+    return decisionMicrocopyEl;
+  }
+  decisionMicrocopyEl = null;
+
   const panel = document.getElementById("resultPanel");
   if (!panel) return null;
   const bar = panel.querySelector(".consequence-bar") || panel.querySelector("#consequenceSignal") || panel;
@@ -377,10 +417,11 @@ function ensureDecisionMicrocopy() {
   el.id = "decisionMicrocopy";
   el.className = "decision-microcopy";
   el.style.display = "none";
-  // Prefer to sit immediately under the consequence bar/strip.
+  // Keep ordering stable: trust strip first (if any), then microcopy directly under the bar.
+  ensureTrustStrip();
   const anchor = trustStripEl || panel.querySelector("#trustStrip");
   if (anchor && anchor.parentElement) {
-    anchor.insertAdjacentElement("beforebegin", el);
+    anchor.insertAdjacentElement("afterend", el);
   } else if (bar instanceof HTMLElement) {
     bar.insertAdjacentElement("afterend", el);
   } else {
@@ -1549,8 +1590,12 @@ if (copyBtn) {
 }
 
 if (insertBtn) {
+  let insertInFlight = false;
   insertBtn.addEventListener("click", async () => {
     if (!lastReply) return;
+    if (insertInFlight) return;
+    insertInFlight = true;
+    insertBtn.disabled = true;
 
     try {
       const tab = await chromeCtx.getActiveTab();
@@ -1573,8 +1618,10 @@ if (insertBtn) {
         showStatus(
           {
             kind: "error",
-            title: "Couldn’t place in Gmail",
-            body: res.detail || "Open a reply or compose field in Gmail, then try again.",
+            title: "Couldn’t place text in Gmail",
+            body:
+              res.detail ||
+              "Couldn’t find an active reply box. Open Reply or Compose, click in the message body, then try Insert again. You can also use Copy and paste into Gmail manually.",
           },
           true
         );
@@ -1583,7 +1630,10 @@ if (insertBtn) {
 
       const original = insertBtn.textContent;
       insertBtn.textContent = "Inserted ✓";
-      showStatus({ title: "Inserted into reply", body: "Ready to send — give it a final read." }, false);
+      showStatus(
+        { title: "Inserted in Gmail", body: "Your draft is in the message body — give it a final read before sending." },
+        false
+      );
 
       setTimeout(() => {
         insertBtn.textContent = original;
@@ -1594,10 +1644,13 @@ if (insertBtn) {
         {
           kind: "error",
           title: "Couldn’t reach Gmail",
-          body: "Open Gmail with a reply or compose box visible, then try again. Copy still works if you prefer.",
+          body: "Focus the Gmail tab, open a reply or compose box, then try Insert again. Or use Copy and paste the reply into Gmail manually.",
         },
         true
       );
+    } finally {
+      insertInFlight = false;
+      insertBtn.disabled = !lastReply;
     }
   });
 }
