@@ -608,21 +608,41 @@ if (typeof window.pulseRail !== "function") {
             }
             body[data-ui="claude"] .op-action__label{ font-weight:650 !important; }
             body[data-ui="claude"] .op-action--primary{
-              border:none !important;
-              background: rgba(209,190,162,0.22) !important;
-              box-shadow: 0 0 0 1px rgba(209,190,162,0.22) !important;
+              border: 1px solid rgba(34,197,94,0.50) !important;
+              background: rgba(34,197,94,0.16) !important;
+              color: rgba(134,239,172,1) !important;
+              box-shadow: 0 0 12px rgba(34,197,94,0.12) !important;
             }
-            body[data-ui="claude"] .op-action--primary:hover{ background: rgba(209,190,162,0.30) !important; }
+            body[data-ui="claude"] .op-action--primary:hover{
+              background: rgba(34,197,94,0.26) !important;
+              box-shadow: 0 0 18px rgba(34,197,94,0.20) !important;
+            }
             body[data-ui="claude"] .op-action--primary--hold{
-              box-shadow: 0 0 0 1px rgba(186,170,255,0.28), 0 6px 22px rgba(124,90,252,0.12) !important;
+              border: 1px solid rgba(34,197,94,0.50) !important;
+              background: rgba(34,197,94,0.16) !important;
+              color: rgba(134,239,172,1) !important;
+              box-shadow: 0 0 14px rgba(34,197,94,0.18) !important;
               min-height:34px !important;
               padding:0 14px !important;
             }
             body[data-ui="claude"] .op-action--ghost-danger{
-              border-color: rgba(210,133,133,0.22) !important;
-              background: rgba(210,133,133,0.08) !important;
+              border-color: rgba(239,68,68,0.50) !important;
+              background: rgba(239,68,68,0.14) !important;
+              color: rgba(252,165,165,1) !important;
             }
-            body[data-ui="claude"] .op-action--ghost-danger:hover{ background: rgba(210,133,133,0.12) !important; }
+            body[data-ui="claude"] .op-action--ghost-danger:hover{
+              background: rgba(239,68,68,0.24) !important;
+              box-shadow: 0 0 14px rgba(239,68,68,0.16) !important;
+            }
+            body[data-ui="claude"] .op-action--edit{
+              border: 1px solid rgba(59,130,246,0.50) !important;
+              background: rgba(59,130,246,0.14) !important;
+              color: rgba(147,197,253,1) !important;
+            }
+            body[data-ui="claude"] .op-action--edit:hover{
+              background: rgba(59,130,246,0.24) !important;
+              box-shadow: 0 0 14px rgba(59,130,246,0.16) !important;
+            }
             body[data-ui="claude"] .decision-state-pill{
               display:inline-flex !important;
               align-items:center !important;
@@ -5139,7 +5159,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       rej.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.reject}</span><span class="op-action__label">Reject</span>`;
       const ed = document.createElement("button");
       ed.type = "button";
-      ed.className = "op-action op-action--secondary";
+      ed.className = "op-action op-action--edit";
       ed.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.edit}</span><span class="op-action__label">Edit</span>`;
       const ap = document.createElement("button");
       ap.type = "button";
