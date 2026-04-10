@@ -11,7 +11,9 @@
 /** Set true only for unpacked local development — never ship with this enabled. */
 const USE_LOCAL_OPERATOR_API = false;
 
-const PRODUCTION_OPERATOR_API_ORIGIN = "https://api.xalvion.tech";
+const PRODUCTION_OPERATOR_API_ORIGIN = "https://xalvion-production.up.railway.app";
+// For custom domains (e.g. api.xalvion.tech),
+// replace this value once DNS is configured.
 const LOCAL_OPERATOR_API_ORIGIN = "http://127.0.0.1:8000";
 
 const DEFAULT_OPERATOR_API_ORIGIN = USE_LOCAL_OPERATOR_API

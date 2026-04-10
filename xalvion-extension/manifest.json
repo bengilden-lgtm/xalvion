@@ -20,9 +20,9 @@
     "http://localhost:8001/*",
     "https://*.up.railway.app/*",
     "https://*.railway.app/*",
+    "https://xalvion-production.up.railway.app/*",
     "https://*.onrender.com/*",
     "https://*.fly.dev/*",
-    "https://api.xalvion.tech/*",
     "https://*.xalvion.tech/*"
   ],
 
