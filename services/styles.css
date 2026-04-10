@@ -1210,6 +1210,12 @@ select.refund-select{ padding-right: 34px; }
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  padding-left: 24px;
+  padding-right: 24px;
 }
 .home-surface{
   flex: 1;
@@ -1269,11 +1275,14 @@ select.refund-select{ padding-right: 34px; }
   max-height: 100%;
   overflow:auto;
   overscroll-behavior: contain;
-  padding: 4px var(--composer-pad-x) 40px var(--composer-pad-x);
+  padding: 4px 0 40px var(--composer-pad-x);
   display:flex;
   flex-direction: column;
   gap: 12px;
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+  padding-right: 0;
+  margin-right: 0;
 }
 .messages > *{
   width: min(var(--thread-max), 100%);
@@ -1316,18 +1325,35 @@ select.refund-select{ padding-right: 34px; }
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklab, white 18%, transparent) transparent;
 }
-.scroll-area::-webkit-scrollbar{ width: 10px; height: 10px; }
-.scroll-area::-webkit-scrollbar-thumb{
-  background: color-mix(in oklab, white 16%, transparent);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
+
+/* Thin scrollbar flush to edge */
+::-webkit-scrollbar{
+  width: 4px;
 }
-.scroll-area::-webkit-scrollbar-thumb:hover{
-  background: color-mix(in oklab, white 22%, transparent);
-  background-clip: content-box;
+::-webkit-scrollbar-track{
+  background: transparent;
+  margin: 0;
+  padding: 0;
 }
-.scroll-area::-webkit-scrollbar-track{ background: transparent; }
+::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,0.15);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover{
+  background: rgba(255,255,255,0.25);
+}
+
+/* Keep scroll-area consistent with global webkit rules */
+.scroll-area::-webkit-scrollbar{ width: 4px; height: 4px; }
+.scroll-area::-webkit-scrollbar-track{ background: transparent; margin: 0; padding: 0; }
+.scroll-area::-webkit-scrollbar-thumb{ background: rgba(255,255,255,0.15); border-radius: 0; }
+.scroll-area::-webkit-scrollbar-thumb:hover{ background: rgba(255,255,255,0.25); }
+
+/* Extend workspace scroll to viewport edge (scrollbar flush right) */
+.messages{
+  padding-right: var(--stage-pad);
+  margin-right: calc(var(--stage-pad) * -1);
+}
 
 /* Message cards: flat transcript, no neon */
 .msg-group{ display:flex; }
