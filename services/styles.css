@@ -1219,12 +1219,13 @@ select.refund-select{ padding-right: 34px; }
   flex-direction: column;
   gap: var(--s-4);
   overflow: hidden;
-  max-width: 720px;
+  max-width: 740px;
+  width: 100%;
   margin-left: auto;
   margin-right: auto;
-  width: 100%;
-  padding-left: var(--s-4);
-  padding-right: var(--s-4);
+  padding-left: 24px;
+  padding-right: 24px;
+  box-sizing: border-box;
 }
 .home-surface{
   flex: 1;
@@ -1284,7 +1285,7 @@ select.refund-select{ padding-right: 34px; }
   max-height: 100%;
   overflow:auto;
   overscroll-behavior: contain;
-  padding: 4px var(--composer-pad-x) 40px var(--composer-pad-x);
+  padding: 4px 0 40px 0;
   display:flex;
   flex-direction: column;
   gap: var(--s-4);
@@ -1315,9 +1316,9 @@ select.refund-select{ padding-right: 34px; }
   font-size: 11px;
 }
 .messages > *{
-  width: min(var(--thread-max), 100%);
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
 .messages:has(> .empty-state){
   justify-content: center;
@@ -1381,8 +1382,8 @@ select.refund-select{ padding-right: 34px; }
 
 /* Extend workspace scroll to viewport edge (scrollbar flush right) */
 .messages{
-  padding-right: var(--stage-pad);
-  margin-right: calc(var(--stage-pad) * -1);
+  padding-right: 0;
+  margin-right: 0;
 }
 
 /* Message cards: flat transcript, no neon */
@@ -1395,7 +1396,7 @@ select.refund-select{ padding-right: 34px; }
   border-radius: var(--r-md);
   border: 1px solid transparent;
   background: transparent;
-  padding: 4px 0 10px 0;
+  padding: 20px;
   transition: border-color var(--t-med) var(--ease), background var(--t-med) var(--ease);
 }
 .msg-card.user{
@@ -1407,7 +1408,7 @@ select.refund-select{ padding-right: 34px; }
   border-color: transparent;
 }
 .msg-group.user .msg-card{
-  padding: 0 0 6px 0;
+  padding: 20px;
 }
 .msg-group.user .reply-text{
   padding: 11px 14px;
@@ -1494,7 +1495,7 @@ select.refund-select{ padding-right: 34px; }
   color: var(--text-2);
 }
 
-.assistant-result-stack{ display:flex; flex-direction: column; gap: 10px; }
+.assistant-result-stack{ display:flex; flex-direction: column; gap: 16px; }
 .assistant-context-line{
   font-size: 12.5px;
   color: color-mix(in oklab, var(--text-muted) 92%, var(--text-4));
@@ -1563,8 +1564,8 @@ select.refund-select{ padding-right: 34px; }
 
 .automation-upsell{
   width: 100%;
-  margin-top: 10px;
-  padding: 12px 12px;
+  margin-top: 16px;
+  padding: 20px;
   border-radius: var(--r-md);
   border: 1px solid color-mix(in oklab, var(--accent) 16%, var(--border));
   background: color-mix(in oklab, var(--accent) 5%, transparent);
@@ -2898,9 +2899,9 @@ body[data-ui="claude"] .workspace-idle .composer-hint-band{
   position: relative;
   padding-top: 0;
   width: 100%;
-  max-width: var(--thread-max);
-  margin-left: auto;
-  margin-right: auto;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
   flex-shrink: 0;
   flex-grow: 0;
   z-index: 5;
@@ -2927,12 +2928,12 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
 }
 
 .inline-limit{
-  width: min(var(--thread-max), 96vw);
-  margin: 0 auto 10px;
+  width: 100%;
+  margin: 0 0 16px 0;
   border-radius: 14px;
   border: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
   background: color-mix(in oklab, var(--surface-soft) 20%, transparent);
-  padding: 12px 16px;
+  padding: 20px;
   color: var(--text-2);
 }
 .inline-limit .inline-limit-eyebrow{
@@ -2986,8 +2987,8 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
 }
 
 .composer-value-moment{
-  width: min(var(--thread-max), 96vw);
-  margin: 0 auto 10px;
+  width: 100%;
+  margin: 0 0 16px 0;
   border-radius: 16px;
   border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--border));
   background: linear-gradient(
@@ -2995,7 +2996,7 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
     color-mix(in oklab, var(--accent) 8%, transparent),
     color-mix(in oklab, var(--surface-soft) 22%, transparent)
   );
-  padding: 14px 16px;
+  padding: 20px;
   color: var(--text-2);
   box-shadow: 0 12px 40px rgba(0,0,0,0.12);
 }
@@ -3071,7 +3072,7 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
 
 .composer{
   width: 100%;
-  max-width: var(--thread-max);
+  max-width: none;
   border-radius: 0;
   border: none;
   background: transparent;
@@ -3307,7 +3308,7 @@ body[data-ui="claude"] #messageInput{
 .chip:focus-visible{ outline:none; box-shadow: var(--ring); }
 
 .composer-quick-patterns{
-  margin-top: 6px;
+  margin-top: 16px;
   border-top: 1px solid color-mix(in oklab, var(--line) 45%, transparent);
   padding-top: 8px;
 }
@@ -3327,7 +3328,7 @@ body[data-ui="claude"] #messageInput{
 
 /* Optional Stripe fold in composer */
 .composer-stripe-fold{
-  margin-top: 8px;
+  margin-top: 16px;
   border-top: 1px solid color-mix(in oklab, var(--line) 50%, transparent);
   background: transparent;
 }
@@ -3891,8 +3892,7 @@ body.access-open .workspace-root{
   .workspace-grid{ grid-template-columns: 1fr; }
   #sidebarShell{ display:none; }
   body.mobile-scroll-mode #sidebarShell{ display:none; }
-  .messages{ padding: 12px 2px 20px 2px; }
-  .composer{ width: min(var(--thread-max), 96vw); }
+  .messages{ padding: 12px 0 20px 0; }
   .refund-form-grid{ grid-template-columns: 1fr; }
 }
 
@@ -4337,8 +4337,8 @@ details > summary{ user-select:none; }
 
 /* Trust footer (subtle, not sticky) */
 .workspace-trust-footer{
-  width: min(var(--thread-max), 96vw);
-  margin: 10px auto 0;
+  width: 100%;
+  margin: 10px 0 0 0;
   text-align: center;
   font-size: 12px;
   color: var(--text-4);

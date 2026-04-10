@@ -2810,6 +2810,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
   function maybeShowPostRunValueMoment(data) {
     if (!data || typeof data !== "object") return;
+    try {
+      if (sessionStorage.getItem("proUpsellDismissed")) return;
+    } catch {
+      /* no-op */
+    }
     const tier = String(state.tier || "free").toLowerCase();
     if (tier === "elite" || tier === "dev") return;
     const conf = Number(data.confidence ?? data.decision?.confidence ?? 0);
@@ -2851,6 +2856,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   function renderComposerValueMoment(tierLc) {
     const el = els.composerValueMoment;
     if (!el) return;
+    try {
+      if (sessionStorage.getItem("proUpsellDismissed")) return;
+    } catch {
+      /* no-op */
+    }
     const isPro = tierLc === "pro";
     const headline = isPro ? "You’re clearing the queue — Elite keeps that rhythm" : "Strong run — don’t let capacity cut the streak";
     const sub = isPro
@@ -2883,7 +2893,18 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       },
       { once: true }
     );
-    el.querySelector("#composerValueMomentDismiss")?.addEventListener("click", () => clearComposerValueMoment(), { once: true });
+    el.querySelector("#composerValueMomentDismiss")?.addEventListener(
+      "click",
+      () => {
+        try {
+          sessionStorage.setItem("proUpsellDismissed", "true");
+        } catch {
+          /* no-op */
+        }
+        clearComposerValueMoment();
+      },
+      { once: true }
+    );
     window.setTimeout(() => {
       if (state.postRunValueMomentUntil && Date.now() > state.postRunValueMomentUntil) clearComposerValueMoment();
     }, 102000);
