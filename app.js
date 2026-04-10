@@ -6723,6 +6723,13 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       syncRunValueSummary(row, data);
       syncReplyReinforcement(row);
       pulsePreparedReplyReveal(row);
+
+      // Scroll to the top of this response so operator reads reply first.
+      try {
+        const scrollTarget = row.querySelector(".msg-card") || row;
+        scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (_) {}
+
       syncAssistantContextLine(row, data);
       flashComposerStatus(buildPostRunComposerFlash(data, elapsedMs / 1000), 10000);
 
@@ -6806,7 +6813,16 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       authDebugLog("support_failed", error);
     } finally {
       setSending(false);
-      scrollMessagesToBottom(true);
+      try {
+        if (row) {
+          const scrollTarget = row.querySelector(".msg-card") || row;
+          scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          scrollMessagesToBottom(true);
+        }
+      } catch (_) {
+        scrollMessagesToBottom(true);
+      }
       refreshMessageShellGlow();
     }
   }
