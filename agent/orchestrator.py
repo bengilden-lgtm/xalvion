@@ -85,6 +85,7 @@ except Exception as _outcome_store_imp_err:
 
 
 from agent.execution import execute_action, normalize_action_payload, should_attach_order_context
+from agent.formatters import is_conversational_message, normalize_text, polish_message
 from agent.llm import sovereign_llm_attempt
 from agent.response_builder import (
     _canonicalize_result,
@@ -93,10 +94,7 @@ from agent.response_builder import (
     build_sovereign_prompt,
     compute_quality,
     conversational_reply,
-    is_conversational_message,
     local_fallback_reply,
-    normalize_text,
-    polish_message,
     rewrite_output_for_issue,
 )
 
@@ -441,15 +439,18 @@ def run_agent(
     update_memory(user_id, ticket, customer_message, final_payload)
     learn_from_ticket(ticket, final_payload, executed, outcome_key=_outcome_key)
     process_feedback(clean, customer_message, quality)
-    log_event(
-        clean,
-        customer_message,
-        confidence,
-        quality,
-        issue_type=str(ticket.get("issue_type", "general_support") or "general_support"),
-        action=str(final_payload.get("action", "none") or "none"),
-        amount=float(final_payload.get("amount", 0) or 0),
-    )
+    try:
+        log_event(
+            clean,
+            customer_message,
+            confidence,
+            quality,
+            issue_type=str(ticket.get("issue_type", "general_support") or "general_support"),
+            action=str(final_payload.get("action", "none") or "none"),
+            amount=float(final_payload.get("amount", 0) or 0),
+        )
+    except Exception:
+        pass  # analytics write failure never blocks the response
     if quality > 0.92:
         brain_growth = load_brain()
         add_rule(brain_growth, "Maintain strong clarity and confident tone.")

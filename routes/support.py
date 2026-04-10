@@ -53,6 +53,22 @@ def _stream_usage_warning_payload(username: str) -> dict[str, Any] | None:
         return None
 
 
+def _apply_ticket_search(q, search_term: str):
+    """
+    Full-text search across ticket columns.
+    TODO: Replace ilike scan with FTS (tsvector+GIN for Postgres,
+    FTS5 for SQLite) before ticket volume exceeds 50k rows.
+    """
+    term = f"%{search_term}%"
+    return q.filter(
+        app_mod.Ticket.subject.ilike(term)
+        | app_mod.Ticket.customer_message.ilike(term)
+        | app_mod.Ticket.final_reply.ilike(term)
+        | app_mod.Ticket.internal_note.ilike(term)
+        | app_mod.Ticket.issue_type.ilike(term)
+    )
+
+
 @router.get("/tickets")
 def list_tickets(
     limit: int = 50,
@@ -95,14 +111,7 @@ def list_tickets(
         q = q.filter(app_mod.Ticket.issue_type == issue_type.strip().lower()[:64])
 
     if search and len(search.strip()) >= 2:
-        term = f"%{search.strip()}%"
-        q = q.filter(
-            app_mod.Ticket.subject.ilike(term)
-            | app_mod.Ticket.customer_message.ilike(term)
-            | app_mod.Ticket.final_reply.ilike(term)
-            | app_mod.Ticket.internal_note.ilike(term)
-            | app_mod.Ticket.issue_type.ilike(term)
-        )
+        q = _apply_ticket_search(q, search.strip())
 
     sort_map = {
         "newest": app_mod.Ticket.id.desc(),

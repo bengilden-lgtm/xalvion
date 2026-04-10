@@ -701,10 +701,28 @@ def register_outreach_crm_routes(
             db.close()
 
     @app.get("/leads")
-    def list_outreach_leads(user=Depends(require_authenticated_user)):  # noqa: ANN001
+    def list_outreach_leads(  # noqa: ANN001
+        limit: int = 50,
+        offset: int = 0,
+        user=Depends(require_authenticated_user),
+    ):
         leads = _get_sorted_leads()
+        try:
+            limit = max(1, min(int(limit), 200))
+            offset = max(0, int(offset))
+            total = len(leads)
+            paginated = leads[offset : offset + limit]
+        except Exception:
+            limit = 50
+            offset = 0
+            total = len(leads)
+            paginated = leads
         return {
-            "items": leads,
+            "items": paginated,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + limit) < total,
             "summary": _get_lead_summary(leads),
             "daily_summary": _get_daily_summary(leads),
             "metrics": _compute_revenue_metrics(leads),
@@ -712,7 +730,11 @@ def register_outreach_crm_routes(
         }
 
     @app.get("/leads/followups")
-    def list_outreach_followups(user=Depends(require_authenticated_user)):  # noqa: ANN001
+    def list_outreach_followups(  # noqa: ANN001
+        limit: int = 50,
+        offset: int = 0,
+        user=Depends(require_authenticated_user),
+    ):
         leads = _get_sorted_leads()
         now = _crm_now()
         due: list[dict[str, Any]] = []
@@ -725,8 +747,22 @@ def register_outreach_crm_routes(
                     due.append(lead)
             except Exception:
                 continue
+        try:
+            limit = max(1, min(int(limit), 200))
+            offset = max(0, int(offset))
+            total = len(due)
+            paginated = due[offset : offset + limit]
+        except Exception:
+            limit = 50
+            offset = 0
+            total = len(due)
+            paginated = due
         return {
-            "items": due,
+            "items": paginated,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + limit) < total,
             "summary": _get_lead_summary(leads),
             "daily_summary": _get_daily_summary(leads),
             "metrics": _compute_revenue_metrics(leads),

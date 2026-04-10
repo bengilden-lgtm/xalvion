@@ -26,6 +26,11 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from threading import Lock
 
+# SKIPPED: Requested Ticket/ActionLog indexes must be declared after the model
+# classes, but this repo defines those models in `orm_models.py` (not `db.py`).
+# Adding `Index(...)` objects here would either be a no-op or raise NameError at
+# import time. If you want this applied, re-run Section 1 targeting `orm_models.py`.
+
 # ---------------------------------------------------------------------------
 # URL resolution
 # ---------------------------------------------------------------------------
