@@ -558,7 +558,7 @@ if (typeof window.pulseRail !== "function") {
               padding: clamp(10px, 2vh, 18px) clamp(12px, 2.5vw, 22px) 8px !important;
             }
             body[data-ui="claude"] #messages{
-              padding: 6px 0 160px !important;
+              padding: 6px 0 28px !important;
               gap: 12px !important;
             }
 
@@ -597,6 +597,26 @@ if (typeof window.pulseRail !== "function") {
               margin-right: auto !important;
               padding-left: 0 !important;
               padding-right: 0 !important;
+            }
+
+            /* Composer: in-column footer — no full-bleed dark slab; sits flush with workspace */
+            body[data-ui="claude"] #workspaceComposerDock{
+              position: relative !important;
+              left: auto !important;
+              right: auto !important;
+              bottom: auto !important;
+              top: auto !important;
+              width: 100% !important;
+              z-index: 5 !important;
+              background: transparent !important;
+              background-color: transparent !important;
+              box-shadow: none !important;
+              padding: 4px 0 calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+            }
+            body[data-ui="claude"] .composer-unified{
+              padding-left: 0 !important;
+              padding-right: 0 !important;
+              padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
             }
 
             /* Operator workflow: command-center hierarchy (no layout changes) */
@@ -8168,25 +8188,10 @@ function bindEvents() {
     ensureInjectedStyles();
     ensureCrmStyles();
 
-    // (intentionally no forced dock/input positioning or sizing here)
+    // Composer chrome is controlled in `services/styles.css` + Claude tweak stylesheet (no inline dock overrides).
     try {
-      const dock = document.getElementById("workspaceComposerDock");
-      if (dock) {
-        dock.style.position = "fixed";
-        dock.style.bottom = "0";
-        dock.style.left = "57px";
-        dock.style.right = "0";
-        dock.style.zIndex = "100";
-        dock.style.backgroundColor = "#1a1814";
-        dock.style.padding = "12px 32px 20px";
-      }
-
       if (els.messageInput) {
         els.messageInput.style.borderRadius = "999px";
-      }
-
-      if (els.messagesZone) {
-        els.messagesZone.style.paddingBottom = "180px";
       }
     } catch {}
 

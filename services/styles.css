@@ -1393,7 +1393,7 @@ select.refund-select{ padding-right: 34px; }
 }
 
 #messages{
-  padding-bottom: 120px !important;
+  padding-bottom: 28px !important;
 }
 
 /* Extend workspace scroll to viewport edge (scrollbar flush right) */
@@ -2932,7 +2932,7 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
 
 .composer-dock,
 #workspaceComposerDock{
-  background: var(--bg, #1a1814);
+  background: transparent;
 }
 
 #workspaceComposerDock .quick-examples,
@@ -2949,9 +2949,9 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
   max-width: 820px;
   margin-left: auto;
   margin-right: auto;
-  padding-left: 32px;
-  padding-right: 32px;
-  padding-bottom: 20px;
+  padding-left: 0;
+  padding-right: 0;
+  padding-bottom: max(4px, env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   display:flex;
   justify-content: center;
