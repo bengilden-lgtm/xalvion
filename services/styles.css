@@ -1142,6 +1142,10 @@ select.refund-select{ padding-right: 34px; }
   min-width: 0;
   min-height: 0;
   align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
 }
 .main-canvas{
   background: transparent;
@@ -2916,20 +2920,10 @@ body[data-ui="claude"] .workspace-idle .composer-hint-band{
   flex-grow: 0;
   z-index: 5;
   padding-bottom: max(2px, env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    color-mix(in oklab, var(--bg) 48%, transparent) 38%,
-    var(--bg) 78%
-  );
+  background: transparent;
 }
 body[data-ui="claude"] .workspace-idle .composer-wrap{
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    color-mix(in oklab, var(--bg) 42%, transparent) 42%,
-    var(--bg) 88%
-  );
+  background: transparent;
 }
 .composer-unified{
   width: 100%;
