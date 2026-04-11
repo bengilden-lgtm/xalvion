@@ -1392,6 +1392,10 @@ select.refund-select{ padding-right: 34px; }
   border-radius: 2px;
 }
 
+#messages{
+  padding-bottom: 120px !important;
+}
+
 /* Extend workspace scroll to viewport edge (scrollbar flush right) */
 .messages{
   padding-right: 0;
@@ -2925,6 +2929,21 @@ body[data-ui="claude"] .workspace-idle .composer-hint-band{
 body[data-ui="claude"] .workspace-idle .composer-wrap{
   background: transparent;
 }
+
+.composer-dock,
+#workspaceComposerDock{
+  background: var(--bg, #1a1814);
+}
+
+#workspaceComposerDock .quick-examples,
+#workspaceComposerDock .composer-stripe-fold{
+  display: none;
+}
+#workspaceComposerDock:focus-within .quick-examples,
+#workspaceComposerDock:focus-within .composer-stripe-fold{
+  display: block;
+}
+
 .composer-unified{
   width: 100%;
   max-width: 820px;
@@ -3140,6 +3159,11 @@ body[data-ui="claude"] .workspace-idle .composer-wrap{
   gap: 0;
   align-items: stretch;
   padding: 0;
+}
+.composer-input-row,
+.composer-input-wrap,
+.composer-field{
+  border-radius: 999px;
 }
 .composer-input-shell{
   flex: 1;
