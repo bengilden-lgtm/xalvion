@@ -61,15 +61,13 @@ from sqlalchemy import (
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from agent import run_agent, local_fallback_reply, build_audit_summary_payload
-from tools import get_order
+from agent import run_agent, build_audit_summary_payload
 from actions import (
     build_ticket as build_support_ticket,
     execution_requires_operator_gate,
     merge_impact_with_business_projection,
     system_decision,
     triage_ticket,
-    HANDLED_ISSUE_TYPES,
     MAX_AUTO_REFUND_AMOUNT,
 )
 from db import Base, SessionLocal, engine, init_db
@@ -1517,14 +1515,21 @@ except Exception as exc:
         action = str(result.get("action", "none") or "none")
         raw_queue = str(decision.get("queue", "new") or "new")
         tool_status = str(result.get("tool_status", "") or "").lower()
-        if tool_status in {"pending_approval", "manual_review"}:
+        if tool_status in {"pending_approval", "manual_review", "approved_pending_execution"}:
             status = "waiting"
-        elif action in {"refund", "credit", "none"}:
+        elif raw_queue == "resolved":
+            status = "resolved"
+        elif action in {"refund", "credit"}:
+            if tool_status in {"refunded", "credit_issued", "success"}:
+                status = "resolved"
+            elif tool_status in {"refund_failed", "error", "failed"}:
+                status = "escalated"
+            else:
+                status = "waiting"
+        elif action == "none":
             status = "resolved"
         else:
             status = "escalated"
-        if raw_queue == "resolved":
-            status = "resolved"
         ticket.updated_at = _now_iso()
         ticket.status = _safe_status(status)
         ticket.queue = _safe_queue(raw_queue)
@@ -2046,12 +2051,21 @@ def hydrate_result_with_engine_context(
     hydrated["meta"] = existing_meta
 
     execution_status = str(hydrated.get("tool_status") or (hydrated.get("tool_result") or {}).get("status") or "unknown")
+    ts_lower = execution_status.lower()
+    pending_exec = ts_lower in {"pending_approval", "manual_review", "approved_pending_execution"}
+    ok_financial = (action in {"refund", "credit"} and ts_lower in {"refunded", "credit_issued", "success"}) or (
+        action == "charge" and ts_lower == "success"
+    )
+    execution_complete = bool(
+        not requires_approval and not pending_exec and (ok_financial or action == "none")
+    )
     hydrated["execution"] = {
         "action": action,
         "amount": round(amount, 2),
         "status": execution_status,
         "auto_resolved": bool((impact or {}).get("auto_resolved", False)),
         "requires_approval": requires_approval,
+        "execution_complete": execution_complete,
     }
 
     internal_note = str(existing_output.get("internal_note") or "").strip()
@@ -2127,6 +2141,9 @@ def serialize_pending_approval_result(result: dict[str, Any], *, action: str, am
         "proposed_amount": round(float(amount or 0), 2),
     })
     pending["decision"] = decision
+    _prev_sd = dict(pending.get("sovereign_decision") or {})
+    _prev_sd.update(decision)
+    pending["sovereign_decision"] = _prev_sd
 
     execution = dict(pending.get("execution") or {})
     execution.update({
@@ -2161,6 +2178,83 @@ def serialize_pending_approval_result(result: dict[str, Any], *, action: str, am
     except Exception:
         pass
     return pending
+
+
+def finalize_agent_result_for_operator_policy(
+    result: dict[str, Any],
+    *,
+    username: str,
+    plan_tier: str,
+) -> dict[str, Any]:
+    """Shared post-`run_agent` path for workspace and extension: approval gating + trust / outcome stats."""
+    out = dict(result or {})
+    try:
+        decision = dict(out.get("sovereign_decision") or out.get("decision") or {})
+        action = str(decision.get("action", "none") or "none").strip().lower()
+        amount = round(float(decision.get("amount", 0) or 0), 2)
+        governor_present = bool(decision.get("governor_reason") or decision.get("execution_mode"))
+        if check_requires_approval(action, amount):
+            decision.update(
+                {
+                    "requires_approval": True,
+                    "status": decision.get("status") or "waiting",
+                    "queue": decision.get("queue") or ("refund_risk" if action == "refund" else "waiting"),
+                    "priority": decision.get("priority") or ("high" if action in {"refund", "charge"} else "medium"),
+                    "risk_level": decision.get("risk_level") or ("high" if action in {"refund", "charge"} else "medium"),
+                    "tool_status": decision.get("tool_status") or "pending_approval",
+                }
+            )
+            if not governor_present:
+                hold_message = build_approval_hold_message(action, amount)
+                out["reply"] = hold_message
+                out["response"] = hold_message
+                out["final"] = hold_message
+            out["sovereign_decision"] = decision
+            out["decision"] = decision
+            out = serialize_pending_approval_result(out, action=action, amount=amount)
+
+        decision_for_gov = dict(out.get("sovereign_decision") or out.get("decision") or {})
+        if decision_for_gov.get("execution_mode") and not out.get("execution_mode"):
+            out["execution_mode"] = decision_for_gov.get("execution_mode")
+        for k in (
+            "governor_reason",
+            "governor_risk_score",
+            "governor_risk_level",
+            "governor_factors",
+            "approved",
+            "violations",
+        ):
+            if decision_for_gov.get(k) is not None and out.get(k) is None:
+                out[k] = decision_for_gov.get(k)
+
+        mem = get_user_memory(str(username))
+        rt = {
+            "issue_type": str(out.get("issue_type") or "general_support"),
+            "triage": dict(out.get("triage_metadata") or out.get("triage") or {}),
+            "plan_tier": str(plan_tier or mem.get("plan_tier") or "free"),
+        }
+        dec = dict(out.get("sovereign_decision") or out.get("decision") or {})
+        td = _build_trust_dominance_layer(runtime_ticket=rt, decision=dec, user_memory=mem)
+        out["trust_dominance"] = td
+        if isinstance(td, dict):
+            if "similar_case_count" in td:
+                dec["similar_case_count"] = int(td.get("similar_case_count") or 0)
+            if "historical_success_rate" in td:
+                dec["historical_success_rate"] = td.get("historical_success_rate")
+            try:
+                from outcome_store import get_decision_outcome_stats
+
+                stats = get_decision_outcome_stats(rt["issue_type"], str(dec.get("action") or "none"), limit=300) or {}
+                dec["historical_reopen_rate"] = stats.get("historical_reopen_rate", None)
+                dec["outcome_confidence_band"] = stats.get("outcome_confidence_band", None)
+            except Exception:
+                dec["historical_reopen_rate"] = None
+                dec["outcome_confidence_band"] = None
+        out["sovereign_decision"] = dec
+        out["decision"] = dec
+    except Exception:
+        pass
+    return out
 
 
 def build_ticket_response_payload(
@@ -2376,150 +2470,32 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
         }
 
     try:
-        msg = (req.message or "").lower()
-        issue_type_rt = str(runtime_ticket.get("issue_type", "general_support") or "general_support")
-
-        shipping_keys = (
-            "where is my order",
-            "my order",
-            "tracking",
-            "package",
-            "delivery",
-            "late",
+        op_mode = str(runtime_ticket.get("operator_mode", "balanced") or "balanced")
+        logger.info(
+            "support_agent_phase_start ticket_id=%s user=%s (db not held during LLM)",
+            ticket_id,
+            getattr(user, "username", "") or "?",
         )
-        damaged_keys = ("damaged", "broken", "arrived damaged")
-
-        _billing_fast_types = HANDLED_ISSUE_TYPES - {"shipping_issue", "damaged_order"}
-        billing_msg_keys = (
-            "charged twice",
-            "double charge",
-            "duplicate charge",
-            "billed twice",
-            "overcharged",
-            "over charged",
-            "wrong charge",
+        result = run_agent(
+            req.message,
+            user_id=principal_id,
+            meta=build_agent_meta(req, user, operator_mode=op_mode),
+            request_context=AgentRequestContext(surface="workspace").model_dump(),
         )
-
-        is_damaged = (issue_type_rt in HANDLED_ISSUE_TYPES and issue_type_rt == "damaged_order") or any(
-            k in msg for k in damaged_keys
-        )
-        is_billing = issue_type_rt in _billing_fast_types or any(k in msg for k in billing_msg_keys)
-        is_shipping = (issue_type_rt in HANDLED_ISSUE_TYPES and issue_type_rt == "shipping_issue") or any(
-            k in msg for k in shipping_keys
-        )
-
-        triage_rt = runtime_ticket.get("triage") or {}
-        risk_from_ctx = str(
-            shadow_decision.get("risk_level", triage_rt.get("risk_level", "medium")) or "medium"
-        )
-        _order_customer = str(runtime_ticket.get("customer") or principal_id or "").strip() or "unknown"
-        order_info = get_order(_order_customer, req.message)
-
-        if is_damaged:
-            ticket_local = dict(runtime_ticket)
-            ticket_local["order_data_connected"] = bool(order_info.get("connected"))
-            ticket_local["issue_type"] = "damaged_order"
-            dam_act = str(shadow_decision.get("action", "review") or "review")
-            if dam_act == "none":
-                dam_act = "review"
-            planned_action = {
-                "action": dam_act,
-                "amount": float(shadow_decision.get("amount", 0) or 0),
-                "reason": str(shadow_decision.get("reason", "") or ""),
-                "queue": str(shadow_decision.get("queue", "escalated") or "escalated"),
-                "priority": str(shadow_decision.get("priority", "high") or "high"),
-                "risk_level": risk_from_ctx,
-                "requires_approval": False,
-            }
-            local_result = local_fallback_reply(ticket_local, planned_action, order_info, req.message)
-            local_result["mode"] = "local_fast_path"
-            local_result["issue_type"] = "damaged_order"
-            local_result["tool_result"] = {
-                "status": "local_fast_path",
-                "type": "escalation",
-            }
-            local_result["tool_status"] = "local_fast_path"
-            result = local_result
-        elif is_billing:
-            ticket_local = dict(runtime_ticket)
-            ticket_local["order_data_connected"] = bool(order_info.get("connected"))
-            if issue_type_rt in _billing_fast_types:
-                it = issue_type_rt
-            elif any(k in msg for k in billing_msg_keys):
-                it = "billing_duplicate_charge"
-            elif "refund" in msg:
-                it = "refund_request"
-            else:
-                it = "billing_issue"
-            ticket_local["issue_type"] = it
-            q_default = "refund_risk" if it in {"billing_duplicate_charge", "refund_request"} else "waiting"
-            planned_action = {
-                "action": "none",
-                "amount": 0,
-                "reason": str(shadow_decision.get("reason", "") or ""),
-                "queue": str(shadow_decision.get("queue", q_default) or q_default),
-                "priority": str(shadow_decision.get("priority", "high") or "high"),
-                "risk_level": risk_from_ctx,
-                "requires_approval": False,
-            }
-            local_result = local_fallback_reply(ticket_local, planned_action, order_info, req.message)
-            local_result["mode"] = "local_fast_path"
-            local_result["issue_type"] = it
-            local_result["tool_result"] = {
-                "status": "local_fast_path",
-                "type": "billing",
-            }
-            local_result["tool_status"] = "local_fast_path"
-            result = local_result
-        elif is_shipping:
-            ticket_local = dict(runtime_ticket)
-            ticket_local["order_data_connected"] = bool(order_info.get("connected"))
-            ticket_local["issue_type"] = "shipping_issue"
-            planned_action = {
-                "action": str(shadow_decision.get("action", "none") or "none"),
-                "amount": float(shadow_decision.get("amount", 0) or 0),
-                "reason": str(shadow_decision.get("reason", "") or ""),
-                "queue": str(shadow_decision.get("queue", "waiting") or "waiting"),
-                "priority": str(shadow_decision.get("priority", "medium") or "medium"),
-                "risk_level": risk_from_ctx,
-                "requires_approval": False,
-            }
-            local_result = local_fallback_reply(ticket_local, planned_action, order_info, req.message)
-            local_result["mode"] = "local_fast_path"
-            local_result["issue_type"] = "shipping_issue"
-            local_result["tool_result"] = {
-                "status": "local_fast_path",
-                "type": "tracking",
-            }
-            local_result["tool_status"] = "local_fast_path"
-            result = local_result
-        else:
-            op_mode = str(runtime_ticket.get("operator_mode", "balanced") or "balanced")
-            logger.info(
-                "support_agent_phase_start ticket_id=%s user=%s (db not held during LLM)",
-                ticket_id,
-                getattr(user, "username", "") or "?",
-            )
-            result = run_agent(
-                req.message,
-                user_id=principal_id,
-                meta=build_agent_meta(req, user, operator_mode=op_mode),
-            )
 
         if not isinstance(result, dict):
             raise RuntimeError("Agent returned invalid payload")
 
-        action = str(result.get("action", "none") or "none").lower()
-        amount = float(result.get("amount", 0) or 0)
-
-        needs_approval = (
-            check_requires_approval(action, amount)
-            or bool((result.get("decision") or {}).get("requires_approval", False))
+        result = finalize_agent_result_for_operator_policy(
+            result,
+            username=principal_id,
+            plan_tier=get_plan_name(user),
         )
 
-        if needs_approval:
-            result = serialize_pending_approval_result(result, action=action, amount=amount)
-        else:
+        decision = dict(result.get("sovereign_decision") or result.get("decision") or {})
+        needs_approval = bool(decision.get("requires_approval", False))
+
+        if not needs_approval:
             result = apply_real_actions(result, req, user)
 
         merged_impact = merge_impact_with_business_projection(
@@ -3498,89 +3474,11 @@ def analyze_extension_ticket(
         request_context=_build_extension_context(req).model_dump(),
     )
 
-    try:
-        decision = dict(result.get("sovereign_decision") or {})
-        action = str(decision.get("action", "none") or "none").strip().lower()
-        amount = round(float(decision.get("amount", 0) or 0), 2)
-        # File: app.py
-        # Governor is final authority when present. Preserve legacy approval hold messaging as a fallback.
-        governor_present = bool(decision.get("governor_reason") or decision.get("execution_mode"))
-        if check_requires_approval(action, amount):
-            decision.update({
-                "requires_approval": True,
-                "status": decision.get("status") or "waiting",
-                "queue": decision.get("queue") or ("refund_risk" if action == "refund" else "waiting"),
-                "priority": decision.get("priority") or ("high" if action in {"refund", "charge"} else "medium"),
-                "risk_level": decision.get("risk_level") or ("high" if action in {"refund", "charge"} else "medium"),
-                "tool_status": decision.get("tool_status") or "pending_approval",
-            })
-            # Only overwrite customer-facing reply when we have no governor context,
-            # so existing UX remains and governor does not get masked.
-            if not governor_present:
-                hold_message = build_approval_hold_message(action, amount)
-                result["reply"] = hold_message
-                result["response"] = hold_message
-                result["final"] = hold_message
-            result["sovereign_decision"] = decision
-
-        # Optional governor fields at top-level (safe if absent)
-        if decision.get("execution_mode") and not result.get("execution_mode"):
-            result["execution_mode"] = decision.get("execution_mode")
-        for k in (
-            "governor_reason",
-            "governor_risk_score",
-            "governor_risk_level",
-            "governor_factors",
-            "approved",
-            "violations",
-        ):
-            if decision.get(k) is not None and result.get(k) is None:
-                result[k] = decision.get(k)
-        
-    except Exception:
-        pass
-
-    # Trust Dominance Layer (additive): derive from real outcomes + learning + memory.
-    try:
-        # For the extension surface, runtime_ticket is not persisted the same way as workspace.
-        # We still pass best-effort issue_type + triage + plan tier + user memory.
-        from memory import get_user_memory
-
-        mem = get_user_memory(str(username))
-        rt = {
-            "issue_type": str(result.get("issue_type") or "general_support"),
-            "triage": dict(result.get("triage_metadata") or result.get("triage") or {}),
-            "plan_tier": str(plan_tier or mem.get("plan_tier") or "free"),
-        }
-        dec = dict(result.get("sovereign_decision") or {})
-        td = _build_trust_dominance_layer(runtime_ticket=rt, decision=dec, user_memory=mem)
-        result["trust_dominance"] = td
-
-        # Mirror outcome stats onto the sovereign_decision fields (used by clients / renderers).
-        if isinstance(td, dict):
-            # these are real/derived from outcome_store.get_decision_outcome_stats or sparse-safe None
-            if "similar_case_count" in td:
-                dec["similar_case_count"] = int(td.get("similar_case_count") or 0)
-            if "historical_success_rate" in td:
-                dec["historical_success_rate"] = td.get("historical_success_rate")
-            # reopen rate is real but may be None when sparse; pass through if present on stats
-            # (kept in trust_dominance for UI risk label even when numeric rate is hidden)
-            # outcome_confidence_band in SovereignDecision is low/medium/high; we keep it aligned with outcome_store
-            # by recomputing from the stored band in stats when available.
-            try:
-                from outcome_store import get_decision_outcome_stats
-
-                stats = get_decision_outcome_stats(rt["issue_type"], str(dec.get("action") or "none"), limit=300) or {}
-                dec["historical_reopen_rate"] = stats.get("historical_reopen_rate", None)
-                dec["outcome_confidence_band"] = stats.get("outcome_confidence_band", None)
-            except Exception:
-                dec["historical_reopen_rate"] = None
-                dec["outcome_confidence_band"] = None
-
-        result["sovereign_decision"] = dec
-    except Exception:
-        # Never fail the analyze path if trust dominance derivation fails.
-        pass
+    result = finalize_agent_result_for_operator_policy(
+        result,
+        username=username,
+        plan_tier=str(plan_tier or "free"),
+    )
 
     if user:
         user.usage = int(user.usage or 0) + 1

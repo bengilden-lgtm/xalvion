@@ -242,6 +242,21 @@ def run_agent(
             "tool_result": {"status": "blocked"},
             "meta": {"issue_type": "blocked", "priority": "high", "ltv": 0, "sentiment": 5, "plan_tier": "free", "operator_mode": "balanced", "queue": "escalated"},
         })
+        _blk_key = f"{user_id}:blocked:{uuid.uuid4().hex[:12]}"
+        try:
+            _log_outcome(
+                outcome_key=_blk_key,
+                user_id=user_id,
+                action="none",
+                amount=0.0,
+                issue_type="blocked",
+                tool_result={"status": "blocked"},
+                auto_resolved=False,
+                approved_by_human=False,
+            )
+        except Exception:
+            logger.warning("outcome_log_blocked_failed", exc_info=True)
+        payload["outcome_key"] = _blk_key
         return payload
 
     thinking_trace.append(_trace("sanitize_input", "done"))
@@ -249,7 +264,24 @@ def run_agent(
 
     if is_conversational_message(clean):
         thinking_trace.append(_trace("conversation_gate", "done"))
-        return conversational_reply(clean)
+        conv = conversational_reply(clean)
+        _conv_key = f"{user_id}:conversation:{uuid.uuid4().hex[:12]}"
+        try:
+            _tr = conv.get("tool_result") if isinstance(conv.get("tool_result"), dict) else {"status": "no_action"}
+            _log_outcome(
+                outcome_key=_conv_key,
+                user_id=user_id,
+                action="none",
+                amount=0.0,
+                issue_type=str(conv.get("issue_type") or "conversation"),
+                tool_result=_tr,
+                auto_resolved=True,
+                approved_by_human=False,
+            )
+        except Exception:
+            logger.warning("outcome_log_conversational_failed", exc_info=True)
+        conv["outcome_key"] = _conv_key
+        return conv
 
     meta = meta or {}
     user_memory = get_user_memory(user_id)

@@ -69,15 +69,21 @@ def update_ticket_from_result(db: Session, ticket: Any, result: dict[str, Any]) 
     raw_queue = str(decision.get("queue", "new") or "new")
     tool_status = str(result.get("tool_status", "") or "").lower()
 
-    if tool_status in {"pending_approval", "manual_review"}:
+    if tool_status in {"pending_approval", "manual_review", "approved_pending_execution"}:
         status = "waiting"
-    elif action in {"refund", "credit", "none"}:
+    elif raw_queue == "resolved":
+        status = "resolved"
+    elif action in {"refund", "credit"}:
+        if tool_status in {"refunded", "credit_issued", "success"}:
+            status = "resolved"
+        elif tool_status in {"refund_failed", "error", "failed"}:
+            status = "escalated"
+        else:
+            status = "waiting"
+    elif action == "none":
         status = "resolved"
     else:
         status = "escalated"
-
-    if raw_queue == "resolved":
-        status = "resolved"
 
     ticket.updated_at = _now_iso()
     ticket.status = _safe_status(status)

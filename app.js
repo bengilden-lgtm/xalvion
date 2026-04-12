@@ -5760,7 +5760,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const toolStatus = String(data.tool_status || data.execution?.status || "resolved");
     const translateToolStatus = (s) => {
       const map = {
-        local_fast_path: "Local decision · no external tool called",
+        local_tracking:     "Shipping handler · unified pipeline",
+        local_billing_flow: "Billing handler · unified pipeline",
+        local_damage_flow:  "Damage handler · unified pipeline",
+        local_refund_request: "Refund-intake handler · unified pipeline",
         stripe_live:     "Stripe · live execution",
         stripe_draft:    "Stripe · draft prepared",
         resolved:        "Resolved",
