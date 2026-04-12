@@ -184,3 +184,5 @@ class CanonicalAgentResponse(BaseModel):
     audit_summary: dict[str, Any] | None = None
     # Trust dominance layer (additive, compact)
     trust_dominance: TrustDominance | None = None
+    # Billing / capacity — set by POST /analyze (authoritative server enforcement)
+    operator_entitlements: dict[str, Any] | None = None

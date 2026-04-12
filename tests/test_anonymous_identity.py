@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid
 
 import pytest
 
@@ -60,8 +61,9 @@ def test_two_anonymous_clients_do_not_share_memory():
 
 def test_guest_ticket_recent_matches_create(client: TestClient):
     """Tickets created under X-Xalvion-Guest-Client must appear only for that client."""
-    h1 = {"X-Xalvion-Guest-Client": "pytestTicketOwner01"}
-    h2 = {"X-Xalvion-Guest-Client": "pytestTicketOwner02"}
+    # Fresh ids per run so preview quota state in the shared dev DB does not flake this test.
+    h1 = {"X-Xalvion-Guest-Client": f"pytestTicketOwner01_{uuid.uuid4().hex[:10]}"}
+    h2 = {"X-Xalvion-Guest-Client": f"pytestTicketOwner02_{uuid.uuid4().hex[:10]}"}
     body = {"message": "My package arrived damaged"}
     r1 = client.post("/support", json=body, headers=h1)
     assert r1.status_code == 200, r1.text

@@ -29,7 +29,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Generator
 from urllib.parse import quote_plus
 
@@ -810,6 +810,17 @@ class RateLimitEvent(Base):
     ts = Column(Float, nullable=False, index=True)  # epoch seconds
 
 
+class OperatorMonthlyUsage(Base):
+    """Successful operator runs per calendar month, split by workspace for attribution."""
+
+    __tablename__ = "operator_monthly_usage"
+
+    account_username = Column(String(96), primary_key=True)
+    workspace_id = Column(String(80), primary_key=True)
+    period_key = Column(String(7), primary_key=True)  # UTC YYYY-MM
+    run_count = Column(Integer, nullable=False, default=0)
+
+
 def _import_orm_submodules() -> None:
     """Import modules that register ORM classes on shared Base (required before create_all).
     Missing optional modules are logged instead of crashing process boot.
@@ -862,6 +873,7 @@ def _startup_database() -> None:
     logger.info("DB schema ensured")
     print("DB schema ensured", flush=True)
     ensure_user_columns()
+    migrate_legacy_operator_usage_into_rollups()
     try:
         ensure_outcome_log_columns()
     except Exception as exc:
@@ -1256,6 +1268,16 @@ def get_usage_summary(user: User | None) -> dict[str, Any]:
     plan_name = get_plan_name(user)
     plan = get_plan_config(plan_name)
     usage = int(getattr(user, "usage", 0) or 0)
+    if user is not None and not is_session_guest(user):
+        uname = str(getattr(user, "username", "") or "").strip()
+        if uname and uname not in {"dev_user"}:
+            try:
+                with db_session() as db:
+                    rolled = account_operator_usage_sum(db, uname, operator_billing_period_key())
+                    if rolled > 0:
+                        usage = rolled
+            except Exception:
+                logger.debug("usage_rollup_read_failed", exc_info=True)
     limit = int(plan["monthly_limit"])
     remaining = max(0, limit - usage) if limit < 10**9 else limit
     billable_usage = max(0, usage - limit) if limit < 10**9 else 0
@@ -1301,15 +1323,55 @@ def build_upgrade_payload(current_tier: str) -> dict[str, Any]:
     }
 
 
-def enforce_plan_limits(user: User, guest_client_id: str | None = None) -> None:
+def _plan_limit_exceeded_detail(user: User, used: int, limit: int, plan_name: str) -> dict[str, Any]:
+    return {
+        "code": "plan_limit_exhausted",
+        "message": f"{get_plan_config(plan_name)['label']} plan limit reached for this billing month ({used}/{limit} operator runs). Upgrade for more capacity.",
+        "usage": used,
+        "limit": limit,
+        "plan_limit": limit,
+        "remaining": max(0, limit - used),
+        "requires_upgrade": True,
+        "upgrade": build_upgrade_payload(get_public_plan_name(user)),
+    }
+
+
+def enforce_plan_limits(
+    user: User,
+    guest_client_id: str | None = None,
+    *,
+    workspace_id: str | None = None,
+) -> None:
     plan_name = get_plan_name(user)
     plan = get_plan_config(plan_name)
 
     if not check_rate_limit(resolve_rate_limit_key(user, guest_client_id)):
         raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
-    # NOTE: We never hard-block after plan limits. Overages are marked as billable usage
-    # (front-end surfaces the notice), while rate limits still protect the service.
-    _ = (plan_name, plan)
+
+    uname = str(getattr(user, "username", "") or "").strip().lower()
+    if uname == "dev_user" or plan_name == "dev":
+        return
+
+    limit = int(plan["monthly_limit"])
+    if limit >= 10**9:
+        return
+
+    if is_session_guest(user):
+        enforce_guest_preview_allow(guest_client_id)
+        return
+
+    period = operator_billing_period_key()
+    with db_session() as db:
+        used = account_operator_usage_sum(db, str(getattr(user, "username", "") or ""), period)
+    if used >= limit:
+        raise HTTPException(
+            status_code=402,
+            detail=_plan_limit_exceeded_detail(user, used, limit, plan_name),
+            headers={
+                "X-Xalvion-Plan": plan_name,
+                "X-Xalvion-Limit": str(limit),
+            },
+        )
 
 
 _guest_preview_lock = threading.Lock()
@@ -1339,12 +1401,92 @@ def _guest_preview_exhausted_detail(used: int) -> dict[str, Any]:
     }
 
 
-def enforce_guest_preview_allow(client_id: str | None) -> None:
-    """Do not hard-block guest preview usage; keep experience continuous.
+def normalize_workspace_id(raw: str | None) -> str:
+    """Stable workspace key from ``X-Xalvion-Workspace-Id`` (default workspace when absent)."""
+    s = (raw or "").strip()
+    if not s or len(s) > 80:
+        return "default"
+    if not re.match(r"^[a-zA-Z0-9._-]+$", s):
+        return "default"
+    return s
 
-    Abuse protection remains via `check_rate_limit` and the guest preview counter is still incremented
-    so the UI can surface upgrade nudges and billable overage semantics.
-    """
+
+def operator_billing_period_key(now: datetime | None = None) -> str:
+    dt = now or datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).strftime("%Y-%m")
+
+
+def account_operator_usage_sum(db: Session, username: str, period_key: str) -> int:
+    total = (
+        db.query(func.coalesce(func.sum(OperatorMonthlyUsage.run_count), 0))
+        .filter(
+            OperatorMonthlyUsage.account_username == str(username or "")[:96],
+            OperatorMonthlyUsage.period_key == str(period_key or "")[:7],
+        )
+        .scalar()
+    )
+    return int(total or 0)
+
+
+def bump_operator_usage_workspace(
+    db: Session, username: str, workspace_id: str | None, period_key: str, delta: int
+) -> int:
+    """Increment successful operator runs for (account, workspace, month); returns account monthly total."""
+    uname = str(username or "")[:96]
+    wid = normalize_workspace_id(workspace_id)
+    pkey = str(period_key or "")[:7]
+    d = max(0, int(delta))
+    if not uname or d <= 0:
+        return account_operator_usage_sum(db, uname, pkey)
+    row = (
+        db.query(OperatorMonthlyUsage)
+        .filter(
+            OperatorMonthlyUsage.account_username == uname,
+            OperatorMonthlyUsage.workspace_id == wid,
+            OperatorMonthlyUsage.period_key == pkey,
+        )
+        .first()
+    )
+    if not row:
+        row = OperatorMonthlyUsage(account_username=uname, workspace_id=wid, period_key=pkey, run_count=0)
+        db.add(row)
+    row.run_count = int(row.run_count or 0) + d
+    db.flush()
+    return account_operator_usage_sum(db, uname, pkey)
+
+
+def migrate_legacy_operator_usage_into_rollups() -> None:
+    """One-time style migration: seed monthly rollups from legacy ``users.usage`` when rollups are empty."""
+    try:
+        period = operator_billing_period_key()
+        with db_session() as db:
+            for u in db.query(User).all():
+                uname = str(getattr(u, "username", "") or "").strip()
+                if not uname or uname in {"guest", "dev_user"}:
+                    continue
+                if account_operator_usage_sum(db, uname, period) > 0:
+                    continue
+                legacy = int(getattr(u, "usage", 0) or 0)
+                if legacy <= 0:
+                    continue
+                db.merge(
+                    OperatorMonthlyUsage(
+                        account_username=uname[:96],
+                        workspace_id="default",
+                        period_key=period,
+                        run_count=legacy,
+                    )
+                )
+            db.commit()
+    except Exception as exc:
+        STARTUP_ISSUES.append(f"operator_usage_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
+        logger.warning("migrate_legacy_operator_usage_failed detail=%s", str(exc)[:400], exc_info=True)
+
+
+def enforce_guest_preview_allow(client_id: str | None) -> None:
+    """Hard cap for unauthenticated preview clients (server-side counter)."""
     gid = normalize_guest_client_id(client_id)
     if not gid:
         raise HTTPException(
@@ -1354,15 +1496,21 @@ def enforce_guest_preview_allow(client_id: str | None) -> None:
                 "message": "Reload the workspace and try again (preview client id missing).",
             },
         )
-    # Defensive visibility: rotating client IDs can bypass per-client usage counters.
-    # We intentionally do not block here to preserve preview UX, but we log when the
-    # header looks suspiciously non-stable so ops can monitor abuse patterns.
     if len(gid) < 6:
         logger.info("guest_preview_client_id_short len=%s", len(gid))
+    lim = int(GUEST_PREVIEW_OPERATOR_LIMIT)
+    if lim >= 10**9:
+        return
     with _guest_preview_lock:
         with db_session() as db:
             row = db.query(GuestPreviewUsage).filter(GuestPreviewUsage.client_id == gid).first()
-            _ = int(row.usage_count) if row else 0
+            used = int(row.usage_count) if row else 0
+            if used >= lim:
+                raise HTTPException(
+                    status_code=402,
+                    detail=_guest_preview_exhausted_detail(used),
+                    headers={"X-Xalvion-Limit": str(lim)},
+                )
 
 
 def bump_guest_preview_usage(client_id: str | None) -> dict[str, Any] | None:
@@ -2480,10 +2628,8 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
     return payload, "approved"
 
 
-def run_support(req: SupportRequest, user: User, guest_client_id: str | None = None) -> dict[str, Any]:
-    if is_session_guest(user):
-        enforce_guest_preview_allow(guest_client_id)
-    enforce_plan_limits(user, guest_client_id)
+def run_support(req: SupportRequest, user: User, guest_client_id: str | None = None, workspace_id: str | None = None) -> dict[str, Any]:
+    enforce_plan_limits(user, guest_client_id, workspace_id=workspace_id)
     principal_id = resolve_storage_principal(user, guest_client_id)
 
     with db_session() as db:
@@ -2599,7 +2745,9 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
             if hasattr(user, "usage") and getattr(user, "username", "") not in {"dev_user", "guest"}:
                 u_row = db.query(User).filter(User.username == user.username).first()
                 if u_row:
-                    u_row.usage = int(u_row.usage or 0) + 1
+                    period = operator_billing_period_key()
+                    acct_total = bump_operator_usage_workspace(db, u_row.username, workspace_id, period, 1)
+                    u_row.usage = int(acct_total)
                     db.commit()
                     db.refresh(u_row)
                     ser_user = u_row
@@ -2700,6 +2848,7 @@ def run_support_for_username(
     req: SupportRequest,
     username: str,
     guest_client_id: str | None = None,
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
     with db_session() as db:
         if username and username != "guest":
@@ -2711,7 +2860,7 @@ def run_support_for_username(
                 user = row
         else:
             user = User(username="guest", password="", usage=0, tier="free")
-    return run_support(req, user, guest_client_id=guest_client_id)
+    return run_support(req, user, guest_client_id=guest_client_id, workspace_id=workspace_id)
 
 # =============================================================================
 # 12. STREAMING HELPERS
@@ -3204,24 +3353,54 @@ def _persist_sovereign_result(
     db.commit()
 
 
-@app.post("/analyze", response_model=CanonicalAgentResponse)
+def extension_operator_entitlements_slice(
+    *,
+    plan_tier_public: str,
+    workspace_id: str,
+    usage: int,
+    limit: int,
+) -> dict[str, Any]:
+    lim = int(limit)
+    use = int(usage)
+    unl = lim >= 10**9
+    rem = max(0, lim - use) if not unl else lim
+    at_limit = bool(not unl and use >= lim)
+    approaching = bool(not unl and lim > 0 and (use / lim) >= 0.75 and use < lim)
+    upgrade = build_upgrade_payload(plan_tier_public) if at_limit else None
+    return {
+        "plan_tier": plan_tier_public,
+        "workspace_id": workspace_id,
+        "usage": use,
+        "limit": lim,
+        "remaining": rem,
+        "at_limit": at_limit,
+        "approaching_limit": approaching,
+        "upgrade": upgrade,
+    }
+
+
+@app.post("/analyze")
 def analyze_extension_ticket(
     req: ExtensionAnalyzeRequest,
     authorization: str | None = Header(None),
     x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
+    x_workspace: str | None = Header(None, alias="X-Xalvion-Workspace-Id"),
     db: Session = Depends(get_db),
 ):
+    wid = normalize_workspace_id(x_workspace)
+    period = operator_billing_period_key()
     username = get_current_username_from_header(authorization)
     user = db.query(User).filter(User.username == username).first() if username != "guest" else None
+    guest_id: str | None = None
 
     if user:
-        enforce_plan_limits(user, None)
+        enforce_plan_limits(user, None, workspace_id=wid)
         plan_tier = get_plan_name(user)
         priority_routing = bool(get_plan_config(plan_tier)["priority_routing"])
         operator_mode = get_operator_mode(db)
     else:
-        gid = normalize_guest_client_id(x_guest_client)
-        if not gid:
+        guest_id = normalize_guest_client_id(x_guest_client)
+        if not guest_id:
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -3229,10 +3408,9 @@ def analyze_extension_ticket(
                     "message": "Extension preview requires X-Xalvion-Guest-Client (stable client id).",
                 },
             )
-        enforce_guest_preview_allow(gid)
         anon_user = User(username="guest", password="", usage=0, tier="free")
-        enforce_plan_limits(anon_user, gid)
-        username = gid
+        enforce_plan_limits(anon_user, guest_id, workspace_id=wid)
+        username = guest_id
         plan_tier = "free"
         priority_routing = False
         operator_mode = get_operator_mode(db)
@@ -3258,15 +3436,39 @@ def analyze_extension_ticket(
         billing_req=billing_req,
     )
 
-    if user:
-        user.usage = int(user.usage or 0) + 1
-        db.commit()
-
     _persist_sovereign_result(db, username, req.text, result)
 
-    payload = CanonicalAgentResponse.model_validate(result).model_dump()
+    entitlements: dict[str, Any] | None = None
+    if user:
+        u_attached = db.query(User).filter(User.username == user.username).first()
+        if u_attached:
+            tot = bump_operator_usage_workspace(db, u_attached.username, wid, period, 1)
+            u_attached.usage = int(tot)
+            db.commit()
+            db.refresh(u_attached)
+            pub = get_public_plan_name(u_attached)
+            cfg = get_plan_config(get_plan_name(u_attached))
+            entitlements = extension_operator_entitlements_slice(
+                plan_tier_public=pub,
+                workspace_id=wid,
+                usage=tot,
+                limit=int(cfg["monthly_limit"]),
+            )
+    elif guest_id:
+        snap = bump_guest_preview_usage(guest_id)
+        if snap:
+            entitlements = extension_operator_entitlements_slice(
+                plan_tier_public="free",
+                workspace_id=wid,
+                usage=int(snap.get("usage", 0) or 0),
+                limit=int(snap.get("limit", GUEST_PREVIEW_OPERATOR_LIMIT) or GUEST_PREVIEW_OPERATOR_LIMIT),
+            )
+
+    merged = CanonicalAgentResponse.model_validate(result).model_dump()
+    if entitlements:
+        merged["operator_entitlements"] = entitlements
     return JSONResponse(
-        content=payload,
+        content=merged,
         media_type="application/json; charset=utf-8",
     )
 

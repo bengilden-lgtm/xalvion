@@ -102,6 +102,16 @@ export function describeOperatorAnalyzeFailure(result, opts = {}) {
       body: `We could not connect to the operator API. Confirm the URL in operator-config.js matches your deployment, then try again.`,
     };
   }
+  if (k === "plan_blocked") {
+    const pb = result.planBlocked && typeof result.planBlocked === "object" ? result.planBlocked : {};
+    const msg = String(pb.message || result.detail || "").trim();
+    return {
+      title: "Plan limit reached",
+      body:
+        msg ||
+        "Included operator runs for this billing period are used up. Open your workspace billing console to upgrade or wait for the next usage window.",
+    };
+  }
   if (k === "http_error") {
     const st = result.status;
     const detail = String(result.detail || "").trim();

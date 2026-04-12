@@ -5,6 +5,13 @@
 
 const initialState = {
   planTier: null,
+  /** Server-backed operator metering (null = unknown until first /analyze). */
+  operatorUsage: null,
+  operatorLimit: null,
+  operatorRemaining: null,
+  operatorAtLimit: false,
+  operatorApproaching: false,
+  usagePeriodAnchor: null,
 };
 
 let state = { ...initialState };

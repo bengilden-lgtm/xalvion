@@ -483,10 +483,12 @@ def support(
     req: app_mod.SupportRequest,
     user: app_mod.User = Depends(app_mod.get_current_user),
     x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
+    x_workspace: str | None = Header(None, alias="X-Xalvion-Workspace-Id"),
 ):
     guest_client_id = app_mod.normalize_guest_client_id(x_guest_client)
+    workspace_id = app_mod.normalize_workspace_id(x_workspace)
     try:
-        return app_mod.run_support(req, user, guest_client_id=guest_client_id)
+        return app_mod.run_support(req, user, guest_client_id=guest_client_id, workspace_id=workspace_id)
     except HTTPException:
         raise
     except Exception:
@@ -502,9 +504,11 @@ async def support_stream(
     req: app_mod.SupportRequest,
     authorization: str | None = Header(None),
     x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
+    x_workspace: str | None = Header(None, alias="X-Xalvion-Workspace-Id"),
 ):
     username = app_mod.get_current_username_from_header(authorization)
     guest_client_id = app_mod.normalize_guest_client_id(x_guest_client)
+    workspace_id = app_mod.normalize_workspace_id(x_workspace)
 
     async def generator() -> AsyncIterator[str]:
         # Stream visible progress immediately so the UI does not sit on a blank loader
@@ -519,7 +523,7 @@ async def support_stream(
 
         try:
             result = await asyncio.wait_for(
-                run_in_threadpool(app_mod.run_support_for_username, req, username, guest_client_id),
+                run_in_threadpool(app_mod.run_support_for_username, req, username, guest_client_id, workspace_id),
                 timeout=28.0,
             )
         except HTTPException as he:
@@ -532,6 +536,9 @@ async def support_stream(
                 if code == "preview_exhausted":
                     tool_st = "preview_blocked"
                     mode_val = "preview_blocked"
+                elif code == "plan_limit_exhausted":
+                    tool_st = "plan_blocked"
+                    mode_val = "plan_blocked"
                 elif he.status_code == 503:
                     tool_st = "db_unavailable"
                     mode_val = "db_unavailable"

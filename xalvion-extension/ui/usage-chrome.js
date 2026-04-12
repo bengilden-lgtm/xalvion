@@ -41,7 +41,8 @@ export function createUsageChrome(deps) {
   }
 
   function formatRunSplit(snap) {
-    return `Guest runs ${snap.guestUsageCount} · Enrolled runs ${snap.freeTierUsageCount}`;
+    if (!snap.serverMetered) return "Server capacity — shown after your next operator run.";
+    return `Included operator runs ${snap.totalOperatorRuns} / ${snap.hardThreshold} (account, this period)`;
   }
 
   /**
@@ -87,6 +88,10 @@ export function createUsageChrome(deps) {
       els.capPill.textContent = `Extension · ${label}`;
       return;
     }
+    if (!snap.serverMetered) {
+      els.capPill.textContent = "Extension · capacity from server";
+      return;
+    }
     const softLabel =
       snap.nearHardLimit && !snap.hardLimited
         ? `Extension · ${snap.totalOperatorRuns}/${snap.hardThreshold} runs (near cap)`
@@ -100,6 +105,8 @@ export function createUsageChrome(deps) {
       if (snap.hasProAccess) {
         const t = currentPlanTier();
         els.capPill.textContent = t ? `Extension · ${String(t).toUpperCase()}` : "Extension · PRO";
+      } else if (!snap.serverMetered) {
+        els.capPill.textContent = "Extension · capacity from server";
       } else {
         els.capPill.textContent =
           snap.nearHardLimit && !snap.hardLimited
@@ -242,7 +249,7 @@ export function createUsageChrome(deps) {
         await enrollFreeTier();
         refreshUsageChrome();
         syncPrimaryRunButtons();
-        showStatus("Free access enabled — run counts are tracked on this device and reset on a rolling window.");
+        showStatus("Included runs are tracked on the operator API for your account and workspace — sign in from the workspace when you are ready.");
       });
     }
     if (els.upgradeDismissSoftBtn && !els.upgradeDismissSoftBtn.dataset.bound) {

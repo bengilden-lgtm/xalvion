@@ -14,6 +14,7 @@ import {
   describeOperatorHealthFailure,
   pingOperatorHealth,
 } from "./operator-api.js";
+import { getExtensionIdentity } from "./extension-identity.js";
 import { createUsageChrome } from "./ui/usage-chrome.js";
 import {
   renderConsequenceBar as renderConsequenceBarGov,
@@ -61,12 +62,19 @@ import {
   enrollFreeTier,
   getUsageSnapshot,
   loadUsagePlan,
-  recordSuccessfulOperatorRun,
-  recordSuccessfulOperatorRuns,
+  syncOperatorEntitlementsFromResponse,
 } from "./usage-plan.js";
 
 const chromeCtx = createChromeContext(typeof chrome !== "undefined" ? chrome : null);
 const chromeApi = typeof chrome !== "undefined" ? chrome : null;
+
+let extensionIdentityPromise = null;
+function ensureExtensionIdentity() {
+  if (!extensionIdentityPromise) {
+    extensionIdentityPromise = getExtensionIdentity();
+  }
+  return extensionIdentityPromise;
+}
 
 const analyzeBtn = document.getElementById("analyze");
 const copyBtn = document.getElementById("copyBtn");
@@ -267,22 +275,42 @@ async function fetchJsonWithTimeout(url, payload, timeoutMs) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const ident = await ensureExtensionIdentity();
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Xalvion-Guest-Client": ident.clientId,
+        "X-Xalvion-Workspace-Id": ident.workspaceId,
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
 
     const raw = await res.text().catch(() => "");
     if (!res.ok) {
-      const detail = sanitizeServiceDetail(raw);
+      let detail = sanitizeServiceDetail(raw);
+      let planBlocked = null;
+      if (res.status === 402) {
+        try {
+          const j = JSON.parse(raw);
+          const inner = j && typeof j.detail === "object" && j.detail !== null ? j.detail : j;
+          if (inner && typeof inner === "object") {
+            planBlocked = inner;
+            const m = String(inner.message || inner.detail || "").trim();
+            if (m) detail = m;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
       return {
         ok: false,
         status: res.status,
         detail,
         data: null,
-        kind: "http_error",
+        kind: res.status === 402 ? "plan_blocked" : "http_error",
+        planBlocked,
       };
     }
 
@@ -1248,6 +1276,18 @@ async function analyze() {
 
     if (!result.ok) {
       const { title, body } = describeOperatorAnalyzeFailure(result, { actionLabel: "Analyze" });
+      if (result.kind === "plan_blocked") {
+        syncOperatorEntitlementsFromResponse(sessionStore.getState().planTier, {
+          operator_entitlements: {
+            plan_tier: "free",
+            usage: Number(result.planBlocked?.usage ?? sessionStore.getState().operatorUsage ?? 0),
+            limit: Number(result.planBlocked?.limit ?? sessionStore.getState().operatorLimit ?? 12),
+            remaining: Number(result.planBlocked?.remaining ?? 0),
+            at_limit: true,
+            approaching_limit: false,
+          },
+        });
+      }
       showStatus(
         {
           kind: "error",
@@ -1258,6 +1298,8 @@ async function analyze() {
         true
       );
       if (emptyState) emptyState.style.display = "grid";
+      usageChrome.refreshUsageChrome();
+      usageChrome.syncPrimaryRunButtons();
       return;
     }
 
@@ -1278,6 +1320,7 @@ async function analyze() {
     }
 
     console.log("[xalvion:analyze] phase:render_start", { runId: currentRunId, keys: Object.keys(data).slice(0, 14) });
+    syncOperatorEntitlementsFromResponse(sessionStore.getState().planTier, data);
     try {
       render(data);
     } catch (renderErr) {
@@ -1296,11 +1339,6 @@ async function analyze() {
     }
     console.log("[xalvion:analyze] phase:render_done", { runId: currentRunId });
 
-    try {
-      await recordSuccessfulOperatorRun(sessionStore.getState().planTier);
-    } catch (usageErr) {
-      console.warn("[xalvion:analyze] usage record skipped", usageErr);
-    }
     usageChrome.notifyOperatorRunComplete?.(data);
     usageChrome.refreshUsageChrome();
     usageChrome.syncPrimaryRunButtons();
@@ -1407,7 +1445,11 @@ async function scanInbox() {
 
       const preLoopSnap = getUsageSnapshot(sessionStore.getState().planTier);
       if (!preLoopSnap.hasProAccess && threads.length) {
-        const remaining = Math.max(0, preLoopSnap.hardThreshold - preLoopSnap.totalOperatorRuns);
+        const st = sessionStore.getState();
+        const fromServer =
+          st.operatorRemaining != null ? Math.max(0, Number(st.operatorRemaining) || 0) : null;
+        const remaining =
+          fromServer != null ? fromServer : Math.max(0, preLoopSnap.hardThreshold - preLoopSnap.totalOperatorRuns);
         if (remaining <= 0) {
           agentStore.setState((s) => ({ ...s, thinkingRunId: s.thinkingRunId + 1 }));
           usageChrome.notifyGateAttempt?.("scan");
@@ -1469,8 +1511,15 @@ async function scanInbox() {
           INBOX_THREAD_FETCH_TIMEOUT_MS
         );
         if (r.ok && isRenderableAnalyzePayload(r.data)) {
+          syncOperatorEntitlementsFromResponse(sessionStore.getState().planTier, r.data);
           results.push(r.data);
         } else {
+          if (r.kind === "plan_blocked") {
+            firstFailure = r;
+            const pb = describeOperatorAnalyzeFailure(r, { actionLabel: "Scan inbox" });
+            showStatus({ kind: "error", title: pb.title, body: pb.body }, true);
+            break;
+          }
           if (!firstFailure) firstFailure = r;
           console.warn("[xalvion:scan] row_skipped", { index: i, ok: r.ok, kind: r.kind || "", status: r.status });
         }
@@ -1503,11 +1552,6 @@ async function scanInbox() {
       return;
     }
 
-    try {
-      await recordSuccessfulOperatorRuns(sessionStore.getState().planTier, results.length);
-    } catch (usageErr) {
-      console.warn("[xalvion:scan] usage record skipped", usageErr);
-    }
     usageChrome.refreshUsageChrome();
     usageChrome.syncPrimaryRunButtons();
 
