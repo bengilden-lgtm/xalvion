@@ -729,6 +729,7 @@ def decode_token(token: str) -> str | None:
 # ────────────────────────────────────────────────────────────────
 def get_current_user(
     authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
 ) -> User:
     if not authorization:
         return User(username="guest", password="", usage=0, tier="free")
@@ -741,18 +742,13 @@ def get_current_user(
     if not username:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.username == username).first()
-        if not user:
-            raise HTTPException(
-                status_code=401,
-                detail="User not found — this token no longer matches an account. Log in again.",
-            )
-        db.expunge(user)
-        return user
-    finally:
-        db.close()
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found — this token no longer matches an account. Log in again.",
+        )
+    return user
 
 
 def get_current_username_from_header(authorization: str | None) -> str:
@@ -916,10 +912,10 @@ def _guest_preview_exhausted_detail(used: int) -> dict[str, Any]:
 
 
 def enforce_guest_preview_allow(client_id: str | None) -> None:
-    """Do not hard-block guest preview usage; keep experience continuous.
+    """Enforce the guest preview usage limit server-side.
 
-    Abuse protection remains via `check_rate_limit` and the guest preview counter is still incremented
-    so the UI can surface upgrade nudges and billable overage semantics.
+    Raises HTTPException with preview_exhausted detail when the client has reached or
+    exceeded GUEST_PREVIEW_OPERATOR_LIMIT. Abuse protection also via `check_rate_limit`.
     """
     gid = normalize_guest_client_id(client_id)
     if not gid:
@@ -931,14 +927,18 @@ def enforce_guest_preview_allow(client_id: str | None) -> None:
             },
         )
     # Defensive visibility: rotating client IDs can bypass per-client usage counters.
-    # We intentionally do not block here to preserve preview UX, but we log when the
-    # header looks suspiciously non-stable so ops can monitor abuse patterns.
+    # We log when the header looks suspiciously non-stable so ops can monitor abuse patterns.
     if len(gid) < 6:
         logger.info("guest_preview_client_id_short len=%s", len(gid))
     with _guest_preview_lock:
         with db_session() as db:
             row = db.query(GuestPreviewUsage).filter(GuestPreviewUsage.client_id == gid).first()
-            _ = int(row.usage_count) if row else 0
+            used = int(row.usage_count) if row else 0
+            if used >= GUEST_PREVIEW_OPERATOR_LIMIT:
+                raise HTTPException(
+                    status_code=402,
+                    detail=_guest_preview_exhausted_detail(used),
+                )
 
 
 def bump_guest_preview_usage(client_id: str | None) -> dict[str, Any] | None:
@@ -1780,6 +1780,9 @@ def append_ticket_internal_note(ticket: Ticket, note: str) -> None:
 
 
 def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionRequest, user: User) -> tuple[dict[str, Any], str]:
+    # TODO(plan-limit-consolidation): pass ticket.plan_tier to execution_requires_operator_gate()
+    # once actions.py execution_requires_operator_gate() accepts a plan_tier parameter.
+    # Currently uses flat constants from actions.py; tier-aware limits live in governor.plan_limits().
     proposed_action = str(log.action or ticket.action or "none").strip().lower()
     proposed_amount = round(float(log.amount or ticket.amount or 0), 2)
 
@@ -1845,11 +1848,12 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
         return payload, "approved_pending_execution"
 
     if proposed_action == "credit":
-        payload["reply"] = f"I’ve approved the ${proposed_amount:.2f} credit and it’s ready for the next step."
+        payload["reply"] = f"I’ve approved the ${proposed_amount:.2f} credit. To issue it to the customer, execute this via Shopify or your payment processor."
         payload["response"] = payload["reply"]
         payload["final"] = payload["reply"]
-        payload["tool_status"] = "approved"
-        payload["tool_result"] = {"status": "approved"}
+        payload["tool_status"] = "approved_pending_execution"
+        payload["tool_result"] = {"status": "approved_pending_execution"}
+        payload.setdefault("decision", {}).update({"status": "waiting", "queue": "waiting"})
         try:
             _log_real_outcome(
                 outcome_key="approve:{}:{}".format(
@@ -1863,7 +1867,7 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
                     getattr(ticket, "issue_type", "general_support")
                     or "general_support"
                 ),
-                tool_result={"status": "approved"},
+                tool_result={"status": "approved_pending_execution"},
                 auto_resolved=False,
                 approved_by_human=True,
             )
@@ -1874,7 +1878,7 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
                 getattr(ticket, "id", ""),
                 str(_log_exc)[:200],
             )
-        return payload, "approved"
+        return payload, "approved_pending_execution"
 
     if proposed_action == "charge":
         payload["reply"] = f"I’ve approved the ${proposed_amount:.2f} charge and moved it into the execution path."
@@ -2326,7 +2330,7 @@ def serve_workspace_bootstrap():
 
 
 @app.get("/debug/refund-mode")
-def debug_refund_mode():
+def debug_refund_mode(user: User = Depends(require_admin)):
     return {
         "mode": "platform-fallback-v2-latest-charge",
         "has_stripe_key": bool(STRIPE_KEY),
@@ -2334,7 +2338,7 @@ def debug_refund_mode():
 
 
 @app.get("/debug/payment-intent/{payment_intent_id}")
-def debug_payment_intent(payment_intent_id: str):
+def debug_payment_intent(payment_intent_id: str, user: User = Depends(require_admin)):
     try:
         intent = stripe.PaymentIntent.retrieve(
             payment_intent_id,
@@ -2739,7 +2743,13 @@ def inbox_pull(
         seed = username or normalize_guest_client_id(guest_client_id) or "guest"
         needed = max(0, lim - len(items))
         if needed > 0:
+            before = len(items)
             items.extend(_sim(count=needed, seed=seed))
+            # Ensure every simulated ticket is clearly labelled so the UI and
+            # downstream consumers can distinguish simulated from real tickets.
+            for sim_item in items[before:]:
+                sim_item["is_simulated"] = True
+                sim_item.setdefault("source", "sim")
     except Exception:
         pass
 

@@ -4,8 +4,8 @@
     "text": "customer support is killing us right now",
     "score": 1,
     "message": "Hey \u2014 saw your post about support:\n\n\"customer support is killing us right now...\"\n\nI built a tool that prepares support decisions (refunds, replies, etc)\nbut keeps you in control with approval.\n\nMost people cut support workload by ~60%.\n\nHappy to run a few of your tickets through it if you want to see it.\n",
-    "status": "new",
-    "source": "manual",
+    "status": "demo",
+    "source": "demo",
     "created_at": "2026-04-01 06:05:22.613003"
   },
   {
@@ -13,8 +13,8 @@
     "text": "handling refunds manually is painful",
     "score": 1,
     "message": "Hey \u2014 saw your post about support:\n\n\"handling refunds manually is painful...\"\n\nI built a tool that prepares support decisions (refunds, replies, etc)\nbut keeps you in control with approval.\n\nMost people cut support workload by ~60%.\n\nHappy to run a few of your tickets through it if you want to see it.\n",
-    "status": "new",
-    "source": "manual",
+    "status": "demo",
+    "source": "demo",
     "created_at": "2026-04-01 06:05:22.613828"
   },
   {
@@ -22,8 +22,8 @@
     "text": "zendesk tickets are getting out of control",
     "score": 2,
     "message": "Hey \u2014 saw your post about support:\n\n\"zendesk tickets are getting out of control...\"\n\nI built a tool that prepares support decisions (refunds, replies, etc)\nbut keeps you in control with approval.\n\nMost people cut support workload by ~60%.\n\nHappy to run a few of your tickets through it if you want to see it.\n",
-    "status": "new",
-    "source": "manual",
+    "status": "demo",
+    "source": "demo",
     "created_at": "2026-04-01 06:05:22.614517"
   }
 ]

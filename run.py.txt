@@ -1,7 +1,0 @@
-# Deprecated snippet — use `run.py` instead:
-#   python run.py
-# With reload:
-#   UVICORN_RELOAD=true python run.py
-#
-# Or directly:
-#   uvicorn app:app --host 127.0.0.1 --port 8000 --reload

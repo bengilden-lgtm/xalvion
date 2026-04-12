@@ -7,6 +7,14 @@ Hard constraints:
 - No DB writes.
 - Dict-in / dict-out API.
 - Conservative defaults: on ambiguity, force review (never crash).
+
+PLAN LIMIT NOTE:
+This module is the authoritative tier-aware source for per-plan financial limits
+(free: $15 refund / $10 credit, pro: $50 / $30, elite: $100 / $50).
+The flat constants in actions.py (MAX_AUTO_REFUND_AMOUNT=50, MAX_AUTO_CREDIT_AMOUNT=30,
+MAX_APPROVAL_THRESHOLD=25) are fallback defaults used by non-tier-aware code paths such
+as execution_requires_operator_gate().  When plan_tier is available from the ticket,
+callers must use plan_limits(plan_tier) from this module instead.
 """
 
 from __future__ import annotations

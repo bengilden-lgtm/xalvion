@@ -55,6 +55,9 @@ def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
 
 
 def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Dict[str, Any]:
+    # TODO(plan-limit-consolidation): extract ticket.get("plan_tier") and pass it to
+    # execution_requires_operator_gate() once that function accepts plan_tier.
+    # Currently uses flat constants from actions.py; tier-aware limits live in governor.plan_limits().
     safe_action = dict(normalize_action_payload(action_payload))
     if execution_requires_operator_gate(safe_action["action"], safe_action["amount"]):
         safe_action["requires_approval"] = True

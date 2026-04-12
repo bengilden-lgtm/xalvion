@@ -15,17 +15,27 @@ HANDLED_ISSUE_TYPES = frozenset({
     "refund_request",
 })
 
+# IMPORTANT: These constants are fallback defaults for non-tier-aware code paths only.
+# governor.py is the authoritative tier-aware source (free: $15, pro: $50, elite: $100).
+# When a ticket's plan_tier is known, callers MUST use governor.plan_limits(plan_tier)
+# instead of these constants.  See also: TODO in app.approve_ticket_action() and
+# agent/execution.execute_action() to pass plan_tier to execution_requires_operator_gate().
 MAX_AUTO_REFUND_AMOUNT: float = 50.0
 MAX_AUTO_CREDIT_AMOUNT: float = 30.0
 MAX_APPROVAL_THRESHOLD: float = 25.0
 
 
 def execution_requires_operator_gate(action: str, amount: Any) -> bool:
-    """
-    Single source of truth for “must not auto-execute without operator approval”.
-    Mirrors FastAPI workspace policy (app.check_requires_approval) so agent execution
-    cannot drift from API gates.
-    """
+    “””
+    Fast-path gate: returns True if the action/amount combo must NOT be auto-executed.
+
+    NOTE: This function uses flat constants (MAX_APPROVAL_THRESHOLD) and is not
+    plan-tier-aware.  For tier-aware enforcement, callers should consult
+    governor.plan_limits(plan_tier) first and pass plan_tier-derived thresholds.
+    TODO: Add optional plan_tier parameter and wire through approve_ticket_action()
+    (app.py) and execute_action() (agent/execution.py) once governor consolidation
+    is complete.
+    “””
     norm = str(action or "none").strip().lower()
     try:
         value = float(amount or 0)

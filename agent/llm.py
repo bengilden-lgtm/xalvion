@@ -41,9 +41,11 @@ def sovereign_llm_attempt(
     thinking_trace: list[dict[str, Any]],
 ) -> tuple[dict[str, Any] | None, str, float, float, bool]:
     parsed = None
-    mode = "sovereign-local"
-    confidence = 0.9
-    quality = 0.94
+    # Fallback defaults used when OpenAI is unavailable or the call fails.
+    # Deliberately conservative to signal low-confidence heuristic output.
+    mode = "local_heuristic"
+    confidence = 0.60
+    quality = 0.55
     llm_used = False
 
     if client is not None:
