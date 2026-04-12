@@ -2056,9 +2056,8 @@ def hydrate_result_with_engine_context(
     ok_financial = (action in {"refund", "credit"} and ts_lower in {"refunded", "credit_issued", "success"}) or (
         action == "charge" and ts_lower == "success"
     )
-    execution_complete = bool(
-        not requires_approval and not pending_exec and (ok_financial or action == "none")
-    )
+    # Complete only when a real financial motion succeeded (not merely `none` / simulated paths).
+    execution_complete = bool(not requires_approval and not pending_exec and ok_financial)
     hydrated["execution"] = {
         "action": action,
         "amount": round(amount, 2),
@@ -2154,6 +2153,7 @@ def serialize_pending_approval_result(result: dict[str, Any], *, action: str, am
         "requires_approval": True,
         "proposed_action": action,
         "proposed_amount": round(float(amount or 0), 2),
+        "execution_complete": False,
     })
     pending["execution"] = execution
     ok = (str(pending.get("outcome_key") or result.get("outcome_key") or "")).strip() or None
@@ -2255,6 +2255,60 @@ def finalize_agent_result_for_operator_policy(
     except Exception:
         pass
     return out
+
+
+def run_sovereign_execution_pipeline(
+    *,
+    message: str,
+    principal_id: str,
+    meta: dict[str, Any],
+    request_context: dict[str, Any],
+    plan_tier: str,
+    billing_user: User | None = None,
+    billing_req: SupportRequest | None = None,
+) -> dict[str, Any]:
+    """
+    Single execution path for workspace `/support` and extension `/analyze`:
+    `run_agent` → operator policy → optional Stripe billing bridge.
+    """
+    result = run_agent(
+        message,
+        user_id=principal_id,
+        meta=meta,
+        request_context=request_context,
+    )
+    if not isinstance(result, dict):
+        raise RuntimeError("Agent returned invalid payload")
+    result = finalize_agent_result_for_operator_policy(
+        result,
+        username=principal_id,
+        plan_tier=str(plan_tier or "free"),
+    )
+    decision = dict(result.get("sovereign_decision") or result.get("decision") or {})
+    needs_approval = bool(decision.get("requires_approval", False))
+    if billing_user is not None and billing_req is not None and not needs_approval:
+        result = apply_real_actions(result, billing_req, billing_user)
+        if str(result.get("tool_status", "") or "").lower() == "refunded":
+            ok = str(result.get("outcome_key") or "").strip()
+            if ok:
+                try:
+                    _log_real_outcome(
+                        outcome_key=ok[:64],
+                        user_id=str(principal_id or "")[:120],
+                        action="refund",
+                        amount=float(result.get("amount", 0) or 0),
+                        issue_type=str(result.get("issue_type", "general_support") or "general_support"),
+                        tool_result=dict(result.get("tool_result") or {}),
+                        auto_resolved=True,
+                        approved_by_human=False,
+                    )
+                except Exception as _out_log_exc:
+                    logger.warning(
+                        "post_stripe_outcome_log_failed user=%s detail=%s",
+                        principal_id,
+                        str(_out_log_exc)[:200],
+                    )
+    return result
 
 
 def build_ticket_response_payload(
@@ -2476,27 +2530,18 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
             ticket_id,
             getattr(user, "username", "") or "?",
         )
-        result = run_agent(
-            req.message,
-            user_id=principal_id,
+        result = run_sovereign_execution_pipeline(
+            message=req.message,
+            principal_id=principal_id,
             meta=build_agent_meta(req, user, operator_mode=op_mode),
             request_context=AgentRequestContext(surface="workspace").model_dump(),
-        )
-
-        if not isinstance(result, dict):
-            raise RuntimeError("Agent returned invalid payload")
-
-        result = finalize_agent_result_for_operator_policy(
-            result,
-            username=principal_id,
             plan_tier=get_plan_name(user),
+            billing_user=user,
+            billing_req=req,
         )
 
         decision = dict(result.get("sovereign_decision") or result.get("decision") or {})
         needs_approval = bool(decision.get("requires_approval", False))
-
-        if not needs_approval:
-            result = apply_real_actions(result, req, user)
 
         merged_impact = merge_impact_with_business_projection(
             runtime_ticket,
@@ -3467,17 +3512,25 @@ def analyze_extension_ticket(
         priority_routing = False
         operator_mode = get_operator_mode(db)
 
-    result = run_agent(
+    ext_meta = _build_extension_meta(req, operator_mode, plan_tier, priority_routing)
+    billing_req = SupportRequest(
         message=req.text,
-        user_id=username,
-        meta=_build_extension_meta(req, operator_mode, plan_tier, priority_routing),
-        request_context=_build_extension_context(req).model_dump(),
+        sentiment=req.sentiment,
+        ltv=req.ltv,
+        order_status=req.order_status,
+        payment_intent_id=req.payment_intent_id,
+        charge_id=req.charge_id,
+        channel="email",
+        source="extension",
     )
-
-    result = finalize_agent_result_for_operator_policy(
-        result,
-        username=username,
+    result = run_sovereign_execution_pipeline(
+        message=req.text,
+        principal_id=username,
+        meta=ext_meta,
+        request_context=_build_extension_context(req).model_dump(),
         plan_tier=str(plan_tier or "free"),
+        billing_user=user,
+        billing_req=billing_req,
     )
 
     if user:

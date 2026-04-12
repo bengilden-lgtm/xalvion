@@ -85,7 +85,7 @@ except Exception as _outcome_store_imp_err:
 
 
 from agent.execution import execute_action, normalize_action_payload, should_attach_order_context
-from agent.formatters import is_conversational_message, normalize_text, polish_message
+from agent.formatters import normalize_text, polish_message
 from agent.llm import sovereign_llm_attempt
 from agent.response_builder import (
     _canonicalize_result,
@@ -93,8 +93,6 @@ from agent.response_builder import (
     build_audit_summary_payload,
     build_sovereign_prompt,
     compute_quality,
-    conversational_reply,
-    local_fallback_reply,
     rewrite_output_for_issue,
 )
 
@@ -171,6 +169,30 @@ def _apply_governor_overrides(*, ticket: Dict[str, Any], final_action: Dict[str,
     next_action["violations"] = list(g.get("violations") or [])
 
     return next_action
+
+
+def _sovereign_llm_parse_fallback(
+    planned_action: Dict[str, Any],
+    ticket: Dict[str, Any],
+    triage: Dict[str, Any],
+    confidence: float,
+) -> Dict[str, Any]:
+    """When the sovereign LLM returns no parseable JSON, continue with the structured planned decision (no local copy deck)."""
+    pa = normalize_action_payload(planned_action)
+    triage_d = triage if isinstance(triage, dict) else {}
+    return {
+        "customer_message": "",
+        "customer_note": "",
+        "internal_note": "LLM parse unavailable — continuing with structured planned decision.",
+        "action": pa["action"],
+        "amount": pa["amount"],
+        "reason": str(planned_action.get("reason") or pa.get("reason") or ""),
+        "confidence": float(confidence or 0.75),
+        "risk_level": str(pa.get("risk_level") or triage_d.get("risk_level", "medium") or "medium"),
+        "priority": str(pa.get("priority", "medium") or "medium"),
+        "queue": str(pa.get("queue", "new") or "new"),
+        "requires_approval": bool(pa.get("requires_approval", False)),
+    }
 
 
 def run_agent(
@@ -262,27 +284,6 @@ def run_agent(
     thinking_trace.append(_trace("sanitize_input", "done"))
     clean = clean or ""
 
-    if is_conversational_message(clean):
-        thinking_trace.append(_trace("conversation_gate", "done"))
-        conv = conversational_reply(clean)
-        _conv_key = f"{user_id}:conversation:{uuid.uuid4().hex[:12]}"
-        try:
-            _tr = conv.get("tool_result") if isinstance(conv.get("tool_result"), dict) else {"status": "no_action"}
-            _log_outcome(
-                outcome_key=_conv_key,
-                user_id=user_id,
-                action="none",
-                amount=0.0,
-                issue_type=str(conv.get("issue_type") or "conversation"),
-                tool_result=_tr,
-                auto_resolved=True,
-                approved_by_human=False,
-            )
-        except Exception:
-            logger.warning("outcome_log_conversational_failed", exc_info=True)
-        conv["outcome_key"] = _conv_key
-        return conv
-
     meta = meta or {}
     user_memory = get_user_memory(user_id)
     meta["customer_history"] = user_memory
@@ -349,8 +350,8 @@ def run_agent(
     parsed, mode, confidence, quality, llm_used = sovereign_llm_attempt(clean, brain, prompt, thinking_trace)
 
     if parsed is None:
-        parsed = local_fallback_reply(ticket, planned_action, order_info, clean)
-        thinking_trace.append(_trace("local_fallback_reply", "done"))
+        parsed = _sovereign_llm_parse_fallback(planned_action, ticket, triage, confidence)
+        thinking_trace.append(_trace("sovereign_llm_parse", "done", "structured_planned_action"))
 
     llm_payload = normalize_action_payload(parsed)
 
