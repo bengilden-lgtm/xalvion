@@ -52,6 +52,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    case,
     func,
     inspect,
     text,
@@ -122,6 +123,236 @@ _METRICS_FALLBACK: dict[str, Any] = {
 _dashboard_cache: dict[str, Any] = {}
 _dashboard_cache_ts: float = 0.0
 _DASHBOARD_TTL: float = 30.0
+_dashboard_summary_cache_lock = threading.Lock()
+
+
+def _merge_get_metrics_into_dashboard_payload(payload: dict[str, Any], file_metrics: dict[str, Any]) -> None:
+    """Top-level fields from analytics.get_metrics(); preserves DB-blended keys already on payload."""
+    for key, val in file_metrics.items():
+        if key not in payload:
+            payload[key] = val
+    payload["metrics"] = dict(file_metrics)
+
+
+def _dashboard_summary_fallback(user: User, db: Session, file_metrics: dict[str, Any]) -> dict[str, Any]:
+    """Same JSON shape as dashboard_summary when DB aggregations fail."""
+    usage_summary = get_usage_summary(user)
+    public_tier = get_public_plan_name(user)
+    pc = get_plan_config(public_tier)
+    operator_mode = "balanced"
+    try:
+        operator_mode = get_operator_mode(db)
+    except Exception:
+        pass
+    out: dict[str, Any] = {
+        "total_interactions": int(file_metrics.get("total_interactions", 0) or 0),
+        "avg_confidence": float(file_metrics.get("avg_confidence", 0) or 0),
+        "avg_quality": float(file_metrics.get("avg_quality", 0) or 0),
+        "total_tickets": 0,
+        "auto_resolved": 0,
+        "escalated": 0,
+        "failed": 0,
+        "high_churn_risk": 0,
+        "pending_approvals": 0,
+        "approved_actions": 0,
+        "auto_resolution_rate": 0.0,
+        "escalation_rate": 0.0,
+        "refund_total": 0.0,
+        "credit_total": 0.0,
+        "money_saved": 0.0,
+        "actions": 0,
+        "by_queue": {},
+        "by_priority": {},
+        "by_risk": {},
+        "by_status": {},
+        "your_usage": usage_summary["usage"],
+        "your_tier": public_tier,
+        "your_limit": pc["monthly_limit"],
+        "remaining": usage_summary["remaining"],
+        "dashboard_access": pc["dashboard_access"],
+        "priority_routing": pc["priority_routing"],
+        "operator_mode": operator_mode,
+        "total_users": 0,
+        "pro_users": 0,
+        "elite_users": 0,
+        "outcome_quality": 0.0,
+        "reopened_rate": 0.0,
+        "crm_close_rate": 0.0,
+        "value_generated": {
+            "money_saved": 0.0,
+            "time_saved_minutes": 0,
+            "actions_taken": 0,
+        },
+    }
+    _merge_get_metrics_into_dashboard_payload(out, file_metrics)
+    return out
+
+
+def dashboard_summary_handler(user: User, db: Session) -> dict[str, Any]:
+    """
+    Workspace GET /dashboard/summary implementation (mounted from routes.dashboard).
+    Merges ticket/action aggregates with analytics.get_metrics() (revenue_saved, rates, etc.).
+    """
+    global _dashboard_cache_ts
+    file_metrics = {**_METRICS_FALLBACK, **(get_metrics() or {})}
+    outcome_stats: dict[str, Any] = {}
+    try:
+        outcome_stats = get_outcome_stats()
+    except Exception:
+        outcome_stats = {}
+
+    _now = time.time()
+    if _dashboard_cache and (_now - _dashboard_cache_ts) < _DASHBOARD_TTL:
+        cached = dict(_dashboard_cache)
+        usage_summary = get_usage_summary(user)
+        public_tier = get_public_plan_name(user)
+        pc = get_plan_config(public_tier)
+        cached.update(
+            {
+                "your_usage": usage_summary["usage"],
+                "your_tier": public_tier,
+                "your_limit": pc["monthly_limit"],
+                "remaining": usage_summary["remaining"],
+            }
+        )
+        ms = float(cached.get("money_saved", 0) or 0)
+        act = int(cached.get("actions", 0) or 0)
+        cached["value_generated"] = {
+            "money_saved": round(ms, 2),
+            "time_saved_minutes": int(act * 6),
+            "actions_taken": act,
+        }
+        try:
+            cached["operator_mode"] = get_operator_mode(db)
+        except Exception:
+            pass
+        _merge_get_metrics_into_dashboard_payload(cached, file_metrics)
+        _attach_outcome_intelligence_optional(cached)
+        return cached
+
+    try:
+        _tkt = db.query(
+            func.count(Ticket.id).label("total"),
+            func.count(case((Ticket.status == "resolved", 1), else_=None)).label("resolved"),
+            func.count(case((Ticket.status.in_(["waiting", "escalated"]), 1), else_=None)).label("escalated"),
+            func.count(case((Ticket.status == "failed", 1), else_=None)).label("failed"),
+            func.count(case((Ticket.churn_risk >= 60, 1), else_=None)).label("high_risk"),
+        ).one_or_none()
+
+        if _tkt is None:
+            total_tickets = auto_resolved = escalated = failed_count = high_risk = 0
+        else:
+            total_tickets = int(_tkt.total or 0)
+            auto_resolved = int(_tkt.resolved or 0)
+            escalated = int(_tkt.escalated or 0)
+            failed_count = int(_tkt.failed or 0)
+            high_risk = int(_tkt.high_risk or 0)
+
+        pending_approvals = db.query(ActionLog).filter(
+            ActionLog.requires_approval == 1,
+            ActionLog.approved == 0,
+        ).count()
+
+        _act = db.query(
+            func.coalesce(func.sum(case((ActionLog.action == "refund", ActionLog.amount), else_=0)), 0).label("refund_total"),
+            func.coalesce(func.sum(case((ActionLog.action == "credit", ActionLog.amount), else_=0)), 0).label("credit_total"),
+            func.count(case((ActionLog.action.in_(["refund", "credit"]), 1), else_=None)).label("actions_done"),
+            func.count(case((ActionLog.approved == 1, 1), else_=None)).label("approved_count"),
+            func.avg(case((ActionLog.confidence > 0, ActionLog.confidence), else_=None)).label("avg_conf"),
+            func.avg(case((ActionLog.quality > 0, ActionLog.quality), else_=None)).label("avg_qual"),
+        ).one_or_none()
+
+        if _act is None:
+            refund_total = credit_total = 0.0
+            actions_done = approved_count = 0
+            db_avg_conf = db_avg_qual = 0.0
+        else:
+            refund_total = float(_act.refund_total or 0)
+            credit_total = float(_act.credit_total or 0)
+            actions_done = int(_act.actions_done or 0)
+            approved_count = int(_act.approved_count or 0)
+            db_avg_conf = float(_act.avg_conf or 0)
+            db_avg_qual = float(_act.avg_qual or 0)
+
+        avg_confidence = file_metrics.get("avg_confidence") or round(db_avg_conf, 4)
+        avg_quality = file_metrics.get("avg_quality") or round(db_avg_qual, 4)
+
+        queue_rows = db.query(Ticket.queue, func.count(Ticket.id)).group_by(Ticket.queue).all()
+        prio_rows = db.query(Ticket.priority, func.count(Ticket.id)).group_by(Ticket.priority).all()
+        risk_rows = db.query(Ticket.risk_level, func.count(Ticket.id)).group_by(Ticket.risk_level).all()
+        status_rows = db.query(Ticket.status, func.count(Ticket.id)).group_by(Ticket.status).all()
+
+        by_queue = {_safe_queue(q or "new"): int(c) for q, c in queue_rows}
+        by_priority = {_safe_priority(p or "medium"): int(c) for p, c in prio_rows}
+        by_risk = {_safe_risk(r or "medium"): int(c) for r, c in risk_rows}
+        by_status = {_safe_status(s or "new"): int(c) for s, c in status_rows}
+
+        usage_summary = get_usage_summary(user)
+        public_tier = get_public_plan_name(user)
+
+        result: dict[str, Any] = {
+            "total_interactions": file_metrics.get("total_interactions", 0),
+            "avg_confidence": avg_confidence,
+            "avg_quality": avg_quality,
+            "total_tickets": total_tickets,
+            "auto_resolved": auto_resolved,
+            "escalated": escalated,
+            "failed": failed_count,
+            "high_churn_risk": high_risk,
+            "pending_approvals": pending_approvals,
+            "approved_actions": approved_count,
+            "auto_resolution_rate": round(auto_resolved / max(1, total_tickets) * 100, 2),
+            "escalation_rate": round(escalated / max(1, total_tickets) * 100, 2),
+            "refund_total": round(refund_total, 2),
+            "credit_total": round(credit_total, 2),
+            "money_saved": round(refund_total + credit_total, 2),
+            "actions": actions_done,
+            "by_queue": by_queue,
+            "by_priority": by_priority,
+            "by_risk": by_risk,
+            "by_status": by_status,
+            "your_usage": usage_summary["usage"],
+            "your_tier": public_tier,
+            "your_limit": get_plan_config(public_tier)["monthly_limit"],
+            "remaining": usage_summary["remaining"],
+            "dashboard_access": get_plan_config(public_tier)["dashboard_access"],
+            "priority_routing": get_plan_config(public_tier)["priority_routing"],
+            "operator_mode": get_operator_mode(db),
+            "total_users": db.query(User).count(),
+            "pro_users": db.query(User).filter(User.tier == "pro").count(),
+            "elite_users": db.query(User).filter(User.tier == "elite").count(),
+            "outcome_quality": float(outcome_stats.get("avg_outcome_quality", 0.0) or 0.0),
+            "reopened_rate": float(outcome_stats.get("reopened_rate", 0.0) or 0.0),
+            "crm_close_rate": float(outcome_stats.get("crm_close_rate", 0.0) or 0.0),
+            "value_generated": {
+                "money_saved": round(refund_total + credit_total, 2),
+                "time_saved_minutes": int(actions_done * 6),
+                "actions_taken": actions_done,
+            },
+        }
+        _merge_get_metrics_into_dashboard_payload(result, file_metrics)
+        with _dashboard_summary_cache_lock:
+            _dashboard_cache.clear()
+            _dashboard_cache.update(result)
+            _dashboard_cache_ts = _now
+        _attach_outcome_intelligence_optional(result)
+        return result
+    except Exception as exc:
+        _log_throttled_db_issue("GET /dashboard/summary", exc)
+        fb = _dashboard_summary_fallback(user, db, file_metrics)
+        _attach_outcome_intelligence_optional(fb)
+        return fb
+
+
+def _attach_outcome_intelligence_optional(payload: dict[str, Any]) -> None:
+    try:
+        from outcome_store import outcome_intelligence_snapshot
+
+        oi = outcome_intelligence_snapshot(limit=25)
+        if oi:
+            payload["outcome_intelligence"] = oi
+    except Exception:
+        pass
 
 try:
     from analytics import get_metrics
@@ -2905,54 +3136,6 @@ async def support_stream(
     username = getattr(user, "username", "") or "guest"
     result = await run_in_threadpool(run_support_for_username, req, username, guest_client_id)
     return StreamingResponse(stream_support_events(result), media_type="text/event-stream")
-
-
-@app.get("/dashboard/summary")
-def dashboard_summary(
-    user: User = Depends(get_current_user),
-    guest_client_id: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
-    db: Session = Depends(get_db),
-):
-    usage = get_usage_summary(user)
-    if getattr(user, "username", "") in {"", "guest"}:
-        snap = _guest_preview_snapshot(guest_client_id) or {}
-        usage = {
-            "tier": "free",
-            "label": "Free",
-            "usage": int(snap.get("usage", 0) or 0),
-            "limit": int(snap.get("limit", GUEST_PREVIEW_OPERATOR_LIMIT) or GUEST_PREVIEW_OPERATOR_LIMIT),
-            "remaining": int(snap.get("remaining", 0) or 0),
-            "dashboard_access": "basic",
-            "priority_routing": False,
-        }
-    # Keep payload stable for frontend widgets.
-    try:
-        metrics = get_metrics()
-    except Exception:
-        metrics = dict(_METRICS_FALLBACK)
-    payload: dict[str, Any] = {
-        "ok": True,
-        "usage": usage,
-        "value_generated": {
-            "money_saved": float(metrics.get("money_moved", 0) or 0),
-            "actions_taken": int(metrics.get("total_refunds", 0) or 0) + int(metrics.get("total_credits", 0) or 0),
-        },
-        "metrics": metrics,
-        "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
-    }
-
-    # Outcome intelligence (additive, optional): never break summary if unavailable.
-    try:
-        from outcome_store import outcome_intelligence_snapshot
-
-        oi = outcome_intelligence_snapshot(limit=25)
-        if oi:
-            payload["outcome_intelligence"] = oi
-    except Exception:
-        # Silent fallback: dashboard summary must never fail due to outcome stats.
-        pass
-
-    return payload
 
 
 def _build_extension_meta(
