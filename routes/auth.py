@@ -65,15 +65,10 @@ def _build_me_value_signals(
         money_moved, total_actions = _user_billing_motion_rollups(db, uname)
         time_saved_mins = total_actions * 6
     else:
-        try:
-            metrics = app_mod.get_metrics()
-            money_moved = float(metrics.get("money_moved", 0) or 0)
-            total_actions = int(metrics.get("total_refunds", 0) or 0) + int(metrics.get("total_credits", 0) or 0)
-            time_saved_mins = total_actions * 6
-        except Exception:
-            money_moved = 0.0
-            total_actions = 0
-            time_saved_mins = 0
+        # Guests must not inherit global analytics aggregates; preview motion is tracked separately.
+        money_moved = 0.0
+        total_actions = 0
+        time_saved_mins = 0
     return {
         "tickets_handled":    usage,
         "upgrade_unlocks":    unlock_map.get(tkey, _tier_upgrade_unlocks(tier)),

@@ -219,6 +219,25 @@ if (typeof window.pulseRail !== "function") {
     _composerFlashTimer: null
   };
 
+  function dashboardHasWorkspaceActivity(data) {
+    if (!data || typeof data !== "object") return false;
+    if (Object.prototype.hasOwnProperty.call(data, "has_workspace_activity")) {
+      return Boolean(data.has_workspace_activity);
+    }
+    const tickets = Number(data.total_tickets ?? data.total_interactions ?? 0);
+    const actions = Number(data.actions ?? 0);
+    const mx = data.metrics && typeof data.metrics === "object" ? data.metrics : {};
+    const ev = Number(mx.total_interactions ?? 0);
+    return tickets > 0 || actions > 0 || ev > 0;
+  }
+
+  function billingVolumeFromDashboard(d) {
+    const v =
+      d && typeof d === "object" && d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
+    if (!v) return 0;
+    return Number(v.credit_volume_usd || 0) + Number(v.refund_volume_usd || 0);
+  }
+
   function getValueSnapshot() {
     const d = state.dashboardStats || {};
     const vs = state.valueSignals && typeof state.valueSignals === "object" ? state.valueSignals : {};
@@ -230,13 +249,13 @@ if (typeof window.pulseRail !== "function") {
         : Number(d.total_tickets ?? d.total_interactions ?? state.totalInteractions ?? 0);
     const tickets = Number.isFinite(ticketsRaw) ? Math.max(0, Math.floor(ticketsRaw)) : 0;
 
-    const actionsRaw = Number((vg && vg.actions_taken) ?? d.actions ?? state.actionsCount ?? 0);
+    const actionsRaw = Number((vg && vg.billing_actions_count) ?? d.actions ?? state.actionsCount ?? 0);
     const actions = Number.isFinite(actionsRaw) ? Math.max(0, Math.floor(actionsRaw)) : 0;
 
     const minsRaw = Number((vg && vg.time_saved_minutes) ?? estimateAgentMinutesSavedFromDashboard(d));
     const minutes = Number.isFinite(minsRaw) ? Math.max(0, Math.round(minsRaw)) : 0;
 
-    const moneyRaw = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
+    const moneyRaw = billingVolumeFromDashboard(d);
     const money = Number.isFinite(moneyRaw) ? Math.max(0, moneyRaw) : 0;
 
     const churnRiskRaw = Number(d?.triage?.churn_risk ?? state.latestRun?.triage?.churn_risk ?? 0);
@@ -1551,8 +1570,8 @@ if (typeof window.pulseRail !== "function") {
     const vs = state.valueSignals;
     const d = state.dashboardStats || {};
     const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
-    const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
-    const actions = Number((vg && vg.actions_taken) ?? d.actions ?? 0);
+    const money = billingVolumeFromDashboard(d);
+    const actions = Number((vg && vg.billing_actions_count) ?? d.actions ?? 0);
     const tickets =
       vs && typeof vs.tickets_handled === "number"
         ? vs.tickets_handled
@@ -2055,8 +2074,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       if (els.refundUpgradeTease) {
         const d = state.dashboardStats || {};
         const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
-        const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
-        const actions = Number((vg && vg.actions_taken) ?? d.actions ?? 0);
+        const money = billingVolumeFromDashboard(d);
+        const actions = Number((vg && vg.billing_actions_count) ?? d.actions ?? 0);
         els.refundUpgradeTease.textContent = allowed
           ? "Stripe execution from the workspace · Pro and Elite"
           : money > 0 || actions > 0
@@ -2710,21 +2729,22 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   function buildCommandEarnedValueLine() {
     const d = state.dashboardStats || {};
     const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
-    const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
-    const actions = Number((vg && vg.actions_taken) ?? d.actions ?? state.actionsCount ?? 0);
+    const money = billingVolumeFromDashboard(d);
+    const actions = Number((vg && vg.billing_actions_count) ?? d.actions ?? state.actionsCount ?? 0);
     const mins = Number((vg && vg.time_saved_minutes) ?? estimateAgentMinutesSavedFromDashboard(d));
     const tickets = Number(d.total_tickets ?? d.total_interactions ?? state.totalInteractions ?? 0);
     const hasAny =
-      (Number.isFinite(tickets) && tickets > 0) ||
-      money > 0 ||
-      actions > 0 ||
-      (Number.isFinite(mins) && mins > 0);
+      dashboardHasWorkspaceActivity(d) &&
+      ((Number.isFinite(tickets) && tickets > 0) ||
+        money > 0 ||
+        actions > 0 ||
+        (Number.isFinite(mins) && mins > 0));
     if (!hasAny) return "";
     const pts = [];
     if (tickets > 0) pts.push(`${Math.floor(tickets)} ticket${tickets === 1 ? "" : "s"}`);
     if (mins > 0) pts.push(`~${Math.round(mins)} min saved`);
     if (actions > 0) pts.push(`${actions} billing action${actions === 1 ? "" : "s"}`);
-    if (money > 0) pts.push(`${formatMoney(money)} protected`);
+    if (money > 0) pts.push(`${formatMoney(money)} billing motion`);
     return pts.length ? `Earned value · ${pts.join(" · ")}` : "";
   }
 
@@ -2878,9 +2898,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (tier === "elite" || tier === "dev") return;
     const conf = Number(data.confidence ?? data.decision?.confidence ?? 0);
     const og = String(data.outcome_intelligence?.latest?.tier || "").toLowerCase();
-    const money = Number(
-      data.amount ?? state.dashboardStats?.money_saved ?? state.dashboardStats?.value_generated?.money_saved ?? 0
-    );
+    const money = Number(data.amount ?? 0);
     const strong =
       (Number.isFinite(conf) && conf >= 0.88) || og === "excellent" || (Number.isFinite(money) && money >= 40);
     if (!strong) return;
@@ -3064,6 +3082,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   }
 
   function estimateAgentMinutesSavedFromDashboard(d = {}) {
+    if (d && d.has_workspace_activity === false) return 0;
+    if (!dashboardHasWorkspaceActivity(d)) return 0;
     const p2 = getPhase2();
     if (phase2WorkspaceReady() && p2?.analyticsEngine?.estimateAgentMinutesSavedFromDashboard) {
       try {
@@ -3102,8 +3122,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const d = state.dashboardStats || {};
     const vg = d.value_generated && typeof d.value_generated === "object" ? d.value_generated : null;
     const tickets = Number(d.total_tickets ?? d.total_interactions ?? state.totalInteractions ?? 0);
-    const money = Number((vg && vg.money_saved) ?? d.money_saved ?? 0);
-    const actions = Number((vg && vg.actions_taken) ?? d.actions ?? state.actionsCount ?? 0);
+    const money = billingVolumeFromDashboard(d);
+    const actions = Number((vg && vg.billing_actions_count) ?? d.actions ?? state.actionsCount ?? 0);
     const mins = Number((vg && vg.time_saved_minutes) ?? estimateAgentMinutesSavedFromDashboard(d));
     const tier = String(state.tier || "free").toLowerCase();
 
@@ -3130,7 +3150,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         })
       : null;
 
-    const hasValue = tickets > 0 || money > 0 || actions > 0 || mins > 0;
+    const hasValue = dashboardHasWorkspaceActivity(d) && (tickets > 0 || money > 0 || actions > 0 || mins > 0);
     const primaryLine = narrative?.primary
       ? narrative.primary
       : hasValue
@@ -3617,19 +3637,22 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (!rev || !tick || !conf) return;
     const safe = data && typeof data === "object" ? data : {};
     const m = safe.metrics && typeof safe.metrics === "object" ? safe.metrics : {};
-    const revenueSaved = Number(safe.revenue_saved ?? m.revenue_saved ?? 0);
+    const vg = safe.value_generated && typeof safe.value_generated === "object" ? safe.value_generated : {};
+    const hasAct = dashboardHasWorkspaceActivity(safe);
     const autoResolved = Number(safe.auto_resolved ?? 0);
     const avgConfRaw = Number(safe.avg_confidence ?? m.avg_confidence ?? 0);
-    const money = Number.isFinite(revenueSaved)
-      ? revenueSaved.toLocaleString(undefined, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: revenueSaved < 100 && revenueSaved % 1 !== 0 ? 2 : 0,
-        })
-      : "0";
-    rev.textContent = `Estimated value saved this month: $${money}`;
-    tick.textContent = `🎟️ Tickets auto-resolved: ${Number.isFinite(autoResolved) ? String(Math.max(0, Math.round(autoResolved))) : "—"}`;
+    if (!hasAct) {
+      rev.textContent = "No workspace activity data yet.";
+      tick.textContent = "Tickets auto-resolved (closed, no approval gate): —";
+      conf.textContent = "Avg confidence: —";
+      return;
+    }
+    const cref = Number(vg.credit_volume_usd ?? 0);
+    const rref = Number(vg.refund_volume_usd ?? 0);
+    rev.textContent = `Recorded billing motion: ${formatMoney(cref)} credits · ${formatMoney(rref)} refunds`;
+    tick.textContent = `Tickets auto-resolved (closed, no approval gate): ${Number.isFinite(autoResolved) ? String(Math.max(0, Math.round(autoResolved))) : "—"}`;
     const pct = Number.isFinite(avgConfRaw) ? (avgConfRaw <= 1.001 ? avgConfRaw * 100 : avgConfRaw) : 0;
-    conf.textContent = `⚡ Avg confidence: ${Math.round(pct)}%`;
+    conf.textContent = `Avg confidence: ${Math.round(pct)}%`;
   }
 
   function buildEmptyStateHtml() {
@@ -5233,7 +5256,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             tickets: n,
             minutes: mins,
             actions: Number(state.actionsCount || 0),
-            money: Number(state.dashboardStats?.money_saved || state.dashboardStats?.value_generated?.money_saved || 0),
+            money: billingVolumeFromDashboard(state.dashboardStats || {}),
             latestOutcomeTier: String(state.dashboardStats?.outcome_intelligence?.latest?.tier || "unknown"),
             stripeConnected: Boolean(state.stripeConnected),
           })
@@ -5862,7 +5885,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         </div>
         <div class="xv-dsumm-cell" style="text-align:center">
           <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Value</div>
-          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(formatMoney(impact.money_saved || impact.amount || data.amount || 0))}</div>
+          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(formatMoney(impact.amount ?? data.amount ?? impact.money_saved ?? 0))}</div>
         </div>
       </div>
       <summary class="details-toggle">
@@ -5877,7 +5900,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           ${createDetailBox("Risk", riskLabel(data))}
           ${createDetailBox("Priority", String(decision.priority || "medium"))}
           ${createDetailBox("Tool status", toolStatusDisplay)}
-          ${createDetailBox("Value surfaced", formatMoney(impact.money_saved || impact.amount || data.amount || 0))}
+          ${createDetailBox("Transaction amount", formatMoney(impact.amount ?? data.amount ?? impact.money_saved ?? 0))}
         </div>
         ${policyNote && policyNote !== internalNote ? `<div class="details-note">${escapeHtml(policyNote)}</div>` : ""}
         ${internalNote ? `<div class="details-note">${escapeHtml(internalNote)}</div>` : ""}
@@ -6592,7 +6615,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (latestAction) latestAction.textContent = displayActionLabel(data);
     if (latestQueue) latestQueue.textContent = displayQueueLabel({ decision });
     if (latestConfidence) latestConfidence.textContent = formatMetric(data.confidence || 0, 2);
-    if (latestValue) latestValue.textContent = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
+    if (latestValue) latestValue.textContent = formatMoney(impact.amount ?? data.amount ?? impact.money_saved ?? 0);
     if (latestTime) {
       latestTime.textContent = mins > 0 ? `${Math.round(mins)} min` : "—";
     }
@@ -6600,7 +6623,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     if (latestNarrative) {
       const reason = explainWhyAction(data);
-      const value = formatMoney(impact.money_saved || impact.amount || data.amount || 0);
+      const value = formatMoney(impact.amount ?? data.amount ?? impact.money_saved ?? 0);
       const posture = operatorPostureLabel(data);
       const risk = String(decision.risk_level || triage.risk_level || "medium");
       const line = `Operator system · ${posture} · ${risk} risk · value surfaced ${value}. ${reason}`;
@@ -6719,7 +6742,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const decision = data.decision || {};
     const toolStatus = String(data.tool_status || "");
 
-    const moneySaved = Number(impact.money_saved || impact.amount || data.amount || 0);
+    const moneySaved = Number(impact.amount ?? data.amount ?? impact.money_saved ?? 0);
     const refundTotal = String(data.action || "").toLowerCase() === "refund" ? Number(data.amount || 0) : 0;
     const autoRate = state.totalInteractions > 0 ? Math.round((state.actionsCount / state.totalInteractions) * 100) : 0;
     const churnSaved = Number(decision.priority === "high" && toolStatus !== "error");
@@ -7403,10 +7426,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         state.actionsCount = Number(data.actions || 0);
       }
 
-      setText(els.statInteractions, formatMetric(state.totalInteractions, 0));
-      setText(els.statQuality, formatMetric(state.avgQuality, 2));
-      setText(els.statConfidence, formatMetric(state.avgConfidence, 2));
-      setText(els.statActions, formatMetric(state.actionsCount, 0));
+      const dashHas = dashboardHasWorkspaceActivity(data);
+      setText(els.statInteractions, dashHas ? formatMetric(state.totalInteractions, 0) : "No data");
+      setText(els.statQuality, dashHas ? formatMetric(state.avgQuality, 2) : "No data");
+      setText(els.statConfidence, dashHas ? formatMetric(state.avgConfidence, 2) : "No data");
+      setText(els.statActions, dashHas ? formatMetric(state.actionsCount, 0) : "No data");
 
       if (typeof data.your_tier !== "undefined" || typeof data.your_usage !== "undefined") {
         updatePlanUI(

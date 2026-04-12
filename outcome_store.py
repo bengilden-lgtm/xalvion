@@ -30,13 +30,9 @@ from db import Base, SessionLocal, engine
 logger = logging.getLogger("xalvion.outcome_store")
 
 
-_outcome_stats_cache: dict[str, Any] = {}
-_outcome_stats_cache_ts: float = 0.0
-_OUTCOME_STATS_TTL: float = 30.0
-
 # Outcome intelligence snapshot cache (UI-facing, compact)
 _outcome_intel_cache: dict[str, Any] = {}
-_outcome_intel_cache_ts: float = 0.0
+_outcome_intel_cache_ts: dict[str, float] = {}
 _OUTCOME_INTEL_TTL: float = 15.0
 
 
@@ -575,29 +571,43 @@ def mark_reversed(outcome_key: str) -> bool:
         db.close()
 
 
-def get_outcome_stats() -> dict[str, Any]:
-    """Aggregate real outcome stats. Used by the /metrics endpoint."""
-    import time as _time
+def _empty_outcome_stats() -> dict[str, Any]:
+    return {
+        "total": 0,
+        "success_rate": 0.0,
+        "auto_resolution_rate": 0.0,
+        "human_approved": 0,
+        "reversed": 0,
+        "money_moved": 0.0,
+        "avg_outcome_quality": 0.0,
+        "reopened_rate": 0.0,
+        "crm_close_rate": 0.0,
+        "avg_impact_score": 0.5,
+        "excellent_rate": 0.0,
+        "bad_rate": 0.0,
+        "good_excellent_outcome_rate": 0.0,
+    }
 
-    global _outcome_stats_cache, _outcome_stats_cache_ts
 
-    now = _time.time()
-    if _outcome_stats_cache and (now - _outcome_stats_cache_ts) < _OUTCOME_STATS_TTL:
-        return dict(_outcome_stats_cache)
+def get_outcome_stats(user_id: str | None = None) -> dict[str, Any]:
+    """Aggregate real outcome stats for a single workspace principal (username or guest client id).
+
+    Callers must pass ``user_id``; without it we return zeros so we never leak cross-tenant aggregates.
+    """
+    uid = str(user_id or "").strip()[:120]
+    if not uid:
+        return _empty_outcome_stats()
 
     db = SessionLocal()
     try:
+        scope = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.user_id == uid)
+
         avg_impact_score = 0.5
         excellent_rate = 0.0
         bad_rate = 0.0
         good_excellent_outcome_rate = 0.0
         try:
-            sample_rows = (
-                db.query(ActionOutcomeLog)
-                .order_by(ActionOutcomeLog.id.desc())
-                .limit(500)
-                .all()
-            )
+            sample_rows = scope.order_by(ActionOutcomeLog.id.desc()).limit(500).all()
             if sample_rows:
                 impacts = [compute_outcome_impact(_outcome_orm_to_dict(r)) for r in sample_rows]
                 n = len(impacts)
@@ -621,64 +631,48 @@ def get_outcome_stats() -> dict[str, Any]:
             good_excellent_outcome_rate = 0.0
             logger.warning("get_outcome_stats_sample_impact_failed", exc_info=True)
 
-        total = db.query(ActionOutcomeLog).count()
+        total = int(scope.count() or 0)
         if not total:
-            result = {
-                "total":               0,
-                "success_rate":        0.0,
-                "auto_resolution_rate": 0.0,
-                "human_approved":      0,
-                "reversed":            0,
-                "money_moved":         0.0,
-                "avg_outcome_quality": 0.0,
-                "reopened_rate":       0.0,
-                "crm_close_rate":      0.0,
-                "avg_impact_score":    0.5,
-                "excellent_rate":      0.0,
-                "bad_rate":            0.0,
-                "good_excellent_outcome_rate": 0.0,
-            }
-            _outcome_stats_cache.clear()
-            _outcome_stats_cache.update(result)
-            _outcome_stats_cache_ts = now
-            return result
+            return _empty_outcome_stats()
 
-        successes      = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.success == 1).count()
-        auto           = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.auto_resolved == 1).count()
-        human_approved = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.approved_by_human == 1).count()
-        reversed_count = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.refund_reversed == 1).count()
-        reopened_n     = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.ticket_reopened == 1).count()
-        crm_closed_n   = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.crm_closed == 1).count()
-        money_moved    = db.query(func.sum(ActionOutcomeLog.amount)).filter(
-            ActionOutcomeLog.action.in_(["refund", "credit"]),
-            ActionOutcomeLog.success == 1,
-        ).scalar() or 0.0
+        successes = int(scope.filter(ActionOutcomeLog.success == 1).count() or 0)
+        auto = int(scope.filter(ActionOutcomeLog.auto_resolved == 1).count() or 0)
+        human_approved = int(scope.filter(ActionOutcomeLog.approved_by_human == 1).count() or 0)
+        reversed_count = int(scope.filter(ActionOutcomeLog.refund_reversed == 1).count() or 0)
+        reopened_n = int(scope.filter(ActionOutcomeLog.ticket_reopened == 1).count() or 0)
+        crm_closed_n = int(scope.filter(ActionOutcomeLog.crm_closed == 1).count() or 0)
+        money_moved = (
+            db.query(func.sum(ActionOutcomeLog.amount))
+            .filter(
+                ActionOutcomeLog.user_id == uid,
+                ActionOutcomeLog.action.in_(["refund", "credit"]),
+                ActionOutcomeLog.success == 1,
+            )
+            .scalar()
+            or 0.0
+        )
 
-        success_rows = db.query(ActionOutcomeLog).filter(ActionOutcomeLog.success == 1).all()
+        success_rows = scope.filter(ActionOutcomeLog.success == 1).all()
         qualities = [compute_outcome_quality(r) for r in success_rows]
         avg_q = round(sum(qualities) / max(1, len(qualities)), 4) if qualities else 0.0
 
-        result = {
-            "total":               total,
-            "successes":           successes,
-            "success_rate":        round(successes / max(1, total) * 100, 1),
-            "auto_resolved":       auto,
+        return {
+            "total": total,
+            "successes": successes,
+            "success_rate": round(successes / max(1, total) * 100, 1),
+            "auto_resolved": auto,
             "auto_resolution_rate": round(auto / max(1, total) * 100, 1),
-            "human_approved":      human_approved,
-            "reversed":            reversed_count,
-            "money_moved":         round(float(money_moved), 2),
+            "human_approved": human_approved,
+            "reversed": reversed_count,
+            "money_moved": round(float(money_moved), 2),
             "avg_outcome_quality": avg_q,
-            "reopened_rate":       round(reopened_n / max(1, total) * 100, 2),
-            "crm_close_rate":      round(crm_closed_n / max(1, total) * 100, 2),
-            "avg_impact_score":    avg_impact_score,
-            "excellent_rate":      excellent_rate,
-            "bad_rate":            bad_rate,
+            "reopened_rate": round(reopened_n / max(1, total) * 100, 2),
+            "crm_close_rate": round(crm_closed_n / max(1, total) * 100, 2),
+            "avg_impact_score": avg_impact_score,
+            "excellent_rate": excellent_rate,
+            "bad_rate": bad_rate,
             "good_excellent_outcome_rate": good_excellent_outcome_rate,
         }
-        _outcome_stats_cache.clear()
-        _outcome_stats_cache.update(result)
-        _outcome_stats_cache_ts = now
-        return result
     finally:
         db.close()
 
@@ -701,20 +695,35 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
-def summarize_recent_outcomes(limit: int = 25) -> dict[str, Any]:
+def summarize_recent_outcomes(limit: int = 25, user_id: str | None = None) -> dict[str, Any]:
     """
     Compact aggregation over the most recent outcome rows.
     Additive helper; never raises; safe to call from summary endpoints.
     """
     lim = max(1, min(500, _safe_int(limit, 25)))
+    uid = str(user_id or "").strip()[:120]
     db = SessionLocal()
     try:
-        rows = (
-            db.query(ActionOutcomeLog)
-            .order_by(ActionOutcomeLog.id.desc())
-            .limit(lim)
-            .all()
-        )
+        q = db.query(ActionOutcomeLog)
+        if uid:
+            q = q.filter(ActionOutcomeLog.user_id == uid)
+        else:
+            return {
+                "excellent": 0,
+                "good": 0,
+                "neutral": 0,
+                "bad": 0,
+                "auto_success": 0,
+                "assisted_success": 0,
+                "failed": 0,
+                "ticket_reopened": 0,
+                "refund_reversed": 0,
+                "dispute_filed": 0,
+                "crm_closed": 0,
+                "money_refunded": 0.0,
+                "money_credited": 0.0,
+            }
+        rows = q.order_by(ActionOutcomeLog.id.desc()).limit(lim).all()
         if not rows:
             return {
                 "excellent": 0,
@@ -812,14 +821,22 @@ def summarize_recent_outcomes(limit: int = 25) -> dict[str, Any]:
         db.close()
 
 
-def latest_outcome_summary() -> dict[str, Any] | None:
+def latest_outcome_summary(user_id: str | None = None) -> dict[str, Any] | None:
     """
     Latest outcome row summarized for UI.
     Returns None if no rows exist; never raises.
     """
+    uid = str(user_id or "").strip()[:120]
+    if not uid:
+        return None
     db = SessionLocal()
     try:
-        row = db.query(ActionOutcomeLog).order_by(ActionOutcomeLog.id.desc()).first()
+        row = (
+            db.query(ActionOutcomeLog)
+            .filter(ActionOutcomeLog.user_id == uid)
+            .order_by(ActionOutcomeLog.id.desc())
+            .first()
+        )
         if not row:
             return None
         row_dict = {
@@ -1041,29 +1058,37 @@ def get_decision_outcome_stats(
         db.close()
 
 
-def outcome_intelligence_snapshot(limit: int = 25) -> dict[str, Any]:
+def outcome_intelligence_snapshot(limit: int = 25, user_id: str | None = None) -> dict[str, Any]:
     """
     UI-facing outcome intelligence snapshot.
-    Cached briefly; never raises; returns {} when no outcome data exists.
+    Cached briefly per workspace principal; never raises; returns {} when no outcome data exists.
     """
     import time as _time
 
+    uid = str(user_id or "").strip()[:120]
+    if not uid:
+        return {}
+
     global _outcome_intel_cache, _outcome_intel_cache_ts
     now = _time.time()
-    if _outcome_intel_cache and (now - _outcome_intel_cache_ts) < _OUTCOME_INTEL_TTL:
-        return dict(_outcome_intel_cache)
+    cache_key = uid
+    cached = _outcome_intel_cache.get(cache_key)
+    cached_ts = _outcome_intel_cache_ts.get(cache_key, 0.0)
+    if cached and (now - cached_ts) < _OUTCOME_INTEL_TTL:
+        return dict(cached)
 
-    latest = latest_outcome_summary()
-    summary = summarize_recent_outcomes(limit=limit)
+    latest = latest_outcome_summary(user_id=uid)
+    summary = summarize_recent_outcomes(limit=limit, user_id=uid)
     # If there are no outcomes at all, return empty to keep payload minimal.
     total = _safe_int(summary.get("excellent", 0)) + _safe_int(summary.get("good", 0)) + _safe_int(summary.get("neutral", 0)) + _safe_int(summary.get("bad", 0))
     if total <= 0 and not latest:
-        _outcome_intel_cache.clear()
-        _outcome_intel_cache_ts = now
+        _outcome_intel_cache.pop(cache_key, None)
+        _outcome_intel_cache_ts.pop(cache_key, None)
         return {}
 
     insights = build_outcome_insights(summary, latest)
-    best_pattern = _best_pattern_snapshot()
+    # Cross-tenant learning store — omit from per-workspace dashboard surfaces.
+    best_pattern = None
 
     snapshot: dict[str, Any] = {
         "latest": latest,
@@ -1072,7 +1097,6 @@ def outcome_intelligence_snapshot(limit: int = 25) -> dict[str, Any]:
         "best_pattern": best_pattern,
     }
 
-    _outcome_intel_cache.clear()
-    _outcome_intel_cache.update(snapshot)
-    _outcome_intel_cache_ts = now
+    _outcome_intel_cache[cache_key] = dict(snapshot)
+    _outcome_intel_cache_ts[cache_key] = now
     return dict(snapshot)

@@ -29,9 +29,10 @@ _DEFAULT_METRICS: dict[str, Any] = {
     "approval_rate": 0.0,
     "auto_safe_rate": 0.0,
     "review_rate": 0.0,
-    "revenue_saved": 0.0,
     "refund_cost": 0.0,
+    "credit_volume_usd": 0.0,
     "good_excellent_outcome_rate": 0.0,
+    "has_analytics_data": False,
 }
 
 _metrics_failure_logged = False
@@ -128,30 +129,50 @@ def log_event(
         db.close()
 
 
-def get_metrics() -> dict[str, Any]:
+def get_metrics(actor_principal: str | None = None) -> dict[str, Any]:
+    """Aggregate analytics_events for one workspace principal (matches ``actor_principal`` on log_event).
+
+    Without a principal we return empty-shaped metrics so callers never read cross-tenant aggregates.
+    """
     global _metrics_failure_logged
+    principal = str(actor_principal or "").strip()[:120]
+    if not principal:
+        return dict(_DEFAULT_METRICS)
+
     db = SessionLocal()
     try:
-        total = int(db.query(func.count(AnalyticsEvent.id)).scalar() or 0)
+        scope = db.query(AnalyticsEvent).filter(AnalyticsEvent.actor_principal == principal)
+        total = int(scope.count() or 0)
         if not total:
             out = dict(_DEFAULT_METRICS)
             out["total_interactions"] = 0
+            out["has_analytics_data"] = False
             return out
 
         try:
-            avg_conf = db.query(func.avg(AnalyticsEvent.confidence)).scalar() or 0.0
+            avg_conf = (
+                db.query(func.avg(AnalyticsEvent.confidence))
+                .filter(AnalyticsEvent.actor_principal == principal)
+                .scalar()
+                or 0.0
+            )
         except OperationalError:
             avg_conf = 0.0
         try:
-            avg_qual = db.query(func.avg(AnalyticsEvent.quality)).scalar() or 0.0
+            avg_qual = (
+                db.query(func.avg(AnalyticsEvent.quality))
+                .filter(AnalyticsEvent.actor_principal == principal)
+                .scalar()
+                or 0.0
+            )
         except OperationalError:
             avg_qual = 0.0
 
         # Older schemas may not have action/amount columns. Preserve total_interactions regardless.
         try:
-            total_refunds = int(db.query(func.count(AnalyticsEvent.id)).filter(AnalyticsEvent.action == "refund").scalar() or 0)
-            total_credits = int(db.query(func.count(AnalyticsEvent.id)).filter(AnalyticsEvent.action == "credit").scalar() or 0)
-            review_n = int(db.query(func.count(AnalyticsEvent.id)).filter(AnalyticsEvent.action == "review").scalar() or 0)
+            total_refunds = int(scope.filter(AnalyticsEvent.action == "refund").count() or 0)
+            total_credits = int(scope.filter(AnalyticsEvent.action == "credit").count() or 0)
+            review_n = int(scope.filter(AnalyticsEvent.action == "review").count() or 0)
         except OperationalError:
             total_refunds = 0
             total_credits = 0
@@ -160,19 +181,22 @@ def get_metrics() -> dict[str, Any]:
         try:
             money_moved = (
                 db.query(func.sum(AnalyticsEvent.amount))
-                .filter(AnalyticsEvent.action.in_(["refund", "credit"]))
+                .filter(
+                    AnalyticsEvent.actor_principal == principal,
+                    AnalyticsEvent.action.in_(["refund", "credit"]),
+                )
                 .scalar()
                 or 0.0
             )
             refund_cost = (
                 db.query(func.sum(AnalyticsEvent.amount))
-                .filter(AnalyticsEvent.action == "refund")
+                .filter(AnalyticsEvent.actor_principal == principal, AnalyticsEvent.action == "refund")
                 .scalar()
                 or 0.0
             )
             credit_volume = (
                 db.query(func.sum(AnalyticsEvent.amount))
-                .filter(AnalyticsEvent.action == "credit")
+                .filter(AnalyticsEvent.actor_principal == principal, AnalyticsEvent.action == "credit")
                 .scalar()
                 or 0.0
             )
@@ -183,20 +207,17 @@ def get_metrics() -> dict[str, Any]:
 
         try:
             auto_safe_n = int(
-                db.query(func.count(AnalyticsEvent.id))
-                .filter(
+                scope.filter(
                     AnalyticsEvent.action.in_(["none", "credit"]),
                     AnalyticsEvent.quality >= 0.85,
                     AnalyticsEvent.confidence >= 0.82,
-                )
-                .scalar()
+                ).count()
                 or 0
             )
         except OperationalError:
             auto_safe_n = 0
         review_rate = round(review_n / max(1, total) * 100, 2)
         auto_safe_rate = round(auto_safe_n / max(1, total) * 100, 2)
-        revenue_saved = round(float(credit_volume) * 2.05 + max(0, total - review_n) * 0.35, 2)
 
         approval_rate = 0.0
         good_excellent_outcome_rate = 0.0
@@ -206,7 +227,7 @@ def get_metrics() -> dict[str, Any]:
         try:
             from outcome_store import get_outcome_stats as _outcome_stats
 
-            ost = _outcome_stats()
+            ost = _outcome_stats(principal)
             ot = max(1, int(ost.get("total", 0) or 0))
             approval_rate = round(float(ost.get("human_approved", 0) or 0) / ot * 100, 2)
             good_excellent_outcome_rate = float(ost.get("good_excellent_outcome_rate", 0.0) or 0.0)
@@ -215,7 +236,7 @@ def get_metrics() -> dict[str, Any]:
             try:
                 from outcome_store import summarize_recent_outcomes as _summ_recent
 
-                mix = _summ_recent(limit=50)
+                mix = _summ_recent(limit=50, user_id=principal)
                 if isinstance(mix, dict):
                     outcome_quality_mix = {
                         "excellent": int(mix.get("excellent", 0) or 0),
@@ -253,9 +274,10 @@ def get_metrics() -> dict[str, Any]:
             "approval_rate": approval_rate,
             "auto_safe_rate": auto_safe_rate,
             "review_rate": review_rate,
-            "revenue_saved": revenue_saved,
             "refund_cost": round(float(refund_cost), 2),
+            "credit_volume_usd": round(float(credit_volume), 2),
             "good_excellent_outcome_rate": round(good_excellent_outcome_rate, 2),
+            "has_analytics_data": True,
             # Optional additions: safe for old clients (ignored if unknown).
             "outcome_quality_mix": outcome_quality_mix,
             "recent_risk_events": recent_risk_events,

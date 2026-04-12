@@ -52,6 +52,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    and_,
     case,
     func,
     inspect,
@@ -116,13 +117,15 @@ _METRICS_FALLBACK: dict[str, Any] = {
     "approval_rate": 0.0,
     "auto_safe_rate": 0.0,
     "review_rate": 0.0,
-    "revenue_saved": 0.0,
     "refund_cost": 0.0,
+    "credit_volume_usd": 0.0,
     "good_excellent_outcome_rate": 0.0,
+    "has_analytics_data": False,
 }
 
-_dashboard_cache: dict[str, Any] = {}
-_dashboard_cache_ts: float = 0.0
+# Per-workspace dashboard snapshot (never cross-tenant).
+_dashboard_snap_by_principal: dict[str, dict[str, Any]] = {}
+_dashboard_snap_ts_by_principal: dict[str, float] = {}
 _DASHBOARD_TTL: float = 30.0
 _dashboard_summary_cache_lock = threading.Lock()
 
@@ -135,7 +138,70 @@ def _merge_get_metrics_into_dashboard_payload(payload: dict[str, Any], file_metr
     payload["metrics"] = dict(file_metrics)
 
 
-def _dashboard_summary_fallback(user: User, db: Session, file_metrics: dict[str, Any]) -> dict[str, Any]:
+def _dashboard_workspace_principal(user: User, guest_client_id: str | None) -> str | None:
+    """Tenant key for dashboard rows (signed-in username or guest preview client id)."""
+    if is_session_guest(user):
+        return normalize_guest_client_id(guest_client_id)
+    u = str(getattr(user, "username", "") or "").strip()
+    return u or None
+
+
+def _dashboard_guest_no_client_payload(user: User, db: Session) -> dict[str, Any]:
+    """Preview session without ``X-Xalvion-Guest-Client``: no scoped workspace, no borrowed global stats."""
+    usage_summary = get_usage_summary(user)
+    public_tier = get_public_plan_name(user)
+    pc = get_plan_config(public_tier)
+    file_metrics = dict(_METRICS_FALLBACK)
+    out: dict[str, Any] = {
+        "dashboard_scoped": False,
+        "has_workspace_activity": False,
+        "no_data_reason": "missing_preview_client",
+        "total_interactions": 0,
+        "avg_confidence": 0.0,
+        "avg_quality": 0.0,
+        "total_tickets": 0,
+        "auto_resolved": 0,
+        "escalated": 0,
+        "failed": 0,
+        "high_churn_risk": 0,
+        "pending_approvals": 0,
+        "approved_actions": 0,
+        "auto_resolution_rate": 0.0,
+        "escalation_rate": 0.0,
+        "refund_total": 0.0,
+        "credit_total": 0.0,
+        "actions": 0,
+        "by_queue": {},
+        "by_priority": {},
+        "by_risk": {},
+        "by_status": {},
+        "your_usage": usage_summary["usage"],
+        "your_tier": public_tier,
+        "your_limit": pc["monthly_limit"],
+        "remaining": usage_summary["remaining"],
+        "dashboard_access": pc["dashboard_access"],
+        "priority_routing": pc["priority_routing"],
+        "operator_mode": "balanced",
+        "outcome_quality": 0.0,
+        "reopened_rate": 0.0,
+        "crm_close_rate": 0.0,
+        "value_generated": {
+            "credit_volume_usd": 0.0,
+            "refund_volume_usd": 0.0,
+            "billing_actions_count": 0,
+        },
+    }
+    try:
+        out["operator_mode"] = get_operator_mode(db)
+    except Exception:
+        pass
+    _merge_get_metrics_into_dashboard_payload(out, file_metrics)
+    return out
+
+
+def _dashboard_summary_fallback(
+    user: User, db: Session, file_metrics: dict[str, Any], principal: str | None
+) -> dict[str, Any]:
     """Same JSON shape as dashboard_summary when DB aggregations fail."""
     usage_summary = get_usage_summary(user)
     public_tier = get_public_plan_name(user)
@@ -146,6 +212,10 @@ def _dashboard_summary_fallback(user: User, db: Session, file_metrics: dict[str,
     except Exception:
         pass
     out: dict[str, Any] = {
+        "dashboard_scoped": bool(principal),
+        "has_workspace_activity": bool(
+            int(file_metrics.get("total_interactions", 0) or 0) > 0 or bool(file_metrics.get("has_analytics_data"))
+        ),
         "total_interactions": int(file_metrics.get("total_interactions", 0) or 0),
         "avg_confidence": float(file_metrics.get("avg_confidence", 0) or 0),
         "avg_quality": float(file_metrics.get("avg_quality", 0) or 0),
@@ -160,7 +230,6 @@ def _dashboard_summary_fallback(user: User, db: Session, file_metrics: dict[str,
         "escalation_rate": 0.0,
         "refund_total": 0.0,
         "credit_total": 0.0,
-        "money_saved": 0.0,
         "actions": 0,
         "by_queue": {},
         "by_priority": {},
@@ -173,38 +242,47 @@ def _dashboard_summary_fallback(user: User, db: Session, file_metrics: dict[str,
         "dashboard_access": pc["dashboard_access"],
         "priority_routing": pc["priority_routing"],
         "operator_mode": operator_mode,
-        "total_users": 0,
-        "pro_users": 0,
-        "elite_users": 0,
         "outcome_quality": 0.0,
         "reopened_rate": 0.0,
         "crm_close_rate": 0.0,
         "value_generated": {
-            "money_saved": 0.0,
-            "time_saved_minutes": 0,
-            "actions_taken": 0,
+            "credit_volume_usd": 0.0,
+            "refund_volume_usd": 0.0,
+            "billing_actions_count": 0,
         },
     }
     _merge_get_metrics_into_dashboard_payload(out, file_metrics)
     return out
 
 
-def dashboard_summary_handler(user: User, db: Session) -> dict[str, Any]:
+def dashboard_summary_handler(
+    user: User,
+    db: Session,
+    *,
+    guest_client_id: str | None = None,
+) -> dict[str, Any]:
     """
-    Workspace GET /dashboard/summary implementation (mounted from routes.dashboard).
-    Merges ticket/action aggregates with analytics.get_metrics() (revenue_saved, rates, etc.).
+    Workspace GET /dashboard/summary — all ticket/action/analytics aggregates are scoped to the
+    signed-in account or the guest preview client id (never global DB totals).
     """
-    global _dashboard_cache_ts
-    file_metrics = {**_METRICS_FALLBACK, **(get_metrics() or {})}
+    if is_session_guest(user) and not normalize_guest_client_id(guest_client_id):
+        return _dashboard_guest_no_client_payload(user, db)
+
+    principal = _dashboard_workspace_principal(user, guest_client_id)
+    if not principal:
+        return _dashboard_guest_no_client_payload(user, db)
+
+    file_metrics = {**_METRICS_FALLBACK, **(get_metrics(principal) or {})}
     outcome_stats: dict[str, Any] = {}
     try:
-        outcome_stats = get_outcome_stats()
+        outcome_stats = get_outcome_stats(principal)
     except Exception:
         outcome_stats = {}
 
     _now = time.time()
-    if _dashboard_cache and (_now - _dashboard_cache_ts) < _DASHBOARD_TTL:
-        cached = dict(_dashboard_cache)
+    last_ts = _dashboard_snap_ts_by_principal.get(principal, 0.0)
+    if principal in _dashboard_snap_by_principal and (_now - last_ts) < _DASHBOARD_TTL:
+        cached = dict(_dashboard_snap_by_principal[principal])
         usage_summary = get_usage_summary(user)
         public_tier = get_public_plan_name(user)
         pc = get_plan_config(public_tier)
@@ -216,52 +294,78 @@ def dashboard_summary_handler(user: User, db: Session) -> dict[str, Any]:
                 "remaining": usage_summary["remaining"],
             }
         )
-        ms = float(cached.get("money_saved", 0) or 0)
         act = int(cached.get("actions", 0) or 0)
+        rt = float(cached.get("refund_total", 0) or 0)
+        ct = float(cached.get("credit_total", 0) or 0)
         cached["value_generated"] = {
-            "money_saved": round(ms, 2),
-            "time_saved_minutes": int(act * 6),
-            "actions_taken": act,
+            "credit_volume_usd": round(ct, 2),
+            "refund_volume_usd": round(rt, 2),
+            "billing_actions_count": act,
         }
         try:
             cached["operator_mode"] = get_operator_mode(db)
         except Exception:
             pass
         _merge_get_metrics_into_dashboard_payload(cached, file_metrics)
-        _attach_outcome_intelligence_optional(cached)
+        _attach_outcome_intelligence_optional(cached, principal)
         return cached
 
     try:
-        _tkt = db.query(
-            func.count(Ticket.id).label("total"),
-            func.count(case((Ticket.status == "resolved", 1), else_=None)).label("resolved"),
-            func.count(case((Ticket.status.in_(["waiting", "escalated"]), 1), else_=None)).label("escalated"),
-            func.count(case((Ticket.status == "failed", 1), else_=None)).label("failed"),
-            func.count(case((Ticket.churn_risk >= 60, 1), else_=None)).label("high_risk"),
-        ).one_or_none()
+        _tkt = (
+            db.query(
+                func.count(Ticket.id).label("total"),
+                func.count(
+                    case(
+                        (
+                            and_(Ticket.status == "resolved", Ticket.requires_approval == 0),
+                            1,
+                        ),
+                        else_=None,
+                    )
+                ).label("auto_resolved"),
+                func.count(case((Ticket.status.in_(["waiting", "escalated"]), 1), else_=None)).label("escalated"),
+                func.count(case((Ticket.status == "failed", 1), else_=None)).label("failed"),
+                func.count(case((Ticket.churn_risk >= 60, 1), else_=None)).label("high_risk"),
+            )
+            .filter(Ticket.username == principal)
+            .one_or_none()
+        )
 
         if _tkt is None:
             total_tickets = auto_resolved = escalated = failed_count = high_risk = 0
         else:
             total_tickets = int(_tkt.total or 0)
-            auto_resolved = int(_tkt.resolved or 0)
+            auto_resolved = int(_tkt.auto_resolved or 0)
             escalated = int(_tkt.escalated or 0)
             failed_count = int(_tkt.failed or 0)
             high_risk = int(_tkt.high_risk or 0)
 
-        pending_approvals = db.query(ActionLog).filter(
-            ActionLog.requires_approval == 1,
-            ActionLog.approved == 0,
-        ).count()
+        pending_approvals = (
+            db.query(ActionLog)
+            .filter(
+                ActionLog.username == principal,
+                ActionLog.requires_approval == 1,
+                ActionLog.approved == 0,
+            )
+            .count()
+        )
 
-        _act = db.query(
-            func.coalesce(func.sum(case((ActionLog.action == "refund", ActionLog.amount), else_=0)), 0).label("refund_total"),
-            func.coalesce(func.sum(case((ActionLog.action == "credit", ActionLog.amount), else_=0)), 0).label("credit_total"),
-            func.count(case((ActionLog.action.in_(["refund", "credit"]), 1), else_=None)).label("actions_done"),
-            func.count(case((ActionLog.approved == 1, 1), else_=None)).label("approved_count"),
-            func.avg(case((ActionLog.confidence > 0, ActionLog.confidence), else_=None)).label("avg_conf"),
-            func.avg(case((ActionLog.quality > 0, ActionLog.quality), else_=None)).label("avg_qual"),
-        ).one_or_none()
+        _act = (
+            db.query(
+                func.coalesce(func.sum(case((ActionLog.action == "refund", ActionLog.amount), else_=0)), 0).label(
+                    "refund_total"
+                ),
+                func.coalesce(func.sum(case((ActionLog.action == "credit", ActionLog.amount), else_=0)), 0).label(
+                    "credit_total"
+                ),
+                func.count(case((ActionLog.action.in_(["refund", "credit"]), 1), else_=None)).label("actions_done"),
+                func.count(case((ActionLog.approved == 1, 1), else_=None)).label("approved_count"),
+                func.avg(case((ActionLog.confidence > 0, ActionLog.confidence), else_=None)).label("avg_conf"),
+                func.avg(case((ActionLog.quality > 0, ActionLog.quality), else_=None)).label("avg_qual"),
+            )
+            .filter(ActionLog.username == principal)
+            .one_or_none()
+        )
 
         if _act is None:
             refund_total = credit_total = 0.0
@@ -275,13 +379,33 @@ def dashboard_summary_handler(user: User, db: Session) -> dict[str, Any]:
             db_avg_conf = float(_act.avg_conf or 0)
             db_avg_qual = float(_act.avg_qual or 0)
 
-        avg_confidence = file_metrics.get("avg_confidence") or round(db_avg_conf, 4)
-        avg_quality = file_metrics.get("avg_quality") or round(db_avg_qual, 4)
+        avg_confidence = round(db_avg_conf, 4) if db_avg_conf else float(file_metrics.get("avg_confidence", 0) or 0)
+        avg_quality = round(db_avg_qual, 4) if db_avg_qual else float(file_metrics.get("avg_quality", 0) or 0)
 
-        queue_rows = db.query(Ticket.queue, func.count(Ticket.id)).group_by(Ticket.queue).all()
-        prio_rows = db.query(Ticket.priority, func.count(Ticket.id)).group_by(Ticket.priority).all()
-        risk_rows = db.query(Ticket.risk_level, func.count(Ticket.id)).group_by(Ticket.risk_level).all()
-        status_rows = db.query(Ticket.status, func.count(Ticket.id)).group_by(Ticket.status).all()
+        queue_rows = (
+            db.query(Ticket.queue, func.count(Ticket.id))
+            .filter(Ticket.username == principal)
+            .group_by(Ticket.queue)
+            .all()
+        )
+        prio_rows = (
+            db.query(Ticket.priority, func.count(Ticket.id))
+            .filter(Ticket.username == principal)
+            .group_by(Ticket.priority)
+            .all()
+        )
+        risk_rows = (
+            db.query(Ticket.risk_level, func.count(Ticket.id))
+            .filter(Ticket.username == principal)
+            .group_by(Ticket.risk_level)
+            .all()
+        )
+        status_rows = (
+            db.query(Ticket.status, func.count(Ticket.id))
+            .filter(Ticket.username == principal)
+            .group_by(Ticket.status)
+            .all()
+        )
 
         by_queue = {_safe_queue(q or "new"): int(c) for q, c in queue_rows}
         by_priority = {_safe_priority(p or "medium"): int(c) for p, c in prio_rows}
@@ -291,7 +415,16 @@ def dashboard_summary_handler(user: User, db: Session) -> dict[str, Any]:
         usage_summary = get_usage_summary(user)
         public_tier = get_public_plan_name(user)
 
+        has_workspace_activity = (
+            total_tickets > 0
+            or actions_done > 0
+            or bool(file_metrics.get("has_analytics_data"))
+            or int(file_metrics.get("total_interactions", 0) or 0) > 0
+        )
+
         result: dict[str, Any] = {
+            "dashboard_scoped": True,
+            "has_workspace_activity": has_workspace_activity,
             "total_interactions": file_metrics.get("total_interactions", 0),
             "avg_confidence": avg_confidence,
             "avg_quality": avg_quality,
@@ -306,7 +439,6 @@ def dashboard_summary_handler(user: User, db: Session) -> dict[str, Any]:
             "escalation_rate": round(escalated / max(1, total_tickets) * 100, 2),
             "refund_total": round(refund_total, 2),
             "credit_total": round(credit_total, 2),
-            "money_saved": round(refund_total + credit_total, 2),
             "actions": actions_done,
             "by_queue": by_queue,
             "by_priority": by_priority,
@@ -319,37 +451,33 @@ def dashboard_summary_handler(user: User, db: Session) -> dict[str, Any]:
             "dashboard_access": get_plan_config(public_tier)["dashboard_access"],
             "priority_routing": get_plan_config(public_tier)["priority_routing"],
             "operator_mode": get_operator_mode(db),
-            "total_users": db.query(User).count(),
-            "pro_users": db.query(User).filter(User.tier == "pro").count(),
-            "elite_users": db.query(User).filter(User.tier == "elite").count(),
             "outcome_quality": float(outcome_stats.get("avg_outcome_quality", 0.0) or 0.0),
             "reopened_rate": float(outcome_stats.get("reopened_rate", 0.0) or 0.0),
             "crm_close_rate": float(outcome_stats.get("crm_close_rate", 0.0) or 0.0),
             "value_generated": {
-                "money_saved": round(refund_total + credit_total, 2),
-                "time_saved_minutes": int(actions_done * 6),
-                "actions_taken": actions_done,
+                "credit_volume_usd": round(credit_total, 2),
+                "refund_volume_usd": round(refund_total, 2),
+                "billing_actions_count": actions_done,
             },
         }
         _merge_get_metrics_into_dashboard_payload(result, file_metrics)
         with _dashboard_summary_cache_lock:
-            _dashboard_cache.clear()
-            _dashboard_cache.update(result)
-            _dashboard_cache_ts = _now
-        _attach_outcome_intelligence_optional(result)
+            _dashboard_snap_by_principal[principal] = dict(result)
+            _dashboard_snap_ts_by_principal[principal] = _now
+        _attach_outcome_intelligence_optional(result, principal)
         return result
     except Exception as exc:
         _log_throttled_db_issue("GET /dashboard/summary", exc)
-        fb = _dashboard_summary_fallback(user, db, file_metrics)
-        _attach_outcome_intelligence_optional(fb)
+        fb = _dashboard_summary_fallback(user, db, file_metrics, principal)
+        _attach_outcome_intelligence_optional(fb, principal)
         return fb
 
 
-def _attach_outcome_intelligence_optional(payload: dict[str, Any]) -> None:
+def _attach_outcome_intelligence_optional(payload: dict[str, Any], principal: str) -> None:
     try:
         from outcome_store import outcome_intelligence_snapshot
 
-        oi = outcome_intelligence_snapshot(limit=25)
+        oi = outcome_intelligence_snapshot(limit=25, user_id=principal)
         if oi:
             payload["outcome_intelligence"] = oi
     except Exception:
@@ -363,7 +491,7 @@ except Exception as _get_metrics_imp_err:
         exc_info=True,
     )
 
-    def get_metrics() -> dict[str, Any]:
+    def get_metrics(actor_principal: str | None = None) -> dict[str, Any]:
         return dict(_METRICS_FALLBACK)
 
 try:
@@ -390,7 +518,7 @@ except Exception as _outcome_store_imp_err:
     ) -> dict[str, Any] | None:
         raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
 
-    def get_outcome_stats() -> dict[str, Any]:
+    def get_outcome_stats(user_id: str | None = None) -> dict[str, Any]:
         return {
             "total": 0,
             "avg_outcome_quality": 0.0,
@@ -3508,15 +3636,40 @@ def public_metrics(
     drive plan conversion: tickets handled, money moved, real outcomes,
     and current plan usage.
     """
-    total_tickets = db.query(Ticket).count()
-    auto_resolved = db.query(Ticket).filter(Ticket.status == "resolved").count()
-    pending       = db.query(ActionLog).filter(
-        ActionLog.requires_approval == 1, ActionLog.approved == 0
-    ).count()
-    refund_total  = float(db.query(func.sum(ActionLog.amount)).filter(ActionLog.action == "refund").scalar() or 0)
-    credit_total  = float(db.query(func.sum(ActionLog.amount)).filter(ActionLog.action == "credit").scalar() or 0)
+    owner = str(getattr(user, "username", "") or "").strip()
+    total_tickets = db.query(Ticket).filter(Ticket.username == owner).count()
+    auto_resolved = (
+        db.query(Ticket)
+        .filter(
+            Ticket.username == owner,
+            Ticket.status == "resolved",
+            Ticket.requires_approval == 0,
+        )
+        .count()
+    )
+    pending = (
+        db.query(ActionLog)
+        .filter(
+            ActionLog.username == owner,
+            ActionLog.requires_approval == 1,
+            ActionLog.approved == 0,
+        )
+        .count()
+    )
+    refund_total = float(
+        db.query(func.sum(ActionLog.amount))
+        .filter(ActionLog.username == owner, ActionLog.action == "refund")
+        .scalar()
+        or 0
+    )
+    credit_total = float(
+        db.query(func.sum(ActionLog.amount))
+        .filter(ActionLog.username == owner, ActionLog.action == "credit")
+        .scalar()
+        or 0
+    )
 
-    outcome_stats = get_outcome_stats()
+    outcome_stats = get_outcome_stats(owner)
     usage_summary = get_usage_summary(user)
     public_tier   = get_public_plan_name(user)
     plan_cfg      = get_plan_config(public_tier)

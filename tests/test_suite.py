@@ -771,19 +771,24 @@ class TestAnalyticsCompactMetrics:
             "approval_rate",
             "auto_safe_rate",
             "review_rate",
-            "revenue_saved",
             "refund_cost",
+            "credit_volume_usd",
             "good_excellent_outcome_rate",
+            "has_analytics_data",
         ):
             assert key in _DEFAULT_METRICS
         m = get_metrics()
+        assert m.get("has_analytics_data") is False
+        m_scoped = get_metrics("__fixture_principal_no_events__")
+        assert m_scoped.get("has_analytics_data") is False
         for key in (
             "approval_rate",
             "auto_safe_rate",
             "review_rate",
-            "revenue_saved",
             "refund_cost",
+            "credit_volume_usd",
             "good_excellent_outcome_rate",
+            "has_analytics_data",
         ):
-            assert key in m
-            assert isinstance(m[key], (int, float))
+            assert key in m_scoped
+            assert isinstance(m_scoped[key], (int, float, bool))
