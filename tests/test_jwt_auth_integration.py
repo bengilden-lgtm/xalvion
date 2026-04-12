@@ -40,7 +40,6 @@ def test_login_then_me_succeeds(client: TestClient):
     r2 = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert r2.status_code == 200, r2.text
     me = r2.json()
-    # ``routes.auth`` registers ``GET /me`` before ``app.py``'s fallback; response is the router shape.
     assert me.get("username") == user
     assert me.get("tier") in {"free", "pro", "elite", "dev"}
 

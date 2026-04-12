@@ -5,11 +5,11 @@ import logging
 from urllib.parse import quote_plus
 
 import stripe
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 import app as app_mod
-from services import stripe_service
+from services import guest_preview_service, stripe_service
 
 router = APIRouter(tags=["billing"])
 
@@ -195,8 +195,14 @@ def actions_charge(
 
 
 @router.get("/billing/plans")
-def billing_plans(user: app_mod.User = Depends(app_mod.get_current_user)):
-    return app_mod.build_upgrade_payload(app_mod.get_public_plan_name(user))
+def billing_plans(
+    user: app_mod.User = Depends(app_mod.get_current_user),
+    guest_client_id: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
+):
+    payload = app_mod.build_upgrade_payload(app_mod.get_public_plan_name(user))
+    if app_mod.is_session_guest(user):
+        payload["guest_preview"] = guest_preview_service.guest_preview_snapshot(guest_client_id)
+    return payload
 
 
 @router.post("/billing/upgrade")

@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import app as app_mod
 from app_utils import _me_capacity_message, _tier_upgrade_unlocks
+from services import guest_preview_service
 
 router = APIRouter(tags=["auth"])
 
@@ -83,23 +84,47 @@ def _build_me_value_signals(
 def me(
     user: app_mod.User = Depends(app_mod.get_current_user),
     db: Session = Depends(app_mod.get_db),
+    guest_client_id: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
 ):
     usage_summary = app_mod.get_usage_summary(user)
+    if app_mod.is_session_guest(user):
+        snap = guest_preview_service.guest_preview_snapshot(guest_client_id)
+        lim = int((snap or {}).get("limit") or app_mod.GUEST_PREVIEW_OPERATOR_LIMIT)
+        used = int((snap or {}).get("usage") or 0) if snap else 0
+        rem = int((snap or {}).get("remaining") or max(0, lim - used)) if snap else int(app_mod.GUEST_PREVIEW_OPERATOR_LIMIT)
+        usage_pct = float(used) / float(max(1, lim)) if lim < 10**9 else 0.0
+        at_limit = lim < 10**9 and used >= lim
+        approaching_limit = lim < 10**9 and usage_pct >= 0.75 and not at_limit
+        usage_summary = {
+            **usage_summary,
+            "tier": "free",
+            "label": "Free",
+            "usage": used,
+            "limit": lim,
+            "remaining": rem,
+            "usage_pct": usage_pct,
+            "at_limit": at_limit,
+            "approaching_limit": approaching_limit,
+            "dashboard_access": "basic",
+            "priority_routing": False,
+        }
     public_username = "" if user.username in {"guest", "dev_user"} else user.username
     public_tier = app_mod.get_public_plan_name(user)
     public_plan = app_mod.get_plan_config(public_tier)
-    public_limit = int(public_plan["monthly_limit"])
+    public_limit = int(usage_summary["limit"])
     usage = int(usage_summary["usage"])
-    remaining = max(0, public_limit - usage)
+    remaining = int(usage_summary["remaining"])
     if public_limit >= 10**9:
         usage_pct = 0.0
         approaching_limit = False
         at_limit = False
     else:
-        usage_pct = float(usage) / float(max(1, public_limit))
-        approaching_limit = usage_pct >= 0.75
-        at_limit = usage >= public_limit
-    return {
+        usage_pct = float(usage_summary.get("usage_pct", float(usage) / float(max(1, public_limit))))
+        at_limit = bool(usage_summary.get("at_limit", usage >= public_limit))
+        approaching_limit = bool(
+            usage_summary.get("approaching_limit", usage_pct >= 0.75 and not at_limit)
+        )
+    out: dict[str, Any] = {
         "username": public_username,
         "tier": public_tier,
         "usage": usage_summary["usage"],
@@ -120,6 +145,9 @@ def me(
             db=db,
         ),
     }
+    if app_mod.is_session_guest(user):
+        out["guest_preview"] = guest_preview_service.guest_preview_snapshot(guest_client_id)
+    return out
 
 
 @router.post("/signup")

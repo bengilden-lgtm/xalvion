@@ -30,14 +30,13 @@ import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Any, AsyncIterator, Generator
+from typing import Any, Generator
 from urllib.parse import quote_plus
 
 import stripe
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -1112,7 +1111,7 @@ def decode_token(token: str) -> str | None:
 #
 # Routes currently using get_current_user() that allow guest access:
 #   POST /support, POST /analyze, GET /dashboard/summary,
-#   GET /tickets, GET /billing/plans
+#   GET /tickets, GET /billing/plans (see ``routes.*`` routers)
 #
 # Review: confirm guest access is intentional for each of these.
 # To lock a route down, change its dependency to
@@ -2748,21 +2747,6 @@ def build_status_sequence(result: dict[str, Any]) -> list[dict[str, str]]:
     return seq
 
 
-def stream_support_events(result: dict[str, Any]) -> AsyncIterator[str]:
-    async def generator() -> AsyncIterator[str]:
-        for item in build_status_sequence(result):
-            yield sse_event("status", item)
-            await asyncio.sleep(STATUS_STEP_DELAY)
-
-        for part in chunk_text(result.get("reply", ""), STREAM_CHUNK_SIZE):
-            yield sse_event("chunk", {"text": part})
-            await asyncio.sleep(STREAM_CHUNK_DELAY)
-
-        yield sse_event("result", result)
-        yield sse_event("done", {"ok": True})
-
-    return generator()
-
 # =============================================================================
 # 13. ROUTES — STATIC
 # =============================================================================
@@ -2986,130 +2970,6 @@ except Exception as exc:
     logger.warning("router import failed for crm", exc_info=True)
 
 
-# =============================================================================
-# FALLBACK ROUTES (workspace-critical)
-# =============================================================================
-# The live workspace frontend depends on these endpoints being present. In some
-# deployments, optional router modules may not ship; these fallback endpoints
-# keep auth, billing, integrations, and preview gating reliable.
-
-
-def _guest_preview_snapshot(client_id: str | None) -> dict[str, Any] | None:
-    gid = normalize_guest_client_id(client_id)
-    if not gid:
-        return None
-    with db_session() as db:
-        row = db.query(GuestPreviewUsage).filter(GuestPreviewUsage.client_id == gid).first()
-        used = int(row.usage_count) if row else 0
-    lim = int(GUEST_PREVIEW_OPERATOR_LIMIT)
-    rem = max(0, lim - used)
-    return {
-        "usage": used,
-        "limit": lim,
-        "plan_limit": lim,
-        "remaining": rem,
-        "preview_exhausted": rem <= 0,
-    }
-
-
-@app.post("/signup")
-def signup(req: AuthRequest, db: Session = Depends(get_db)):
-    username = validate_username(req.username)
-    password = validate_password(req.password)
-
-    existing = db.query(User).filter(User.username == username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Username already exists")
-
-    user = User(username=username, password=hash_password(password), usage=0, tier="free")
-    db.add(user)
-    db.commit()
-    token = create_token(username)
-    return {
-        "token": token,
-        "username": username,
-        "tier": get_public_plan_name(user),
-        "usage": 0,
-        "limit": get_plan_config("free")["monthly_limit"],
-        "remaining": get_plan_config("free")["monthly_limit"],
-    }
-
-
-@app.post("/login")
-def login(req: AuthRequest, db: Session = Depends(get_db)):
-    username = validate_username(req.username)
-    password = (req.password or "").strip()
-
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not verify_password(password, str(user.password or "")):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    token = create_token(username)
-    usage = get_usage_summary(user)
-    return {
-        "token": token,
-        "username": username,
-        "tier": get_public_plan_name(user),
-        "usage": usage["usage"],
-        "limit": usage["limit"],
-        "remaining": usage["remaining"],
-        "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
-        "stripe_account_id": str(getattr(user, "stripe_account_id", "") or ""),
-        "stripe_livemode": bool(getattr(user, "stripe_livemode", 0)),
-    }
-
-
-@app.get("/me")
-def me(
-    user: User = Depends(get_current_user),
-    guest_client_id: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
-    db: Session = Depends(get_db),
-):
-    if getattr(user, "username", "") in {"", "guest"}:
-        snap = _guest_preview_snapshot(guest_client_id)
-        usage = {
-            "tier": "free",
-            "label": "Free",
-            "usage": int(snap["usage"]) if snap else 0,
-            "limit": int(snap["limit"]) if snap else int(GUEST_PREVIEW_OPERATOR_LIMIT),
-            "remaining": int(snap["remaining"]) if snap else int(GUEST_PREVIEW_OPERATOR_LIMIT),
-            "dashboard_access": "basic",
-            "priority_routing": False,
-        }
-        return {
-            "ok": True,
-            "authenticated": False,
-            "username": "",
-            "tier": "free",
-            "usage": usage["usage"],
-            "limit": usage["limit"],
-            "remaining": usage["remaining"],
-            "guest_preview": snap,
-            "stripe_connected": False,
-            "stripe_account_id": "",
-            "stripe_livemode": False,
-        }
-
-    db_user = db.query(User).filter(User.username == user.username).first()
-    if not db_user:
-        raise HTTPException(status_code=401, detail="User not found")
-    usage = get_usage_summary(db_user)
-    return {
-        "ok": True,
-        "authenticated": True,
-        "username": db_user.username,
-        "tier": get_public_plan_name(db_user),
-        "usage": usage["usage"],
-        "limit": usage["limit"],
-        "remaining": usage["remaining"],
-        "stripe_connected": bool(getattr(db_user, "stripe_connected", 0)),
-        "stripe_account_id": str(getattr(db_user, "stripe_account_id", "") or ""),
-        "stripe_livemode": bool(getattr(db_user, "stripe_livemode", 0)),
-    }
-
-
 def _inbox_priority_score(item: dict[str, Any]) -> float:
     risk = float(max(int(item.get("churn_risk", 0) or 0), int(item.get("refund_likelihood", 0) or 0), int(item.get("abuse_likelihood", 0) or 0)))
     urgency = float(int(item.get("urgency", 0) or 0))
@@ -3245,141 +3105,6 @@ def inbox_pull(
             },
         },
     }
-
-
-@app.get("/billing/plans")
-def billing_plans(
-    user: User = Depends(get_current_user),
-    guest_client_id: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
-):
-    tier = get_public_plan_name(user)
-    payload = build_upgrade_payload(tier)
-    if getattr(user, "username", "") in {"", "guest"}:
-        payload["guest_preview"] = _guest_preview_snapshot(guest_client_id)
-    return payload
-
-
-@app.post("/billing/upgrade")
-def billing_upgrade(req: UpgradeRequest, user: User = Depends(require_authenticated_user), db: Session = Depends(get_db)):
-    desired = (req.tier or "").strip().lower()
-    current = get_public_plan_name(user)
-    from services import stripe_service
-
-    stripe_service.validate_upgrade_request(desired, current)
-    db_user = db.query(User).filter(User.username == user.username).first()
-    if not db_user:
-        raise HTTPException(status_code=401, detail="User not found")
-    session = stripe_service.create_checkout_session_for_user(db_user, desired)
-    return {"ok": True, "checkout_url": getattr(session, "url", ""), "session_id": getattr(session, "id", "")}
-
-
-@app.get("/integrations/status")
-def integrations_status(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if getattr(user, "username", "") in {"", "guest"}:
-        return {"ok": True, "stripe_connected": False, "stripe_account_id": "", "stripe_livemode": False}
-    row = db.query(User).filter(User.username == user.username).first()
-    if not row:
-        raise HTTPException(status_code=401, detail="User not found")
-    return {
-        "ok": True,
-        "stripe_connected": bool(getattr(row, "stripe_connected", 0)),
-        "stripe_account_id": str(getattr(row, "stripe_account_id", "") or ""),
-        "stripe_livemode": bool(getattr(row, "stripe_livemode", 0)),
-        "stripe_scope": str(getattr(row, "stripe_scope", "") or ""),
-    }
-
-
-@app.get("/integrations/stripe/connect")
-def stripe_connect(user: User = Depends(require_authenticated_user)):
-    if not STRIPE_CONNECT_CLIENT_ID:
-        raise HTTPException(status_code=500, detail="Stripe Connect client id not configured")
-    from services import stripe_service
-
-    state_token = create_stripe_state(user.username)
-    url = stripe_service.build_stripe_connect_authorize_url(
-        client_id=STRIPE_CONNECT_CLIENT_ID,
-        redirect_uri=STRIPE_CONNECT_REDIRECT_URI,
-        state=state_token,
-        scope="read_write",
-    )
-    return {"ok": True, "url": url}
-
-
-@app.get("/integrations/stripe/callback")
-def stripe_connect_callback(code: str | None = None, state: str | None = None, db: Session = Depends(get_db)):
-    username = decode_stripe_state(state or "")
-    if not username:
-        return RedirectResponse(url=f"{FRONTEND_URL}?surface=integrations&stripe=state_error")
-    if not code:
-        return RedirectResponse(url=f"{FRONTEND_URL}?surface=integrations&stripe=missing_code")
-    if not STRIPE_KEY:
-        return RedirectResponse(url=f"{FRONTEND_URL}?surface=integrations&stripe=not_configured")
-
-    try:
-        # Bind the OAuth token exchange to the configured redirect URI.
-        # This should be a no-op when configured correctly, but helps prevent
-        # misconfiguration and some classes of callback confusion.
-        resp = stripe.OAuth.token(
-            grant_type="authorization_code",
-            code=code,
-            redirect_uri=STRIPE_CONNECT_REDIRECT_URI,
-        )
-        acct_id = str(resp.get("stripe_user_id") or "")
-        scope = str(resp.get("scope") or "")
-        livemode = bool(resp.get("livemode", False))
-        if not acct_id:
-            raise RuntimeError("No stripe_user_id returned from Stripe")
-    except Exception:
-        # Never log the OAuth code or state token.
-        logger.warning("stripe_oauth_callback_failed user=%s", username)
-        return RedirectResponse(url=f"{FRONTEND_URL}?surface=integrations&stripe=oauth_error")
-
-    user = db.query(User).filter(User.username == username).first()
-    if user:
-        user.stripe_connected = 1
-        user.stripe_account_id = acct_id
-        user.stripe_scope = scope
-        user.stripe_livemode = 1 if livemode else 0
-        db.commit()
-
-    return RedirectResponse(url=f"{FRONTEND_URL}?surface=integrations&stripe=connected")
-
-
-@app.post("/integrations/stripe/disconnect")
-def stripe_disconnect(user: User = Depends(require_authenticated_user), db: Session = Depends(get_db)):
-    row = db.query(User).filter(User.username == user.username).first()
-    if not row:
-        raise HTTPException(status_code=401, detail="User not found")
-    row.stripe_connected = 0
-    row.stripe_account_id = None
-    row.stripe_scope = None
-    row.stripe_livemode = 0
-    db.commit()
-    return {"ok": True}
-
-
-@app.post("/support")
-def support(
-    req: SupportRequest,
-    user: User = Depends(get_current_user),
-    guest_client_id: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
-):
-    username = getattr(user, "username", "") or "guest"
-    return JSONResponse(
-        content=run_support_for_username(req, username=username, guest_client_id=guest_client_id),
-        media_type="application/json; charset=utf-8",
-    )
-
-
-@app.post("/support/stream")
-async def support_stream(
-    req: SupportRequest,
-    user: User = Depends(get_current_user),
-    guest_client_id: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
-):
-    username = getattr(user, "username", "") or "guest"
-    result = await run_in_threadpool(run_support_for_username, req, username, guest_client_id)
-    return StreamingResponse(stream_support_events(result), media_type="text/event-stream")
 
 
 def _build_extension_meta(
