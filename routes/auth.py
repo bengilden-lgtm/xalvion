@@ -17,7 +17,7 @@ logger = logging.getLogger("xalvion.api")
 
 def _user_billing_motion_rollups(db: Session, username: str) -> tuple[float, int]:
     """Per-user refund/credit totals for /me value_signals (additive fields only)."""
-    if not username or username in {"guest", "dev_user", "extension_guest", ""}:
+    if not username or username in {"guest", "dev_user", ""}:
         return 0.0, 0
     try:
         refund_sum = db.query(func.sum(app_mod.ActionLog.amount)).filter(
@@ -181,6 +181,16 @@ def login(req: app_mod.AuthRequest, db: Session = Depends(app_mod.get_db)):
 
     try:
         token = app_mod.create_token(user.username)
+        decoded_sub = app_mod.decode_token(token)
+        if decoded_sub != user.username:
+            logger.error(
+                "login_token_roundtrip_failed username=%s decoded=%r",
+                username,
+                decoded_sub,
+            )
+            raise HTTPException(status_code=500, detail="Could not issue session. Try again.")
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("login_jwt_failed username=%s", username)
         raise HTTPException(status_code=500, detail="Could not issue session. Try again.")

@@ -61,6 +61,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from agent import run_agent, local_fallback_reply, build_audit_summary_payload
+from tools import get_order
 from actions import (
     build_ticket as build_support_ticket,
     execution_requires_operator_gate,
@@ -897,27 +898,57 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_token(username: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=TOKEN_EXPIRE_MINUTES)
-    # Use numeric exp/iat for portability across JWT libraries/languages.
-    # JWT is opaque to clients; adding iat/jti is non-breaking and aids incident response.
-    now = int(datetime.utcnow().timestamp())
+    """Issue a session JWT with POSIX exp/iat (UTC epoch seconds).
+
+    Uses ``int(time.time())`` instead of ``datetime.utcnow().timestamp()`` so claims
+    stay correct when the host timezone is not UTC (naive UTC datetimes are
+    misinterpreted as local time by ``datetime.timestamp()``).
+    """
+    subject = _normalize_username(username)
+    if not subject:
+        raise ValueError("username required for token")
+    now_ts = int(time.time())
+    ttl_s = max(1, int(TOKEN_EXPIRE_MINUTES) * 60)
+    exp_ts = now_ts + ttl_s
     payload = {
-        "sub": username,
-        "exp": int(expire.timestamp()),
-        "iat": now,
+        "sub": subject,
+        "exp": exp_ts,
+        "iat": now_ts,
         "jti": uuid.uuid4().hex,
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    verified = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    if str(verified.get("sub", "")).strip() != subject:
+        raise RuntimeError("session token sub mismatch after issue")
+    if int(verified.get("exp", 0)) <= now_ts:
+        raise RuntimeError("session token exp must be in the future")
+    return token
+
+
+_STRIPE_STATE_TTL_S = max(1, 15 * 60)
 
 
 def create_stripe_state(username: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=15)
+    subject = _normalize_username(username)
+    if not subject:
+        raise ValueError("username required for stripe state")
+    now_ts = int(time.time())
+    exp_ts = now_ts + _STRIPE_STATE_TTL_S
     payload = {
-        "sub": username,
-        "exp": int(expire.timestamp()),
+        "sub": subject,
+        "exp": exp_ts,
+        "iat": now_ts,
         "purpose": "stripe_connect",
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    verified = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    if str(verified.get("sub", "")).strip() != subject:
+        raise RuntimeError("stripe state token sub mismatch after issue")
+    if verified.get("purpose") != "stripe_connect":
+        raise RuntimeError("stripe state token purpose missing after issue")
+    if int(verified.get("exp", 0)) <= now_ts:
+        raise RuntimeError("stripe state token exp must be in the future")
+    return token
 
 
 def decode_stripe_state(token: str) -> str | None:
@@ -1007,8 +1038,42 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-def check_rate_limit(user_id: str) -> bool:
-    key = user_id if user_id and user_id != "guest" else "__guest__"
+def is_session_guest(user: User | None) -> bool:
+    """True when the request is JWT-less preview workspace (placeholder user)."""
+    return str(getattr(user, "username", "") or "").strip().lower() == "guest"
+
+
+def resolve_storage_principal(user: User, guest_client_id: str | None) -> str:
+    """Stable tenant key for DB rows, memory, outcomes, and rate limits.
+
+    Authenticated accounts use ``username``. Anonymous preview/extension clients
+    use the normalized ``X-Xalvion-Guest-Client`` value (never the shared literal
+    ``guest``).
+    """
+    if not is_session_guest(user):
+        return str(getattr(user, "username", "") or "unknown")
+    gid = normalize_guest_client_id(guest_client_id)
+    if not gid:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "preview_client_required",
+                "message": "Reload the workspace and try again (preview client id missing).",
+            },
+        )
+    return gid
+
+
+def resolve_rate_limit_key(user: User, guest_client_id: str | None) -> str:
+    """Per-tenant sliding window key (never a shared bucket for all anonymous users)."""
+    if is_session_guest(user):
+        gid = normalize_guest_client_id(guest_client_id)
+        return f"guest:{gid}" if gid else "guest:__missing_client__"
+    return str(getattr(user, "username", "") or "unknown")
+
+
+def check_rate_limit(actor_key: str) -> bool:
+    key = str(actor_key or "").strip()[:96] or "__unknown__"
     now = time.time()
     cutoff = now - 60.0
 
@@ -1108,11 +1173,11 @@ def build_upgrade_payload(current_tier: str) -> dict[str, Any]:
     }
 
 
-def enforce_plan_limits(user: User) -> None:
+def enforce_plan_limits(user: User, guest_client_id: str | None = None) -> None:
     plan_name = get_plan_name(user)
     plan = get_plan_config(plan_name)
 
-    if not check_rate_limit(user.username):
+    if not check_rate_limit(resolve_rate_limit_key(user, guest_client_id)):
         raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
     # NOTE: We never hard-block after plan limits. Overages are marked as billable usage
     # (front-end surfaces the notice), while rate limits still protect the service.
@@ -1272,11 +1337,18 @@ except Exception as exc:
     STARTUP_ISSUES.append(f"ticket_service_import_failed:{type(exc).__name__}:{str(exc)[:180]}")
     logger.warning("ticket_service import failed; using local compatibility helpers", exc_info=True)
 
-    def create_ticket_record(db: Session, user: User, req: SupportRequest) -> Ticket:
+    def create_ticket_record(
+        db: Session,
+        user: User,
+        req: SupportRequest,
+        *,
+        storage_username: str | None = None,
+    ) -> Ticket:
         now = _now_iso()
+        owner = (storage_username or "").strip() or str(getattr(user, "username", "unknown") or "unknown")
         bootstrap_ticket = build_support_ticket(
             req.message,
-            user_id=str(getattr(user, "username", "unknown") or "unknown"),
+            user_id=owner,
             meta={
                 "sentiment": req.sentiment if req.sentiment is not None else 5,
                 "ltv": req.ltv if req.ltv is not None else 0,
@@ -1291,7 +1363,7 @@ except Exception as exc:
         ticket = Ticket(
             created_at=now,
             updated_at=now,
-            username=str(getattr(user, "username", "unknown") or "unknown"),
+            username=owner,
             channel=_safe_channel(req.channel),
             source=_safe_source(req.source),
             subject=(req.message or "")[:300],
@@ -1672,7 +1744,7 @@ def serialize_support_result(
         "triage": result.get("triage", {}),
         "history": result.get("history", {}),
         "runtime_ticket": result.get("runtime_ticket", {}),
-        "username": str(getattr(user, "username", "guest") or "guest"),
+        "username": "" if is_session_guest(user) else str(getattr(user, "username", "") or ""),
         "tier": usage_summary["tier"],
         "plan_limit": plan_limit_val,
         "usage": usage_val,
@@ -1765,11 +1837,17 @@ def apply_real_actions(result: dict[str, Any], req: SupportRequest, user: User) 
 # =============================================================================
 
 
-def build_runtime_ticket(req: SupportRequest, user: User, db: Session) -> dict[str, Any]:
+def build_runtime_ticket(
+    req: SupportRequest,
+    user: User,
+    db: Session,
+    *,
+    principal_id: str,
+) -> dict[str, Any]:
     meta = build_agent_meta(req, user, db)
-    user_memory = get_user_memory(str(getattr(user, "username", "guest") or "guest"))
+    user_memory = get_user_memory(principal_id)
     meta["customer_history"] = user_memory
-    raw_ticket = build_support_ticket(req.message, user_id=str(getattr(user, "username", "guest") or "guest"), meta=meta)
+    raw_ticket = build_support_ticket(req.message, user_id=principal_id, meta=meta)
     ticket = normalize_ticket(raw_ticket)
     ticket["customer_history"] = user_memory
     ticket["triage"] = ticket.get("triage") or triage_ticket(ticket, user_memory)
@@ -2125,13 +2203,14 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
 
 
 def run_support(req: SupportRequest, user: User, guest_client_id: str | None = None) -> dict[str, Any]:
-    enforce_plan_limits(user)
-    if str(getattr(user, "username", "") or "").strip().lower() == "guest":
+    if is_session_guest(user):
         enforce_guest_preview_allow(guest_client_id)
+    enforce_plan_limits(user, guest_client_id)
+    principal_id = resolve_storage_principal(user, guest_client_id)
 
     with db_session() as db:
         try:
-            created = create_ticket_record(db, user, req)
+            created = create_ticket_record(db, user, req, storage_username=principal_id)
             ticket_id = int(created.id)
         except SQLAlchemyError as exc:
             try:
@@ -2151,7 +2230,7 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
     )
 
     with db_session() as db:
-        runtime_ticket = build_runtime_ticket(req, user, db)
+        runtime_ticket = build_runtime_ticket(req, user, db, principal_id=principal_id)
 
     shadow_decision = safe_execute(system_decision, runtime_ticket)
     if not isinstance(shadow_decision, dict) or shadow_decision.get("__xalvion_exec_error__"):
@@ -2202,14 +2281,12 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
         risk_from_ctx = str(
             shadow_decision.get("risk_level", triage_rt.get("risk_level", "medium")) or "medium"
         )
-        order_info = {
-            "status": str(runtime_ticket.get("order_status", "unknown") or "unknown"),
-            "tracking": str(runtime_ticket.get("tracking", "") or ""),
-            "eta": str(runtime_ticket.get("eta", "") or ""),
-        }
+        _order_customer = str(runtime_ticket.get("customer") or principal_id or "").strip() or "unknown"
+        order_info = get_order(_order_customer, req.message)
 
         if is_damaged:
             ticket_local = dict(runtime_ticket)
+            ticket_local["order_data_connected"] = bool(order_info.get("connected"))
             ticket_local["issue_type"] = "damaged_order"
             dam_act = str(shadow_decision.get("action", "review") or "review")
             if dam_act == "none":
@@ -2234,6 +2311,7 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
             result = local_result
         elif is_billing:
             ticket_local = dict(runtime_ticket)
+            ticket_local["order_data_connected"] = bool(order_info.get("connected"))
             if issue_type_rt in _billing_fast_types:
                 it = issue_type_rt
             elif any(k in msg for k in billing_msg_keys):
@@ -2264,6 +2342,7 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
             result = local_result
         elif is_shipping:
             ticket_local = dict(runtime_ticket)
+            ticket_local["order_data_connected"] = bool(order_info.get("connected"))
             ticket_local["issue_type"] = "shipping_issue"
             planned_action = {
                 "action": str(shadow_decision.get("action", "none") or "none"),
@@ -2292,7 +2371,7 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
             )
             result = run_agent(
                 req.message,
-                user_id=str(getattr(user, "username", "guest") or "guest"),
+                user_id=principal_id,
                 meta=build_agent_meta(req, user, operator_mode=op_mode),
             )
 
@@ -2350,7 +2429,7 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
             update_ticket_from_result(db, t, result)
             action_entry = log_action(
                 db,
-                username=str(getattr(user, "username", "unknown")),
+                username=principal_id,
                 ticket_id=t.id,
                 action=str(result.get("action", "none")),
                 amount=float(result.get("amount", 0) or 0),
@@ -2937,16 +3016,18 @@ def inbox_pull(
     lim = min(12, max(3, lim))
 
     # Guest workspace should never read cross-user DB rows.
-    is_guest = getattr(user, "username", "") in {"", "guest"}
+    is_guest = is_session_guest(user)
     username = "" if is_guest else str(getattr(user, "username", "") or "")
+    guest_key = normalize_guest_client_id(guest_client_id) if is_guest else None
 
     items: list[dict[str, Any]] = []
-    if username:
+    if username or guest_key:
         try:
-            # Pull newest “incoming” work for this operator.
+            # Pull newest “incoming” work for this operator (or preview client id bucket).
+            owner = username or guest_key
             rows = (
                 db.query(Ticket)
-                .filter(Ticket.username == username)
+                .filter(Ticket.username == owner)
                 .filter(Ticket.status.in_(["new", "waiting"]))
                 .filter(Ticket.queue.in_(["new", "incoming"]))
                 .order_by(Ticket.id.desc())
@@ -2967,7 +3048,7 @@ def inbox_pull(
     try:
         from services.ticket_service import generate_simulated_inbox_tickets as _sim
 
-        seed = username or normalize_guest_client_id(guest_client_id) or "guest"
+        seed = username or guest_key or "inbox_anon"
         needed = max(0, lim - len(items))
         if needed > 0:
             items.extend(_sim(count=needed, seed=seed))
@@ -3239,25 +3320,31 @@ def _persist_sovereign_result(
 def analyze_extension_ticket(
     req: ExtensionAnalyzeRequest,
     authorization: str | None = Header(None),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
     db: Session = Depends(get_db),
 ):
     username = get_current_username_from_header(authorization)
     user = db.query(User).filter(User.username == username).first() if username != "guest" else None
 
     if user:
-        enforce_plan_limits(user)
+        enforce_plan_limits(user, None)
         plan_tier = get_plan_name(user)
         priority_routing = bool(get_plan_config(plan_tier)["priority_routing"])
         operator_mode = get_operator_mode(db)
     else:
-        # Anonymous extension traffic: same sliding-window pattern as workspace guest (12/min per key).
-        username = "extension_guest"
-        if not check_rate_limit("__ext_guest__"):
+        gid = normalize_guest_client_id(x_guest_client)
+        if not gid:
             raise HTTPException(
-                status_code=429,
-                detail="Too many requests. Please slow down.",
-                headers={"Retry-After": "60"},
+                status_code=400,
+                detail={
+                    "code": "preview_client_required",
+                    "message": "Extension preview requires X-Xalvion-Guest-Client (stable client id).",
+                },
             )
+        enforce_guest_preview_allow(gid)
+        anon_user = User(username="guest", password="", usage=0, tier="free")
+        enforce_plan_limits(anon_user, gid)
+        username = gid
         plan_tier = "free"
         priority_routing = False
         operator_mode = get_operator_mode(db)
@@ -3317,7 +3404,7 @@ def analyze_extension_ticket(
         # We still pass best-effort issue_type + triage + plan tier + user memory.
         from memory import get_user_memory
 
-        mem = get_user_memory(str(username or "guest"))
+        mem = get_user_memory(str(username))
         rt = {
             "issue_type": str(result.get("issue_type") or "general_support"),
             "triage": dict(result.get("triage_metadata") or result.get("triage") or {}),

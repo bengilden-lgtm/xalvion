@@ -46,6 +46,14 @@ def integrations_stripe_connect(user: app_mod.User = Depends(app_mod.require_aut
         raise HTTPException(status_code=500, detail="Stripe Connect is not configured.")
 
     state = app_mod.create_stripe_state(user.username)
+    decoded_state_user = app_mod.decode_stripe_state(state)
+    if decoded_state_user != user.username:
+        logger.error(
+            "stripe_state_roundtrip_failed username=%s decoded=%r",
+            user.username,
+            decoded_state_user,
+        )
+        raise HTTPException(status_code=500, detail="Could not start Stripe Connect. Try again.")
     url = stripe_service.build_stripe_connect_authorize_url(
         client_id=app_mod.STRIPE_CONNECT_CLIENT_ID,
         redirect_uri=app_mod.STRIPE_CONNECT_REDIRECT_URI,
