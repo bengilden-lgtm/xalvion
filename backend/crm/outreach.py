@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import uuid
 import math
 from datetime import datetime, timedelta, timezone
@@ -22,11 +23,154 @@ from typing import Any, Callable
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, field_validator
-from sqlalchemy import Column, Integer, String, Text, Float, func
+from sqlalchemy import Column, Integer, String, Text, Float
 
 from db import Base, SessionLocal
 
+from backend.crm import acquisition_engine as acq
+
 logger = logging.getLogger("xalvion.crm.outreach")
+
+LEAD_STATUS_ORDER = frozenset({"new", "contacted", "replied", "closed"})
+LEAD_STAGE_ORDER = frozenset({"lead", "approved", "contacted", "replied", "demo", "booked", "closed"})
+
+
+class LeadAddRequest(BaseModel):
+    username: str
+    text: str
+    source: str | None = "manual"
+    value: float | None = None
+
+    @field_validator("username")
+    @classmethod
+    def validate_username_field(cls, v: str) -> str:
+        text = (v or "").strip()
+        if not text:
+            raise ValueError("username required")
+        if len(text) > 120:
+            raise ValueError("username too long")
+        return text
+
+    @field_validator("text")
+    @classmethod
+    def validate_text_field(cls, v: str) -> str:
+        text = (v or "").strip()
+        if not text:
+            raise ValueError("text required")
+        if len(text) > 5000:
+            raise ValueError("text too long")
+        return text
+
+    @field_validator("value")
+    @classmethod
+    def validate_value_field(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        try:
+            value = float(v)
+        except Exception:
+            return None
+        if not math.isfinite(value):
+            return None
+        return max(0.0, min(1000000.0, value))
+
+
+class LeadStatusRequest(BaseModel):
+    status: str | None = None
+    stage: str | None = None
+    note: str | None = None
+    value: float | None = None
+    probability: float | None = None
+    human_confirmed_send: bool | None = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status_field(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        status = (v or "").strip().lower()
+        if status not in LEAD_STATUS_ORDER:
+            raise ValueError("status must be one of new/contacted/replied/closed")
+        return status
+
+    @field_validator("stage")
+    @classmethod
+    def validate_stage_field(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        stage = (v or "").strip().lower()
+        if stage not in LEAD_STAGE_ORDER:
+            raise ValueError("stage must be one of lead/approved/contacted/replied/demo/booked/closed")
+        return stage
+
+    @field_validator("value")
+    @classmethod
+    def validate_value_field(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        try:
+            value = float(v)
+        except Exception:
+            return None
+        if not math.isfinite(value):
+            return None
+        return max(0.0, min(1000000.0, value))
+
+    @field_validator("probability")
+    @classmethod
+    def validate_probability_field(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        try:
+            value = float(v)
+        except Exception:
+            return None
+        if not math.isfinite(value):
+            return None
+        return max(0.0, min(1.0, value))
+
+
+class LeadReminderRequest(BaseModel):
+    days: int | None = 1
+    note: str | None = None
+    human_confirmed_followup: bool | None = None
+
+    @field_validator("days")
+    @classmethod
+    def validate_days_field(cls, v: int | None) -> int:
+        try:
+            value = int(v or 1)
+        except Exception:
+            value = 1
+        return max(1, min(14, value))
+
+
+class LeadReplyRequest(BaseModel):
+    reply_text: str
+
+    @field_validator("reply_text")
+    @classmethod
+    def validate_reply_text_field(cls, v: str) -> str:
+        text = (v or "").strip()
+        if not text:
+            raise ValueError("reply_text required")
+        if len(text) > 8000:
+            raise ValueError("reply_text too long")
+        return text
+
+
+class LeadConvertRequest(BaseModel):
+    value: float | None = 0
+    note: str | None = None
+
+    @field_validator("value")
+    @classmethod
+    def validate_value_field(cls, v: float | None) -> float:
+        try:
+            value = float(v or 0)
+        except Exception:
+            value = 0.0
+        return max(0.0, min(1000000.0, value))
 
 
 class OutreachLeadRow(Base):
@@ -67,126 +211,8 @@ def register_outreach_crm_routes(
     - Do not import `app.py`; pass dependencies in from the orchestrator.
     """
 
-    lead_status_order = {"new", "contacted", "replied", "closed"}
-    lead_stage_order = {"lead", "contacted", "replied", "demo", "closed"}
-
-    class LeadAddRequest(BaseModel):
-        username: str
-        text: str
-        source: str | None = "manual"
-        value: float | None = None
-
-        @field_validator("username")
-        @classmethod
-        def validate_username_field(cls, v: str) -> str:
-            text = (v or "").strip()
-            if not text:
-                raise ValueError("username required")
-            if len(text) > 120:
-                raise ValueError("username too long")
-            return text
-
-        @field_validator("text")
-        @classmethod
-        def validate_text_field(cls, v: str) -> str:
-            text = (v or "").strip()
-            if not text:
-                raise ValueError("text required")
-            if len(text) > 5000:
-                raise ValueError("text too long")
-            return text
-
-        @field_validator("value")
-        @classmethod
-        def validate_value_field(cls, v: float | None) -> float | None:
-            if v is None:
-                return None
-            try:
-                value = float(v)
-            except Exception:
-                return None
-            if not math.isfinite(value):
-                return None
-            return max(0.0, min(1000000.0, value))
-
-    class LeadStatusRequest(BaseModel):
-        status: str | None = None
-        stage: str | None = None
-        note: str | None = None
-        value: float | None = None
-        probability: float | None = None
-
-        @field_validator("status")
-        @classmethod
-        def validate_status_field(cls, v: str | None) -> str | None:
-            if v is None:
-                return None
-            status = (v or "").strip().lower()
-            if status not in lead_status_order:
-                raise ValueError("status must be one of new/contacted/replied/closed")
-            return status
-
-        @field_validator("stage")
-        @classmethod
-        def validate_stage_field(cls, v: str | None) -> str | None:
-            if v is None:
-                return None
-            stage = (v or "").strip().lower()
-            if stage not in lead_stage_order:
-                raise ValueError("stage must be one of lead/contacted/replied/demo/closed")
-            return stage
-
-        @field_validator("value")
-        @classmethod
-        def validate_value_field(cls, v: float | None) -> float | None:
-            if v is None:
-                return None
-            try:
-                value = float(v)
-            except Exception:
-                return None
-            if not math.isfinite(value):
-                return None
-            return max(0.0, min(1000000.0, value))
-
-        @field_validator("probability")
-        @classmethod
-        def validate_probability_field(cls, v: float | None) -> float | None:
-            if v is None:
-                return None
-            try:
-                value = float(v)
-            except Exception:
-                return None
-            if not math.isfinite(value):
-                return None
-            return max(0.0, min(1.0, value))
-
-    class LeadReminderRequest(BaseModel):
-        days: int | None = 1
-        note: str | None = None
-
-        @field_validator("days")
-        @classmethod
-        def validate_days_field(cls, v: int | None) -> int:
-            try:
-                value = int(v or 1)
-            except Exception:
-                value = 1
-            return max(1, min(14, value))
-
-    class LeadConvertRequest(BaseModel):
-        value: float | None = 0
-        note: str | None = None
-
-        @field_validator("value")
-        @classmethod
-        def validate_value_field(cls, v: float | None) -> float:
-            try:
-                value = float(v or 0)
-            except Exception:
-                value = 0.0
-            return max(0.0, min(1000000.0, value))
+    lead_status_order = LEAD_STATUS_ORDER
+    lead_stage_order = LEAD_STAGE_ORDER
 
     def _crm_now() -> datetime:
         return datetime.now(timezone.utc)
@@ -219,11 +245,32 @@ def register_outreach_crm_routes(
 
     def _normalize_lead_stage(value: str | None, status: str | None = None) -> str:
         stage = (value or "").strip().lower()
-        if stage in lead_stage_order:
-            return stage
         status_norm = _normalize_lead_status(status or "new")
-        mapping = {"new": "lead", "contacted": "contacted", "replied": "replied", "closed": "closed"}
-        return mapping.get(status_norm, "lead")
+        status_to_stage = {
+            "new": "lead",
+            "contacted": "contacted",
+            "replied": "replied",
+            "closed": "closed",
+        }
+        if not stage:
+            return status_to_stage.get(status_norm, "lead")
+        if stage in lead_stage_order:
+            if stage == "lead" and status_norm in {"contacted", "replied", "closed"}:
+                return status_to_stage.get(status_norm, stage)
+            if stage == "approved" and status_norm == "contacted":
+                return "contacted"
+            return stage
+        return status_to_stage.get(status_norm, "lead")
+
+    def _pipeline_to_stage(pipeline: str | None) -> str:
+        p = (pipeline or "found").strip().lower()
+        return {
+            "found": "lead",
+            "approved": "approved",
+            "sent": "contacted",
+            "replied": "replied",
+            "booked": "booked",
+        }.get(p, "lead")
 
     def _lead_from_row(row: OutreachLeadRow) -> dict[str, Any] | None:
         try:
@@ -268,7 +315,24 @@ def register_outreach_crm_routes(
         except Exception:
             row.converted_value = 0.0
 
+        _flush_followups_snapshot(db)
         return normalized
+
+    def _flush_followups_snapshot(db) -> None:
+        try:
+            rows = db.query(OutreachLeadRow).all()
+            leads: list[dict[str, Any]] = []
+            for r in rows:
+                try:
+                    payload = json.loads(str(r.payload_json or "{}"))
+                    if not isinstance(payload, dict) or not payload.get("id"):
+                        continue
+                    leads.append(_serialize_lead(payload))
+                except Exception:
+                    continue
+            acq.write_followups_json(base_dir, leads, now_iso=_crm_now_iso())
+        except Exception:
+            logger.warning("followups.json snapshot failed", exc_info=True)
 
     def _lead_score(text: str, source: str = "manual") -> int:
         lowered = (text or "").lower()
@@ -299,40 +363,31 @@ def register_outreach_crm_routes(
             score += 1
         return max(score, 1)
 
-    def _generate_initial_lead_message(username: str, text: str) -> str:
-        excerpt = " ".join((text or "").strip().split())
-        excerpt = excerpt[:140] + ("..." if len(excerpt) > 140 else "")
-        return (
-            f"Hey — saw your post about support:\n\n"
-            f"\"{excerpt}\"\n\n"
-            f"I built a tool that prepares support decisions (refunds, replies, escalations) "
-            f"but keeps you in control with approval.\n\n"
-            f"It usually cuts support workload pretty hard without adding risk.\n\n"
-            f"Happy to run a few of your tickets through it for free if you want to see it."
-        )
-
     def _generate_followup_message(lead: dict[str, Any]) -> str:
-        text = str(lead.get("text", "") or "").lower()
-        if "refund" in text or "charge" in text:
-            angle = "Still dealing with refund volume?"
-        elif "zendesk" in text or "ticket" in text:
-            angle = "Still getting hit by ticket volume?"
-        else:
-            angle = "Just looping back on this"
+        cfg = acq.load_acquisition_config(base_dir)
+        sug = acq.suggest_followup_text(lead, cfg, _crm_now())
+        if sug:
+            return sug
         return (
-            f"{angle}\n\n"
-            f"Happy to show how Xalvion prepares the right support action "
-            f"while keeping approval in your hands."
+            "Circling back on support throughput — want a no-cost pass on a few live tickets "
+            "so you can compare handle time?"
         )
 
     def _build_lead_record(username: str, text: str, source: str = "manual") -> dict[str, Any]:
         now_iso = _crm_now_iso()
         normalized_source = _infer_lead_source(text, source)
         score = _lead_score(text, normalized_source)
-        initial = _generate_initial_lead_message(username, text)
+        ch = acq.channel_key_for_source(normalized_source)
+        variants_map = acq.outcome_message_variants(username, text, normalized_source)
+        lead_id = uuid.uuid4().hex
+        keys = list(variants_map.get(ch) or variants_map.get("manual") or [])
+        idx = acq.pick_ab_variant_index(lead_id, len(keys)) if keys else 0
+        initial = keys[idx] if keys else (
+            "Reduce ticket load by 40–50% in week one — free setup on a small batch, pay only if it works."
+        )
         follow_up_due = (_crm_now() + timedelta(days=2)).isoformat()
         return {
-            "id": uuid.uuid4().hex,
+            "id": lead_id,
             "username": (username or "").strip(),
             "text": (text or "").strip(),
             "source": normalized_source,
@@ -355,17 +410,41 @@ def register_outreach_crm_routes(
                 }
             ],
             "notes": [],
+            "pipeline_stage": "found",
+            "last_action_time": now_iso,
+            "replied": False,
+            "reply_text": None,
+            "reply_time": None,
+            "followup_count": 0,
+            "last_followup_time": None,
+            "booking_status": "none",
+            "high_priority": False,
+            "outreach_message_approved": False,
+            "followup_message_approved": False,
+            "pending_followup_suggestion": None,
+            "pending_booking_message": None,
+            "message_variants": variants_map,
+            "ab_variant_index": idx,
+            "ab_variant_channel": ch,
+            "last_sent_at": None,
         }
 
     def _serialize_lead(lead: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(lead or {})
         normalized["status"] = _normalize_lead_status(str(normalized.get("status", "new") or "new"))
-        normalized["stage"] = _normalize_lead_stage(str(normalized.get("stage", "") or ""), normalized["status"])
         normalized["score"] = int(normalized.get("score", 1) or 1)
         normalized["source"] = _infer_lead_source(
             str(normalized.get("text", "") or ""),
             str(normalized.get("source", "manual") or "manual"),
         )
+        cfg = acq.load_acquisition_config(base_dir)
+        now_iso = _crm_now_iso()
+        normalized = acq.merge_acquisition_defaults(normalized, config=cfg, now_iso=now_iso)
+        pipe = str(normalized.get("pipeline_stage") or "found").strip().lower()
+        if pipe not in acq.PIPELINE_STAGES:
+            pipe = "found"
+            normalized["pipeline_stage"] = pipe
+        normalized["stage"] = _normalize_lead_stage(_pipeline_to_stage(pipe), normalized["status"])
         normalized["message"] = str(normalized.get("message", "") or "")
         normalized["follow_up_message"] = str(
             normalized.get("follow_up_message") or _generate_followup_message(normalized)
@@ -383,6 +462,9 @@ def register_outreach_crm_routes(
             normalized["converted_value"] = round(float(normalized.get("converted_value", 0) or 0), 2)
         except Exception:
             normalized["converted_value"] = 0.0
+        normalized["intent_score"] = acq.compute_intent_score(normalized)
+        normalized["conversion_score"] = acq.compute_conversion_score(normalized)
+        normalized["message_history"] = list(normalized.get("messages") or [])
         return normalized
 
     def _crm_day_bucket(value: str | None) -> str:
@@ -410,10 +492,13 @@ def register_outreach_crm_routes(
 
     def _lead_hotness(lead: dict[str, Any]) -> int:
         stage = _normalize_lead_stage(str(lead.get("stage", "") or ""), str(lead.get("status", "new") or "new"))
-        stage_weight = {"demo": 8, "replied": 6, "contacted": 3, "lead": 1, "closed": -2}.get(stage, 0)
+        stage_weight = {"booked": 10, "demo": 8, "replied": 6, "contacted": 3, "approved": 2, "lead": 1, "closed": -2}.get(
+            stage, 0
+        )
         due_bonus = 2 if _is_due_followup(lead) else 0
         value_bonus = min(4, int(float(lead.get("value", 0) or 0) // 100))
-        return int(lead.get("score", 0) or 0) + stage_weight + due_bonus + value_bonus
+        conv = int(float(lead.get("conversion_score", 0) or 0) // 5)
+        return int(lead.get("score", 0) or 0) + stage_weight + due_bonus + value_bonus + conv
 
     def _get_due_reminders(leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
         now = _crm_now()
@@ -494,14 +579,19 @@ def register_outreach_crm_routes(
                     leads.append(lead)
         finally:
             db.close()
-        stage_rank = {"demo": 0, "replied": 1, "contacted": 2, "lead": 3, "closed": 4}
-        leads.sort(
-            key=lambda item: (
-                stage_rank.get(item.get("stage", item.get("status", "new")), 9),
-                -(int(item.get("score", 0) or 0)),
-                item.get("created_at", ""),
+        def _queue_rank(item: dict[str, Any]) -> tuple[Any, ...]:
+            ps = str(item.get("pipeline_stage") or "").lower()
+            stage_rank = {"booked": 0, "replied": 1, "sent": 2, "approved": 3, "found": 4}
+            replied_first = 0 if item.get("replied") else 1
+            return (
+                -float(item.get("conversion_score", 0) or 0),
+                -float(item.get("intent_score", 0) or 0),
+                replied_first,
+                stage_rank.get(ps, 9),
+                str(item.get("last_action_time") or item.get("last_contacted") or item.get("created_at") or ""),
             )
-        )
+
+        leads.sort(key=_queue_rank)
         return leads
 
     def _get_lead_summary(leads: list[dict[str, Any]]) -> dict[str, int]:
@@ -609,12 +699,20 @@ def register_outreach_crm_routes(
                 "closing_rate": _pct(closed, total),
                 "lead_to_close_rate": _pct(closed, total),
                 "win_rate": _pct(closed, demos),
+                "booked_pipeline": sum(1 for lead in normalized if str(lead.get("pipeline_stage") or "").lower() == "booked"),
             },
             "best_source": best_source,
             "by_source": by_source,
         }
 
-    def _snooze_lead_reminder(lead_id: str, days: int = 1, note: str | None = None) -> dict[str, Any] | None:
+    def _snooze_lead_reminder(
+        lead_id: str,
+        days: int = 1,
+        note: str | None = None,
+        *,
+        human_confirmed_followup: bool | None = None,
+        followup_complete: bool = False,
+    ) -> dict[str, Any] | None:
         db = SessionLocal()
         try:
             row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
@@ -622,8 +720,26 @@ def register_outreach_crm_routes(
                 return None
             lead = _lead_from_row(row) or {}
             now_iso = _crm_now_iso()
+            cfg = acq.load_acquisition_config(base_dir)
+            if followup_complete and cfg.get("require_followup_approval", True):
+                if not (bool(lead.get("followup_message_approved")) or bool(human_confirmed_followup)):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="followup_not_approved: approve follow-up or pass human_confirmed_followup on the reminder request",
+                    )
             new_due = (_crm_now() + timedelta(days=max(1, min(14, int(days or 1))))).isoformat()
             lead["follow_up_due"] = new_due
+            if followup_complete:
+                lead["followup_count"] = int(lead.get("followup_count") or 0) + 1
+                lead["last_followup_time"] = now_iso
+                lead["followup_message_approved"] = False
+                lead["last_action_time"] = now_iso
+                hist = list(lead.get("messages") or [])
+                hist.append(
+                    {"type": "follow_up_sent", "text": str(lead.get("follow_up_message") or ""), "timestamp": now_iso}
+                )
+                lead["messages"] = hist[-24:]
+                lead = acq.refresh_followup_suggestion(lead, cfg, _crm_now())
             if note:
                 notes = list(lead.get("notes") or [])
                 notes.append({"text": str(note)[:300], "timestamp": now_iso})
@@ -631,6 +747,9 @@ def register_outreach_crm_routes(
             updated_lead = _persist_lead(db, lead)
             db.commit()
             return updated_lead
+        except HTTPException:
+            db.rollback()
+            raise
         except Exception:
             db.rollback()
             raise
@@ -642,6 +761,7 @@ def register_outreach_crm_routes(
         status: str | None = None,
         note: str | None = None,
         stage: str | None = None,
+        human_confirmed_send: bool | None = None,
     ) -> dict[str, Any] | None:
         db = SessionLocal()
         try:
@@ -650,6 +770,7 @@ def register_outreach_crm_routes(
                 return None
             lead = _lead_from_row(row) or {}
             now_iso = _crm_now_iso()
+            cfg = acq.load_acquisition_config(base_dir)
 
             current_status = _normalize_lead_status(str(lead.get("status", "new") or "new"))
             current_stage = _normalize_lead_stage(str(lead.get("stage", "") or ""), current_status)
@@ -658,9 +779,11 @@ def register_outreach_crm_routes(
 
             if stage == "lead":
                 new_status = "new"
+            elif stage == "approved":
+                new_status = "new"
             elif stage == "contacted":
                 new_status = "contacted"
-            elif stage in {"replied", "demo"}:
+            elif stage in {"replied", "demo", "booked"}:
                 new_status = "replied"
             elif stage == "closed":
                 new_status = "closed"
@@ -669,19 +792,53 @@ def register_outreach_crm_routes(
             lead["stage"] = new_stage
 
             if new_stage == "contacted":
+                if cfg.get("require_outreach_approval", True) and not (
+                    bool(lead.get("outreach_message_approved")) or bool(human_confirmed_send)
+                ):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="outreach_not_approved: approve outreach first or set human_confirmed_send on this status update",
+                    )
+                if human_confirmed_send or lead.get("outreach_message_approved"):
+                    lead["outreach_message_approved"] = True
+                    if human_confirmed_send:
+                        history = list(lead.get("messages") or [])
+                        history.append(
+                            {
+                                "type": "human_send_confirmed",
+                                "text": str(lead.get("message") or ""),
+                                "timestamp": now_iso,
+                            }
+                        )
+                        lead["messages"] = history[-24:]
+                lead["pipeline_stage"] = "sent"
+                lead["last_sent_at"] = now_iso
+                lead["last_action_time"] = now_iso
                 lead["last_contacted"] = now_iso
                 lead["follow_up_due"] = (_crm_now() + timedelta(days=2)).isoformat()
                 follow_text = _generate_followup_message(lead)
                 lead["follow_up_message"] = follow_text
+                lead["pending_followup_suggestion"] = follow_text
                 history = list(lead.get("messages") or [])
                 history.append({"type": "follow_up_scheduled", "text": follow_text, "timestamp": now_iso})
-                lead["messages"] = history[-12:]
+                lead["messages"] = history[-24:]
+            elif new_stage == "approved":
+                lead["pipeline_stage"] = "approved"
+                lead["outreach_message_approved"] = True
+                lead["last_action_time"] = now_iso
             elif new_stage == "replied":
                 lead["last_contacted"] = now_iso
                 lead["follow_up_due"] = (_crm_now() + timedelta(days=3)).isoformat()
+                lead["pipeline_stage"] = "replied"
+                lead["last_action_time"] = now_iso
             elif new_stage == "demo":
                 lead["last_contacted"] = now_iso
                 lead["follow_up_due"] = (_crm_now() + timedelta(days=4)).isoformat()
+            elif new_stage == "booked":
+                lead["last_contacted"] = now_iso
+                lead["pipeline_stage"] = "booked"
+                lead["booking_status"] = "link_sent"
+                lead["last_action_time"] = now_iso
             elif new_stage == "closed":
                 lead["follow_up_due"] = None
                 lead["converted_at"] = lead.get("converted_at") or now_iso
@@ -694,6 +851,9 @@ def register_outreach_crm_routes(
             updated_lead = _persist_lead(db, lead)
             db.commit()
             return updated_lead
+        except HTTPException:
+            db.rollback()
+            raise
         except Exception:
             db.rollback()
             raise
@@ -770,8 +930,8 @@ def register_outreach_crm_routes(
         }
 
     @app.post("/leads/add")
-    def add_outreach_lead(req: LeadAddRequest, user=Depends(require_authenticated_user)):  # noqa: ANN001
-        record = _build_lead_record(req.username, req.text, req.source or "manual")
+    def add_outreach_lead(payload: LeadAddRequest, user=Depends(require_authenticated_user)):  # noqa: ANN001
+        record = _build_lead_record(payload.username, payload.text, payload.source or "manual")
         db = SessionLocal()
         try:
             record = _persist_lead(db, record)
@@ -791,13 +951,177 @@ def register_outreach_crm_routes(
             "username": getattr(user, "username", ""),
         }
 
+    def _crm_lead_bundle(updated: dict[str, Any], username: str) -> dict[str, Any]:
+        all_leads = _get_sorted_leads()
+        return {
+            "lead": updated,
+            "items": all_leads,
+            "summary": _get_lead_summary(all_leads),
+            "daily_summary": _get_daily_summary(all_leads),
+            "metrics": _compute_revenue_metrics(all_leads),
+            "username": username,
+        }
+
+    @app.get("/leads/acquisition-config")
+    def get_acquisition_config(user=Depends(require_authenticated_user)):  # noqa: ANN001
+        cfg = acq.load_acquisition_config(base_dir)
+        return {
+            "config": cfg,
+            "followups_json": os.path.join(base_dir, "followups.json"),
+            "crm_acquisition_config_json": os.path.join(base_dir, "crm_acquisition_config.json"),
+        }
+
+    @app.post("/leads/{lead_id}/approve-outreach")
+    def approve_outreach_message(lead_id: str, user=Depends(require_authenticated_user)):  # noqa: ANN001
+        db = SessionLocal()
+        try:
+            row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Lead not found")
+            lead = _lead_from_row(row) or {}
+            now_iso = _crm_now_iso()
+            lead["outreach_message_approved"] = True
+            lead["pipeline_stage"] = "approved"
+            lead["last_action_time"] = now_iso
+            updated = _persist_lead(db, lead)
+            db.commit()
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+        return _crm_lead_bundle(updated, getattr(user, "username", ""))
+
+    @app.post("/leads/{lead_id}/approve-followup")
+    def approve_followup_message(lead_id: str, user=Depends(require_authenticated_user)):  # noqa: ANN001
+        db = SessionLocal()
+        try:
+            row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Lead not found")
+            lead = _lead_from_row(row) or {}
+            now_iso = _crm_now_iso()
+            lead["followup_message_approved"] = True
+            if lead.get("pending_followup_suggestion"):
+                lead["follow_up_message"] = str(lead.get("pending_followup_suggestion"))
+            lead["last_action_time"] = now_iso
+            updated = _persist_lead(db, lead)
+            db.commit()
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+        return _crm_lead_bundle(updated, getattr(user, "username", ""))
+
+    @app.post("/leads/{lead_id}/record-reply")
+    def record_outreach_reply(  # noqa: ANN001
+        lead_id: str,
+        req: LeadReplyRequest,
+        user=Depends(require_authenticated_user),
+    ):
+        db = SessionLocal()
+        try:
+            row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Lead not found")
+            lead = _lead_from_row(row) or {}
+            now_iso = _crm_now_iso()
+            cfg = acq.load_acquisition_config(base_dir)
+            lead["replied"] = True
+            lead["reply_text"] = req.reply_text
+            lead["reply_time"] = now_iso
+            lead["status"] = "replied"
+            lead["pipeline_stage"] = "replied"
+            lead["stage"] = "replied"
+            lead["high_priority"] = True
+            lead["last_action_time"] = now_iso
+            hist = list(lead.get("messages") or [])
+            hist.append({"type": "inbound_reply", "text": req.reply_text, "timestamp": now_iso})
+            lead["messages"] = hist[-24:]
+            lead = acq.refresh_followup_suggestion(lead, cfg, _crm_now())
+            if acq.classify_reply(req.reply_text) == "positive":
+                pushed = acq.apply_booking_push(lead, cfg, now_iso=now_iso)
+                if pushed:
+                    lead = pushed
+            updated = _persist_lead(db, lead)
+            db.commit()
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+        return _crm_lead_bundle(updated, getattr(user, "username", ""))
+
+    @app.post("/leads/{lead_id}/acquisition/refresh")
+    def refresh_acquisition_suggestions(lead_id: str, user=Depends(require_authenticated_user)):  # noqa: ANN001
+        db = SessionLocal()
+        try:
+            row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Lead not found")
+            lead = _lead_from_row(row) or {}
+            cfg = acq.load_acquisition_config(base_dir)
+            lead = acq.refresh_followup_suggestion(lead, cfg, _crm_now())
+            updated = _persist_lead(db, lead)
+            db.commit()
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+        return _crm_lead_bundle(updated, getattr(user, "username", ""))
+
+    @app.post("/leads/{lead_id}/booking/push")
+    def push_booking_for_lead(lead_id: str, user=Depends(require_authenticated_user)):  # noqa: ANN001
+        db = SessionLocal()
+        try:
+            row = db.query(OutreachLeadRow).filter(OutreachLeadRow.id == str(lead_id)[:64]).first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Lead not found")
+            lead = _lead_from_row(row) or {}
+            cfg = acq.load_acquisition_config(base_dir)
+            now_iso = _crm_now_iso()
+            pushed = acq.apply_booking_push(lead, cfg, now_iso=now_iso)
+            if not pushed:
+                raise HTTPException(status_code=400, detail="Lead is not warm enough for a booking push yet.")
+            updated = _persist_lead(db, pushed)
+            db.commit()
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+        return _crm_lead_bundle(updated, getattr(user, "username", ""))
+
     @app.post("/leads/{lead_id}/status")
     def update_outreach_lead_status(  # noqa: ANN001
         lead_id: str,
         req: LeadStatusRequest,
         user=Depends(require_authenticated_user),
     ):
-        updated = _update_lead_status(lead_id, req.status, req.note, req.stage)
+        updated = _update_lead_status(
+            lead_id,
+            req.status,
+            req.note,
+            req.stage,
+            human_confirmed_send=req.human_confirmed_send,
+        )
         if not updated:
             raise HTTPException(status_code=404, detail="Lead not found")
 
@@ -837,7 +1161,13 @@ def register_outreach_crm_routes(
         req: LeadReminderRequest,
         user=Depends(require_authenticated_user),
     ):
-        updated = _snooze_lead_reminder(lead_id, max(2, req.days), req.note or "Follow-up sent")
+        updated = _snooze_lead_reminder(
+            lead_id,
+            max(2, req.days),
+            req.note or "Follow-up sent",
+            human_confirmed_followup=req.human_confirmed_followup,
+            followup_complete=True,
+        )
         if not updated:
             raise HTTPException(status_code=404, detail="Lead not found")
         leads = _get_sorted_leads()
@@ -856,7 +1186,12 @@ def register_outreach_crm_routes(
         req: LeadReminderRequest,
         user=Depends(require_authenticated_user),
     ):
-        updated = _snooze_lead_reminder(lead_id, req.days, req.note or f"Snoozed {req.days} day")
+        updated = _snooze_lead_reminder(
+            lead_id,
+            req.days,
+            req.note or f"Snoozed {req.days} day",
+            followup_complete=False,
+        )
         if not updated:
             raise HTTPException(status_code=404, detail="Lead not found")
         leads = _get_sorted_leads()

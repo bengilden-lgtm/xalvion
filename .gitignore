@@ -5,5 +5,7 @@ __pycache__/
 *.sqlite
 *.sqlite3
 aurum.db
+aurum.db-wal
+aurum.db-shm
 outreach_queue.json
 learned_rules.json

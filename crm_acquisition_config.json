@@ -1,0 +1,7 @@
+{
+  "booking_url": "https://cal.com/example/10min",
+  "no_reply_followup_hours": 48,
+  "require_outreach_approval": true,
+  "require_followup_approval": true,
+  "warm_intent_threshold": 55
+}

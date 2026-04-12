@@ -7898,14 +7898,18 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   }
 
   function stageOptionsMarkup(currentStage) {
-    const options = ["lead", "contacted", "replied", "demo", "closed"];
+    const options = ["lead", "approved", "contacted", "replied", "demo", "booked", "closed"];
     return options.map((stage) => `<option value="${stage}"${stage === currentStage ? " selected" : ""}>${stage.toUpperCase()}</option>`).join("");
   }
 
   async function updateLeadStage(leadId, stage) {
     if (!leadId || !stage) return;
     try {
-      const data = await apiPost(`/leads/${encodeURIComponent(leadId)}/status`, { stage, status: stage === "lead" ? "new" : (stage === "closed" ? "closed" : (stage === "contacted" ? "contacted" : "replied")) });
+      if (stage === "contacted") {
+        await apiPost(`/leads/${encodeURIComponent(leadId)}/approve-outreach`, {});
+      }
+      const stageToStatus = { lead: "new", approved: "new", contacted: "contacted", replied: "replied", demo: "replied", booked: "replied", closed: "closed" };
+      const data = await apiPost(`/leads/${encodeURIComponent(leadId)}/status`, { stage, status: stageToStatus[stage] || "new" });
       renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {}, data.daily_summary || {}, data.metrics || null);
       renderRevenueMetrics(data.metrics || state.revenueMetrics || {});
       setNotice("success", "Stage updated", `Lead moved to ${stage}.`);
@@ -8035,6 +8039,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (!leadId || !status) return;
 
     try {
+      if (status === "contacted") {
+        await apiPost(`/leads/${encodeURIComponent(leadId)}/approve-outreach`, {});
+      }
       const data = await apiPost(`/leads/${encodeURIComponent(leadId)}/status`, { status });
       renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {}, data.daily_summary || {}, data.metrics || null);
       const notices = {
@@ -8052,7 +8059,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   async function markReminderDone(leadId) {
     if (!leadId) return;
     try {
-      const data = await apiPost(`/crm/reminders/${encodeURIComponent(leadId)}/done`, { days: 2 });
+      await apiPost(`/leads/${encodeURIComponent(leadId)}/approve-followup`, {});
+      const data = await apiPost(`/crm/reminders/${encodeURIComponent(leadId)}/done`, { days: 2, human_confirmed_followup: true });
       renderCrmLeads(Array.isArray(data.items) ? data.items : state.crmLeads, data.summary || {}, data.daily_summary || {}, data.metrics || null);
       setNotice("success", "Reminder completed", "Follow-up was logged and the next reminder moved out." );
     } catch (error) {
