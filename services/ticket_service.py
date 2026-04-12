@@ -199,9 +199,10 @@ def serialize_ticket_with_log(ticket: Any, db: Session) -> dict[str, Any]:
 
 
 def generate_simulated_inbox_tickets(*, count: int = 6, seed: str | None = None) -> list[dict[str, Any]]:
-    """Generate realistic-looking inbound tickets for the workspace inbox layer.
+    """Generate sample inbound tickets for workspace demo / training UI only.
 
-    Additive / safe: used only when there is no upstream integration providing real tickets.
+    Callers must gate on explicit demo mode (e.g. ``XALVION_DEMO_MODE``) and must not merge
+    these dicts with live DB-backed inbox rows.
     """
     import hashlib
     import random
@@ -315,6 +316,7 @@ def generate_simulated_inbox_tickets(*, count: int = 6, seed: str | None = None)
             {
                 "id": sid,
                 "source": "sim",
+                "data_origin": "demo",
                 "created_at": now_ms - (i * 19_000),
                 "subject": str(t["subject"]),
                 "customer_message": str(t["message"]),

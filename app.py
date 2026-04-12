@@ -553,6 +553,9 @@ PRICE_MAP = {"pro": STRIPE_PRICE_PRO, "elite": STRIPE_PRICE_ELITE}
 # Unauthenticated operator preview (workspace): must match frontend GUEST_USAGE_LIMIT in app.js.
 GUEST_PREVIEW_OPERATOR_LIMIT = int(os.getenv("GUEST_PREVIEW_OPERATOR_LIMIT", "3"))
 
+# Inbox / queue: synthetic sample tickets are opt-in only (never mixed with live DB rows).
+XALVION_DEMO_MODE = os.getenv("XALVION_DEMO_MODE", "false").strip().lower() in ("1", "true", "yes")
+
 if STRIPE_KEY:
     stripe.api_key = STRIPE_KEY
 
@@ -3006,8 +3009,8 @@ def inbox_pull(
 ):
     """Auto-pull inbox layer.
 
-    - Returns real queued tickets when present (no breaking changes to ticket ingestion).
-    - Tops up with simulated inbound tickets so the workspace never feels empty.
+    Live rows come only from ticket ingestion (DB). Simulated samples are returned only when
+    ``XALVION_DEMO_MODE`` is enabled and there are zero matching live rows — never merged with live data.
     """
     try:
         lim = int(limit or 0)
@@ -3020,7 +3023,7 @@ def inbox_pull(
     username = "" if is_guest else str(getattr(user, "username", "") or "")
     guest_key = normalize_guest_client_id(guest_client_id) if is_guest else None
 
-    items: list[dict[str, Any]] = []
+    db_items: list[dict[str, Any]] = []
     if username or guest_key:
         try:
             # Pull newest “incoming” work for this operator (or preview client id bucket).
@@ -3039,21 +3042,30 @@ def inbox_pull(
             for t in rows or []:
                 base = _ser(t)
                 base["source"] = "db"
+                base["data_origin"] = "live"
                 base["ltv"] = 0.0
-                items.append(base)
+                db_items.append(base)
         except Exception as exc:
             _log_throttled_db_issue("GET /inbox/pull", exc)
 
-    # Top up with simulation so the empty state has a queue surface.
-    try:
-        from services.ticket_service import generate_simulated_inbox_tickets as _sim
+    items: list[dict[str, Any]] = []
+    dataset: str
+    if db_items:
+        items = db_items
+        dataset = "live"
+    elif XALVION_DEMO_MODE:
+        try:
+            from services.ticket_service import generate_simulated_inbox_tickets as _sim
 
-        seed = username or guest_key or "inbox_anon"
-        needed = max(0, lim - len(items))
-        if needed > 0:
-            items.extend(_sim(count=needed, seed=seed))
-    except Exception:
-        pass
+            seed = username or guest_key or "inbox_anon"
+            items = _sim(count=lim, seed=seed)
+            dataset = "demo"
+        except Exception:
+            items = []
+            dataset = "empty"
+    else:
+        items = []
+        dataset = "empty"
 
     # Enrich + sort.
     enriched: list[dict[str, Any]] = []
@@ -3076,10 +3088,12 @@ def inbox_pull(
         "recommended_next_action": recommended,
         "high_risk_cases": high_risk,
         "meta": {
+            "demo_mode": bool(XALVION_DEMO_MODE),
+            "dataset": dataset,
             "source_mix": {
                 "db": sum(1 for x in incoming if str(x.get("source", "") or "") == "db"),
                 "sim": sum(1 for x in incoming if str(x.get("source", "") or "") == "sim"),
-            }
+            },
         },
     }
 

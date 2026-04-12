@@ -1367,6 +1367,34 @@ if (typeof window.pulseRail !== "function") {
         white-space: nowrap;
       }
 
+      .xv-inbox-dataset-banner {
+        display: none;
+        margin: 0 0 10px 0;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 650;
+      }
+
+      .xv-inbox-dataset-banner--demo {
+        display: block;
+        border: 1px solid rgba(255, 170, 96, 0.42);
+        background: rgba(255, 140, 64, 0.10);
+        color: rgba(255, 228, 210, 0.96);
+      }
+
+      .xv-queue-summary-chip--demo {
+        border-color: rgba(255, 170, 96, 0.45) !important;
+        color: rgba(255, 220, 196, 0.96) !important;
+        background: rgba(255, 140, 64, 0.08) !important;
+      }
+
+      .xv-inbox-item.xv-inbox-item--demo,
+      .xv-inbox-reco-btn.xv-inbox-reco-btn--demo {
+        border-color: rgba(255, 170, 96, 0.28) !important;
+      }
+
       textarea:focus,
       #messageInput:focus,
       .message-input:focus {
@@ -3837,8 +3865,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const tone = inboxTone(item);
     const badge = inboxBadgeLabel(item);
     const issueCategory = categoriseIssue(item?.issue_type || "");
+    const isDemo =
+      String(item?.data_origin || "").toLowerCase() === "demo" || String(item?.source || "").toLowerCase() === "sim";
+    const demoCls = isDemo ? " xv-inbox-item--demo" : "";
     return `
-      <button type="button" class="xv-inbox-item" data-act="inbox-open" data-inbox-id="${escapeHtml(String(item?.id || ""))}" data-issue-category="${escapeHtml(issueCategory)}">
+      <button type="button" class="xv-inbox-item${demoCls}" data-act="inbox-open" data-inbox-id="${escapeHtml(String(item?.id || ""))}" data-issue-category="${escapeHtml(issueCategory)}">
         <div class="xv-inbox-item-top">
           <span class="xv-inbox-item-id">${escapeHtml(metaLeft)}</span>
           <span class="xv-inbox-item-meta">${escapeHtml(metaRight || "Incoming")}</span>
@@ -3847,6 +3878,18 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         <div class="xv-inbox-item-preview">${escapeHtml(preview || "Open ticket")}</div>
       </button>
     `;
+  }
+
+  function ensureInboxDatasetBanner(host) {
+    let el = host.querySelector("#xvInboxDatasetBanner");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "xvInboxDatasetBanner";
+      el.className = "xv-inbox-dataset-banner";
+      el.setAttribute("role", "status");
+      host.insertBefore(el, host.firstChild);
+    }
+    return el;
   }
 
   function renderInboxLayer(snapshot) {
@@ -3863,12 +3906,32 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const incoming = Array.isArray(s.incoming) ? s.incoming : [];
     const recommended = s.recommended_next_action || null;
     const highRisk = Array.isArray(s.high_risk_cases) ? s.high_risk_cases : [];
+    const dataset = String(s.meta?.dataset || "empty").toLowerCase();
 
-    const mix = s.meta?.source_mix || {};
-    const mixLine =
-      incoming.length > 0
-        ? `${incoming.length} queued · ${Number(mix.db || 0) || 0} live · ${Number(mix.sim || 0) || 0} simulated`
-        : "No incoming tickets yet";
+    const banner = ensureInboxDatasetBanner(host);
+    if (dataset === "demo") {
+      banner.className = "xv-inbox-dataset-banner xv-inbox-dataset-banner--demo";
+      banner.textContent =
+        "Demo mode is on — these are synthetic sample tickets. They are not live ingestion and are not mixed with your real queue.";
+    } else {
+      banner.className = "xv-inbox-dataset-banner";
+      banner.textContent = "";
+    }
+
+    let mixLine = "";
+    if (dataset === "live") {
+      mixLine =
+        incoming.length > 0
+          ? `Live data · ${incoming.length} in queue (ingested tickets)`
+          : "Live data · queue empty — paste a ticket or wait for new work";
+    } else if (dataset === "demo") {
+      mixLine =
+        incoming.length > 0
+          ? `Demo data · ${incoming.length} sample case${incoming.length === 1 ? "" : "s"} (simulation only)`
+          : "Demo data · no samples returned";
+    } else {
+      mixLine = "No live tickets in queue — paste a ticket below to start";
+    }
     if (metaNode) metaNode.textContent = mixLine;
 
     incomingNode.innerHTML = incoming.length
@@ -3881,8 +3944,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const msg = String(recommended.customer_message || "").trim();
       const preview = msg.replace(/\s+/g, " ").slice(0, 150);
       const issueCategory = categoriseIssue(recommended?.issue_type || "");
+      const recoDemo =
+        String(recommended?.data_origin || "").toLowerCase() === "demo" ||
+        String(recommended?.source || "").toLowerCase() === "sim";
+      const recoDemoCls = recoDemo ? " xv-inbox-reco-btn--demo" : "";
       recNode.innerHTML = `
-        <button type="button" class="xv-inbox-reco-btn" data-act="inbox-open" data-inbox-id="${escapeHtml(String(recommended.id || ""))}" data-issue-category="${escapeHtml(issueCategory)}">
+        <button type="button" class="xv-inbox-reco-btn${recoDemoCls}" data-act="inbox-open" data-inbox-id="${escapeHtml(String(recommended.id || ""))}" data-issue-category="${escapeHtml(issueCategory)}">
           <div class="xv-inbox-reco-top">
             <span class="meta-chip ${escapeHtml(tone)}">${ICONS.pulse}<span>${escapeHtml(title)}</span></span>
             <span class="xv-inbox-reco-id">${escapeHtml(formatInboxId(recommended.id))}</span>
@@ -3901,9 +3968,19 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     const chip = document.getElementById("xvQueueSummaryChip");
     if (chip) {
-      const nQueued = incoming.length + highRisk.length + (recommended ? 1 : 0);
-      chip.textContent =
-        nQueued > 0 ? `${nQueued} case${nQueued === 1 ? "" : "s"} surfaced` : "No queue yet · paste a ticket below";
+      const nSurfaced = incoming.length + highRisk.length + (recommended ? 1 : 0);
+      chip.classList.toggle("xv-queue-summary-chip--demo", dataset === "demo");
+      if (dataset === "demo") {
+        chip.textContent =
+          nSurfaced > 0 ? `Demo · ${nSurfaced} sample${nSurfaced === 1 ? "" : "s"}` : "Demo · no samples";
+      } else if (dataset === "live") {
+        chip.textContent =
+          nSurfaced > 0
+            ? `${nSurfaced} live case${nSurfaced === 1 ? "" : "s"} queued`
+            : "Live queue empty · paste a ticket";
+      } else {
+        chip.textContent = "No live queue · paste a ticket";
+      }
     }
 
     host.querySelectorAll("[data-act='inbox-open']").forEach((btn) => {
