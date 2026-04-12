@@ -259,13 +259,22 @@ def run_agent(
     thinking_trace.append(_trace("build_ticket", "done"))
 
     order_info: Dict[str, Any] = {}
+    ticket["order_data_connected"] = False
     if should_attach_order_context(str(ticket.get("issue_type", "general_support"))):
         order_info = get_order(ticket["customer"], clean)
-        if ticket.get("order_status") == "unknown":
-            ticket["order_status"] = order_info.get("status", "unknown")
-        if order_info:
-            ticket["tracking"] = order_info.get("tracking", "") or ""
-            ticket["eta"] = order_info.get("eta", "") or ""
+        connected = bool(order_info.get("connected"))
+        ticket["order_data_connected"] = connected
+        if connected:
+            if ticket.get("order_status") == "unknown":
+                st = str(order_info.get("status") or "").strip()
+                if st:
+                    ticket["order_status"] = st
+            tr = str(order_info.get("tracking", "") or "").strip()
+            if tr:
+                ticket["tracking"] = tr
+            et = str(order_info.get("eta", "") or "").strip()
+            if et:
+                ticket["eta"] = et
     else:
         ticket["order_status"] = ticket.get("order_status", "unknown")
     thinking_trace.append(_trace("order_context", "done"))

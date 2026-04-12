@@ -16,6 +16,7 @@ from models import AgentRequestContext, CanonicalAgentResponse
 
 from agent.execution import MAX_CREDIT, MAX_REFUND, normalize_action_payload
 from agent.parser import clamp_confidence
+from tools import NO_LIVE_ORDER_MESSAGE
 
 logger = logging.getLogger("xalvion")
 
@@ -243,8 +244,8 @@ def build_issue_examples(ticket: Dict[str, Any]) -> str:
     if issue_type == "shipping_issue":
         return """
 Examples:
-- "Hi there, thanks for reaching out — I’ve checked your order and it’s already on the way. You can track it here: [TRACKING LINK]. Estimated delivery: [DATE]. If anything looks off, just reply here and we’ll take care of it."
-- "Hi there, I checked the latest shipping status and your package is still moving. Tracking: [TRACKING LINK]. Latest ETA: [DATE]. If you need anything else, reply here and we’ll take care of it."
+- "Hi — I don’t have live shipment details on this channel. I’ll route this so someone can pull the real tracking and status from your order system."
+- "Hi — I can’t see carrier or delivery data here. Next step: I’ll escalate so an operator can confirm tracking and ETA from your fulfillment tools."
 """.strip()
 
     if issue_type == "damaged_order":
@@ -312,7 +313,8 @@ Business rules:
 - Never invent a credit above ${MAX_CREDIT}.
 - If a hard business decision exists, align to it unless you are escalating risk.
 - If risk is high or abuse likelihood is elevated, prefer review over automation.
-- For shipping questions, give status and next step, not a generic apology.
+- Never invent tracking numbers, carrier status, ETAs, or delivery claims. If order information shows connected=false, state clearly that live order data is not connected and offer escalation or a human follow-up — do not fabricate logistics.
+- For shipping questions when real order data is present, give factual status and next step; otherwise do not imply you checked a carrier.
 - Return internal and customer notes separately.
 
 Tone mode:
@@ -388,6 +390,22 @@ def local_fallback_reply(ticket: Dict[str, Any], planned_action: Dict[str, Any],
     risk_level = str(planned_action.get("risk_level", triage.get("risk_level", "medium")) or "medium")
 
     if issue_type == "shipping_issue":
+        if not bool(order_info.get("connected")):
+            line = str(order_info.get("message") or NO_LIVE_ORDER_MESSAGE).strip() or NO_LIVE_ORDER_MESSAGE
+            return _finalize_local_payload({
+                "customer_message": line,
+                "customer_note": line,
+                "internal_note": "Shipping inquiry without live order/shipment integration or demo data.",
+                "action": action,
+                "amount": amount,
+                "reason": reason or "no_live_order_data",
+                "confidence": 0.85,
+                "risk_level": risk_level,
+                "priority": priority,
+                "queue": queue or "waiting",
+                "requires_approval": bool(planned_action.get("requires_approval", False)),
+            })
+
         status = str(order_info.get("status", ticket.get("order_status", "unknown")) or "unknown")
         tracking = str(order_info.get("tracking", "") or "").strip()
         eta = str(order_info.get("eta", "") or "").strip()
@@ -566,6 +584,9 @@ def rewrite_output_for_issue(ticket: Dict[str, Any], executed: Dict[str, Any], p
         return "You were charged twice — I’ve flagged the duplicate charge for review and the billing correction is now in motion."
 
     if issue_type == "shipping_issue":
+        if not bool(ticket.get("order_data_connected")):
+            return NO_LIVE_ORDER_MESSAGE
+
         status = str(ticket.get("order_status", "unknown") or "unknown")
         tracking = str(ticket.get("tracking", "") or "").strip()
         eta = str(ticket.get("eta", "") or "").strip()
