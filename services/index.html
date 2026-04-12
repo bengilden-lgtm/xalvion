@@ -11,7 +11,7 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260411" />
   <link rel="icon" type="image/png" href="/static/favicon.png" />
   <link rel="shortcut icon" href="/static/favicon.ico" />
-  <link rel="stylesheet" href="/styles.css?v=elite-op-15" />
+  <link rel="stylesheet" href="/styles.css?v=elite-op-16" />
 </head>
 <body data-ui="claude">
   <div class="workspace-atmosphere" aria-hidden="true">
@@ -140,6 +140,21 @@
               <section class="xv-surface" data-surface-panel="workspace">
                 <div class="workspace-conversation-column" id="workspaceConversationColumn">
                   <div id="homeSurface" class="home-surface" aria-label="Workspace home"></div>
+                  <template id="xv-roi-hero-strip">
+                    <section class="xv-roi-hero" id="xvRoiHero" aria-label="Estimated impact this month">
+                      <div class="xv-roi-hero-glow" aria-hidden="true"></div>
+                      <div class="xv-roi-hero-inner">
+                        <div class="xv-roi-hero-main">
+                          <span class="xv-roi-hero-emoji" aria-hidden="true">💰</span>
+                          <p id="xvRoiRevenueSaved" class="xv-roi-hero-line">Estimated value saved this month: …</p>
+                        </div>
+                        <div class="xv-roi-hero-side">
+                          <p id="xvRoiAutoResolved" class="xv-roi-hero-line xv-roi-hero-line--compact">🎟️ Tickets auto-resolved: —</p>
+                          <p id="xvRoiAvgConfidence" class="xv-roi-hero-line xv-roi-hero-line--compact">⚡ Avg confidence: —</p>
+                        </div>
+                      </div>
+                    </section>
+                  </template>
                   <div class="messages-zone" id="messagesZone">
                     <div class="messages-shell scroll-shell" id="messagesShell" data-show-top="false" data-show-bottom="false">
                       <div id="messages" class="messages scroll-area"></div>
@@ -591,7 +606,7 @@
   <script src="/workspace-bootstrap.js"></script>
   <script type="module" src="/workspace-client/boot.js"></script>
   <script src="/workspace_modules.js"></script>
-  <script src="/app.js?v=elite-op-13"></script>
+  <script src="/app.js?v=elite-op-16"></script>
   <script>
     (() => {
       function bindMoreJumpers() {

@@ -3571,6 +3571,39 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     return first.length ? first.charAt(0).toUpperCase() + first.slice(1) : "";
   }
 
+  function roiHeroStripMarkup() {
+    if (!isAuthenticated()) return "";
+    const tpl = document.getElementById("xv-roi-hero-strip");
+    if (tpl && typeof tpl.innerHTML === "string") {
+      const html = tpl.innerHTML.trim();
+      if (html) return html;
+    }
+    return "";
+  }
+
+  function syncRoiHeroFromDashboard(data) {
+    if (!isAuthenticated()) return;
+    const rev = document.getElementById("xvRoiRevenueSaved");
+    const tick = document.getElementById("xvRoiAutoResolved");
+    const conf = document.getElementById("xvRoiAvgConfidence");
+    if (!rev || !tick || !conf) return;
+    const safe = data && typeof data === "object" ? data : {};
+    const m = safe.metrics && typeof safe.metrics === "object" ? safe.metrics : {};
+    const revenueSaved = Number(safe.revenue_saved ?? m.revenue_saved ?? 0);
+    const autoResolved = Number(safe.auto_resolved ?? 0);
+    const avgConfRaw = Number(safe.avg_confidence ?? m.avg_confidence ?? 0);
+    const money = Number.isFinite(revenueSaved)
+      ? revenueSaved.toLocaleString(undefined, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: revenueSaved < 100 && revenueSaved % 1 !== 0 ? 2 : 0,
+        })
+      : "0";
+    rev.textContent = `Estimated value saved this month: $${money}`;
+    tick.textContent = `🎟️ Tickets auto-resolved: ${Number.isFinite(autoResolved) ? String(Math.max(0, Math.round(autoResolved))) : "—"}`;
+    const pct = Number.isFinite(avgConfRaw) ? (avgConfRaw <= 1.001 ? avgConfRaw * 100 : avgConfRaw) : 0;
+    conf.textContent = `⚡ Avg confidence: ${Math.round(pct)}%`;
+  }
+
   function buildEmptyStateHtml() {
     const guest = !isAuthenticated();
     const tierLc = String(state.tier || "free").toLowerCase();
@@ -3651,6 +3684,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         : "";
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-card-onboarding" role="status">
+        ${roiHeroStripMarkup()}
         <div class="xv-empty-hero">
           <p class="xv-empty-kicker" translate="no">Operator console</p>
           <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""}`)}</h2>
@@ -3697,6 +3731,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     return `
       <div class="empty-card empty-card-premium empty-card-launch">
+        ${roiHeroStripMarkup()}
         <div class="xv-empty-hero xv-empty-hero--legacy">
           <p class="empty-launch-directive">One thread, one decision</p>
           <p class="empty-launch-outcome">Paste a ticket — get a customer-ready reply and the next best move</p>
@@ -4081,6 +4116,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     syncInboxAutopull();
     moveThreadBelowQueueIfNeeded();
     syncWorkspaceLayoutMode();
+    syncRoiHeroFromDashboard(state.dashboardStats || {});
   }
 
   function addEmptyState() {
@@ -4104,6 +4140,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (state.inboxSnapshot) renderInboxLayer(state.inboxSnapshot);
     syncInboxAutopull();
     moveThreadBelowQueueIfNeeded();
+    syncRoiHeroFromDashboard(state.dashboardStats || {});
   }
 
   function clearEmptyState() {
@@ -7308,6 +7345,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       updateRefundUI();
       syncAnalyticsRail();
       syncOutcomeIntelligenceRail(data);
+      syncRoiHeroFromDashboard(data);
     } catch {
       setText(els.statInteractions, formatMetric(state.totalInteractions, 0));
       setText(els.statQuality, formatMetric(state.avgQuality, 2));
