@@ -18,11 +18,18 @@ from orm_models import ActionLog, Ticket
 from sqlalchemy.orm import Session
 
 
-def create_ticket_record(db: Session, user: Any, req: Any) -> Any:
+def create_ticket_record(
+    db: Session,
+    user: Any,
+    req: Any,
+    *,
+    storage_username: str | None = None,
+) -> Any:
     now = _now_iso()
+    owner = (storage_username or "").strip() or str(getattr(user, "username", "unknown") or "unknown")
     bootstrap_ticket = build_support_ticket(
         req.message,
-        user_id=str(getattr(user, "username", "unknown") or "unknown"),
+        user_id=owner,
         meta={
             "sentiment": req.sentiment if req.sentiment is not None else 5,
             "ltv": req.ltv if req.ltv is not None else 0,
@@ -37,7 +44,7 @@ def create_ticket_record(db: Session, user: Any, req: Any) -> Any:
     ticket = Ticket(
         created_at=now,
         updated_at=now,
-        username=str(getattr(user, "username", "unknown") or "unknown"),
+        username=owner,
         channel=_safe_channel(req.channel),
         source=_safe_source(req.source),
         subject=(req.message or "")[:300],

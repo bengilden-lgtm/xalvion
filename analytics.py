@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import Column, Float, Integer, String, Text, func
+from sqlalchemy import Column, Float, Integer, String, Text, func, inspect, text
 from sqlalchemy.exc import OperationalError, TimeoutError as SQLTimeoutError
 
 from db import Base, SessionLocal, engine
@@ -58,20 +58,42 @@ def _log_metrics_pool_timeout_once(exc: BaseException) -> None:
 class AnalyticsEvent(Base):
     __tablename__ = "analytics_events"
 
-    id              = Column(Integer, primary_key=True, autoincrement=True)
-    time            = Column(String(32), nullable=False, index=True)
-    user_input      = Column(Text, default="")
-    confidence      = Column(Float, default=0.0)
-    quality         = Column(Float, default=0.0)
-    response_length = Column(Integer, default=0)
-    issue_type      = Column(String(64), default="general_support")
-    action          = Column(String(32), default="none")
-    amount          = Column(Float, default=0.0)
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    time             = Column(String(32), nullable=False, index=True)
+    user_input       = Column(Text, default="")
+    confidence       = Column(Float, default=0.0)
+    quality          = Column(Float, default=0.0)
+    response_length  = Column(Integer, default=0)
+    issue_type       = Column(String(64), default="general_support")
+    action           = Column(String(32), default="none")
+    amount           = Column(Float, default=0.0)
+    actor_principal  = Column(String(120), nullable=False, default="")
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+_analytics_actor_column_ready = False
+
+
+def ensure_analytics_actor_principal_column() -> None:
+    """SQLite lazy migration: tenant key for analytics (account or guest client id)."""
+    global _analytics_actor_column_ready
+    if _analytics_actor_column_ready:
+        return
+    try:
+        insp = inspect(engine)
+        cols = {c["name"] for c in insp.get_columns("analytics_events")}
+        if "actor_principal" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE analytics_events ADD COLUMN actor_principal VARCHAR(120) DEFAULT ''")
+                )
+    except Exception:
+        logger.warning("analytics_actor_principal_migration_failed", exc_info=True)
+    _analytics_actor_column_ready = True
+
 
 def log_event(
     user_input:  str,
@@ -81,7 +103,10 @@ def log_event(
     issue_type:  str = "general_support",
     action:      str = "none",
     amount:      float = 0.0,
+    *,
+    actor_principal: str | None = None,
 ) -> None:
+    ensure_analytics_actor_principal_column()
     db = SessionLocal()
     try:
         event = AnalyticsEvent(
@@ -93,6 +118,7 @@ def log_event(
             issue_type=(issue_type or "general_support")[:64],
             action=(action or "none")[:32],
             amount=round(float(amount or 0), 2),
+            actor_principal=str(actor_principal or "")[:120],
         )
         db.add(event)
         db.commit()

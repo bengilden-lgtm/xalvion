@@ -17,6 +17,13 @@ router = APIRouter(tags=["support"])
 logger = logging.getLogger("xalvion.api")
 
 
+def _ticket_owner_key(user: app_mod.User, x_guest_client: str | None) -> str | None:
+    """DB ``Ticket.username`` / ``ActionLog.username`` scope for the current request."""
+    if app_mod.is_session_guest(user):
+        return app_mod.normalize_guest_client_id(x_guest_client)
+    return str(getattr(user, "username", "") or "") or None
+
+
 def _stream_usage_warning_payload(username: str) -> dict[str, Any] | None:
     if not username or username in {"guest", "dev_user", ""}:
         return None
@@ -84,6 +91,7 @@ def list_tickets(
     search: str | None = None,
     sort: str = "newest",
     user: app_mod.User = Depends(app_mod.get_current_user),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
     db: Session = Depends(app_mod.get_db),
 ):
     if page_size is not None:
@@ -93,9 +101,22 @@ def list_tickets(
 
     q = db.query(app_mod.Ticket)
     is_admin = getattr(user, "username", "") == app_mod.ADMIN_USERNAME
+    owner_key = _ticket_owner_key(user, x_guest_client)
 
     if not is_admin:
-        q = q.filter(app_mod.Ticket.username == user.username)
+        if app_mod.is_session_guest(user) and not owner_key:
+            return {
+                "operator_mode": app_mod.get_operator_mode(db),
+                "total": 0,
+                "limit": max(1, min(limit, 200)),
+                "offset": max(0, offset),
+                "page": (offset // max(1, min(limit, 200))) + 1 if limit > 0 else 1,
+                "page_size": max(1, min(limit, 200)),
+                "has_more": False,
+                "items": [],
+                "tickets": [],
+            }
+        q = q.filter(app_mod.Ticket.username == owner_key)
     elif username:
         q = q.filter(app_mod.Ticket.username == username.strip())
 
@@ -155,16 +176,14 @@ def recent_tickets(
     db: Session = Depends(app_mod.get_db),
 ):
     limit = max(1, min(int(limit or 5), 10))
-    username = getattr(user, "username", "") or ""
+    owner_key = _ticket_owner_key(user, x_guest_client)
 
     # Authenticated users: scope to account (admin can see own only here; list_tickets supports admin browse).
-    if username and username not in {"guest", "dev_user"}:
-        q = db.query(app_mod.Ticket).filter(app_mod.Ticket.username == username)
-    else:
-        guest_client_id = app_mod.normalize_guest_client_id(x_guest_client)
-        if not guest_client_id:
+    if not owner_key:
+        if app_mod.is_session_guest(user):
             return {"items": [], "tickets": []}
-        q = db.query(app_mod.Ticket).filter(app_mod.Ticket.username == guest_client_id)
+        raise HTTPException(status_code=401, detail="Authentication required")
+    q = db.query(app_mod.Ticket).filter(app_mod.Ticket.username == owner_key)
 
     rows = q.order_by(app_mod.Ticket.updated_at.desc(), app_mod.Ticket.id.desc()).limit(limit).all()
     items = [app_mod.serialize_ticket(r) for r in rows]
@@ -174,13 +193,21 @@ def recent_tickets(
 @router.get("/tickets/queues")
 def ticket_queue_counts(
     user: app_mod.User = Depends(app_mod.get_current_user),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
     db: Session = Depends(app_mod.get_db),
 ):
     is_admin = getattr(user, "username", "") == app_mod.ADMIN_USERNAME
+    owner_key = _ticket_owner_key(user, x_guest_client)
 
     base_q = db.query(app_mod.Ticket.queue, func.count(app_mod.Ticket.id).label("cnt"))
     if not is_admin:
-        base_q = base_q.filter(app_mod.Ticket.username == user.username)
+        if app_mod.is_session_guest(user) and not owner_key:
+            return {
+                "queues": {q: 0 for q in app_mod.VALID_QUEUES},
+                "statuses": {s: 0 for s in app_mod.VALID_STATUSES},
+                "operator_mode": app_mod.get_operator_mode(db),
+            }
+        base_q = base_q.filter(app_mod.Ticket.username == owner_key)
 
     queue_counts: dict[str, int] = {q: 0 for q in app_mod.VALID_QUEUES}
     for qname, cnt in base_q.group_by(app_mod.Ticket.queue).all():
@@ -188,7 +215,7 @@ def ticket_queue_counts(
 
     base_s = db.query(app_mod.Ticket.status, func.count(app_mod.Ticket.id).label("cnt"))
     if not is_admin:
-        base_s = base_s.filter(app_mod.Ticket.username == user.username)
+        base_s = base_s.filter(app_mod.Ticket.username == owner_key)
 
     status_counts: dict[str, int] = {s: 0 for s in app_mod.VALID_STATUSES}
     for sname, cnt in base_s.group_by(app_mod.Ticket.status).all():
@@ -205,13 +232,18 @@ def ticket_queue_counts(
 def get_ticket(
     ticket_id: int,
     user: app_mod.User = Depends(app_mod.get_current_user),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
     db: Session = Depends(app_mod.get_db),
 ):
     ticket = db.query(app_mod.Ticket).filter(app_mod.Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
-    if getattr(user, "username", "") != app_mod.ADMIN_USERNAME and ticket.username != user.username:
-        raise HTTPException(status_code=403, detail="Forbidden")
+    owner_key = _ticket_owner_key(user, x_guest_client)
+    if getattr(user, "username", "") != app_mod.ADMIN_USERNAME:
+        if app_mod.is_session_guest(user) and not owner_key:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        if ticket.username != owner_key:
+            raise HTTPException(status_code=403, detail="Forbidden")
     return app_mod.serialize_ticket_with_log(ticket, db)
 
 

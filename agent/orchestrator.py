@@ -38,7 +38,7 @@ except Exception as _analytics_imp_err:
         exc_info=True,
     )
 
-    def log_event(user_input, response, confidence, quality, **kwargs):
+    def log_event(user_input, response, confidence, quality, **kwargs):  # noqa: ANN001
         return None
 
 
@@ -448,6 +448,7 @@ def run_agent(
             issue_type=str(ticket.get("issue_type", "general_support") or "general_support"),
             action=str(final_payload.get("action", "none") or "none"),
             amount=float(final_payload.get("amount", 0) or 0),
+            actor_principal=str(user_id or "")[:120],
         )
     except Exception:
         pass  # analytics write failure never blocks the response
