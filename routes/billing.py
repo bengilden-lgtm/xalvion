@@ -320,8 +320,11 @@ async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)
                 outcome = "skipped"
                 detail = "Missing username or tier in event payload"
 
-        elif event_type in {"customer.subscription.deleted", "customer.subscription.updated"}:
-            pass
+        elif event_type == "customer.subscription.deleted":
+            outcome, detail = stripe_service.apply_subscription_deleted(db, data_object)
+
+        elif event_type == "customer.subscription.updated":
+            outcome, detail = stripe_service.apply_subscription_updated(db, data_object)
 
     except Exception as process_exc:
         outcome = "failed"

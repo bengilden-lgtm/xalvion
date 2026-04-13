@@ -649,3 +649,133 @@ def infer_tier_from_checkout_session(session_id: str) -> str:
         return ""
 
     return ""
+
+
+def _metadata_from_stripe_object(meta: Any) -> dict[str, str]:
+    if not meta:
+        return {}
+    if isinstance(meta, dict):
+        return {str(k): str(v) if v is not None else "" for k, v in meta.items()}
+    try:
+        raw = dict(meta)
+        if isinstance(raw, dict):
+            return {str(k): str(v) if v is not None else "" for k, v in raw.items()}
+    except Exception:
+        pass
+    return {}
+
+
+def _subscription_field(subscription: Any, key: str, default: Any = None) -> Any:
+    """Read subscription fields from StripeObject or plain dict (webhook JSON)."""
+    if subscription is None:
+        return default
+    if isinstance(subscription, dict):
+        return subscription.get(key, default)
+    return getattr(subscription, key, default)
+
+
+def subscription_username(subscription: Any) -> str:
+    meta = _metadata_from_stripe_object(_subscription_field(subscription, "metadata"))
+    return (meta.get("username") or "").strip()
+
+
+def _tier_for_price_id(price_id: str) -> str:
+    pid = (price_id or "").strip()
+    pro = (_app.STRIPE_PRICE_PRO or "").strip()
+    elite = (_app.STRIPE_PRICE_ELITE or "").strip()
+    if pid and pro and pid == pro:
+        return "pro"
+    if pid and elite and pid == elite:
+        return "elite"
+    return ""
+
+
+def infer_tier_from_subscription(subscription: Any) -> str:
+    """
+    Map a Stripe Subscription to a billable tier (free / pro / elite).
+    Uses subscription status and line-item price IDs (PRICE_MAP / env prices).
+    """
+    status = str(_subscription_field(subscription, "status", "") or "").lower()
+    if status in {"canceled", "unpaid", "incomplete_expired", "incomplete"}:
+        return "free"
+
+    items_obj = _subscription_field(subscription, "items")
+    lines: list[Any] = []
+    if isinstance(items_obj, dict):
+        lines = list(items_obj.get("data") or [])
+    else:
+        lines = list(getattr(items_obj, "data", None) or [])
+    tier_rank = {"free": 0, "pro": 1, "elite": 2}
+    best = "free"
+    for item in lines:
+        price = item.get("price") if isinstance(item, dict) else getattr(item, "price", None)
+        pid = ""
+        if isinstance(price, str):
+            pid = price
+        elif isinstance(price, dict):
+            pid = str(price.get("id") or "")
+        elif price is not None:
+            pid = str(getattr(price, "id", "") or "")
+        t = _tier_for_price_id(pid)
+        if t and tier_rank.get(t, 0) > tier_rank.get(best, 0):
+            best = t
+
+    if best != "free":
+        return best
+
+    meta = _metadata_from_stripe_object(_subscription_field(subscription, "metadata"))
+    meta_tier = (meta.get("tier") or "").strip().lower()
+    if meta_tier in {"pro", "elite"}:
+        return meta_tier
+
+    return "free"
+
+
+def downgrade_user_to_free(db: Session, username: str) -> Any:
+    """Set user.tier to free after subscription removal (preserves internal dev tier)."""
+    user = db.query(_app.User).filter(_app.User.username == username).first()
+    if not user:
+        return None
+    if str(getattr(user, "tier", "") or "").strip().lower() == "dev":
+        return user
+    user.tier = "free"
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def sync_user_tier_from_stripe_subscription(db: Session, username: str, tier: str) -> Any:
+    """Apply tier from Stripe subscription state (free / pro / elite). Preserves dev tier."""
+    user = db.query(_app.User).filter(_app.User.username == username).first()
+    if not user:
+        return None
+    if str(getattr(user, "tier", "") or "").strip().lower() == "dev":
+        return user
+    desired = (tier or "").strip().lower()
+    if desired not in {"free", "pro", "elite"}:
+        desired = "free"
+    user.tier = desired
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def apply_subscription_deleted(db: Session, subscription: Any) -> tuple[str, str]:
+    username = subscription_username(subscription)
+    if not username:
+        return "skipped", "Missing username in subscription metadata"
+    user = downgrade_user_to_free(db, username)
+    if not user:
+        return "skipped", f"User not found: {username!r}"
+    return "ok", f"Downgraded {username} to free"
+
+
+def apply_subscription_updated(db: Session, subscription: Any) -> tuple[str, str]:
+    username = subscription_username(subscription)
+    if not username:
+        return "skipped", "Missing username in subscription metadata"
+    tier = infer_tier_from_subscription(subscription)
+    user = sync_user_tier_from_stripe_subscription(db, username, tier)
+    if not user:
+        return "skipped", f"User not found: {username!r}"
+    return "ok", f"Synced {username} to tier={tier}"
