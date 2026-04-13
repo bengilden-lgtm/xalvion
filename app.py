@@ -21,6 +21,7 @@ from __future__ import annotations
 print("BOOT: starting app import (app.py)", flush=True)
 
 import asyncio
+import importlib.util
 import json
 import logging
 import os
@@ -3002,19 +3003,33 @@ def build_status_sequence(result: dict[str, Any]) -> list[dict[str, str]]:
 # Register before direct ``@app`` routes below: Starlette matches in order, so
 # a duplicate path on ``app`` must not appear *above* ``routes.*`` handlers.
 
-for _router_mod, _router_label in (
+_ROUTER_SPECS: tuple[tuple[str, str], ...] = (
     ("routes.auth", "auth"),
     ("routes.billing", "billing"),
     ("routes.dashboard", "dashboard"),
     ("routes.support", "support"),
     ("routes.growth", "growth"),
-):
+)
+_router_import_errors: list[str] = []
+for _router_mod, _router_label in _ROUTER_SPECS:
+    if importlib.util.find_spec(_router_mod) is None:
+        msg = f"{_router_label}:module_not_found"
+        _router_import_errors.append(msg)
+        STARTUP_ISSUES.append(f"router_import_failed:{msg}")
+        continue
     try:
         _module = __import__(_router_mod, fromlist=["router"])
         app.include_router(_module.router)
     except Exception as exc:
-        STARTUP_ISSUES.append(f"router_import_failed:{_router_label}:{type(exc).__name__}:{str(exc)[:180]}")
-        logger.warning("router import failed for %s", _router_label, exc_info=True)
+        msg = f"{_router_label}:{type(exc).__name__}:{str(exc)[:180]}"
+        _router_import_errors.append(msg)
+        STARTUP_ISSUES.append(f"router_import_failed:{msg}")
+if _router_import_errors:
+    logger.warning(
+        "router import failed for %d module(s): %s",
+        len(_router_import_errors),
+        "; ".join(_router_import_errors),
+    )
 
 try:
     from backend.crm.outreach import register_outreach_crm_routes as _register_outreach_crm_routes
@@ -3022,7 +3037,11 @@ try:
     _register_outreach_crm_routes(app, base_dir=BASE_DIR, require_authenticated_user=require_authenticated_user)
 except Exception as exc:
     STARTUP_ISSUES.append(f"router_import_failed:crm:{type(exc).__name__}:{str(exc)[:180]}")
-    logger.warning("router import failed for crm", exc_info=True)
+    logger.warning(
+        "router import failed for crm: %s: %s",
+        type(exc).__name__,
+        str(exc)[:180],
+    )
 
 
 # =============================================================================
