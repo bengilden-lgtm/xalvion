@@ -1700,11 +1700,12 @@ if (typeof window.pulseRail !== "function") {
       .xv-act-check { font-weight: 800; width: 16px; flex: none; }
       .xv-act-skip { margin-top: 8px; font-size: 12px !important; }
       .xv-first-outcome-callout {
-        margin: 0 0 12px 0;
-        padding: 12px 14px;
-        border-radius: 12px;
-        border: 1px solid rgba(96, 220, 170, 0.35);
-        background: rgba(96, 220, 170, 0.08);
+        margin: 0 0 14px 0;
+        padding: 14px 16px;
+        border-radius: 14px;
+        border: 1px solid rgba(96, 220, 170, 0.42);
+        background: linear-gradient(135deg, rgba(96, 220, 170, 0.12), rgba(96, 220, 170, 0.05));
+        box-shadow: 0 0 0 1px rgba(96, 220, 170, 0.12) inset;
       }
       .xv-first-outcome-kicker {
         font-size: 11px;
@@ -1724,10 +1725,16 @@ if (typeof window.pulseRail !== "function") {
         font-size: 12.5px;
         line-height: 1.45;
       }
-      .decision-panel-integration-hint-inner .btn {
+      .decision-panel-integration-hint-inner .xv-int-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
         margin-top: 10px;
-        width: 100%;
-        max-width: 280px;
+      }
+      .decision-panel-integration-hint-inner .btn {
+        margin-top: 0;
+        width: auto;
+        max-width: none;
       }
 
       @media (max-width: 1200px) {
@@ -1845,15 +1852,15 @@ if (typeof window.pulseRail !== "function") {
     host.innerHTML = `
       <div class="xv-act-inner" role="list">
         <div class="xv-act-head">
-          <span class="xv-act-title">First success</span>
+          <span class="xv-act-title">First-run checklist</span>
           <button type="button" class="xv-act-dismiss ghost-btn" id="xvActDismissChecklist" aria-label="Dismiss checklist">×</button>
         </div>
         <p class="xv-act-lead muted-copy">About three minutes to your first meaningful outcome — work top to bottom.</p>
-        ${row(s.analyzed, "Analyze your first ticket (paste below or pick a sample)")}
+        ${row(s.analyzed, "Analyze your first ticket — paste below, import, or open a labeled sample")}
         ${row(s.reviewedSummary, "Review the result summary and decision details")}
         ${row(s.shipped, "Approve, edit, or send one customer-visible action")}
-        ${row(integDone, "Connect Stripe or SMTP if a live refund or send needs them")}
-        <button type="button" class="xv-act-skip ghost-btn" id="xvActSkipIntegrations">Not using refunds or server email yet</button>
+        ${row(integDone, "Connect Stripe or configure email (SMTP) only when a live refund or send needs them")}
+        <button type="button" class="xv-act-skip ghost-btn" id="xvActSkipIntegrations">Not using live refunds or server email yet</button>
       </div>`;
     host.querySelector("#xvActDismissChecklist")?.addEventListener("click", () => {
       try {
@@ -1882,18 +1889,18 @@ if (typeof window.pulseRail !== "function") {
   }
 
   function buildOnboardingFlowCalloutHtml() {
-    if (!isClaudeShell() || onboardingFlowDismissed()) return "";
+    if (onboardingFlowDismissed()) return "";
     return `
       <div class="xv-onboarding-flow" role="region" aria-label="How Xalvion works">
         <div class="xv-onboarding-flow-head">
-          <span class="xv-onboarding-flow-title">How it works</span>
+          <span class="xv-onboarding-flow-title">First run · about a minute to read</span>
           <button type="button" class="xv-onboarding-flow-dismiss ghost-btn" id="xvOnboardingFlowDismiss" aria-label="Dismiss getting started tip">×</button>
         </div>
         <ol class="xv-onboarding-flow-steps">
-          <li><strong>Paste or import</strong> a ticket into the composer.</li>
-          <li><strong>AI prepares</strong> the reply and proposed next step — auditable, not hidden.</li>
-          <li><strong>You approve</strong> when money, policy, or send risk is involved.</li>
-          <li><strong>Execute or send</strong> on your terms — or copy out if integrations are not wired yet.</li>
+          <li><strong>Paste or import</strong> a ticket.</li>
+          <li><strong>AI prepares</strong> the decision and customer-ready reply — visible reasoning, nothing faked.</li>
+          <li><strong>You approve</strong> when money, policy, or send risk needs a human.</li>
+          <li><strong>Execute or send</strong> when you are satisfied — or copy the verified draft if integrations are not wired yet.</li>
         </ol>
       </div>`;
   }
@@ -1925,12 +1932,12 @@ if (typeof window.pulseRail !== "function") {
     }
     const tierLc = String(state.tier || "free").toLowerCase();
     if (tierLc === "elite" || tierLc === "dev") return;
-    if (n < 3) return;
+    if (n < 4) return;
     if (state.atLimit || state.approachingLimit) return;
     state.usageInlineCtaUntil = Date.now() + 120 * 1000;
     setUsageInlineCta({
       tone: "neutral",
-      copy: "You have repeated manual handoffs (email or billing). Paid tiers remove those bottlenecks while keeping human approval on sensitive moves.",
+      copy: "You have repeated manual handoffs (email or billing). Paid tiers reduce that friction while keeping human approval on sensitive moves — upgrade when the pattern sticks, not on day one.",
       cta: tierLc === "pro" ? "See Elite headroom" : "See Pro execution",
       targetTier: tierLc === "pro" ? "elite" : "pro",
     });
@@ -2870,7 +2877,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           "SMTP is configured — approved sends can deliver from this server with a clear audit trail.";
       } else {
         els.smtpIntegrationCopy.textContent =
-          "SMTP is not configured — when you approve a send, copy the verified draft to your helpdesk until outbound email is wired here.";
+          "SMTP is not configured — when you approve a send, copy the verified draft to your helpdesk until outbound email is wired here. Nothing is logged as delivered unless SMTP actually sends.";
       }
     }
   }
@@ -4302,8 +4309,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         <div class="xv-empty-hero">
           <p class="xv-empty-kicker" translate="no">Operator console</p>
           <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""}`)}</h2>
-          <p class="cld-welcome-lead">Paste or import a ticket — <strong>AI prepares</strong> the reply and next step. <strong>You approve</strong> when money, policy, or send risk is on the line — then <strong>execute or send</strong>.</p>
-          <p class="cld-welcome-prompt onboarding-subline">No live tickets yet? Use <strong>Example openers</strong> in the composer or open the queue — <span class="xv-demo-inline-label">Preview / demo</span> samples are labeled and are not your production queue.</p>
+          <p class="cld-welcome-lead">Paste or import a ticket — <strong>AI prepares</strong> the decision and customer-ready reply. <strong>You approve</strong> when money, policy, or send risk needs a human — then <strong>execute or send</strong> (or copy the verified draft).</p>
+          <p class="cld-welcome-prompt onboarding-subline">Testing the system? Use <strong>Example openers</strong> or the queue — synthetic rows carry a <span class="xv-demo-inline-label">Preview / demo</span> label so they never read as live production traffic.</p>
         </div>
         <details class="xv-queue-details">
           <summary class="xv-queue-details-summary">Queue <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
@@ -4346,15 +4353,17 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     return `
       <div class="empty-card empty-card-premium empty-card-launch">
         ${roiHeroStripMarkup()}
+        ${buildOnboardingFlowCalloutHtml()}
         <div class="xv-empty-hero xv-empty-hero--legacy">
           <p class="empty-launch-directive">One thread, one decision</p>
-          <p class="empty-launch-outcome">Paste a ticket — get a customer-ready reply and the next best move</p>
-          <p class="empty-launch-review">You edit, approve, or stop it before anything executes</p>
+          <p class="empty-launch-outcome">Paste or import a ticket — <strong>AI prepares</strong> the decision; <strong>you approve</strong> when needed; then <strong>execute or send</strong>.</p>
+          <p class="empty-launch-review">No live queue yet? Use <strong>Quick examples</strong> below to test — samples are labeled <span class="xv-demo-inline-label">Preview / demo</span> and are not production tickets.</p>
         </div>
         <div class="empty-flow-strip" aria-hidden="true">
-          <span>Analyze ticket</span>
-          <span>Prepare action</span>
-          <span>Approve &amp; execute</span>
+          <span>Paste / import</span>
+          <span>AI prepares</span>
+          <span>Approve</span>
+          <span>Send / execute</span>
         </div>
         <details class="xv-queue-details">
           <summary class="xv-queue-details-summary">Queue <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
@@ -4526,7 +4535,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     incomingNode.innerHTML = incoming.length
       ? incoming.slice(0, 6).map(buildInboxTicketButton).join("")
-      : `<div class="xv-inbox-empty">No live tickets in this workspace yet. Paste a real ticket below to run your first case, or open <strong>Example openers</strong> to test the flow — demo rows are labeled <span class="xv-demo-inline-label">Preview / demo</span> so they never look like production.</div>`;
+      : `<div class="xv-inbox-empty">No ingested live tickets yet — that is normal in a fresh workspace. Paste a real case below to run production work, or use <strong>Example openers</strong> / queue samples to test end-to-end. Anything synthetic is labeled <span class="xv-demo-inline-label">Preview / demo</span> so it cannot be mistaken for live customer data.</div>`;
 
     if (recommended) {
       const tone = inboxTone(recommended);
@@ -4688,6 +4697,20 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
   function focusPlansPanel() {
     setSurface("plans");
+  }
+
+  function focusIntegrationsStripe() {
+    setSurface("integrations");
+    window.setTimeout(() => {
+      document.getElementById("stripeCard")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    }, 90);
+  }
+
+  function focusIntegrationsSmtp() {
+    setSurface("integrations");
+    window.setTimeout(() => {
+      document.getElementById("smtpCard")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    }, 90);
   }
 
   function setSurface(key) {
@@ -5556,43 +5579,66 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const paid = tierLc === "pro" || tierLc === "elite" || tierLc === "dev";
     const wantsEmail = Boolean(String(data?.ticket?.customer_email || "").includes("@"));
     const pendingGate = Boolean(approval?.requiresApproval && !approval?.approved);
-    const lines = [];
-    if (pendingGate && moneyActs && paid && !state.stripeConnected) {
-      lines.push(
-        "This approval can execute a live billing move in Stripe. Connect Stripe under Integrations first if you want it to run automatically — nothing is faked as completed."
+    const stripeBlocksPaidSend = Boolean(moneyActs && paid && !state.stripeConnected);
+    const showStripeConnect = Boolean(pendingGate && moneyActs && paid && !state.stripeConnected);
+    const showStripePlan = Boolean(pendingGate && moneyActs && !paid);
+    const showSmtpConfigure = Boolean(
+      pendingGate && wantsEmail && !state.smtpReady && !stripeBlocksPaidSend
+    );
+
+    const chunks = [];
+    if (showStripeConnect) {
+      chunks.push(
+        `<p><strong>Live refund needs Stripe connected.</strong> AI prepared this decision for your review — connect Stripe, then approve to execute here. Nothing is marked paid until Stripe confirms.</p>
+        <div class="xv-int-actions"><button type="button" class="btn xv-int-connect-stripe">Connect Stripe</button></div>`
+      );
+    } else if (showStripePlan) {
+      chunks.push(
+        `<p><strong>Live billing execution is not on this plan.</strong> AI still prepares a verified recommendation you can run manually in Stripe. Upgrade when you routinely execute refunds here — not required to learn the loop.</p>
+        <div class="xv-int-actions"><button type="button" class="btn xv-int-compare-plans">Compare plans</button></div>`
       );
     }
-    if (pendingGate && wantsEmail && !state.smtpReady) {
-      lines.push(
-        "Outbound SMTP is not configured on this server. You can still approve and copy the verified reply to your helpdesk — configure email under Integrations when you want sends from here."
+    if (showSmtpConfigure) {
+      chunks.push(
+        `<p><strong>Customer email send needs SMTP.</strong> Approve when the text is right — configure outbound email here, or copy the verified draft to your helpdesk. Sends are not simulated as delivered.</p>
+        <div class="xv-int-actions"><button type="button" class="btn xv-int-configure-email">Configure email (SMTP)</button></div>`
       );
     }
-    if (!lines.length) {
+
+    if (!chunks.length) {
       hint.hidden = true;
       hint.innerHTML = "";
       return;
     }
     hint.hidden = false;
-    hint.innerHTML = `
-      <div class="decision-panel-integration-hint-inner">
-        ${lines.map((t) => `<p>${escapeHtml(t)}</p>`).join("")}
-        <button type="button" class="btn xv-int-open-integrations">Open Integrations</button>
-      </div>`;
-    hint.querySelector(".xv-int-open-integrations")?.addEventListener("click", () => setSurface("integrations"), {
-      once: true,
-    });
+    hint.innerHTML = `<div class="decision-panel-integration-hint-inner">${chunks.join("")}</div>`;
+    hint.querySelector(".xv-int-connect-stripe")?.addEventListener(
+      "click",
+      () => focusIntegrationsStripe(),
+      { once: true }
+    );
+    hint.querySelector(".xv-int-compare-plans")?.addEventListener(
+      "click",
+      () => focusPlansPanel(),
+      { once: true }
+    );
+    hint.querySelector(".xv-int-configure-email")?.addEventListener(
+      "click",
+      () => focusIntegrationsSmtp(),
+      { once: true }
+    );
   }
 
   function maybeNudgeIntegrationsFromApproveError(message) {
     const m = String(message || "").toLowerCase();
     if (m.includes("stripe") || m.includes("payment_intent") || m.includes("connect")) {
-      setNotice("warning", "Stripe needed", "Connect Stripe under Integrations, then try approving again.");
-      setSurface("integrations");
+      setNotice("warning", "Stripe needed", "Connect Stripe for this workspace, then approve again — refunds are never faked as completed.");
+      focusIntegrationsStripe();
       return;
     }
     if (m.includes("smtp") || m.includes("email") || m.includes("send")) {
-      setNotice("warning", "Email delivery blocked", "Configure SMTP under Integrations, or copy the verified reply to your helpdesk.");
-      setSurface("integrations");
+      setNotice("warning", "Email delivery blocked", "Configure SMTP for server-side sends, or copy the verified reply to your helpdesk.");
+      focusIntegrationsSmtp();
     }
   }
 
@@ -5668,11 +5714,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     // Default decision microcopy (kept minimal, high-signal).
     if (pendingGate || /signal-approval/.test(sig.cls)) {
-      setMicrocopy("This is your call — nothing moves until you approve, edit, or reject.", "hold");
+      setMicrocopy("Human approval gate — AI prepared this; nothing customer-facing ships until you sign off.", "hold");
     } else if (/signal-review|signal-high-risk|signal-blocked/.test(sig.cls)) {
-      setMicrocopy("Pause — read the reply before it reaches the customer.", "risk");
+      setMicrocopy("Pause — read the verified reply before it reaches the customer.", "risk");
     } else if (/signal-safe/.test(sig.cls)) {
-      setMicrocopy("Handled safely by policy — still your send.", "safe");
+      setMicrocopy("Policy read looks routine — still your send; actions stay auditable.", "safe");
     } else {
       setMicrocopy("");
     }
@@ -5810,7 +5856,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const n = effectiveTicketCount();
       const mins = estimateTimeSavedMinutes();
       const momentum = momentumLine();
-      const integrationHint = n >= 4 ? "Connect your system to auto-fill tracking, refunds, and orders" : "";
+      const integrationHint =
+        n >= 12 && !state.stripeConnected
+          ? "Stripe is still disconnected — connect when you are ready to finish refunds in-place after approval"
+          : "";
       const tierLc = String(state.tier || "free").toLowerCase();
       const conv = getPhase2Core()?.conversion || null;
       const postValueNudge = conv?.buildPostValueUpgradeNudge
@@ -5825,10 +5874,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           })
         : null;
       const volumeHint =
-        !postValueNudge && n >= 5
-          ? "You’re on a roll — add headroom before a hard cap slows the queue"
+        !postValueNudge && (state.atLimit || n >= 14)
+          ? "You are brushing against capacity — add headroom when limits start breaking your flow"
           : "";
-      const canShowAutomation = !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev" && n >= 3;
+      const canShowAutomation =
+        !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev" && (state.atLimit || n >= 10);
       const automationBlock = canShowAutomation
         ? `<div class="xv-next-nudge">
             <div class="xv-next-nudge-copy">${
@@ -5844,7 +5894,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const integrationBlock = integrationHint
         ? `<div class="xv-next-nudge">
             <div class="xv-next-nudge-copy">${escapeHtml(integrationHint)}.</div>
-            <button type="button" class="xv-next-nudge-cta" data-act="connect-integrations">Connect Stripe</button>
+            <button type="button" class="xv-next-nudge-cta" data-act="connect-integrations">Open Integrations</button>
           </div>`
         : "";
       const volumeBlock = volumeHint
@@ -5863,10 +5913,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const firstOut = isFirstOutcomeCelebrationPending();
       const firstBlock = firstOut
         ? `<div class="xv-first-outcome-callout" role="status">
-            <div class="xv-first-outcome-kicker">First success</div>
-            <p class="xv-first-outcome-copy"><strong>What happened:</strong> You ran a full decision loop — AI prepared, you approved, and the outcome is on the record.</p>
-            <p class="xv-first-outcome-copy"><strong>What you saved:</strong> ${escapeHtml(mins > 0 ? `Roughly ${mins} minutes of operator time on this path.` : "Time on drafting, policy checks, and copy iteration.")}</p>
-            <p class="xv-first-outcome-copy muted-copy"><strong>What paid plans add:</strong> Higher included runs, live Stripe execution after approval, and server-side email sends when SMTP is configured — same human gate, less tab switching.</p>
+            <div class="xv-first-outcome-kicker">First success — you shipped a real loop</div>
+            <p class="xv-first-outcome-copy"><strong>What happened:</strong> AI prepared a verified decision and reply; you approved when it mattered; the workspace logged the outcome — nothing hidden or simulated as done.</p>
+            <p class="xv-first-outcome-copy"><strong>What you saved:</strong> ${escapeHtml(mins > 0 ? `About ${mins} minutes of operator drafting and back-and-forth on this path.` : "Drafting time, policy double-checks, and risky copy iterations you did not have to invent from scratch.")}</p>
+            <p class="xv-first-outcome-copy muted-copy"><strong>On paid plans you can automate further:</strong> higher included runs, live Stripe moves after the same approval gate, and SMTP sends from this host — still human-in-the-loop on sensitive actions.</p>
           </div>`
         : "";
 
@@ -5887,12 +5937,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           <div class="xv-next-prompt-title">Handle another ticket?</div>
           <div class="xv-next-actions" role="group" aria-label="Next actions">
             <button type="button" class="xv-next-btn" data-act="paste-another">Paste another</button>
-            <button type="button" class="xv-next-btn xv-next-btn--ghost" data-act="simulate">Simulate new case</button>
+            <button type="button" class="xv-next-btn xv-next-btn--ghost" data-act="simulate">Try a demo ticket</button>
           </div>
           <div class="xv-next-meta">
             ${momentum ? `<span class="xv-next-meta-chip">${escapeHtml(momentum)}</span>` : ""}
             ${mins > 0 ? `<span class="xv-next-meta-chip">Estimated time saved: ${escapeHtml(String(mins))} min</span>` : ""}
-            <span class="xv-next-meta-chip">You stayed in control — time back, risk bounded</span>
+            <span class="xv-next-meta-chip">AI prepared · you approved · auditable outcome</span>
           </div>
         </div>
 
@@ -6021,7 +6071,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             </div>
             <div class="edit-compose-head">
               <div class="edit-compose-label">Final customer response</div>
-              <div class="edit-compose-hint">Preview updates live below. Keep it customer-safe and policy-compliant.</div>
+              <div class="edit-compose-hint">Preview updates live below — you are editing the verified customer-visible text; nothing sends until you approve.</div>
             </div>
             <textarea class="decision-edit-textarea" aria-label="Final customer response">${escapeHtml(draftSeed)}</textarea>
             <div class="edit-preview">
@@ -6722,8 +6772,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     }
     if (!hasThread) {
       els.composerStatusLine.textContent = isAuthenticated()
-        ? "Describe the case below."
-        : "A few full runs available—no account needed.";
+        ? "Paste or import a ticket — AI prepares; you approve when it matters."
+        : "Preview runs available — AI prepares; you approve before anything ships.";
       syncComposerAriaDescribedBy();
       return;
     }
@@ -6740,7 +6790,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     }
     {
       const m = momentumLine();
-      els.composerStatusLine.textContent = m ? `${m} Next ticket?` : "Next ticket, or refine this thread.";
+      els.composerStatusLine.textContent = m ? `${m} Next ticket?` : "Next ticket — same loop: AI prepares, you approve, then send or execute.";
     }
     syncComposerAriaDescribedBy();
   }
