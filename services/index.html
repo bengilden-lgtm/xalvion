@@ -11,7 +11,7 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260411" />
   <link rel="icon" type="image/png" href="/static/favicon.png" />
   <link rel="shortcut icon" href="/static/favicon.ico" />
-  <link rel="stylesheet" href="/styles.css?v=elite-op-17" />
+  <link rel="stylesheet" href="/styles.css?v=elite-op-18" />
 </head>
 <body data-ui="claude">
   <div class="workspace-atmosphere" aria-hidden="true">
@@ -41,7 +41,7 @@
               fill="rgba(255,255,255,0.28)" letter-spacing="3.5">AUTONOMOUS SUPPORT</text>
           </svg>
         </a>
-        <span id="commandModeLine" class="command-mode-pill" translate="no">AI prepares support decisions · You approve, or automate within limits · Reduce support workload</span>
+        <span id="commandModeLine" class="command-mode-pill" translate="no">Verified actions · approval-first workspace</span>
       </div>
       <div class="command-strip-center command-strip-center--align">
         <div class="command-status-chip command-status-chip--stack" role="status" aria-live="polite">
@@ -141,15 +141,15 @@
                 <div class="workspace-conversation-column" id="workspaceConversationColumn">
                   <div id="homeSurface" class="home-surface" aria-label="Workspace home"></div>
                   <template id="xv-roi-hero-strip">
-                    <section class="xv-roi-hero" id="xvRoiHero" aria-label="Estimated impact this month">
+                    <section class="xv-roi-hero" id="xvRoiHero" aria-label="Impact this month">
                       <div class="xv-roi-hero-glow" aria-hidden="true"></div>
                       <div class="xv-roi-hero-inner">
                         <div class="xv-roi-hero-main">
                           <span class="xv-roi-hero-emoji" aria-hidden="true">💰</span>
-                          <p id="xvRoiRevenueSaved" class="xv-roi-hero-line">Estimated value saved this month: …</p>
+                          <p id="xvRoiRevenueSaved" class="xv-roi-hero-line">Value saved (month): …</p>
                         </div>
                         <div class="xv-roi-hero-side">
-                          <p id="xvRoiAutoResolved" class="xv-roi-hero-line xv-roi-hero-line--compact">🎟️ Tickets auto-resolved: —</p>
+                          <p id="xvRoiAutoResolved" class="xv-roi-hero-line xv-roi-hero-line--compact">🎟️ Auto-resolved: —</p>
                           <p id="xvRoiAvgConfidence" class="xv-roi-hero-line xv-roi-hero-line--compact">⚡ Avg confidence: —</p>
                         </div>
                       </div>
@@ -180,7 +180,7 @@
                       <div class="composer-input-row composer-input-wrap composer-field">
                         <div class="composer-input-shell">
                           <div class="composer-field-inner">
-                            <textarea id="messageInput" placeholder="Paste or import a ticket — AI prepares the decision; you approve before anything ships." autocomplete="off"></textarea>
+                            <textarea id="messageInput" placeholder="Paste a ticket. AI prepares. You approve before sending." autocomplete="off"></textarea>
                             <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                           </div>
                         </div>

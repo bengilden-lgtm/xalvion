@@ -1681,7 +1681,7 @@ if (typeof window.pulseRail !== "function") {
       }
 
       .xv-onboarding-flow {
-        margin: 0 0 14px 0;
+        margin: 0 0 12px 0;
         padding: 12px 14px;
         border-radius: 12px;
         border: 1px solid rgba(255,255,255,0.08);
@@ -1689,21 +1689,45 @@ if (typeof window.pulseRail !== "function") {
       }
       .xv-onboarding-flow-head {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 10px;
-        margin-bottom: 8px;
+        margin-bottom: 0;
       }
-      .xv-onboarding-flow-title {
-        font-size: 12px;
-        font-weight: 750;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        color: rgba(230,236,255,0.82);
+      .xv-onboarding-flow-tagline {
+        margin: 0;
+        flex: 1;
+        min-width: 0;
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 1.45;
+        letter-spacing: -0.02em;
+        color: rgba(236, 240, 255, 0.96);
+      }
+      .xv-onboarding-flow-more {
+        margin-top: 8px;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.06);
+        background: rgba(0,0,0,0.12);
+        padding: 0;
+      }
+      .xv-onboarding-flow-more-summary {
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+        padding: 8px 10px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: rgba(200, 210, 255, 0.78);
+      }
+      .xv-onboarding-flow-more-summary::-webkit-details-marker { display: none; }
+      .xv-onboarding-flow-more[open] .xv-onboarding-flow-more-summary {
+        color: rgba(220, 228, 255, 0.9);
+        border-bottom: 1px solid rgba(255,255,255,0.06);
       }
       .xv-onboarding-flow-steps {
         margin: 0;
-        padding-left: 18px;
+        padding: 10px 14px 10px 28px;
         font-size: 13px;
         line-height: 1.55;
         color: rgba(224,234,255,0.9);
@@ -1972,15 +1996,18 @@ if (typeof window.pulseRail !== "function") {
     return `
       <div class="xv-onboarding-flow" role="region" aria-label="How Xalvion works">
         <div class="xv-onboarding-flow-head">
-          <span class="xv-onboarding-flow-title">First run · about a minute to read</span>
+          <p class="xv-onboarding-flow-tagline">Paste a ticket. AI prepares. You approve before sending.</p>
           <button type="button" class="xv-onboarding-flow-dismiss ghost-btn" id="xvOnboardingFlowDismiss" aria-label="Dismiss getting started tip">×</button>
         </div>
-        <ol class="xv-onboarding-flow-steps">
-          <li><strong>Paste or import</strong> a ticket.</li>
-          <li><strong>AI prepares</strong> the decision and customer-ready reply — visible reasoning, nothing faked.</li>
-          <li><strong>You approve</strong> when money, policy, or send risk needs a human.</li>
-          <li><strong>Execute or send</strong> when you are satisfied — or copy the verified draft if integrations are not wired yet.</li>
-        </ol>
+        <details class="xv-onboarding-flow-more">
+          <summary class="xv-onboarding-flow-more-summary">Learn more</summary>
+          <ol class="xv-onboarding-flow-steps">
+            <li><strong>Paste or import</strong> a ticket.</li>
+            <li><strong>AI prepares</strong> the decision and customer-ready reply — visible reasoning, nothing faked.</li>
+            <li><strong>You approve</strong> when money, policy, or send risk needs a human.</li>
+            <li><strong>Execute or send</strong> when you are satisfied — or copy the verified draft if integrations are not wired yet.</li>
+          </ol>
+        </details>
       </div>`;
   }
 
@@ -4148,7 +4175,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (els.commandModeLine) {
       els.commandModeLine.textContent = state.latestRun
         ? "Session active"
-        : "AI prepares · you approve · verified actions only";
+        : "Verified actions · approval-first workspace";
     }
     syncCommandStripCapacity();
 
@@ -4184,7 +4211,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     if (!data) {
       els.systemPanelCopy.textContent =
-        "Paste or import a ticket — AI prepares the decision; you approve when needed; then execute or send. Nothing is hidden or faked.";
+        "Sensitive moves stay staged until you decide. Visible reasoning — nothing logged as done unless it actually happened.";
       return;
     }
 
@@ -4313,7 +4340,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             </div>
             <div class="ticket-result-summary js-ticket-result-summary" hidden aria-live="polite"></div>
             <div class="customer-message-label reply-hero-label">Suggested reply</div>
-              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Policy-checked. You approve before sending.</div>
+              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Verified against policy before send.</div>
               <div class="reply-text js-reply-text">${bodyHtml}</div>
             </div>
           </div>
@@ -4382,15 +4409,15 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const autoResolved = Number(safe.auto_resolved ?? 0);
     const avgConfRaw = Number(safe.avg_confidence ?? m.avg_confidence ?? 0);
     if (!hasAct) {
-      rev.textContent = "No workspace activity data yet.";
-      tick.textContent = "Tickets auto-resolved (closed, no approval gate): —";
+      rev.textContent = "No activity this month yet.";
+      tick.textContent = "Auto-resolved: —";
       conf.textContent = "Avg confidence: —";
       return;
     }
     const cref = Number(vg.credit_volume_usd ?? 0);
     const rref = Number(vg.refund_volume_usd ?? 0);
-    rev.textContent = `Recorded billing motion: ${formatMoney(cref)} credits · ${formatMoney(rref)} refunds`;
-    tick.textContent = `Tickets auto-resolved (closed, no approval gate): ${Number.isFinite(autoResolved) ? String(Math.max(0, Math.round(autoResolved))) : "—"}`;
+    rev.textContent = `Billing motion: ${formatMoney(cref)} credits · ${formatMoney(rref)} refunds`;
+    tick.textContent = `Auto-resolved: ${Number.isFinite(autoResolved) ? String(Math.max(0, Math.round(autoResolved))) : "—"}`;
     const pct = Number.isFinite(avgConfRaw) ? (avgConfRaw <= 1.001 ? avgConfRaw * 100 : avgConfRaw) : 0;
     conf.textContent = `Avg confidence: ${Math.round(pct)}%`;
   }
@@ -4501,15 +4528,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         <div class="xv-empty-hero">
           <p class="xv-empty-kicker" translate="no">Operator console</p>
           <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""}`)}</h2>
-          <p class="cld-welcome-lead">Paste or import a ticket — <strong>AI prepares</strong> the decision and customer-ready reply. <strong>You approve</strong> when money, policy, or send risk needs a human — then <strong>execute or send</strong> (or copy the verified draft).</p>
-          <p class="cld-welcome-prompt onboarding-subline">Testing the system? Use <strong>Sample demo tickets</strong> below, <strong>Example openers</strong>, or the queue — synthetic content is labeled <span class="xv-demo-inline-label">Demo</span> or <span class="xv-demo-inline-label">Preview / demo</span> so it is never confused with real customer data.</p>
+          <p class="cld-welcome-prompt onboarding-subline">Try <strong>Sample demo tickets</strong>, <strong>Example openers</strong>, or the queue — synthetic threads are labeled <span class="xv-demo-inline-label">Demo</span> or <span class="xv-demo-inline-label">Preview / demo</span>.</p>
         </div>
         <div class="xv-demo-lab" role="region" aria-label="Sample demo tickets">
           <div class="xv-demo-lab__bar">
             <span class="xv-demo-inline-label">Demo</span>
             <span class="xv-demo-lab__title">Try a synthetic ticket (not real data)</span>
           </div>
-          <p class="xv-demo-lab__hint">Pick one — it fills the composer with a tagged demo thread. Press send to see AI-prepared decisions and the <strong>Result</strong> summary.</p>
+          <p class="xv-demo-lab__hint">Fills the composer with a tagged demo thread — send to see the decision and <strong>Result</strong> summary.</p>
           <div class="xv-demo-lab__actions">
             <button type="button" class="chip empty-intent-chip" data-demo-sample="dup">Sample: duplicate charge</button>
             <button type="button" class="chip empty-intent-chip" data-demo-sample="late">Sample: late shipment</button>
@@ -4559,14 +4585,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         ${buildOnboardingFlowCalloutHtml()}
         <div class="xv-empty-hero xv-empty-hero--legacy">
           <p class="empty-launch-directive">One thread, one decision</p>
-          <p class="empty-launch-outcome">Paste or import a ticket — <strong>AI prepares</strong> the decision; <strong>you approve</strong> when needed; then <strong>execute or send</strong>.</p>
-          <p class="empty-launch-review">No live queue yet? Use <strong>Quick examples</strong> below to test — samples are labeled <span class="xv-demo-inline-label">Preview / demo</span> and are not production tickets.</p>
-        </div>
-        <div class="empty-flow-strip" aria-hidden="true">
-          <span>Paste / import</span>
-          <span>AI prepares</span>
-          <span>Approve</span>
-          <span>Send / execute</span>
+          <p class="empty-launch-review">No live queue? Use <strong>Quick examples</strong> below — labeled <span class="xv-demo-inline-label">Preview / demo</span>.</p>
         </div>
         <details class="xv-queue-details">
           <summary class="xv-queue-details-summary">Queue <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
@@ -7202,9 +7221,13 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       return;
     }
     if (!hasThread) {
-      els.composerStatusLine.textContent = isAuthenticated()
-        ? "Paste or import a ticket — AI prepares; you approve when it matters."
-        : "Preview runs available — AI prepares; you approve before anything ships.";
+      if (isAuthenticated()) {
+        els.composerStatusLine.textContent = "";
+      } else {
+        const left = Math.max(0, GUEST_USAGE_LIMIT - getGuestUsage());
+        const rw = left === 1 ? "run" : "runs";
+        els.composerStatusLine.textContent = left > 0 ? `Preview · ${left} ${rw} left` : "";
+      }
       syncComposerAriaDescribedBy();
       return;
     }
@@ -7221,7 +7244,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     }
     {
       const m = momentumLine();
-      els.composerStatusLine.textContent = m ? `${m} Next ticket?` : "Next ticket — same loop: AI prepares, you approve, then send or execute.";
+      els.composerStatusLine.textContent = m ? `${m} Next ticket?` : "Next ticket — paste when ready.";
     }
     syncComposerAriaDescribedBy();
   }
@@ -9450,8 +9473,7 @@ function bindEvents() {
     if (isClaudeShell()) {
       if (els.composerStatusLine) els.composerStatusLine.textContent = "";
       if (els.messageInput) {
-        els.messageInput.placeholder =
-          "Paste or import a ticket — AI prepares; you approve before anything ships.";
+        els.messageInput.placeholder = "Paste a ticket. AI prepares. You approve before sending.";
       }
       syncComposerAriaDescribedBy();
     }

@@ -2697,6 +2697,130 @@ select.refund-select{ padding-right: 34px; }
   font-weight: 600;
   color: var(--text-2);
 }
+
+/* Workspace onboarding — one-line default, details for depth */
+.xv-onboarding-flow{
+  margin: 0 0 12px 0;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 35%, transparent);
+}
+.xv-onboarding-flow-head{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.xv-onboarding-flow-tagline{
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.xv-onboarding-flow-dismiss{
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin: -4px -6px 0 0;
+  border-radius: 10px;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.75;
+}
+.xv-onboarding-flow-dismiss:hover{
+  opacity: 1;
+}
+.xv-onboarding-flow-more{
+  margin-top: 8px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+  background: color-mix(in oklab, var(--bg1) 40%, transparent);
+}
+.xv-onboarding-flow-more-summary{
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.xv-onboarding-flow-more-summary::-webkit-details-marker{ display: none; }
+.xv-onboarding-flow-more[open] .xv-onboarding-flow-more-summary{
+  color: var(--text-2);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+}
+.xv-onboarding-flow-steps{
+  margin: 0;
+  padding: 10px 14px 10px 28px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.xv-onboarding-flow-steps li{ margin: 4px 0; }
+
+/* Demo lab strip (workspace home) */
+.xv-demo-lab{
+  margin: 12px 0 10px 0;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  border: 1px dashed color-mix(in oklab, var(--warning) 35%, var(--border));
+  background: color-mix(in oklab, var(--warning) 8%, var(--surface-soft));
+}
+.xv-demo-lab__bar{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.xv-demo-lab__title{
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+}
+.xv-demo-lab__hint{
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 0 0 10px 0;
+  line-height: 1.45;
+}
+.xv-demo-lab__actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Idle workspace: composer reads as the primary action */
+body[data-ui="claude"] .workspace-idle .composer .composer-field-inner{
+  border-color: color-mix(in oklab, var(--border) 100%, transparent);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 color-mix(in oklab, white 7%, transparent);
+  background: linear-gradient(180deg, color-mix(in oklab, white 7%, transparent), color-mix(in oklab, white 2.5%, transparent));
+}
+body[data-ui="claude"] .workspace-idle #messageInput{
+  min-height: 56px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+body[data-ui="claude"] .workspace-idle #messageInput::placeholder{
+  color: color-mix(in oklab, var(--text-3) 92%, transparent);
+  font-weight: 500;
+}
+
+.empty-card.empty-card-onboarding .xv-roi-hero{
+  margin-bottom: 12px;
+}
+.empty-card.empty-card-onboarding .cld-welcome-headline{
+  margin-bottom: 6px;
+}
+
 .empty-card-premium .xv-roi-hero{
   max-width: min(520px, 100%);
   text-align: left;
