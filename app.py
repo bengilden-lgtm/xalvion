@@ -29,6 +29,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 from typing import Any, Generator
 from urllib.parse import quote_plus
@@ -39,6 +40,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -745,6 +747,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+_plan_usage_warning_payload: ContextVar[str | None] = ContextVar("_plan_usage_warning_payload", default=None)
+
+
+class PlanUsageWarningMiddleware(BaseHTTPMiddleware):
+    """Attach ``X-Xalvion-Plan-Warning`` when free-tier usage crosses the soft threshold (75%)."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        _plan_usage_warning_payload.set(None)
+        response = await call_next(request)
+        warn = _plan_usage_warning_payload.get()
+        if warn:
+            response.headers["X-Xalvion-Plan-Warning"] = warn
+        return response
+
+
+app.add_middleware(PlanUsageWarningMiddleware)
+
 # =============================================================================
 # 2. DATABASE ENGINE
 # =============================================================================
@@ -1344,6 +1364,7 @@ def enforce_plan_limits(
 ) -> None:
     plan_name = get_plan_name(user)
     plan = get_plan_config(plan_name)
+    public_tier = get_public_plan_name(user)
 
     if not check_rate_limit(resolve_rate_limit_key(user, guest_client_id)):
         raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
@@ -1360,15 +1381,40 @@ def enforce_plan_limits(
         enforce_guest_preview_allow(guest_client_id)
         return
 
+    # Paid tiers: no monthly operator cap (usage may still be tracked for analytics).
+    if public_tier != "free":
+        return
+
     period = operator_billing_period_key()
     with db_session() as db:
         used = account_operator_usage_sum(db, str(getattr(user, "username", "") or ""), period)
+
+    if limit > 0 and used < limit:
+        usage_pct = used / limit
+        if usage_pct >= 0.75:
+            _plan_usage_warning_payload.set(
+                json.dumps(
+                    {
+                        "code": "plan_usage_warning",
+                        "message": (
+                            f"Free plan: you have used about {usage_pct * 100:.0f}% of this month's "
+                            f"operator runs ({used}/{limit}). Upgrade to avoid interruption."
+                        ),
+                        "usage": used,
+                        "limit": limit,
+                        "usage_pct": round(usage_pct * 100, 1),
+                        "threshold_pct": 75,
+                    },
+                    separators=(",", ":"),
+                )
+            )
+
     if used >= limit:
         raise HTTPException(
             status_code=402,
             detail=_plan_limit_exceeded_detail(user, used, limit, plan_name),
             headers={
-                "X-Xalvion-Plan": plan_name,
+                "X-Xalvion-Plan": public_tier,
                 "X-Xalvion-Limit": str(limit),
             },
         )
