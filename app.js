@@ -355,6 +355,57 @@ if (typeof window.pulseRail !== "function") {
     return { ...base, ...tr };
   }
 
+  function collapseWsForDedupe(t) {
+    return String(t || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  /**
+   * Conservative pass for rendered assistant reply only: removes duplicated paragraphs,
+   * consecutive duplicate lines, and obvious whole-text echoes. Does not rewrite short or
+   * single-line intentional repeats.
+   */
+  function dedupeDisplayedReplyText(text) {
+    let s = String(text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n");
+    s = s.replace(/\n{3,}/g, "\n\n");
+    const paras = s.split(/\n\n+/);
+    const paraOut = [];
+    for (const p of paras) {
+      const t = p.trim();
+      if (!t) continue;
+      const prev = paraOut.length ? collapseWsForDedupe(paraOut[paraOut.length - 1]) : "";
+      if (prev && prev === collapseWsForDedupe(t)) continue;
+      paraOut.push(t);
+    }
+    s = paraOut.join("\n\n");
+    const lines = s.split("\n");
+    const lineOut = [];
+    for (const ln of lines) {
+      const trimmed = ln.trim();
+      if (trimmed.length >= 24 && lineOut.length) {
+        const lastLine = lineOut[lineOut.length - 1].trim();
+        if (lastLine && collapseWsForDedupe(lastLine) === collapseWsForDedupe(trimmed)) continue;
+      }
+      lineOut.push(ln);
+    }
+    s = lineOut.join("\n");
+    const oneLine = collapseWsForDedupe(s);
+    if (oneLine.length >= 100) {
+      const mid = Math.floor(oneLine.length / 2);
+      const a = oneLine.slice(0, mid).trimEnd();
+      const b = oneLine.slice(mid).trimStart();
+      if (a.length >= 48 && a === b) {
+        const half = Math.floor(s.length / 2);
+        const slice = s.slice(0, half).trim();
+        if (slice.length > 40) return slice;
+      }
+    }
+    return s.trim();
+  }
+
   function deriveTicketMinutesSaved(data = {}) {
     const imp = data.impact || {};
     const m = Number(imp.agent_minutes_saved || imp.time_saved_est_min || imp.operator_minutes_saved || 0);
@@ -381,12 +432,12 @@ if (typeof window.pulseRail !== "function") {
     const em = tr.email && typeof tr.email === "object" ? tr.email : null;
     if (em && em.ok === true) {
       const to = String(em.to || data.ticket?.customer_email || "").trim();
-      return to ? `Email sent to: ${to}` : "Email sent.";
+      return to ? `Sent — customer notified · ${to}` : "Sent — customer notified";
     }
     if (String(tr.status || "").toLowerCase() === "sent" && String(tr.to || "").includes("@")) {
-      return `Email sent to: ${String(tr.to).trim()}`;
+      return `Sent — customer notified · ${String(tr.to).trim()}`;
     }
-    return "Email not sent — SMTP not configured on this server (copy the verified draft to your helpdesk).";
+    return "Not sent — SMTP not configured (copy the verified draft to your helpdesk).";
   }
 
   function derivePlanLimitValueLine(data = {}) {
@@ -449,13 +500,14 @@ if (typeof window.pulseRail !== "function") {
   function deriveExecutionStatusHeadline(data = {}) {
     const auto = deriveAutoManualExecution(data);
     const tst = String(data.tool_status || "").toLowerCase();
-    if (auto.label === "Requires approval") return { headline: "Pending", detail: auto.why };
-    if (auto.label === "Manual required") return { headline: "Manual", detail: auto.why };
-    if (auto.label === "Pending manual") return { headline: "Awaiting setup", detail: auto.why };
-    if (auto.label === "Auto-resolved") return { headline: "Executed", detail: auto.why };
-    if (tst === "approved_pending_execution") return { headline: "Pending", detail: auto.why };
-    if (String(data.action || "none").toLowerCase() === "none") return { headline: "Ready", detail: "No billing tool run on this ticket — reply only." };
-    return { headline: "Executed", detail: auto.why };
+    if (auto.label === "Requires approval") return { headline: "Pending — needs your approval", detail: auto.why };
+    if (auto.label === "Manual required") return { headline: "Held — needs review", detail: auto.why };
+    if (auto.label === "Pending manual") return { headline: "Pending — requires setup", detail: auto.why };
+    if (auto.label === "Auto-resolved") return { headline: "Done — executed", detail: auto.why };
+    if (tst === "approved_pending_execution") return { headline: "Pending — requires setup", detail: auto.why };
+    if (String(data.action || "none").toLowerCase() === "none")
+      return { headline: "Ready — reply only", detail: "No billing tool run on this ticket — reply only." };
+    return { headline: "Done — executed", detail: auto.why };
   }
 
   function actionTakenLabel(data = {}) {
@@ -503,7 +555,7 @@ if (typeof window.pulseRail !== "function") {
     const hasMoreDetail = Boolean(execExplain || smtpNote || sysLine || modeWhy);
     const moreBlock = hasMoreDetail
       ? `<details class="ticket-result-summary__more">
-      <summary class="ticket-result-summary__more-summary"><span>Delivery, execution notes, and system context</span><span class="ticket-result-summary__more-chev" aria-hidden="true"></span></summary>
+      <summary class="ticket-result-summary__more-summary"><span>Details (execution and delivery)</span><span class="ticket-result-summary__more-chev" aria-hidden="true"></span></summary>
       <div class="ticket-result-summary__more-body">
         ${
           execExplain
@@ -1367,6 +1419,24 @@ if (typeof window.pulseRail !== "function") {
         margin-top: 14px;
         padding-top: 14px;
         border-top: 1px solid rgba(255, 255, 255, 0.055);
+      }
+      .xv-outcome-decision-cluster .xv-workspace-zone,
+      .xv-outcome-decision-cluster .xv-workspace-zone + .xv-workspace-zone {
+        margin-top: 0;
+        padding-top: 0;
+        border-top: none;
+      }
+      .xv-outcome-decision-cluster .decision-panel {
+        margin-top: 6px;
+        padding-top: 10px;
+      }
+      .xv-zone--reply-output {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.055);
+      }
+      .xv-zone--reply-output .reply-body--hero {
+        gap: 10px;
       }
       .xv-zone--next .assistant-footer {
         margin-top: 10px;
@@ -4489,7 +4559,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
   /** Subtle branded reveal on prepared reply (CSS: .xv-prepared-reveal) */
   function pulsePreparedReplyReveal(row) {
-    const block = row?.querySelector(".customer-message-block");
+    const block =
+      row?.querySelector(".customer-message-block--reply-hero") ||
+      row?.querySelector(".customer-message-block");
     if (!block) return;
     block.classList.remove("xv-prepared-reveal");
     void block.offsetWidth;
@@ -4556,23 +4628,31 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       role === "assistant"
         ? `<div class="msg-body assistant-canvas">
         <div class="assistant-result-stack">
+          <div class="xv-outcome-decision-cluster" aria-label="Outcome and actions">
           <section class="xv-workspace-zone xv-zone--result" aria-label="Result">
-          <div class="customer-message-block">
-            <div class="reply-body">
+          <div class="customer-message-block customer-message-block--outcome">
+            <div class="reply-body reply-body--outcome">
               <div class="assistant-context-line js-assistant-context" hidden></div>
             <div class="reply-prep-meta">
               <span class="run-value-summary js-run-value-summary" hidden aria-live="polite"></span>
               <span class="reply-prep-time js-prepared-time" hidden></span>
             </div>
             <div class="ticket-result-summary js-ticket-result-summary" hidden aria-live="polite"></div>
-            <div class="customer-message-label reply-hero-label">Suggested reply</div>
-              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Verified against policy before send.</div>
-              <div class="reply-text js-reply-text">${bodyHtml}</div>
             </div>
           </div>
           </section>
           <section class="xv-workspace-zone xv-zone--decision" aria-label="Decision">
           <div class="assistant-decision-slot" data-slot="decision"></div>
+          </section>
+          </div>
+          <section class="xv-workspace-zone xv-zone--reply-output" aria-label="Suggested reply">
+          <div class="customer-message-block customer-message-block--reply-hero">
+            <div class="reply-body reply-body--hero">
+            <div class="customer-message-label reply-hero-label">Suggested reply</div>
+              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Verified against policy before send.</div>
+              <div class="reply-text js-reply-text">${bodyHtml}</div>
+            </div>
+          </div>
           </section>
           <section class="xv-workspace-zone xv-zone--next" aria-label="Next steps">
           <div class="assistant-brief-slot" data-slot="brief"></div>
@@ -5517,7 +5597,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         : `<li>Connect Stripe for live refunds after approval</li><li>Raise monthly run limits vs Free</li>`;
     upsell.innerHTML = `
       <div class="automation-upsell-stack">
-        <p class="xv-int-lead">To fully automate this:</p>
+        <p class="xv-int-lead">Go further when you are ready:</p>
         <ul class="xv-int-checklist">${bullets}</ul>
         <p class="automation-upsell-copy">${escapeHtml(copy)}</p>
       </div>
@@ -5550,10 +5630,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (!node.querySelector(".typing, .xv-thinking-block")) {
       node.innerHTML = "";
     }
-    const normalized = (text || "")
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .replace(/\n{3,}/g, "\n\n");
+    const normalized = dedupeDisplayedReplyText(
+      (text || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+    );
     const html = escapeHtml(normalized)
       .replace(/\n\n/g, "<br><br>")
       .replace(/\n/g, "<br>");
@@ -5582,7 +5664,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       swapThinkingToContent(node, "");
       window.setTimeout(() => {
         const current = node.innerText || node.textContent || "";
-        const combined = (current + chunk).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        const combined = dedupeDisplayedReplyText((current + chunk).replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
         node.innerHTML = escapeHtml(combined)
           .replace(/\n\n/g, "<br><br>")
           .replace(/\n/g, "<br>");
@@ -5600,7 +5682,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       node._pendingChunk = "";
       node._chunkRafId = null;
       const current = node.innerText || node.textContent || "";
-      const combined = (current + pending).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      const combined = dedupeDisplayedReplyText((current + pending).replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
       node.innerHTML = escapeHtml(combined)
         .replace(/\n\n/g, "<br><br>")
         .replace(/\n/g, "<br>");
@@ -6111,47 +6193,83 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       pendingGate && wantsEmail && !state.smtpReady && !stripeBlocksPaidSend
     );
 
-    const chunks = [];
+    const bullets = [];
+    const footnotes = [];
+    const buttons = [];
+
     if (showStripeConnect) {
-      chunks.push(
-        `<p class="xv-int-lead">To fully automate this:</p>
-        <ul class="xv-int-checklist">
-          <li>Connect Stripe for this workspace</li>
-          <li>Approve again to execute the refund here</li>
-        </ul>
-        <p class="xv-int-footnote muted-copy">Nothing is marked paid until Stripe confirms.</p>
-        <div class="xv-int-actions"><button type="button" class="btn xv-int-connect-stripe">Connect Stripe</button></div>`
+      bullets.push(
+        "Connect Stripe for this workspace",
+        "Approve again to execute the refund in-product"
       );
+      footnotes.push("Nothing is marked paid until Stripe confirms.");
+      buttons.push({ cls: "xv-int-connect-stripe", label: "Connect Stripe" });
     } else if (showStripePlan) {
-      chunks.push(
-        `<p class="xv-int-lead">To fully automate this:</p>
-        <ul class="xv-int-checklist">
-          <li>Move to Pro for in-workspace execution (within limits)</li>
-          <li>Connect Stripe when you want refunds to run here</li>
-        </ul>
-        <p class="xv-int-footnote muted-copy">You can downgrade anytime · No risk to try · Works with your existing tools</p>
-        <div class="xv-int-actions"><button type="button" class="btn xv-int-compare-plans">Enable auto refunds</button></div>`
+      bullets.push(
+        "Move to Pro for in-workspace execution (within limits)",
+        "Connect Stripe when refunds should run here"
       );
+      footnotes.push("You can downgrade anytime · No risk to try · Works with your existing tools.");
+      buttons.push({ cls: "xv-int-compare-plans", label: "Enable auto refunds" });
     }
     if (showSmtpConfigure) {
-      chunks.push(
-        `<p class="xv-int-lead">To fully automate this:</p>
-        <ul class="xv-int-checklist">
-          <li>Configure outbound email (SMTP) for sends after approval</li>
-          <li>Or copy the verified draft to your helpdesk</li>
-        </ul>
-        <p class="xv-int-footnote muted-copy">Server-side sends are not simulated as delivered.</p>
-        <div class="xv-int-actions"><button type="button" class="btn xv-int-configure-email">Configure email (SMTP)</button></div>`
+      bullets.push(
+        "Configure outbound email (SMTP) for sends after approval",
+        "Or copy the verified draft to your helpdesk"
       );
+      footnotes.push("Server-side sends are not simulated as delivered.");
+      buttons.push({ cls: "xv-int-configure-email", label: "Configure email (SMTP)" });
     }
 
-    if (!chunks.length) {
+    if (!bullets.length) {
       hint.hidden = true;
       hint.innerHTML = "";
       return;
     }
+
+    const seenB = new Set();
+    const uniqBullets = [];
+    for (const b of bullets) {
+      const k = collapseWsForDedupe(b).toLowerCase();
+      if (seenB.has(k)) continue;
+      seenB.add(k);
+      uniqBullets.push(b);
+    }
+    const seenF = new Set();
+    const uniqFoot = [];
+    for (const f of footnotes) {
+      const k = collapseWsForDedupe(f).toLowerCase();
+      if (seenF.has(k)) continue;
+      seenF.add(k);
+      uniqFoot.push(f);
+    }
+    const seenBtn = new Set();
+    const uniqButtons = [];
+    for (const btn of buttons) {
+      if (seenBtn.has(btn.cls)) continue;
+      seenBtn.add(btn.cls);
+      uniqButtons.push(btn);
+    }
+
+    const actionsHtml = uniqButtons
+      .slice(0, 2)
+      .map(
+        (b) =>
+          `<button type="button" class="btn ${escapeHtml(b.cls)}">${escapeHtml(b.label)}</button>`
+      )
+      .join("");
+
     hint.hidden = false;
-    hint.innerHTML = `<div class="decision-panel-integration-hint-inner">${chunks.join("")}</div>`;
+    hint.innerHTML = `<div class="decision-panel-integration-hint-inner decision-panel-integration-hint-inner--merged">
+      <p class="xv-int-lead">Run the next one in-product:</p>
+      <ul class="xv-int-checklist">${uniqBullets.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+      ${
+        uniqFoot.length
+          ? `<p class="xv-int-footnote muted-copy">${escapeHtml(uniqFoot.join(" · "))}</p>`
+          : ""
+      }
+      <div class="xv-int-actions xv-int-actions--merged">${actionsHtml}</div>
+    </div>`;
     hint.querySelector(".xv-int-connect-stripe")?.addEventListener(
       "click",
       () => focusIntegrationsStripe(),
@@ -6194,9 +6312,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const approval = getApprovalContext(data);
     const pendingGate = Boolean(approval.requiresApproval && !approval.approved);
     const sig = deriveConsequenceSignal(data);
-    const originalAi = String(
-      initialReply || getAssistantCopyNode(row)?.innerText || getAssistantCopyNode(row)?.textContent || ""
-    ).trim();
+    const originalAi = dedupeDisplayedReplyText(
+      String(
+        initialReply || getAssistantCopyNode(row)?.innerText || getAssistantCopyNode(row)?.textContent || ""
+      ).trim()
+    );
 
     const panel = document.createElement("div");
     panel.className = "decision-panel";
@@ -6399,10 +6519,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         pill === "Approved"
           ? "✓ Approved — ready to execute"
           : pill === "Sent as edited"
-            ? "✓ Approved — recorded as edited"
+            ? "✓ Sent — saved as edited"
             : pill === "Edited"
               ? "✓ Edited — copy when ready"
-              : pill;
+              : pill === "Rejected"
+                ? "Rejected — not sent"
+                : pill;
       controls.innerHTML = `<span class="decision-state-pill">${escapeHtml(pillDisplay)}</span>`;
       if (note) {
         noteEl.textContent = note;
@@ -6464,56 +6586,99 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         tierLc !== "elite" &&
         tierLc !== "dev" &&
         (state.atLimit || n >= 10);
-      const automationBlock = canShowAutomation
-        ? `<div class="xv-next-nudge xv-next-nudge--stacked">
-            <p class="xv-int-lead">To fully automate this:</p>
-            <ul class="xv-int-checklist">${
-              tierLc === "pro"
-                ? "<li>Raise limits before peak volume hits the ceiling</li><li>Keep the same approval-first loop</li>"
-                : "<li>Run approved refunds in Stripe from here (within limits)</li><li>Raise ticket ceiling vs Free</li>"
-            }</ul>
-            <div class="xv-next-nudge-row">
-            <div class="xv-next-nudge-copy">${
-              tierLc === "pro"
-                ? "Elite removes the last manual bottlenecks at scale — same approvals, highest limits."
-                : "Pro removes manual Stripe tab work after you approve — auto refunds within limits, higher ticket ceiling."
-            }</div>
-            <button type="button" class="xv-next-nudge-cta" data-act="enable-automation">${
-              tierLc === "pro" ? "Handle more tickets automatically — Elite" : "Enable auto refunds — Pro"
-            }</button>
-            </div>
-          </div>`
-        : "";
-      const integrationBlock = integrationHint
-        ? `<div class="xv-next-nudge xv-next-nudge--stacked">
-            <p class="xv-int-lead">To fully automate this:</p>
-            <ul class="xv-int-checklist"><li>Connect Stripe for this workspace</li><li>Finish refunds in-place after approval</li></ul>
-            <div class="xv-next-nudge-row">
-            <div class="xv-next-nudge-copy">${escapeHtml(integrationHint)}.</div>
-            <button type="button" class="xv-next-nudge-cta" data-act="connect-integrations">Open Integrations</button>
-            </div>
-          </div>`
-        : "";
-      const volumeBlock = volumeHint
-        ? `<div class="xv-next-nudge xv-next-nudge--subtle xv-next-nudge--stacked">
-            <p class="xv-int-lead">To fully automate this:</p>
-            <ul class="xv-int-checklist"><li>Add plan headroom before limits interrupt the shift</li></ul>
-            <div class="xv-next-nudge-row">
-            <div class="xv-next-nudge-copy">${escapeHtml(volumeHint)}.</div>
-            <button type="button" class="xv-next-nudge-cta" data-act="upgrade">Handle more tickets automatically</button>
-            </div>
-          </div>`
-        : "";
-      const postValueBlock = postValueNudge
-        ? `<div class="xv-next-nudge xv-next-nudge--subtle xv-next-nudge--stacked">
-            <p class="xv-int-lead">To fully automate this:</p>
-            <ul class="xv-int-checklist"><li>Connect Stripe when refunds should run in-workspace</li><li>Raise limits if you are pacing against the cap</li></ul>
-            <div class="xv-next-nudge-row">
-            <div class="xv-next-nudge-copy">${escapeHtml(postValueNudge.primary)} ${escapeHtml(postValueNudge.secondary)}</div>
-            <button type="button" class="xv-next-nudge-cta" data-act="upgrade">${escapeHtml(postValueNudge.cta || "View plans")}</button>
-            </div>
-          </div>`
-        : "";
+      const stripBullets = [];
+      const stripCopyParts = [];
+      const stripActions = [];
+
+      if (canShowAutomation) {
+        if (tierLc === "pro") {
+          stripBullets.push(
+            "Raise limits before peak volume hits the ceiling",
+            "Keep the same approval-first loop"
+          );
+          stripCopyParts.push(
+            "Elite removes the last manual bottlenecks at scale — same approvals, highest limits."
+          );
+          stripActions.push({ act: "enable-automation", label: "Handle more tickets automatically — Elite" });
+        } else {
+          stripBullets.push(
+            "Run approved refunds in Stripe from here (within limits)",
+            "Raise ticket ceiling vs Free"
+          );
+          stripCopyParts.push(
+            "Pro removes manual Stripe tab work after you approve — auto refunds within limits, higher ticket ceiling."
+          );
+          stripActions.push({ act: "enable-automation", label: "Enable auto refunds — Pro" });
+        }
+      }
+      if (integrationHint) {
+        stripBullets.push("Connect Stripe for this workspace", "Finish refunds in-place after approval");
+        stripCopyParts.push(integrationHint);
+        stripActions.push({ act: "connect-integrations", label: "Open Integrations" });
+      }
+      if (volumeHint) {
+        stripBullets.push("Add plan headroom before limits interrupt the shift");
+        stripCopyParts.push(volumeHint);
+        stripActions.push({ act: "upgrade", label: "Handle more tickets automatically" });
+      }
+      if (postValueNudge) {
+        stripBullets.push(
+          "Connect Stripe when refunds should run in-workspace",
+          "Raise limits if you are pacing against the cap"
+        );
+        stripCopyParts.push(`${postValueNudge.primary} ${postValueNudge.secondary}`.trim());
+        stripActions.push({ act: "upgrade", label: postValueNudge.cta || "View plans" });
+      }
+
+      const seenStripBullet = new Set();
+      const uniqStripBullets = [];
+      for (const b of stripBullets) {
+        const k = collapseWsForDedupe(b).toLowerCase();
+        if (seenStripBullet.has(k)) continue;
+        seenStripBullet.add(k);
+        uniqStripBullets.push(b);
+      }
+      const seenStripCopy = new Set();
+      const uniqStripCopyParts = [];
+      for (const c of stripCopyParts) {
+        const k = collapseWsForDedupe(c).toLowerCase();
+        if (!k || seenStripCopy.has(k)) continue;
+        seenStripCopy.add(k);
+        uniqStripCopyParts.push(c);
+      }
+      const mergedStripCopy = uniqStripCopyParts.join(" ").trim();
+      const stripActionOrder = ["enable-automation", "connect-integrations", "upgrade"];
+      const uniqStripActions = [];
+      const seenAct = new Set();
+      for (const act of stripActionOrder) {
+        const hit = stripActions.filter((x) => x.act === act).pop();
+        if (!hit || seenAct.has(hit.act)) continue;
+        seenAct.add(hit.act);
+        uniqStripActions.push(hit);
+      }
+      const ctaRow = uniqStripActions.slice(0, 2);
+      const automationUpsellMerged =
+        uniqStripBullets.length === 0
+          ? ""
+          : `<div class="xv-next-nudge xv-next-nudge--merged xv-next-nudge--subtle">
+            <p class="xv-int-lead">Go further when you are ready:</p>
+            <ul class="xv-int-checklist">${uniqStripBullets.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+            ${
+              mergedStripCopy
+                ? `<div class="xv-next-nudge-copy">${escapeHtml(mergedStripCopy)}${
+                    /[.!?…]$/.test(mergedStripCopy.trim()) ? "" : "."
+                  }</div>`
+                : ""
+            }
+            <div class="xv-next-nudge-row xv-next-nudge-row--merged">${ctaRow
+              .map(
+                (a) =>
+                  `<button type="button" class="xv-next-nudge-cta" data-act="${escapeHtml(a.act)}">${escapeHtml(
+                    a.label
+                  )}</button>`
+              )
+              .join("")}</div>
+          </div>`;
 
       const referralUrlGrowth = (() => {
         try {
@@ -6618,10 +6783,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           </div>
         </div>
 
-        ${automationBlock}
-        ${integrationBlock}
-        ${postValueBlock}
-        ${volumeBlock}
+        ${automationUpsellMerged}
       `;
     }
 

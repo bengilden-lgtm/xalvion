@@ -1482,12 +1482,13 @@ select.refund-select{ padding-right: 34px; }
 .msg-body{ color: var(--text-2); }
 .reply-body{ display:flex; flex-direction: column; gap: 8px; }
 .reply-hero-label{
-  font-size: 11px;
-  font-weight: 520;
-  letter-spacing: 0.06em;
-  text-transform: none;
-  color: color-mix(in oklab, var(--text-4) 92%, var(--text-3));
-  margin-bottom: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin: 2px 0 0 0;
+  opacity: 0.78;
 }
 .reply-text{
   font-size: 15px;
@@ -1501,6 +1502,12 @@ select.refund-select{ padding-right: 34px; }
   line-height: 1.75;
   letter-spacing: -0.015em;
   color: var(--text);
+}
+#workspaceRoot.workspace-active .msg-card.assistant .xv-zone--reply-output .reply-text{
+  font-size: 16.25px;
+  line-height: 1.72;
+  font-weight: 500;
+  letter-spacing: -0.018em;
 }
 .reply-text p{
   margin: 0 0 12px;
@@ -1517,7 +1524,37 @@ select.refund-select{ padding-right: 34px; }
   color: var(--text-2);
 }
 
-.assistant-result-stack{ display:flex; flex-direction: column; gap: 16px; }
+.assistant-result-stack{ display:flex; flex-direction: column; gap: 12px; }
+.reply-body--outcome{
+  gap: 6px;
+}
+.reply-body--hero{
+  gap: 10px;
+}
+.customer-message-block--reply-hero{
+  padding: 12px 14px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--line) 72%, transparent);
+  background: color-mix(in oklab, var(--bg2) 42%, transparent);
+}
+.xv-outcome-decision-cluster .xv-workspace-zone,
+.xv-outcome-decision-cluster .xv-workspace-zone + .xv-workspace-zone{
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.xv-outcome-decision-cluster .decision-panel{
+  margin-top: 6px;
+  padding-top: 10px;
+}
+.xv-outcome-decision-cluster .ticket-result-summary{
+  margin-bottom: 8px;
+}
+.xv-zone--reply-output{
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+}
 .assistant-context-line{
   font-size: 12.5px;
   color: color-mix(in oklab, var(--text-muted) 92%, var(--text-4));
@@ -1841,7 +1878,7 @@ select.refund-select{ padding-right: 34px; }
 /* Primary decision callout — scanned before actions */
 .decision-callout{
   width: 100%;
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
   padding: 14px 16px 13px;
   border-radius: var(--r-md);
   border: 1px solid color-mix(in oklab, var(--line) 55%, var(--accent) 12%);
@@ -2118,8 +2155,8 @@ select.refund-select{ padding-right: 34px; }
   gap: 12px;
   flex-wrap: wrap;
   position: static;
-  padding-top: 4px;
-  padding-bottom: 8px;
+  padding-top: 2px;
+  padding-bottom: 6px;
 }
 .decision-controls{
   display: flex;
@@ -4938,6 +4975,26 @@ details > summary{ user-select:none; }
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+}
+.xv-int-actions--merged{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 4px;
+}
+.decision-panel-integration-hint-inner--merged .xv-int-lead{
+  margin-top: 0;
+}
+.xv-next-nudge-row--merged{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+.xv-next-nudge--merged .xv-next-nudge-copy{
+  margin-bottom: 2px;
 }
 .xv-zone--next .assistant-footer{
   margin-top: 10px;
