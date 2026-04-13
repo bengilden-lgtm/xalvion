@@ -50,7 +50,10 @@ def build_structured_response(
     internal_note: str,
     customer_note: str,
 ) -> Dict[str, Any]:
-    safe_action = normalize_action_payload(action_payload)
+    safe_action = normalize_action_payload(
+        action_payload,
+        plan_tier=str(ticket.get("plan_tier", "free") or "free"),
+    )
     queue = str(action_payload.get("queue", "new") or "new")
     priority = str(action_payload.get("priority", "medium") or "medium")
     risk_level = str(action_payload.get("risk_level", triage.get("risk_level", "medium")) or "medium")

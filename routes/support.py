@@ -10,7 +10,7 @@ from sqlalchemy import case as _case, func
 from sqlalchemy.orm import Session
 
 import app as app_mod
-from app_utils import _me_capacity_message, _tier_upgrade_unlocks
+from app_utils import _me_capacity_message, _tier_upgrade_unlocks, normalize_customer_email
 from services import email_service
 
 router = APIRouter(tags=["support"])
@@ -230,14 +230,13 @@ def ticket_queue_counts(
     }
 
 
-@router.post("/tickets/{ticket_id}/reply/send")
-def send_ticket_reply(
+def _execute_ticket_reply_send(
     ticket_id: int,
     req: app_mod.TicketReplySendRequest,
-    user: app_mod.User = Depends(app_mod.get_current_user),
-    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
-    db: Session = Depends(app_mod.get_db),
-):
+    user: app_mod.User,
+    x_guest_client: str | None,
+    db: Session,
+) -> dict[str, Any]:
     """Email ``final_reply`` to the customer using persisted ``customer_email`` (never ``username``)."""
     if not getattr(user, "username", "") or user.username == "guest":
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -252,6 +251,15 @@ def send_ticket_reply(
             raise HTTPException(status_code=403, detail="Forbidden")
         if not owner_key or ticket.username != owner_key:
             raise HTTPException(status_code=403, detail="Forbidden")
+
+    if not normalize_customer_email(getattr(ticket, "customer_email", None)):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "missing_customer_email",
+                "message": "Ticket has no valid customer_email. Update the ticket with a real customer address before sending.",
+            },
+        )
 
     reply_body = (req.body or "").strip() or str(ticket.final_reply or "").strip()
     delivery = email_service.send_ticket_reply_email(
@@ -286,6 +294,29 @@ def send_ticket_reply(
         )
 
     return {"ok": True, "delivery": delivery}
+
+
+@router.post("/tickets/{ticket_id}/reply/send")
+def send_ticket_reply(
+    ticket_id: int,
+    req: app_mod.TicketReplySendRequest,
+    user: app_mod.User = Depends(app_mod.get_current_user),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
+    db: Session = Depends(app_mod.get_db),
+):
+    return _execute_ticket_reply_send(ticket_id, req, user, x_guest_client, db)
+
+
+@router.post("/tickets/{ticket_id}/send")
+def send_ticket_reply_alias(
+    ticket_id: int,
+    req: app_mod.TicketReplySendRequest,
+    user: app_mod.User = Depends(app_mod.get_current_user),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
+    db: Session = Depends(app_mod.get_db),
+):
+    """Alias of ``POST /tickets/{id}/reply/send`` (same validation and delivery semantics)."""
+    return _execute_ticket_reply_send(ticket_id, req, user, x_guest_client, db)
 
 
 @router.get("/tickets/{ticket_id}")

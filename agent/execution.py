@@ -10,12 +10,12 @@ from actions import (
     execute_action as dispatch_integrated_action,
     execution_requires_operator_gate,
 )
+from governor import normalize_plan_tier, plan_limits
 from tools import process_refund, issue_credit
 
 ALLOWED_ACTIONS = {"none", "refund", "credit", "review", "charge"}
-# Maximum amount allowed for automated refunds (safety constraint).
+# Legacy module-level caps (charges use bounded proposal amounts).
 MAX_REFUND = int(MAX_AUTO_REFUND_AMOUNT)
-# Maximum amount allowed for automated charges (distinct from refunds; semantics differ).
 MAX_CHARGE = int(MAX_AUTO_REFUND_AMOUNT)
 MAX_CREDIT = int(MAX_AUTO_CREDIT_AMOUNT)
 
@@ -24,7 +24,7 @@ def should_attach_order_context(issue_type: str) -> bool:
     return issue_type in HANDLED_ISSUE_TYPES and issue_type in {"shipping_issue", "damaged_order"}
 
 
-def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
+def normalize_action_payload(payload: Dict[str, Any] | None, *, plan_tier: str | None = None) -> Dict[str, Any]:
     payload = payload or {}
     action = str(payload.get("action", "none")).strip().lower()
     amount = int(payload.get("amount", 0) or 0)
@@ -35,10 +35,17 @@ def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
     if amount < 0:
         amount = 0
 
+    tier = normalize_plan_tier(plan_tier or "free")
+    limits = plan_limits(tier)
+    max_cred = max(0, int(float(limits.get("max_credit") or 0)))
+
     if action == "refund":
-        amount = min(amount, MAX_REFUND)
+        # Do not clamp here: tier limits are enforced by ``execution_requires_operator_gate``,
+        # ``governor.validate_decision``, and payment backends. Clamping would distort approval UX.
+        pass
     elif action == "credit":
-        amount = min(amount, MAX_CREDIT)
+        cap = max_cred if max_cred > 0 else MAX_CREDIT
+        amount = min(amount, cap)
     elif action == "charge":
         amount = min(amount, MAX_CHARGE)
     else:
@@ -56,8 +63,8 @@ def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
 
 
 def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Dict[str, Any]:
-    safe_action = dict(normalize_action_payload(action_payload))
     _tier = str(ticket.get("plan_tier", "free") or "free")
+    safe_action = dict(normalize_action_payload(action_payload, plan_tier=_tier))
     if execution_requires_operator_gate(
         safe_action["action"],
         safe_action["amount"],
@@ -109,13 +116,16 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
         result = process_refund(payload["customer"], amount)
         if result.get("error"):
             return {"action": "review", "amount": 0, "tool_result": result, "tool_status": result.get("error", "error")}
+        exec_mode = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+        is_mock = exec_mode != "live"
+        result = {**result, "mock": is_mock, "verified": not is_mock}
         return {"action": "refund", "amount": amount, "tool_result": result, "tool_status": result.get("status", "success")}
 
     if action == "credit":
         result = issue_credit(payload["customer"], amount)
         EXEC_MODE = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
         verified = EXEC_MODE == "live"
-        result = {**result, "verified": verified}
+        result = {**result, "verified": verified, "mock": EXEC_MODE != "live"}
         return {"action": "credit", "amount": amount, "tool_result": result, "tool_status": result.get("status", "credit_issued")}
 
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")

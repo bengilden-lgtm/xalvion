@@ -312,7 +312,15 @@ async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)
                 tier = stripe_service.infer_tier_from_checkout_session(session_id)
 
             if username and tier:
-                upgraded_user = stripe_service.apply_successful_upgrade(db, username, tier)
+                sub_raw = getattr(data_object, "subscription", None)
+                sub_id = ""
+                if isinstance(sub_raw, str):
+                    sub_id = sub_raw.strip()
+                elif sub_raw is not None:
+                    sub_id = str(getattr(sub_raw, "id", "") or "").strip()
+                upgraded_user = stripe_service.apply_successful_upgrade(
+                    db, username, tier, stripe_subscription_id=sub_id or None
+                )
                 if not upgraded_user:
                     outcome = "skipped"
                     detail = f"User not found: {username!r}"

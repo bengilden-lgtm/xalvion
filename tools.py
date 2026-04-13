@@ -221,13 +221,19 @@ def get_order(customer: str, context: Optional[str] = None) -> dict[str, Any]:
 
 
 def process_refund(customer, amount):
-    if amount > 50:
-        return {"error": "Refund exceeds safe limit"}
+    try:
+        amt = int(amount or 0)
+    except (TypeError, ValueError):
+        amt = 0
+    if amt > 500_000:
+        return {"error": "Refund exceeds safe limit", "mock": True, "verified": False}
 
     return {
         "status": "success",
         "customer": customer,
-        "amount": amount,
+        "amount": amt,
+        "mock": True,
+        "verified": False,
     }
 
 
@@ -236,6 +242,8 @@ def issue_credit(customer, amount):
         "status": "credit_issued",
         "customer": customer,
         "amount": amount,
+        "mock": True,
+        "verified": False,
     }
 
 
@@ -282,7 +290,7 @@ def execute_tool(
                 str(payload.get("customer", "") or ""),
                 payload.get("context"),
             )
-        return {"status": "no_action", "mode": "mock"}
+        return {"status": "no_action", "mode": "mock", "mock": True, "verified": False}
 
     try:
         return _live_dispatch(action, payload)
@@ -374,6 +382,8 @@ def _live_dispatch(action: str, payload: dict) -> dict:
             "refund_id": str(refund.get("id", "")),
             "order_id": order_id,
             "mode": "live",
+            "mock": False,
+            "verified": True,
         }
 
     if action == "credit":
@@ -393,6 +403,8 @@ def _live_dispatch(action: str, payload: dict) -> dict:
             "amount": amount,
             "gift_card_id": str(gc.get("id", "")),
             "mode": "live",
+            "mock": False,
+            "verified": True,
         }
 
     if action == "get_order":

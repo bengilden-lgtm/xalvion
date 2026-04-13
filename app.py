@@ -92,6 +92,7 @@ from app_utils import (
     _safe_status,
     _tier_upgrade_unlocks,
     get_plan_name,
+    normalize_customer_email,
     resolve_customer_email_for_ticket,
 )
 from orm_models import ActionLog, Ticket, User
@@ -177,7 +178,7 @@ def _dashboard_guest_no_client_payload(user: User, db: Session) -> dict[str, Any
         "by_status": {},
         "your_usage": usage_summary["usage"],
         "your_tier": public_tier,
-        "your_limit": pc["monthly_limit"],
+        "your_limit": monthly_ticket_limit_for_plan(public_tier),
         "remaining": usage_summary["remaining"],
         "dashboard_access": pc["dashboard_access"],
         "priority_routing": pc["priority_routing"],
@@ -237,7 +238,7 @@ def _dashboard_summary_fallback(
         "by_status": {},
         "your_usage": usage_summary["usage"],
         "your_tier": public_tier,
-        "your_limit": pc["monthly_limit"],
+        "your_limit": monthly_ticket_limit_for_plan(public_tier),
         "remaining": usage_summary["remaining"],
         "dashboard_access": pc["dashboard_access"],
         "priority_routing": pc["priority_routing"],
@@ -290,7 +291,7 @@ def dashboard_summary_handler(
             {
                 "your_usage": usage_summary["usage"],
                 "your_tier": public_tier,
-                "your_limit": pc["monthly_limit"],
+                "your_limit": monthly_ticket_limit_for_plan(public_tier),
                 "remaining": usage_summary["remaining"],
             }
         )
@@ -446,7 +447,7 @@ def dashboard_summary_handler(
             "by_status": by_status,
             "your_usage": usage_summary["usage"],
             "your_tier": public_tier,
-            "your_limit": get_plan_config(public_tier)["monthly_limit"],
+            "your_limit": monthly_ticket_limit_for_plan(public_tier),
             "remaining": usage_summary["remaining"],
             "dashboard_access": get_plan_config(public_tier)["dashboard_access"],
             "priority_routing": get_plan_config(public_tier)["priority_routing"],
@@ -884,6 +885,8 @@ def ensure_user_columns() -> None:
             additions.append("ALTER TABLE users ADD COLUMN stripe_livemode INTEGER DEFAULT 0 NOT NULL")
         if "stripe_scope" not in columns:
             additions.append("ALTER TABLE users ADD COLUMN stripe_scope VARCHAR")
+        if "stripe_subscription_id" not in columns:
+            additions.append("ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(128)")
         if additions:
             with engine.begin() as conn:
                 for statement in additions:
@@ -1344,6 +1347,17 @@ def get_plan_config(tier: str | None) -> dict[str, Any]:
     return PLAN_CONFIG.get((tier or "free").strip().lower(), PLAN_CONFIG["free"])
 
 
+def monthly_ticket_limit_for_plan(plan_name: str) -> int:
+    """Canonical monthly ticket cap from ``governor.plan_limits`` (falls back to ``PLAN_CONFIG``)."""
+    from governor import normalize_plan_tier, plan_limits
+
+    raw = plan_limits(normalize_plan_tier(plan_name)).get("monthly_tickets")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return int(get_plan_config(plan_name)["monthly_limit"])
+
+
 def get_usage_summary(user: User | None) -> dict[str, Any]:
     plan_name = get_plan_name(user)
     plan = get_plan_config(plan_name)
@@ -1358,7 +1372,7 @@ def get_usage_summary(user: User | None) -> dict[str, Any]:
                         usage = rolled
             except Exception:
                 logger.debug("usage_rollup_read_failed", exc_info=True)
-    limit = int(plan["monthly_limit"])
+    limit = monthly_ticket_limit_for_plan(plan_name)
     remaining = max(0, limit - usage) if limit < 10**9 else limit
     billable_usage = max(0, usage - limit) if limit < 10**9 else 0
     within_included = usage if limit >= 10**9 else min(usage, limit)
@@ -1390,7 +1404,7 @@ def build_upgrade_payload(current_tier: str) -> dict[str, Any]:
         "plans": {
             tier: {
                 "label": cfg["label"],
-                "monthly_limit": cfg["monthly_limit"],
+                "monthly_limit": monthly_ticket_limit_for_plan(tier),
                 "history_limit": cfg["history_limit"],
                 "dashboard_access": cfg["dashboard_access"],
                 "priority_routing": cfg["priority_routing"],
@@ -1423,7 +1437,6 @@ def enforce_plan_limits(
     workspace_id: str | None = None,
 ) -> None:
     plan_name = get_plan_name(user)
-    plan = get_plan_config(plan_name)
     public_tier = get_public_plan_name(user)
 
     if not check_rate_limit(resolve_rate_limit_key(user, guest_client_id)):
@@ -1433,7 +1446,7 @@ def enforce_plan_limits(
     if uname == "dev_user" or plan_name == "dev":
         return
 
-    limit = int(plan["monthly_limit"])
+    limit = monthly_ticket_limit_for_plan(plan_name)
     if limit >= 10**9:
         return
 
@@ -2098,10 +2111,7 @@ def serialize_support_result(
         usage_summary = get_usage_summary(user)
         plan_limit_val = int(usage_summary["limit"])
         usage_val = int(usage_summary["usage"])
-        remaining_val = max(
-            0,
-            get_plan_config(get_public_plan_name(user))["monthly_limit"] - usage_summary["usage"],
-        )
+        remaining_val = max(0, int(usage_summary["limit"]) - int(usage_summary["usage"]))
     billable_usage_val = max(0, usage_val - plan_limit_val) if plan_limit_val < 10**9 else 0
     within_included_val = usage_val if plan_limit_val >= 10**9 else min(usage_val, plan_limit_val)
     usage_pct_val = (usage_val / plan_limit_val) if plan_limit_val > 0 and plan_limit_val < 10**9 else 0.0
@@ -2217,7 +2227,7 @@ def apply_real_actions(result: dict[str, Any], req: SupportRequest, user: User) 
         result["amount"] = refunded_amount
         result["reason"] = f"Refund capped to ${refunded_amount:.2f}" if capped else "Refund processed via Stripe"
         result["tool_status"] = "refunded"
-        result["tool_result"] = refund_result
+        result["tool_result"] = {**refund_result, "verified": True, "mock": False}
         result["impact"] = {"type": "refund", "amount": refunded_amount}
         if capped:
             result["response"] = (
@@ -2987,9 +2997,9 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
                 "outcome": {"known": False, "summary": None, "tier": None, "success": None},
             },
             "tier": plan,
-            "plan_limit": get_plan_config(plan)["monthly_limit"],
+            "plan_limit": monthly_ticket_limit_for_plan(plan),
             "usage": int(getattr(user, "usage", 0) or 0),
-            "remaining": max(0, get_plan_config(plan)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)),
+            "remaining": max(0, monthly_ticket_limit_for_plan(plan) - int(getattr(user, "usage", 0) or 0)),
             "ticket": ticket_snapshot,
             "operator_mode": runtime_ticket.get("operator_mode", "balanced"),
             "shadow_decision": shadow_decision,
@@ -3416,6 +3426,7 @@ def _build_extension_meta(
     plan_tier: str,
     priority_routing: bool,
 ) -> dict[str, Any]:
+    ce = normalize_customer_email(getattr(req, "customer_email", None)) or normalize_customer_email(getattr(req, "sender", None))
     return {
         "channel": "email",
         "source": "extension",
@@ -3427,6 +3438,7 @@ def _build_extension_meta(
         "charge_id": (req.charge_id or "").strip(),
         "sentiment": req.sentiment if req.sentiment is not None else 5,
         "ltv": req.ltv if req.ltv is not None else 0,
+        "customer_email": ce or None,
     }
 
 
@@ -3450,6 +3462,8 @@ def _persist_sovereign_result(
     username: str,
     raw_text: str,
     result: dict[str, Any],
+    *,
+    explicit_customer_email: str | None = None,
 ) -> None:
     now = _now_iso()
     decision = result.get("sovereign_decision") or {}
@@ -3460,7 +3474,7 @@ def _persist_sovereign_result(
         request_context = {}
     persisted_customer_email = resolve_customer_email_for_ticket(
         request_context=request_context,
-        customer_email=None,
+        customer_email=explicit_customer_email,
     ) or None
 
     ticket = Ticket(
@@ -3578,6 +3592,10 @@ def analyze_extension_ticket(
 
     ext_meta = _build_extension_meta(req, operator_mode, plan_tier, priority_routing)
     ext_ctx = _build_extension_context(req).model_dump()
+    extension_customer_email = (
+        normalize_customer_email(getattr(req, "customer_email", None))
+        or normalize_customer_email(getattr(req, "sender", None))
+    )
     billing_req = SupportRequest(
         message=req.text,
         sentiment=req.sentiment,
@@ -3587,7 +3605,7 @@ def analyze_extension_ticket(
         charge_id=req.charge_id,
         channel="email",
         source="extension",
-        customer_email=str(req.sender or "").strip() or None,
+        customer_email=extension_customer_email or None,
         request_context=ext_ctx,
     )
     result = run_sovereign_execution_pipeline(
@@ -3600,7 +3618,13 @@ def analyze_extension_ticket(
         billing_req=billing_req,
     )
 
-    _persist_sovereign_result(db, username, req.text, result)
+    _persist_sovereign_result(
+        db,
+        username,
+        req.text,
+        result,
+        explicit_customer_email=extension_customer_email or None,
+    )
 
     entitlements: dict[str, Any] | None = None
     if user:
@@ -3611,12 +3635,11 @@ def analyze_extension_ticket(
             db.commit()
             db.refresh(u_attached)
             pub = get_public_plan_name(u_attached)
-            cfg = get_plan_config(get_plan_name(u_attached))
             entitlements = extension_operator_entitlements_slice(
                 plan_tier_public=pub,
                 workspace_id=wid,
                 usage=tot,
-                limit=int(cfg["monthly_limit"]),
+                limit=monthly_ticket_limit_for_plan(get_plan_name(u_attached)),
             )
     elif guest_id:
         snap = bump_guest_preview_usage(guest_id)
@@ -3714,7 +3737,6 @@ def public_metrics(
     outcome_stats = get_outcome_stats(owner)
     usage_summary = get_usage_summary(user)
     public_tier   = get_public_plan_name(user)
-    plan_cfg      = get_plan_config(public_tier)
 
     return {
         "tickets_handled":      total_tickets,
@@ -3730,7 +3752,7 @@ def public_metrics(
         "bad_rate":             float(outcome_stats.get("bad_rate", 0.0) or 0.0),
         "your_plan":            public_tier,
         "your_usage":           usage_summary["usage"],
-        "your_limit":           plan_cfg["monthly_limit"],
+        "your_limit":           monthly_ticket_limit_for_plan(public_tier),
         "your_remaining":       usage_summary["remaining"],
         "upgrade_available":    public_tier in {"free", "pro"},
     }

@@ -31,7 +31,10 @@ def normalize_plan_tier(plan_tier: str) -> str:
 
 def plan_limits(plan_tier: str) -> dict:
     """
-    Deterministic plan policy limits for financial motions.
+    Deterministic plan policy limits for financial motions and monthly ticket caps.
+
+    ``monthly_tickets`` is the canonical per-tier operator/ticket monthly allowance
+    (aligned with product tiers; enforcement reads this field).
     """
     tier = normalize_plan_tier(plan_tier)
     if tier == "pro":
@@ -41,6 +44,7 @@ def plan_limits(plan_tier: str) -> dict:
             "can_auto_refund": True,
             "can_auto_credit": True,
             "requires_human_for_charge": True,
+            "monthly_tickets": 500,
         }
     if tier == "elite":
         return {
@@ -49,6 +53,7 @@ def plan_limits(plan_tier: str) -> dict:
             "can_auto_refund": True,
             "can_auto_credit": True,
             "requires_human_for_charge": True,
+            "monthly_tickets": 5000,
         }
     if tier == "dev":
         # High-but-safe defaults. Charges remain human-reviewed.
@@ -58,6 +63,7 @@ def plan_limits(plan_tier: str) -> dict:
             "can_auto_refund": True,
             "can_auto_credit": True,
             "requires_human_for_charge": True,
+            "monthly_tickets": 10**9,
         }
     # free (default)
     return {
@@ -66,6 +72,7 @@ def plan_limits(plan_tier: str) -> dict:
         "can_auto_refund": False,
         "can_auto_credit": True,
         "requires_human_for_charge": True,
+        "monthly_tickets": 12,
     }
 
 
@@ -274,6 +281,10 @@ def validate_decision(ticket: dict, decision: dict, memory: dict | None = None) 
     if action == "charge":
         violations.append("Charge requires human review")
 
+    # Tier policy: free (and tiers without auto-refund) never auto-execute refunds
+    if action == "refund" and not bool(limits.get("can_auto_refund")):
+        violations.append(f"Plan tier {plan_tier} does not allow automatic refunds")
+
     # Plan caps
     if action == "refund" and amount > float(limits.get("max_refund", 0) or 0):
         violations.append(f"Refund exceeds plan limit for {plan_tier} (max_refund={limits.get('max_refund')})")
@@ -305,6 +316,7 @@ def gate_execution(ticket: dict, decision: dict, memory: dict | None = None) -> 
     """
     t = ticket or {}
     d = decision or {}
+    m = memory or {}
 
     action = str(d.get("action", "none") or "none").strip().lower()
     amount = _to_float(d.get("amount", 0), 0.0)
@@ -351,10 +363,28 @@ def gate_execution(ticket: dict, decision: dict, memory: dict | None = None) -> 
     else:
         governor_reason = "Review required under governor policy"
 
-    # Review for medium/high risk financial actions even if otherwise valid
-    if execution_mode == "auto" and financial and risk["level"] in {"medium", "high"}:
-        execution_mode = "review"
-        governor_reason = "Review required: elevated risk for financial action"
+    # Elevated risk: high always reviews; medium reviews unless tier policy allows in-cap auto motion.
+    if execution_mode == "auto" and financial:
+        plan_tier = normalize_plan_tier(str(t.get("plan_tier", m.get("plan_tier", "free")) or "free"))
+        limits = plan_limits(plan_tier)
+        refund_auto_eligible = (
+            action == "refund"
+            and bool(limits.get("can_auto_refund"))
+            and amount <= float(limits.get("max_refund", 0) or 0)
+            and approved
+        )
+        credit_auto_eligible = (
+            action == "credit"
+            and bool(limits.get("can_auto_credit"))
+            and amount <= float(limits.get("max_credit", 0) or 0)
+            and approved
+        )
+        if risk["level"] == "high":
+            execution_mode = "review"
+            governor_reason = "Review required: elevated risk for financial action"
+        elif risk["level"] == "medium" and not (refund_auto_eligible or credit_auto_eligible):
+            execution_mode = "review"
+            governor_reason = "Review required: elevated risk for financial action"
 
     requires_approval = execution_mode in {"review", "blocked"} or action == "charge"
 

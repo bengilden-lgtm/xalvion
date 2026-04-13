@@ -19,7 +19,7 @@ def safe_refund_reason(value: str | None) -> str:
     return text if text in {"duplicate", "fraudulent", "requested_by_customer"} else "requested_by_customer"
 
 
-def cents_from_dollars(amount: Any) -> int:
+def cents_from_dollars(amount: Any, *, max_dollars: float | None = None) -> int:
     try:
         value = float(amount)
     except (TypeError, ValueError):
@@ -27,7 +27,9 @@ def cents_from_dollars(amount: Any) -> int:
     # Defensive: reject NaN/inf without raising. This is a no-op for normal numeric inputs.
     if not math.isfinite(value):
         value = 0.0
-    return int(round(min(max(value, 0), _app.MAX_AUTO_REFUND) * 100))
+    cap = float(max_dollars) if max_dollars is not None else float(_app.MAX_AUTO_REFUND)
+    cap = max(0.0, cap)
+    return int(round(min(max(value, 0), cap) * 100))
 
 
 def dollars_from_cents(cents: int) -> float:
@@ -225,7 +227,12 @@ def evaluate_refund_rules(
     requested_cents: int,
     refund_cents: int,
 ) -> dict[str, Any]:
+    from governor import normalize_plan_tier, plan_limits
+
     tier = _app.get_plan_name(user)
+    tier_norm = normalize_plan_tier(tier)
+    pl = plan_limits(tier_norm)
+    cap_dollars = float(pl.get("max_refund") or 0)
     issue_type = str(result.get("issue_type", "general_support") or "general_support").strip().lower()
     order_status = str(result.get("order_status", "unknown") or "unknown").strip().lower()
     confidence = float(result.get("confidence", 0) or 0)
@@ -250,7 +257,16 @@ def evaluate_refund_rules(
 
     _rule("captured", bool(charge_context.get("captured", False)), "Charge is captured")
     _rule("has_refundable", remaining > 0, f"Remaining refundable: ${dollars_from_cents(remaining):.2f}")
-    _rule("within_cap", dollars_from_cents(refund_cents) <= rr["max_auto_refund_amount"], f"${dollars_from_cents(refund_cents):.2f} <= cap ${rr['max_auto_refund_amount']:.2f}")
+    _rule(
+        "within_cap",
+        dollars_from_cents(refund_cents) <= cap_dollars,
+        f"${dollars_from_cents(refund_cents):.2f} <= tier cap ${cap_dollars:.2f}",
+    )
+    _rule(
+        "tier_allows_auto_refund",
+        bool(pl.get("can_auto_refund")),
+        "Tier allows automatic refunds" if bool(pl.get("can_auto_refund")) else "Tier does not allow automatic refunds",
+    )
     _rule("positive_request", requested_cents > 0, f"Requested: ${dollars_from_cents(requested_cents):.2f}")
     _rule("positive_refund", refund_cents > 0, f"Actual: ${dollars_from_cents(refund_cents):.2f}")
 
@@ -290,7 +306,11 @@ def execute_real_refund(
     if not pi and not cid:
         return {"ok": False, "status": "missing_payment_reference", "detail": "payment_intent_id or charge_id required."}
 
-    cents_requested = cents_from_dollars(amount)
+    from governor import normalize_plan_tier, plan_limits
+
+    pl = plan_limits(normalize_plan_tier(_app.get_plan_name(user)))
+    max_ref_d = float(pl.get("max_refund") or _app.MAX_AUTO_REFUND)
+    cents_requested = cents_from_dollars(amount, max_dollars=max_ref_d)
     full_refund = cents_requested <= 0
 
     connected_account_id = str(getattr(user, "stripe_account_id", "") or "").strip()
@@ -618,7 +638,7 @@ def create_checkout_session_for_user(user: Any, desired: str) -> Any:
     return session
 
 
-def apply_successful_upgrade(db: Session, username: str, tier: str) -> Any:
+def apply_successful_upgrade(db: Session, username: str, tier: str, *, stripe_subscription_id: str | None = None) -> Any:
     user = db.query(_app.User).filter(_app.User.username == username).first()
     if not user:
         return None
@@ -628,6 +648,9 @@ def apply_successful_upgrade(db: Session, username: str, tier: str) -> Any:
         return user
 
     user.tier = desired
+    sid = (stripe_subscription_id or "").strip()
+    if sid and hasattr(user, "stripe_subscription_id"):
+        user.stripe_subscription_id = sid[:128]
     db.commit()
     db.refresh(user)
     return user
@@ -731,20 +754,32 @@ def infer_tier_from_subscription(subscription: Any) -> str:
     return "free"
 
 
-def downgrade_user_to_free(db: Session, username: str) -> Any:
+def downgrade_user_to_free(db: Session, username: str, *, subscription_id: str | None = None) -> Any:
     """Set user.tier to free after subscription removal (preserves internal dev tier)."""
     user = db.query(_app.User).filter(_app.User.username == username).first()
     if not user:
         return None
     if str(getattr(user, "tier", "") or "").strip().lower() == "dev":
         return user
+    stored = str(getattr(user, "stripe_subscription_id", "") or "").strip()
+    eid = (subscription_id or "").strip()
+    if eid and stored and stored != eid:
+        return user
     user.tier = "free"
+    if hasattr(user, "stripe_subscription_id"):
+        user.stripe_subscription_id = None
     db.commit()
     db.refresh(user)
     return user
 
 
-def sync_user_tier_from_stripe_subscription(db: Session, username: str, tier: str) -> Any:
+def sync_user_tier_from_stripe_subscription(
+    db: Session,
+    username: str,
+    tier: str,
+    *,
+    stripe_subscription_id: str | None = None,
+) -> Any:
     """Apply tier from Stripe subscription state (free / pro / elite). Preserves dev tier."""
     user = db.query(_app.User).filter(_app.User.username == username).first()
     if not user:
@@ -755,6 +790,12 @@ def sync_user_tier_from_stripe_subscription(db: Session, username: str, tier: st
     if desired not in {"free", "pro", "elite"}:
         desired = "free"
     user.tier = desired
+    sid = (stripe_subscription_id or "").strip()
+    if hasattr(user, "stripe_subscription_id"):
+        if desired == "free":
+            user.stripe_subscription_id = None
+        elif sid:
+            user.stripe_subscription_id = sid[:128]
     db.commit()
     db.refresh(user)
     return user
@@ -764,7 +805,8 @@ def apply_subscription_deleted(db: Session, subscription: Any) -> tuple[str, str
     username = subscription_username(subscription)
     if not username:
         return "skipped", "Missing username in subscription metadata"
-    user = downgrade_user_to_free(db, username)
+    sub_id = str(_subscription_field(subscription, "id", "") or "").strip()
+    user = downgrade_user_to_free(db, username, subscription_id=sub_id or None)
     if not user:
         return "skipped", f"User not found: {username!r}"
     return "ok", f"Downgraded {username} to free"
@@ -775,7 +817,10 @@ def apply_subscription_updated(db: Session, subscription: Any) -> tuple[str, str
     if not username:
         return "skipped", "Missing username in subscription metadata"
     tier = infer_tier_from_subscription(subscription)
-    user = sync_user_tier_from_stripe_subscription(db, username, tier)
+    sub_id = str(_subscription_field(subscription, "id", "") or "").strip()
+    user = sync_user_tier_from_stripe_subscription(
+        db, username, tier, stripe_subscription_id=sub_id or None
+    )
     if not user:
         return "skipped", f"User not found: {username!r}"
     return "ok", f"Synced {username} to tier={tier}"

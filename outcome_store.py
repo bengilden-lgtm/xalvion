@@ -130,7 +130,10 @@ def log_outcome(
     idempotency key (or ticket_id as fallback) so learning.py can look it up.
     """
     tool_status = str(tool_result.get("status", "unknown") or "unknown")
-    success     = 1 if tool_status in _SUCCESS_STATUSES else 0
+    is_mock = isinstance(tool_result, dict) and bool(tool_result.get("mock"))
+    vf = tool_result.get("verified") if isinstance(tool_result, dict) else None
+    allow_success = (not is_mock) and (vf is not False)
+    success = 1 if allow_success and tool_status in _SUCCESS_STATUSES else 0
     now         = _now_iso()
 
     db = SessionLocal()

@@ -82,12 +82,12 @@ def resolve_customer_email_for_ticket(
     request_context: dict[str, Any] | None = None,
     customer_email: str | None = None,
 ) -> str:
-    """Prefer ``request_context.sender``, then explicit ``customer_email`` on the support payload."""
+    """Prefer explicit ``customer_email`` on the payload, then ``request_context.sender``."""
     ctx = request_context if isinstance(request_context, dict) else {}
-    sender = normalize_customer_email(ctx.get("sender"))
-    if sender:
-        return sender
-    return normalize_customer_email(customer_email)
+    explicit = normalize_customer_email(customer_email)
+    if explicit:
+        return explicit
+    return normalize_customer_email(ctx.get("sender"))
 
 
 def _me_capacity_message(tier: str, remaining: int) -> str:

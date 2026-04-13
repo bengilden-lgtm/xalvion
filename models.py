@@ -33,6 +33,7 @@ class ExtensionAnalyzeRequest(BaseModel):
     thread_id: str | None = None
     subject: str | None = None
     sender: str | None = None
+    customer_email: str | None = None
     dom_excerpt: str | None = None
     selected_text: str | None = None
 
@@ -45,6 +46,20 @@ class ExtensionAnalyzeRequest(BaseModel):
         if len(text) > 50000:
             raise ValueError("text too long")
         return text
+
+    @field_validator("customer_email")
+    @classmethod
+    def validate_extension_customer_email(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        if "@" not in s:
+            raise ValueError("customer_email must look like an email address")
+        if len(s) > 320:
+            raise ValueError("customer_email too long")
+        return s
 
 
 class ThinkingTraceStep(BaseModel):

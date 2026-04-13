@@ -16,6 +16,7 @@ class User(Base):
     stripe_account_id = Column(String, nullable=True)
     stripe_livemode = Column(Integer, default=0, nullable=False)
     stripe_scope = Column(String, nullable=True)
+    stripe_subscription_id = Column(String(128), nullable=True)
 
 
 class ActionLog(Base):

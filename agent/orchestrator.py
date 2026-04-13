@@ -178,7 +178,7 @@ def _sovereign_llm_parse_fallback(
     confidence: float,
 ) -> Dict[str, Any]:
     """When the sovereign LLM returns no parseable JSON, continue with the structured planned decision (no local copy deck)."""
-    pa = normalize_action_payload(planned_action)
+    pa = normalize_action_payload(planned_action, plan_tier=str(ticket.get("plan_tier", "free") or "free"))
     triage_d = triage if isinstance(triage, dict) else {}
     return {
         "customer_message": "",
@@ -289,6 +289,7 @@ def run_agent(
     meta["customer_history"] = user_memory
     ticket = build_ticket(clean, user_id=user_id, meta=meta)
     ticket["request_context"] = ctx.model_dump()
+    _plan_tier = str(ticket.get("plan_tier", "free") or "free")
     thinking_trace.append(_trace("build_ticket", "done"))
 
     order_info: Dict[str, Any] = {}
@@ -322,12 +323,12 @@ def run_agent(
     memory_block = get_prompt_memory(user_id, limit=5)
     thinking_trace.append(_trace("memory_load", "done"))
 
-    hard_decision = normalize_action_payload(system_decision(ticket))
+    hard_decision = normalize_action_payload(system_decision(ticket), plan_tier=_plan_tier)
     thinking_trace.append(_trace("system_decision", "done"))
     learned_action = None
     top_rules = get_top_rule_objects(brain, 5)
     if hard_decision.get("action") == "none":
-        learned_action = normalize_action_payload(apply_learned_rules(ticket, top_rules)) if top_rules else None
+        learned_action = normalize_action_payload(apply_learned_rules(ticket, top_rules), plan_tier=_plan_tier) if top_rules else None
     thinking_trace.append(_trace("learned_rules", "done"))
 
     if learned_action and hard_decision.get("action") != "none" and learned_action.get("action") != hard_decision.get("action"):
@@ -353,7 +354,7 @@ def run_agent(
         parsed = _sovereign_llm_parse_fallback(planned_action, ticket, triage, confidence)
         thinking_trace.append(_trace("sovereign_llm_parse", "done", "structured_planned_action"))
 
-    llm_payload = normalize_action_payload(parsed)
+    llm_payload = normalize_action_payload(parsed, plan_tier=_plan_tier)
 
     if hard_decision.get("action") != "none":
         final_action = {**hard_decision, "confidence": confidence}
@@ -371,11 +372,10 @@ def run_agent(
             "confidence": confidence,
         }
 
-    _tier = str(ticket.get("plan_tier", "free") or "free")
     if execution_requires_operator_gate(
         final_action.get("action", "none"),
         final_action.get("amount", 0),
-        plan_tier=_tier,
+        plan_tier=_plan_tier,
     ):
         final_action = {**final_action, "requires_approval": True}
 
@@ -453,6 +453,9 @@ def run_agent(
     _exec_ts = str(executed.get("tool_status", "") or "").lower()
     _exec_act = str(executed.get("action", "none") or "none")
     _held_for_operator = _exec_ts in {"pending_approval", "manual_review", "approved_pending_execution"}
+    _mock_tr = isinstance(_tool_result, dict) and bool(_tool_result.get("mock"))
+    _vf_tr = _tool_result.get("verified") if isinstance(_tool_result, dict) else None
+    _verified_ok = (not _mock_tr) and (_vf_tr is not False)
     _log_outcome(
         outcome_key=_outcome_key,
         user_id=user_id,
@@ -460,7 +463,7 @@ def run_agent(
         amount=float(executed.get("amount", 0) or 0),
         issue_type=str(ticket.get("issue_type", "general_support") or "general_support"),
         tool_result=_tool_result,
-        auto_resolved=(not _held_for_operator) and _exec_act in {"refund", "credit", "none"},
+        auto_resolved=(not _held_for_operator) and _exec_act in {"refund", "credit", "none"} and _verified_ok,
         approved_by_human=False,
     )
 

@@ -27,6 +27,7 @@ def execution_requires_operator_gate(
     refund_amount: Any,
     *,
     plan_tier: Optional[str] = None,
+    amount: Any = None,
 ) -> bool:
     """
     Single source of truth for “must not auto-execute without operator approval”.
@@ -36,10 +37,13 @@ def execution_requires_operator_gate(
     - refund: free tier is always manual; pro/elite auto-execute only when can_auto_refund
       and refund_amount is within tier max_refund.
     - credit: optional LIVE_MODE high-amount threshold (unchanged).
+
+    ``amount`` is an alias for ``refund_amount`` (callers may pass either).
     """
     norm = str(action or "none").strip().lower()
+    raw_amt = refund_amount if amount is None else amount
     try:
-        value = float(refund_amount or 0)
+        value = float(raw_amt or 0)
     except (TypeError, ValueError):
         value = 0.0
     if norm == "charge":
@@ -202,6 +206,7 @@ def build_ticket(message: str, user_id: str = "anonymous", meta: Dict[str, Any] 
     meta = meta or {}
     history = meta.get("customer_history") or {}
 
+    ce = str(meta.get("customer_email", "") or "").strip()
     ticket = {
         "customer": user_id,
         "user_id": user_id,
@@ -215,6 +220,7 @@ def build_ticket(message: str, user_id: str = "anonymous", meta: Dict[str, Any] 
         "channel": str(meta.get("channel", "web") or "web"),
         "source": str(meta.get("source", "workspace") or "workspace"),
         "customer_history": history,
+        "customer_email": ce if ce and "@" in ce else None,
     }
     ticket["triage"] = triage_ticket(ticket, history)
     return ticket
