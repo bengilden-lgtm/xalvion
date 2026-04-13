@@ -18,7 +18,7 @@ Ownership / refactor policy:
 
 from __future__ import annotations
 
-print("[BOOT] APP.PY STARTING...", flush=True)
+print("BOOT: starting app import (app.py)", flush=True)
 
 import asyncio
 import json
@@ -46,19 +46,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, field_validator
 from models import CanonicalAgentResponse, ExtensionAnalyzeRequest, AgentRequestContext
-from sqlalchemy import (
-    Column,
-    Float,
-    Index,
-    Integer,
-    String,
-    Text,
-    and_,
-    case,
-    func,
-    inspect,
-    text,
-)
+from sqlalchemy import and_, case, func, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -71,7 +59,7 @@ from actions import (
     triage_ticket,
     MAX_AUTO_REFUND_AMOUNT,
 )
-from db import Base, SessionLocal, engine, init_db
+from db import SessionLocal, engine, init_db
 from memory import get_user_memory
 from utils import normalize_ticket, safe_execute
 from app_utils import (
@@ -95,7 +83,16 @@ from app_utils import (
     normalize_customer_email,
     resolve_customer_email_for_ticket,
 )
+from orm_app_tables import (
+    GuestPreviewUsage,
+    OperatorMonthlyUsage,
+    OperatorState,
+    ProcessedWebhook,
+    RateLimitEvent,
+)
 from orm_models import ActionLog, Ticket, User
+
+print("BOOT: db and ORM table modules imported", flush=True)
 
 try:
     from learning import learn_from_ticket
@@ -693,7 +690,9 @@ if STRIPE_KEY:
 try:
     from security import assert_production_runtime_safety as _assert_production_runtime_safety
 
+    print("BOOT: production runtime safety check (import phase)", flush=True)
     _assert_production_runtime_safety()
+    print("BOOT: production runtime safety check passed (import phase)", flush=True)
 except Exception as exc:
     env = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
     if env == "production":
@@ -726,7 +725,9 @@ WORKSPACE_CLIENT_DIR = os.path.join(BASE_DIR, "workspace-client")
 # FastAPI App + CORS
 # =============================================================================
 
+print("BOOT: creating FastAPI app", flush=True)
 app = FastAPI(title="Xalvion Sovereign Brain")
+print("BOOT: FastAPI app instance created", flush=True)
 
 if os.path.isdir(FLUID_DIR):
     app.mount("/fluid", StaticFiles(directory=FLUID_DIR), name="fluid")
@@ -790,72 +791,6 @@ def db_session() -> Generator[Session, None, None]:
 # =============================================================================
 
 
-class OperatorState(Base):
-    __tablename__ = "operator_state"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    mode = Column(String, default="balanced", nullable=False)
-    updated_at = Column(String, nullable=False)
-    updated_by = Column(String, default="system")
-
-
-class ProcessedWebhook(Base):
-    __tablename__ = "processed_webhooks"
-
-    event_id = Column(String, primary_key=True)
-    event_type = Column(String, nullable=False)
-    processed_at = Column(String, nullable=False)
-    outcome = Column(String, default="ok")
-    detail = Column(Text, default="")
-
-
-class GuestPreviewUsage(Base):
-    """Server-side tally for unauthenticated workspace preview runs (abuse hardening)."""
-
-    __tablename__ = "guest_preview_usage"
-
-    client_id = Column(String(80), primary_key=True)
-    usage_count = Column(Integer, nullable=False, default=0)
-    updated_at = Column(String, nullable=False)
-
-
-class RateLimitEvent(Base):
-    """
-    DB-backed sliding-window rate limit log.
-    Behavior must match the prior in-memory limiter: max 12 events per 60 seconds per key.
-    """
-
-    __tablename__ = "rate_limit_events"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    key = Column(String(96), nullable=False, index=True)
-    ts = Column(Float, nullable=False, index=True)  # epoch seconds
-
-
-class OperatorMonthlyUsage(Base):
-    """Successful operator runs per calendar month, split by workspace for attribution."""
-
-    __tablename__ = "operator_monthly_usage"
-
-    account_username = Column(String(96), primary_key=True)
-    workspace_id = Column(String(80), primary_key=True)
-    period_key = Column(String(7), primary_key=True)  # UTC YYYY-MM
-    run_count = Column(Integer, nullable=False, default=0)
-
-
-def _import_orm_submodules() -> None:
-    """Import modules that register ORM classes on shared Base (required before create_all).
-    Missing optional modules are logged instead of crashing process boot.
-    """
-    for module_name in ("analytics", "outcome_store", "persistence_layer", "state_store"):
-        try:
-            __import__(module_name)
-        except Exception as exc:
-            msg = f"optional_startup_import_failed:{module_name}:{type(exc).__name__}:{str(exc)[:180]}"
-            STARTUP_ISSUES.append(msg)
-            logger.warning(msg)
-
-
 def ensure_ticket_columns() -> None:
     try:
         inspector = inspect(engine)
@@ -898,7 +833,7 @@ def ensure_user_columns() -> None:
 
 @app.on_event("startup")
 def _startup_database() -> None:
-    _import_orm_submodules()
+    print("BOOT: FastAPI startup hook begin (database)", flush=True)
     init_db()
     try:
         from security import assert_production_runtime_safety
@@ -932,6 +867,7 @@ def _startup_database() -> None:
         logger.info("rule_sync_complete")
     except Exception as _sync_exc:
         logger.warning("rule_sync_failed detail=%s", str(_sync_exc)[:200])
+    print("BOOT: startup hooks ready (database phase complete)", flush=True)
 
 
 # =============================================================================

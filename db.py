@@ -22,9 +22,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 from threading import Lock
+
+print("BOOT: db.py module load start", flush=True)
 
 # SKIPPED: Requested Ticket/ActionLog indexes must be declared after the model
 # classes, but this repo defines those models in `orm_models.py` (not `db.py`).
@@ -69,14 +71,40 @@ def _resolve_url() -> str:
     return raw
 
 
+def _redact_database_url(url: str) -> str:
+    """Log-safe DSN (hides password)."""
+    if not url or "@" not in url:
+        return url or ""
+    try:
+        scheme, rest = url.split("://", 1)
+        if "@" not in rest:
+            return f"{scheme}://{rest}"
+        creds, hostpart = rest.rsplit("@", 1)
+        user = creds.split(":", 1)[0] if creds else ""
+        return f"{scheme}://{user}:***@{hostpart}"
+    except Exception:
+        return "[database_url_redacted]"
+
+
 DATABASE_URL: str = _resolve_url()
 _IS_SQLITE: bool = DATABASE_URL.startswith("sqlite")
+
+print(
+    f"BOOT: database backend={'sqlite' if _IS_SQLITE else 'non-sqlite'} url={_redact_database_url(DATABASE_URL)}",
+    flush=True,
+)
 
 # ---------------------------------------------------------------------------
 # Engine
 # ---------------------------------------------------------------------------
 
-_connect_args = {"check_same_thread": False} if _IS_SQLITE else {}
+if _IS_SQLITE:
+    _connect_args = {"check_same_thread": False}
+else:
+    # Prevent indefinite TCP hang when the DB host is unroutable (common deploy misconfig).
+    _db_connect_timeout = int(os.getenv("DB_CONNECT_TIMEOUT", "12").strip() or "12")
+    _db_connect_timeout = max(2, min(_db_connect_timeout, 120))
+    _connect_args = {"connect_timeout": _db_connect_timeout}
 
 # Pool sizing: a single-connection SQLite pool (pool_size=1, max_overflow=0)
 # starves FastAPI under concurrent requests — each Depends(get_db), threadpool
@@ -94,6 +122,7 @@ engine = create_engine(
     pool_size=_SQLITE_POOL_SIZE if _IS_SQLITE else 5,
     max_overflow=_SQLITE_MAX_OVERFLOW if _IS_SQLITE else 10,
 )
+print("BOOT: SQLAlchemy engine configured", flush=True)
 
 # ---------------------------------------------------------------------------
 # SQLite performance & safety PRAGMAs
@@ -130,6 +159,38 @@ Base = declarative_base()
 # ---------------------------------------------------------------------------
 
 _init_lock = Lock()
+_orm_metadata_loaded = False
+
+
+def ensure_orm_metadata_imported() -> None:
+    """Import every module that registers models on ``Base`` so ``create_all`` is complete.
+
+    Safe for Railway pre-deploy: does not import ``app`` (avoids loading FastAPI stack).
+    """
+    global _orm_metadata_loaded
+    if _orm_metadata_loaded:
+        return
+    print("BOOT: registering ORM models on shared Base (metadata)", flush=True)
+    import orm_models  # noqa: F401
+
+    import orm_app_tables  # noqa: F401
+
+    for module_name in (
+        "analytics",
+        "outcome_store",
+        "persistence_layer",
+        "state_store",
+        "backend.crm.outreach",
+    ):
+        try:
+            __import__(module_name)
+        except Exception as exc:
+            print(
+                f"BOOT: optional ORM module skipped name={module_name} err={type(exc).__name__}: {exc!s}"[:300],
+                flush=True,
+            )
+    _orm_metadata_loaded = True
+    print("BOOT: ORM metadata import pass complete", flush=True)
 
 
 def validate_db_config() -> None:
@@ -156,6 +217,8 @@ def init_db() -> None:
     and ignored. Any other error is re-raised as before.
     """
     with _init_lock:
+        ensure_orm_metadata_imported()
+        print("BOOT: init_db create_all starting", flush=True)
         try:
             Base.metadata.create_all(bind=engine)
         except Exception as e:
@@ -168,3 +231,4 @@ def init_db() -> None:
             validate_db_config()
         except Exception:
             pass
+        print("BOOT: db initialized (create_all finished)", flush=True)
