@@ -3050,6 +3050,34 @@ def build_status_sequence(result: dict[str, Any]) -> list[dict[str, str]]:
 
 
 # =============================================================================
+# ROUTER MODULES (auth, billing, dashboard, support) + optional CRM
+# =============================================================================
+# Register before direct ``@app`` routes below: Starlette matches in order, so
+# a duplicate path on ``app`` must not appear *above* ``routes.*`` handlers.
+
+for _router_mod, _router_label in (
+    ("routes.auth", "auth"),
+    ("routes.billing", "billing"),
+    ("routes.dashboard", "dashboard"),
+    ("routes.support", "support"),
+):
+    try:
+        _module = __import__(_router_mod, fromlist=["router"])
+        app.include_router(_module.router)
+    except Exception as exc:
+        STARTUP_ISSUES.append(f"router_import_failed:{_router_label}:{type(exc).__name__}:{str(exc)[:180]}")
+        logger.warning("router import failed for %s", _router_label, exc_info=True)
+
+try:
+    from backend.crm.outreach import register_outreach_crm_routes as _register_outreach_crm_routes
+
+    _register_outreach_crm_routes(app, base_dir=BASE_DIR, require_authenticated_user=require_authenticated_user)
+except Exception as exc:
+    STARTUP_ISSUES.append(f"router_import_failed:crm:{type(exc).__name__}:{str(exc)[:180]}")
+    logger.warning("router import failed for crm", exc_info=True)
+
+
+# =============================================================================
 # 13. ROUTES — STATIC
 # =============================================================================
 
@@ -3243,33 +3271,6 @@ def health_deep(db: Session = Depends(get_db)):
     checks["status"] = "degraded" if degraded else "ok"
     checks["service"] = "xalvion-sovereign-brain"
     return checks
-
-
-# =============================================================================
-# ROUTER MODULES (auth, billing, dashboard, support)
-# =============================================================================
-
-for _router_mod, _router_label in (
-    ("routes.auth", "auth"),
-    ("routes.billing", "billing"),
-    ("routes.dashboard", "dashboard"),
-    ("routes.support", "support"),
-):
-    try:
-        _module = __import__(_router_mod, fromlist=["router"])
-        app.include_router(_module.router)
-    except Exception as exc:
-        STARTUP_ISSUES.append(f"router_import_failed:{_router_label}:{type(exc).__name__}:{str(exc)[:180]}")
-        logger.warning("router import failed for %s", _router_label, exc_info=True)
-
-try:
-    # Optional but shipped in-repo: outreach CRM helpers + endpoints.
-    from backend.crm.outreach import register_outreach_crm_routes as _register_outreach_crm_routes
-
-    _register_outreach_crm_routes(app, base_dir=BASE_DIR, require_authenticated_user=require_authenticated_user)
-except Exception as exc:
-    STARTUP_ISSUES.append(f"router_import_failed:crm:{type(exc).__name__}:{str(exc)[:180]}")
-    logger.warning("router import failed for crm", exc_info=True)
 
 
 def _inbox_priority_score(item: dict[str, Any]) -> float:
