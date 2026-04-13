@@ -4489,3 +4489,139 @@ details > summary{ user-select:none; }
   text-align: left;
 }
 
+/* —— Per-ticket result summary (conversion + clarity) —— */
+.ticket-result-summary{
+  margin: 10px 0 14px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--xv-pill-border);
+  background: linear-gradient(165deg, rgba(124,92,252,.10), rgba(255,255,255,.03));
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+}
+.ticket-result-summary__title{
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-bottom: 10px;
+}
+.ticket-result-summary__grid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+@media (min-width: 720px){
+  .ticket-result-summary__grid{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.ticket-result-summary__k{
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-4);
+  margin-bottom: 4px;
+}
+.ticket-result-summary__v{
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+  line-height: 1.35;
+}
+.ticket-result-summary__hint{
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+.ticket-result-summary__value-strip{
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.ticket-result-summary__mode-row{
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+.ticket-result-summary__mode-pill{
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border: 1px solid var(--line-2);
+  background: rgba(255,255,255,.05);
+  color: var(--text-2);
+}
+.ticket-result-summary__mode-why{
+  flex: 1 1 220px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.ticket-result-summary__email{
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+/* —— Plan limit upgrade pressure —— */
+.usage-at-limit-upgrade{
+  margin-top: 10px;
+  padding: 14px 14px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(124,92,252,.35);
+  background: linear-gradient(180deg, rgba(124,92,252,.14), rgba(255,255,255,.03));
+}
+.usage-at-limit-upgrade__eyebrow{
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-bottom: 6px;
+}
+.usage-at-limit-upgrade__title{
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--text);
+  line-height: 1.35;
+  margin: 0 0 8px;
+}
+.usage-at-limit-upgrade__lead{
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.usage-at-limit-upgrade__list{
+  margin: 0 0 12px 1.1em;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.usage-at-limit-upgrade__actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.usage-at-limit-upgrade__primary{
+  flex: 0 0 auto;
+}
+.usage-at-limit-upgrade__secondary{
+  flex: 0 0 auto;
+}
+

@@ -331,6 +331,175 @@ if (typeof window.pulseRail !== "function") {
     return Math.max(0, Math.round(n * 3));
   }
 
+  function mergedToolResult(data = {}) {
+    const base = data.tool_result && typeof data.tool_result === "object" ? data.tool_result : {};
+    const ar = data.audit_summary && typeof data.audit_summary === "object" ? data.audit_summary : {};
+    const ex = ar.executed && typeof ar.executed === "object" ? ar.executed : {};
+    const tr = ex.tool_result && typeof ex.tool_result === "object" ? ex.tool_result : {};
+    return { ...base, ...tr };
+  }
+
+  function deriveTicketMinutesSaved(data = {}) {
+    const imp = data.impact || {};
+    const m = Number(imp.agent_minutes_saved || imp.time_saved_est_min || imp.operator_minutes_saved || 0);
+    if (Number.isFinite(m) && m > 0) return Math.max(1, Math.round(m));
+    const action = String(data.action || data.decision?.action || "none").toLowerCase();
+    if (action === "none") return 3;
+    if (action === "refund" || action === "credit" || action === "charge") return 7;
+    if (action === "review") return 6;
+    return 4;
+  }
+
+  function formatConfidenceForSummary(data = {}) {
+    const raw = Number(data.confidence || data.decision?.confidence || 0);
+    const v = Math.min(Math.max(raw, 0), 1);
+    const pct = Math.round(v * 100);
+    let band = "moderate";
+    if (pct >= 80) band = "solid";
+    else if (pct < 55) band = "cautious";
+    return { pct, band, line: `Confidence ${pct}% (${band} — verify risky cases)` };
+  }
+
+  function formatOutboundEmailLine(data = {}) {
+    const tr = mergedToolResult(data);
+    const em = tr.email && typeof tr.email === "object" ? tr.email : null;
+    if (em && em.ok === true) {
+      const to = String(em.to || data.ticket?.customer_email || "").trim();
+      return to ? `Email sent to: ${to}` : "Email sent.";
+    }
+    if (String(tr.status || "").toLowerCase() === "sent" && String(tr.to || "").includes("@")) {
+      return `Email sent to: ${String(tr.to).trim()}`;
+    }
+    return "Email not sent — configure SMTP";
+  }
+
+  function derivePlanLimitValueLine(data = {}) {
+    const tier = String(state.tier || "free").toLowerCase();
+    if (!isAuthenticated()) {
+      return "Preview mode — create a free account for saved threads and higher monthly limits.";
+    }
+    if (state.atLimit && tier !== "elite" && tier !== "dev") {
+      return "You’ve reached included runs for this window — upgrade for headroom or continue with tracked overage.";
+    }
+    const rem = Number(data.remaining ?? data.entitlement?.remaining ?? state.remaining ?? 0);
+    if (Number.isFinite(rem) && rem > 0) {
+      return "Auto-executed under your plan limits when policy, Stripe, and SMTP are ready.";
+    }
+    return "Included runs for this cycle are used — Pro adds live execution and higher limits.";
+  }
+
+  function deriveAutoManualExecution(data = {}) {
+    const approval = getApprovalContext(data);
+    const tst = String(data.tool_status || "").toLowerCase();
+    const action = String(data.action || data.decision?.action || "none").toLowerCase();
+    const impact = data.impact || {};
+
+    if (approval.requiresApproval && !approval.approved) {
+      return {
+        label: "Requires approval",
+        why: "A billing or policy-sensitive step is staged — nothing executes until you approve.",
+      };
+    }
+    if (tst === "manual_review" || action === "review" || tst === "escalated") {
+      return {
+        label: "Manual required",
+        why: "This case needs a human judgment, follow-up, or helpdesk step before it is truly closed.",
+      };
+    }
+    if (["refunded", "credit_issued", "success"].includes(tst) || (impact.auto_resolved && tst && tst !== "unknown")) {
+      return {
+        label: "Auto-resolved",
+        why: "Policy and tooling allowed the motion to finish without extra gates on this path.",
+      };
+    }
+    if (tst === "approved_pending_execution") {
+      return {
+        label: "Pending",
+        why: "Approved on record — connect Stripe or add payment references to finish execution.",
+      };
+    }
+    return {
+      label: "Operator send",
+      why: "Customer-ready reply is prepared — you copy or send through your channel when it reads right.",
+    };
+  }
+
+  function deriveExecutionStatusHeadline(data = {}) {
+    const auto = deriveAutoManualExecution(data);
+    const tst = String(data.tool_status || "").toLowerCase();
+    if (auto.label === "Requires approval") return { headline: "Pending", detail: auto.why };
+    if (auto.label === "Manual required") return { headline: "Manual", detail: auto.why };
+    if (auto.label === "Auto-resolved") return { headline: "Executed", detail: auto.why };
+    if (tst === "approved_pending_execution") return { headline: "Pending", detail: auto.why };
+    if (String(data.action || "none").toLowerCase() === "none") return { headline: "Ready", detail: "No billing tool run on this ticket — reply only." };
+    return { headline: "Executed", detail: auto.why };
+  }
+
+  function actionTakenLabel(data = {}) {
+    const raw = String(data.action || data.decision?.action || "none").toLowerCase();
+    const amt = Number(data.amount || data.decision?.amount || 0) || 0;
+    if (raw === "refund" && amt > 0) return `Refund ${formatMoney(amt)}`;
+    if (raw === "credit" && amt > 0) return `Credit ${formatMoney(amt)}`;
+    if (raw === "charge" && amt > 0) return `Charge ${formatMoney(amt)}`;
+    if (raw === "review") return "Escalation / review";
+    if (raw === "none") return "Reply drafted";
+    return displayActionLabel(data);
+  }
+
+  function renderTicketResultSummary(row, data) {
+    const host = row?.querySelector?.(".js-ticket-result-summary");
+    if (!host || !data || typeof data !== "object") return;
+    const card = row.querySelector(".msg-card");
+    if (card?.dataset?.placeholder === "true") {
+      host.hidden = true;
+      host.innerHTML = "";
+      return;
+    }
+
+    const conf = formatConfidenceForSummary(data);
+    const exec = deriveExecutionStatusHeadline(data);
+    const mode = deriveAutoManualExecution(data);
+    const mins = deriveTicketMinutesSaved(data);
+    const prepRaw = Number(row?.dataset?.prepSeconds || "");
+    const prepLine =
+      Number.isFinite(prepRaw) && prepRaw > 0
+        ? `AI prepared this in ${prepRaw < 10 ? prepRaw.toFixed(1) : Math.round(prepRaw)}s`
+        : "";
+    const valueLine = [prepLine, `Saved ~${mins} min of work`, derivePlanLimitValueLine(data)].filter(Boolean).join(" · ");
+    const emailLine = formatOutboundEmailLine(data);
+
+    host.className = "ticket-result-summary js-ticket-result-summary";
+    host.innerHTML = `
+      <div class="ticket-result-summary__title">Result</div>
+      <div class="ticket-result-summary__grid" role="group" aria-label="Ticket outcome">
+        <div class="ticket-result-summary__cell">
+          <div class="ticket-result-summary__k">Action taken</div>
+          <div class="ticket-result-summary__v">${escapeHtml(actionTakenLabel(data))}</div>
+        </div>
+        <div class="ticket-result-summary__cell">
+          <div class="ticket-result-summary__k">Execution</div>
+          <div class="ticket-result-summary__v">${escapeHtml(exec.headline)}</div>
+          <div class="ticket-result-summary__hint">${escapeHtml(exec.detail)}</div>
+        </div>
+        <div class="ticket-result-summary__cell">
+          <div class="ticket-result-summary__k">Time saved (est.)</div>
+          <div class="ticket-result-summary__v">~${escapeHtml(String(mins))} min</div>
+        </div>
+        <div class="ticket-result-summary__cell">
+          <div class="ticket-result-summary__k">Confidence</div>
+          <div class="ticket-result-summary__v">${escapeHtml(conf.line)}</div>
+        </div>
+      </div>
+      <div class="ticket-result-summary__value-strip">${escapeHtml(valueLine)}</div>
+      <div class="ticket-result-summary__mode-row">
+        <span class="ticket-result-summary__mode-pill">${escapeHtml(mode.label)}</span>
+        <span class="ticket-result-summary__mode-why">${escapeHtml(mode.why)}</span>
+      </div>
+      <div class="ticket-result-summary__email" data-tone="neutral">${escapeHtml(emailLine)}</div>
+    `;
+    host.hidden = false;
+  }
+
   function formatIssueType(raw) {
     if (!raw) return "";
     return String(raw)
@@ -3183,12 +3352,60 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   function renderUsageIntelligence(userData) {
     const el = ensureUsageApproachNoticeEl();
     if (!el) return;
-    if (!userData || !userData.approaching_limit || userData.at_limit) {
-      el.style.display = "none";
-      el.innerHTML = "";
+    const tier = String(userData?.tier || state.tier || "free").toLowerCase();
+    const atLimit = Boolean(userData?.at_limit);
+
+    if (atLimit && tier !== "elite" && tier !== "dev") {
+      el.style.display = "block";
+      el.className = "usage-at-limit-upgrade";
+      const isGuest = !isAuthenticated();
+      const primaryCta = isGuest ? "Create free account" : tier === "pro" ? "Upgrade to Elite" : "Upgrade to Pro";
+      const secondaryHint = isGuest
+        ? "Preview runs are capped — a free account adds monthly included runs and saved threads."
+        : "Included runs for this window are used — unlock headroom before the queue feels it.";
+      el.innerHTML = `
+        <div class="usage-at-limit-upgrade__eyebrow">${escapeHtml(isGuest ? "Preview limit reached" : "Plan limit reached")}</div>
+        <div class="usage-at-limit-upgrade__title">Keep auto refunds, higher limits, and faster resolution</div>
+        <p class="usage-at-limit-upgrade__lead">${escapeHtml(secondaryHint)}</p>
+        <ul class="usage-at-limit-upgrade__list">
+          <li><strong>Auto refunds &amp; credits</strong> when Stripe is connected — less tab switching.</li>
+          <li><strong>Higher included runs</strong> so volume weeks do not stall mid-shift.</li>
+          <li><strong>Faster resolution</strong> with live execution lanes and clearer approvals.</li>
+        </ul>
+        <div class="usage-at-limit-upgrade__actions">
+          <button type="button" class="btn usage-at-limit-upgrade__primary">${escapeHtml(primaryCta)}</button>
+          <button type="button" class="ghost-btn usage-at-limit-upgrade__secondary">Compare plans</button>
+        </div>`;
+      el.querySelector(".usage-at-limit-upgrade__primary")?.addEventListener(
+        "click",
+        () => {
+          if (isGuest) {
+            focusAccessPanel();
+            return;
+          }
+          if (tier === "pro") upgradePlan("elite");
+          else upgradePlan("pro");
+        },
+        { once: true }
+      );
+      el.querySelector(".usage-at-limit-upgrade__secondary")?.addEventListener(
+        "click",
+        () => {
+          if (isGuest) focusPlansPanel();
+          else focusPlansPanel();
+        },
+        { once: true }
+      );
+      setUsageInlineCta(null);
       return;
     }
-    const tier = String(userData.tier || state.tier || "free").toLowerCase();
+
+    if (!userData || !userData.approaching_limit) {
+      el.style.display = "none";
+      el.innerHTML = "";
+      el.className = "muted-copy";
+      return;
+    }
     if (tier === "elite") {
       el.style.display = "none";
       el.innerHTML = "";
@@ -3240,10 +3457,23 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
   function syncUsageApproachNotice() {
     if (!isAuthenticated()) {
+      const guestLim = getEffectiveLimit("free", GUEST_USAGE_LIMIT);
+      const guestUsed = getEffectiveUsage();
+      if (guestUsed >= guestLim) {
+        renderUsageIntelligence({
+          approaching_limit: true,
+          at_limit: true,
+          tier: "free",
+          usage: guestUsed,
+          value_signals: state.valueSignals,
+        });
+        return;
+      }
       const el = ensureUsageApproachNoticeEl();
       if (el) {
         el.style.display = "none";
         el.innerHTML = "";
+        el.className = "muted-copy";
       }
       return;
     }
@@ -3281,7 +3511,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     };
     renderUsageIntelligence({
       approaching_limit: true,
-      at_limit: state.atLimit,
+      at_limit: Boolean(payload.at_limit === true || state.atLimit),
       tier: state.tier,
       usage: state.usage,
       value_signals: state.valueSignals,
@@ -3563,7 +3793,6 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const assistantBody =
       role === "assistant"
         ? `<div class="msg-body assistant-canvas">
-        <div class="stream-trace-host"></div>
         <div class="assistant-result-stack">
           <div class="customer-message-block">
             <div class="reply-body">
@@ -3572,6 +3801,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
               <span class="run-value-summary js-run-value-summary" hidden aria-live="polite"></span>
               <span class="reply-prep-time js-prepared-time" hidden></span>
             </div>
+            <div class="ticket-result-summary js-ticket-result-summary" hidden aria-live="polite"></div>
             <div class="customer-message-label reply-hero-label">Suggested reply</div>
               <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Drafted with policy and risk checks; your approval still governs what ships.</div>
               <div class="reply-text js-reply-text">${bodyHtml}</div>
@@ -4368,10 +4598,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (!Number.isFinite(s) || s <= 0) {
       el.hidden = true;
       el.textContent = "";
+      if (row && row.dataset) delete row.dataset.prepSeconds;
       return;
     }
-    const fixed = Math.max(0.1, Math.round(s * 10) / 10).toFixed(1);
-    el.textContent = `Prepared in ${fixed}s`;
+    const fixed = Math.max(0.1, Math.round(s * 10) / 10);
+    if (row && row.dataset) row.dataset.prepSeconds = String(fixed);
+    el.textContent = `AI prepared this in ${fixed.toFixed(1)}s`;
     el.hidden = false;
   }
 
@@ -4657,39 +4889,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
   function syncRunValueSummary(row, data) {
     const el = row?.querySelector?.(".js-run-value-summary");
     if (!el) return;
-    if (!data || typeof data !== "object") {
-      el.hidden = true;
-      el.textContent = "";
-      return;
-    }
-    const sig = deriveConsequenceSignal(data);
-    const approval = getApprovalContext(data);
-    const action = String(data.decision?.action || data.action || "none").toLowerCase();
-    const moneyActs = action === "refund" || action === "credit" || action === "charge";
-    const tst = String(data.tool_status || "").toLowerCase();
-    if (tst === "error" || tst === "blocked_input") {
-      el.hidden = true;
-      el.textContent = "";
-      return;
-    }
-
-    let line = "Reply ready — you stay in control";
-    if (approval.requiresApproval && !approval.approved && moneyActs) {
-      line = "Reply ready — approval required for billing impact";
-    } else if (/signal-blocked/.test(sig.cls)) {
-      line = "Blocked — prevented risky execution";
-    } else if (/signal-approval/.test(sig.cls) && !approval.approved) {
-      line = "Approval required — high-impact action";
-    } else if (/signal-review|signal-high-risk/.test(sig.cls)) {
-      line = "Reply ready — read carefully before send";
-    } else if (/signal-safe/.test(sig.cls)) {
-      line = "Handled safely — routine path, your send";
-    } else if (action === "review") {
-      line = "Reply ready — own the follow-up";
-    }
-
-    el.textContent = line;
-    el.hidden = false;
+    el.hidden = true;
+    el.textContent = "";
   }
 
   function operatorPostureLabel(data = {}) {
@@ -4902,6 +5103,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       confidence: Number(data.confidence || ticket.confidence || previous.confidence || 0) || 0,
       quality: Number(data.quality || ticket.quality || previous.quality || 0) || 0,
       requires_approval: Boolean((data.decision || {}).requires_approval || ticket.requires_approval || false),
+      audit_summary: data.audit_summary || previous.audit_summary,
+      tool_result: mergedToolResult({ ...previous, ...data }),
     };
   }
 
@@ -5004,39 +5207,6 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     return { cls: "signal-safe", text: "Routine path", title: "No billing hold — quick read, then send when satisfied." };
   }
 
-  function populateDecisionOutcomeIntelStrip(el, data) {
-    if (!el) return;
-    try {
-      const fmt = globalThis.__XALVION_FORMAT__;
-      const raw = state.dashboardStats?.outcome_intelligence;
-      if (!raw || typeof raw !== "object") {
-        el.hidden = true;
-        el.innerHTML = "";
-        return;
-      }
-      const norm = fmt?.normalizeOutcomeIntelligence ? fmt.normalizeOutcomeIntelligence(raw) : null;
-      if (!norm) {
-        el.hidden = true;
-        el.innerHTML = "";
-        return;
-      }
-      const mix = fmt?.formatOutcomeSummaryLine ? fmt.formatOutcomeSummaryLine(norm) : "";
-      const hl = String(norm.latest?.headline || "").trim();
-      if (!mix && !hl) {
-        el.hidden = true;
-        el.innerHTML = "";
-        return;
-      }
-      el.hidden = false;
-      const primary = hl || mix;
-      const secondary = hl && mix && mix !== hl ? mix : "";
-      el.innerHTML = `<details class="decision-outcome-intel-fold"><summary class="decision-outcome-intel-fold-summary">Similar outcomes</summary><div class="decision-outcome-intel-inner"><span class="decision-outcome-intel__k">Context</span><span class="decision-outcome-intel__p">${escapeHtml(primary)}</span>${secondary ? `<span class="decision-outcome-intel__s">${escapeHtml(secondary)}</span>` : ""}</div></details>`;
-    } catch {
-      el.hidden = true;
-      el.innerHTML = "";
-    }
-  }
-
   function mountOperatorDecisionPanel(row, data, initialReply) {
     row.querySelector(".decision-panel")?.remove();
     const msgBody = row.querySelector(".msg-body");
@@ -5071,7 +5241,6 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         <div class="trust-strip-detail" data-role="trust-detail" aria-hidden="true"></div>
       </div>
       <div class="xv-governor-surface" data-role="governor" hidden></div>
-      <div class="decision-outcome-intel" data-role="outcome-intel" hidden></div>
       <div class="decision-panel-note" data-role="note" style="display:none"></div>
       <div class="decision-panel-error" data-role="err" style="display:none"></div>
       <div class="edit-mode-container" data-role="edit" style="display:none"></div>
@@ -5093,7 +5262,6 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const trustStripEl = panel.querySelector("[data-role='trust-strip']");
     const trustDetailEl = panel.querySelector("[data-role='trust-detail']");
     const govSurfaceEl = panel.querySelector("[data-role='governor']");
-    const outcomeIntelEl = panel.querySelector("[data-role='outcome-intel']");
     const noteEl = panel.querySelector("[data-role='note']");
     const errEl = panel.querySelector("[data-role='err']");
     const editWrap = panel.querySelector("[data-role='edit']");
@@ -5157,8 +5325,6 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       }
     } catch {}
 
-    populateDecisionOutcomeIntelStrip(outcomeIntelEl, data);
-
     // Governor reasoning: reason, risk score, factors, policy checks, next step — structured (does not replace terminal note).
     try {
       const fmt = globalThis.__XALVION_FORMAT__;
@@ -5206,6 +5372,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       }
     } catch {}
 
+    renderTicketResultSummary(row, data);
+
     const showErr = (t) => {
       errEl.textContent = t || "";
       errEl.style.display = t ? "block" : "none";
@@ -5240,6 +5408,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         nextWrap.innerHTML = approved ? buildNextActionHtml() : "";
         if (approved) bindNextActionHandlers(nextWrap);
       }
+      renderTicketResultSummary(row, data);
     };
 
     function buildNextActionHtml() {
@@ -5299,14 +5468,13 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
       return `
         <div class="xv-next-success" role="status" aria-live="polite">
-          <div class="xv-next-success-title">Approved <span aria-hidden="true">✓</span></div>
-          <div class="xv-next-success-sub">On the record — ready to send when you are</div>
-          <div class="xv-next-audit" aria-label="Approval log">
+          <div class="xv-next-success-title">Ticket resolved successfully</div>
+          <div class="xv-next-success-sub">${escapeHtml(formatOutboundEmailLine(data))}</div>
+          <div class="xv-next-audit" aria-label="Outcome">
             ${audit.ticketId ? `<span class="xv-next-audit-chip">Ticket #${escapeHtml(String(audit.ticketId))}</span>` : ""}
             ${audit.action ? `<span class="xv-next-audit-chip">${escapeHtml(audit.action)}</span>` : ""}
             ${audit.stamp ? `<span class="xv-next-audit-chip">${escapeHtml(audit.stamp)}</span>` : ""}
             ${audit.who ? `<span class="xv-next-audit-chip">By ${escapeHtml(audit.who)}</span>` : ""}
-            ${audit.runId ? `<span class="xv-next-audit-chip">Log ${escapeHtml(audit.runId)}</span>` : ""}
           </div>
         </div>
 
@@ -5510,7 +5678,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
               updateLatestRunCard(normalized);
               updateSystemNarrative(normalized);
               updateTopbarStatus();
-              setNotice("success", "Approved", response.message || "Your edit is what ships — paste or send when ready.");
+              setNotice(
+                "success",
+                "Ticket resolved successfully",
+                [response.message || "Outcome recorded.", formatOutboundEmailLine(normalized)].filter(Boolean).join(" ")
+              );
             } catch (error) {
               showErr(error.message || "Approve failed.");
               [rej, ed, ap].forEach((b) => {
@@ -5603,7 +5775,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             updateLatestRunCard(normalized);
             updateSystemNarrative(normalized);
             updateTopbarStatus();
-            setNotice("success", "Approved", response.message || "Action released — on your approval.");
+            setNotice(
+              "success",
+              "Ticket resolved successfully",
+              [response.message || "Outcome recorded.", formatOutboundEmailLine(normalized)].filter(Boolean).join(" ")
+            );
           } catch (error) {
             showErr(error.message || "Approve failed.");
             [rej, ed, ap].forEach((b) => {
@@ -5614,7 +5790,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           return;
         }
         setTerminal("Approved", "Reply ready — send when it reads right.");
-        setNotice("success", "Cleared", "No billing hold — copy or send on your timeline.");
+        setNotice(
+          "success",
+          "Ticket resolved successfully",
+          ["No billing hold on this run — copy or send on your timeline.", formatOutboundEmailLine(data)].filter(Boolean).join(" ")
+        );
       });
     };
 
@@ -5776,7 +5956,6 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const toolStatusDisplay = translateToolStatus(toolStatus);
     const internalNote = String(output.internal_note || "").trim();
     const policyNote = String(data.reason || decision.reason || "").trim();
-    const trace = thinkingTraceSnippet(data, 5);
     const execDetail = String(data.execution?.detail || data.tool_result?.message || "").trim();
 
     let governorBlock = "";
@@ -5851,46 +6030,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         </div>`
             : ""
         }
-        ${
-          trace
-            ? `<div class="details-insight">
-          <div class="details-insight-k">Decision trace</div>
-          <div class="details-trace">${escapeHtml(trace)}</div>
-        </div>`
-            : ""
-        }
       </div>
     `;
 
     details.innerHTML = `
-      <div class="xv-decision-summary-strip" style="
-        display:grid;
-        grid-template-columns:repeat(4,1fr);
-        gap:8px;
-        padding:12px 14px 10px;
-        border-bottom:1px solid rgba(255,255,255,.07);
-        margin-bottom:2px;
-      ">
-        <div class="xv-dsumm-cell" style="text-align:center">
-          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Action</div>
-          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(displayActionLabel(data))}</div>
-        </div>
-        <div class="xv-dsumm-cell" style="text-align:center">
-          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Confidence</div>
-          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${(() => {
-            const c = Number(decision.confidence || data.confidence || 0);
-            return c > 0 ? escapeHtml(String(c.toFixed(2))) : "—";
-          })()}</div>
-        </div>
-        <div class="xv-dsumm-cell" style="text-align:center">
-          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Risk</div>
-          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(riskLabel(data))}</div>
-        </div>
-        <div class="xv-dsumm-cell" style="text-align:center">
-          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(205,215,242,.5);margin-bottom:4px">Value</div>
-          <div style="font-size:15px;font-weight:700;color:rgba(245,248,255,.95)">${escapeHtml(formatMoney(impact.amount ?? data.amount ?? impact.money_saved ?? 0))}</div>
-        </div>
-      </div>
       <summary class="details-toggle">
         <span>Decision brief</span>
         <span class="chev">${ICONS.chevron}</span>
@@ -6639,7 +6782,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const it = String(
         data.issue_type || data.meta?.issue_type || data.decision?.issue_type || "general_support"
       );
-      els.railRunSummary.textContent = `${formatIssueType(it)} · ${displayActionLabel(data)} · conf ${formatMetric(data.confidence || 0, 2)}`;
+      const ex = deriveExecutionStatusHeadline(data);
+      const conf = formatConfidenceForSummary(data);
+      els.railRunSummary.textContent = `${formatIssueType(it)} · ${actionTakenLabel(data)} · ${ex.headline} · ${conf.pct}% conf (${conf.band})`;
     }
     syncApprovalRail(data);
   }
