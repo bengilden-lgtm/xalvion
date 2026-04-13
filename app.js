@@ -28,6 +28,9 @@
   const ACTIVATION_CHECKLIST_DISMISSED_KEY = "xalvion_activation_checklist_dismissed_v1";
   const FIRST_OUTCOME_CELEBRATION_KEY = "xalvion_first_outcome_celebration_v1";
   const MANUAL_FRICTION_KEY = "xalvion_manual_friction_count_v1";
+  const DEMO_THREAD_TAG = "[DEMO — synthetic ticket, not real customer data]";
+  const UPGRADE_TRIGGER_KEY = "xalvion_upgrade_trigger_pending_v1";
+  const GROWTH_FEEDBACK_DONE_KEY = "xalvion_growth_feedback_done_v1";
   /** Set when URL contains `?checkout=` after Stripe Billing return; consumed after `hydrateMe`. */
   let __billingCheckoutReturn = { kind: null, detail: "" };
 
@@ -302,7 +305,7 @@ if (typeof window.pulseRail !== "function") {
           focusPlansPanel();
           return;
         }
-        upgradePlan(target);
+        upgradePlan(target, "usage_inline_cta");
       },
       { once: true }
     );
@@ -488,8 +491,13 @@ if (typeof window.pulseRail !== "function") {
     const valueLine = [prepLine, `Saved ~${mins} min of work`, derivePlanLimitValueLine(data)].filter(Boolean).join(" · ");
     const emailLine = formatOutboundEmailLine(data);
 
+    const demoBanner =
+      row?.dataset?.demoThread === "1"
+        ? `<div class="ticket-result-summary__demo" role="note"><strong>Demo</strong> — synthetic scenario only; not real customer data. Summary shows how decisions are structured.</div>`
+        : "";
     host.className = "ticket-result-summary js-ticket-result-summary";
     host.innerHTML = `
+      ${demoBanner}
       <div class="ticket-result-summary__title">Result</div>
       <div class="ticket-result-summary__grid" role="group" aria-label="Ticket outcome">
         <div class="ticket-result-summary__cell">
@@ -1726,6 +1734,34 @@ if (typeof window.pulseRail !== "function") {
         margin-bottom: 6px;
       }
       .xv-first-outcome-copy { margin: 0 0 6px 0; font-size: 13px; line-height: 1.5; }
+      .ticket-result-summary__demo {
+        font-size: 11.5px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+        border-radius: 10px;
+        border: 1px solid rgba(120, 160, 255, 0.35);
+        background: rgba(80, 120, 220, 0.12);
+        color: rgba(215, 225, 255, 0.92);
+      }
+      .xv-demo-lab {
+        margin: 18px 0 12px 0;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px dashed rgba(255, 200, 120, 0.35);
+        background: rgba(255, 200, 120, 0.06);
+      }
+      .xv-demo-lab__bar { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+      .xv-demo-lab__title { font-size: 13px; font-weight: 650; color: rgba(245, 248, 255, 0.95); }
+      .xv-demo-lab__hint { font-size: 12px; color: rgba(205, 215, 242, 0.78); margin: 0 0 10px 0; line-height: 1.45; }
+      .xv-demo-lab__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .xv-growth-surface { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); }
+      .xv-growth-feedback-block .xv-growth-q { font-size: 12px; font-weight: 600; margin: 8px 0 4px 0; color: rgba(215,225,242,.9); }
+      .xv-growth-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+      .xv-growth-row .ghost-btn.is-selected { border-color: rgba(96, 220, 170, 0.55); background: rgba(96,220,170,.12); }
+      .xv-growth-ta { width: 100%; min-height: 52px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.2); color: inherit; font: inherit; resize: vertical; margin-bottom: 8px; }
+      .xv-growth-referral { margin-top: 10px; }
+      .xv-growth-referral-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .xv-growth-referral-input { flex: 1; min-width: 200px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.25); color: rgba(215,225,242,.95); font: 12px/1.3 ui-monospace,monospace; }
       .decision-panel-integration-hint {
         margin: 8px 0 0 0;
         padding: 10px 12px;
@@ -2194,8 +2230,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             return;
           }
           const t = String(state.tier || "free").toLowerCase();
-          if (t === "pro") upgradePlan("elite");
-          else upgradePlan("pro");
+          if (t === "pro") upgradePlan("elite", "inline_limit_banner");
+          else upgradePlan("pro", "inline_limit_banner");
         },
         { once: true }
       );
@@ -2267,6 +2303,48 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     return data;
   }
+
+  function setPendingUpgradeTrigger(reason) {
+    try {
+      sessionStorage.setItem(UPGRADE_TRIGGER_KEY, String(reason || "unspecified").slice(0, 200));
+    } catch (_) {}
+  }
+
+  function takePendingUpgradeTrigger() {
+    try {
+      const v = sessionStorage.getItem(UPGRADE_TRIGGER_KEY) || "";
+      sessionStorage.removeItem(UPGRADE_TRIGGER_KEY);
+      return v.slice(0, 200) || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function postGrowthEvent(type, props) {
+    if (!API) return;
+    const t = String(type || "").trim().slice(0, 96);
+    if (!t) return;
+    const p = props && typeof props === "object" ? props : {};
+    void fetch(`${API}/growth/event`, {
+      method: "POST",
+      headers: headers(true),
+      body: JSON.stringify({ type: t, props: p }),
+    }).catch(() => {});
+  }
+
+  function submitGrowthFeedback(useful, payFor, context) {
+    if (!API) return Promise.resolve();
+    return fetch(`${API}/growth/feedback`, {
+      method: "POST",
+      headers: headers(true),
+      body: JSON.stringify({
+        useful: useful || "",
+        pay_for: payFor || "",
+        context: context || "",
+      }),
+    }).catch(() => {});
+  }
+
   async function apiGet(path) {
     const res = await fetch(`${API}${path}`, {
       headers: headers(false)
@@ -3527,7 +3605,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           clearComposerValueMoment();
           return;
         }
-        upgradePlan(target);
+        upgradePlan(target, "post_high_value_run");
         clearComposerValueMoment();
       },
       { once: true }
@@ -3781,8 +3859,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             focusAccessPanel();
             return;
           }
-          if (tier === "pro") upgradePlan("elite");
-          else upgradePlan("pro");
+          if (tier === "pro") upgradePlan("elite", "usage_at_limit_card");
+          else upgradePlan("pro", "usage_at_limit_card");
         },
         { once: true }
       );
@@ -4391,7 +4469,18 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           <p class="xv-empty-kicker" translate="no">Operator console</p>
           <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""}`)}</h2>
           <p class="cld-welcome-lead">Paste or import a ticket — <strong>AI prepares</strong> the decision and customer-ready reply. <strong>You approve</strong> when money, policy, or send risk needs a human — then <strong>execute or send</strong> (or copy the verified draft).</p>
-          <p class="cld-welcome-prompt onboarding-subline">Testing the system? Use <strong>Example openers</strong> or the queue — synthetic rows carry a <span class="xv-demo-inline-label">Preview / demo</span> label so they never read as live production traffic.</p>
+          <p class="cld-welcome-prompt onboarding-subline">Testing the system? Use <strong>Sample demo tickets</strong> below, <strong>Example openers</strong>, or the queue — synthetic content is labeled <span class="xv-demo-inline-label">Demo</span> or <span class="xv-demo-inline-label">Preview / demo</span> so it is never confused with real customer data.</p>
+        </div>
+        <div class="xv-demo-lab" role="region" aria-label="Sample demo tickets">
+          <div class="xv-demo-lab__bar">
+            <span class="xv-demo-inline-label">Demo</span>
+            <span class="xv-demo-lab__title">Try a synthetic ticket (not real data)</span>
+          </div>
+          <p class="xv-demo-lab__hint">Pick one — it fills the composer with a tagged demo thread. Press send to see AI-prepared decisions and the <strong>Result</strong> summary.</p>
+          <div class="xv-demo-lab__actions">
+            <button type="button" class="chip empty-intent-chip" data-demo-sample="dup">Sample: duplicate charge</button>
+            <button type="button" class="chip empty-intent-chip" data-demo-sample="late">Sample: late shipment</button>
+          </div>
         </div>
         <details class="xv-queue-details">
           <summary class="xv-queue-details-summary">Queue <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
@@ -4832,14 +4921,38 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         return;
       }
       const t = String(state.tier || "free").toLowerCase();
-      if (t === "pro") upgradePlan("elite");
-      else upgradePlan("pro");
+      if (t === "pro") upgradePlan("elite", "empty_state_limit");
+      else upgradePlan("pro", "empty_state_limit");
     });
     empty.querySelector("#emptyFreeAccountCta")?.addEventListener("click", () => {
       focusAccessPanel();
     });
     empty.querySelector("#emptySecondaryCap")?.addEventListener("click", () => {
       focusPlansPanel();
+    });
+
+    const demoFill = {
+      dup: `${DEMO_THREAD_TAG}\n\nA customer says: I was charged twice for the same order — please fix the duplicate charge.`,
+      late: `${DEMO_THREAD_TAG}\n\nA customer says: My package is over a week late. I need a straight status update and next steps.`,
+    };
+    empty.querySelectorAll("[data-demo-sample]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = String(btn.getAttribute("data-demo-sample") || "dup");
+        const fill = demoFill[key] || demoFill.dup;
+        if (!els.messageInput) return;
+        if (!isAuthenticated() && getGuestUsage() >= GUEST_USAGE_LIMIT) {
+          focusAccessPanel();
+          pushLimitMessage(true);
+          applyComposerInteractiveLock();
+          return;
+        }
+        els.messageInput.value = fill;
+        saveDraft(fill);
+        autoResizeTextarea();
+        syncComposerDraftClass();
+        els.messageInput.focus();
+        postGrowthEvent("demo_sample_selected", { sample: key.slice(0, 32) });
+      });
     });
 
     empty.querySelector("[data-act='continue-last']")?.addEventListener("click", async () => {
@@ -5508,6 +5621,13 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (!res.ok) {
       throw new Error(detailFromApiBody(data) || `Could not ${action} this action.`);
     }
+    if (action === "approve") {
+      postGrowthEvent("approval", { ticket_id: String(ticketId || ""), tool_status: String(data.tool_status || "") });
+      const tst = String(data.tool_status || "").toLowerCase();
+      if (["refunded", "credit_issued", "success", "sent"].includes(tst)) {
+        postGrowthEvent("auto_execution", { path: "post_approve", ticket_id: String(ticketId || ""), tool_status: tst });
+      }
+    }
     return data;
   }
 
@@ -6000,6 +6120,48 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           </div>`
         : "";
 
+      const referralUrlGrowth = (() => {
+        try {
+          const o = globalThis.location?.origin || "";
+          return o ? `${o.replace(/\/$/, "")}/` : "/";
+        } catch (_) {
+          return "/";
+        }
+      })();
+      let growthFeedbackDone = false;
+      try {
+        growthFeedbackDone = localStorage.getItem(GROWTH_FEEDBACK_DONE_KEY) === "1";
+      } catch (_) {
+        growthFeedbackDone = false;
+      }
+      const growthPulseBlock = firstOut
+        ? `<div class="xv-growth-surface" data-xv-growth-surface>
+            ${
+              growthFeedbackDone
+                ? ""
+                : `<div class="xv-growth-feedback-block">
+              <p class="xv-first-outcome-copy"><strong>Quick pulse (optional)</strong></p>
+              <div class="xv-growth-q">Was this useful?</div>
+              <div class="xv-growth-row" role="group" aria-label="Was this useful">
+                <button type="button" class="ghost-btn" data-growth-useful="yes">Yes</button>
+                <button type="button" class="ghost-btn" data-growth-useful="somewhat">Somewhat</button>
+                <button type="button" class="ghost-btn" data-growth-useful="no">Not really</button>
+              </div>
+              <div class="xv-growth-q">What would make you pay for this?</div>
+              <textarea class="xv-growth-ta" rows="2" maxlength="1200" placeholder="Even one sentence helps." data-growth-pay></textarea>
+              <button type="button" class="btn xv-first-outcome-cta" data-growth-feedback-send>Send feedback</button>
+            </div>`
+            }
+            <div class="xv-growth-referral">
+              <p class="xv-first-outcome-copy muted-copy"><strong>Know someone handling support?</strong> Share this link.</p>
+              <div class="xv-growth-referral-row">
+                <input class="xv-growth-referral-input" readonly value="${escapeHtml(referralUrlGrowth)}" aria-label="Referral link" data-growth-share-url />
+                <button type="button" class="ghost-btn" data-growth-copy>Copy link</button>
+              </div>
+            </div>
+          </div>`
+        : "";
+
       const firstSuccessCta =
         tierLc === "elite" || tierLc === "dev"
           ? ""
@@ -6016,6 +6178,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             <p class="xv-first-outcome-copy"><strong>What you saved:</strong> ${escapeHtml(mins > 0 ? `About ${mins} minutes of operator drafting and back-and-forth on this path.` : "Drafting time, policy double-checks, and risky copy iterations you did not have to invent from scratch.")}</p>
             <p class="xv-first-outcome-copy muted-copy"><strong>What a paid plan automates next:</strong> higher ticket limits, refunds you approve executed in Stripe (within limits), and fewer copy-paste sends when SMTP is connected — you still approve sensitive moves.</p>
             ${firstSuccessCta}
+            ${growthPulseBlock}
           </div>`
         : "";
 
@@ -6052,7 +6215,42 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       `;
     }
 
+    function bindGrowthFeedbackAndReferral(host) {
+      const root = host.querySelector("[data-xv-growth-surface]");
+      if (!root) return;
+      root.querySelectorAll("[data-growth-useful]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          root.querySelectorAll("[data-growth-useful]").forEach((b) => b.classList.remove("is-selected"));
+          btn.classList.add("is-selected");
+        });
+      });
+      root.querySelector("[data-growth-feedback-send]")?.addEventListener("click", async () => {
+        const useful =
+          root.querySelector("[data-growth-useful].is-selected")?.getAttribute("data-growth-useful") || "";
+        const pay = String(root.querySelector("[data-growth-pay]")?.value || "").trim();
+        await submitGrowthFeedback(useful, pay, "first_success");
+        try {
+          localStorage.setItem(GROWTH_FEEDBACK_DONE_KEY, "1");
+        } catch (_) {}
+        const form = root.querySelector(".xv-growth-feedback-block");
+        if (form) {
+          form.innerHTML = `<p class="xv-first-outcome-copy muted-copy">Thanks — your note is saved.</p>`;
+        }
+      });
+      root.querySelector("[data-growth-copy]")?.addEventListener("click", async () => {
+        const inp = root.querySelector("[data-growth-share-url]");
+        const url = String(inp?.value || "").trim() || `${globalThis.location?.origin || ""}/`;
+        try {
+          await navigator.clipboard.writeText(url);
+          setNotice("success", "Copied", "Share link copied to clipboard.");
+        } catch (_) {
+          setNotice("info", "Share link", url);
+        }
+      });
+    }
+
     function bindNextActionHandlers(host) {
+      bindGrowthFeedbackAndReferral(host);
       host.querySelector("[data-act='paste-another']")?.addEventListener("click", () => {
         els.messageInput?.focus?.();
       });
@@ -6063,7 +6261,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           "A customer says: The item arrived damaged. I want a replacement or refund.",
           "A customer says: Where is my order? I can’t find an update.",
         ];
-        const fill = samples[Math.floor(Math.random() * samples.length)] || samples[0];
+        const body = samples[Math.floor(Math.random() * samples.length)] || samples[0];
+        const fill = `${DEMO_THREAD_TAG}\n\n${body}`;
         if (fill && els.messageInput) {
           els.messageInput.value = fill;
           saveDraft(fill);
@@ -6074,6 +6273,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       });
       host.querySelector("[data-act='enable-automation']")?.addEventListener("click", () => {
         state.automationUpsellShown = true;
+        setPendingUpgradeTrigger("automation_nudge");
         focusPlansPanel();
         const tierLc = String(state.tier || "free").toLowerCase();
         window.setTimeout(() => {
@@ -6087,6 +6287,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         setSurface("integrations");
       });
       host.querySelector("[data-act='upgrade']")?.addEventListener("click", () => {
+        setPendingUpgradeTrigger("next_action_upgrade_strip");
         focusPlansPanel();
       });
       host.querySelector("[data-act='first-success-upgrade']")?.addEventListener(
@@ -6097,8 +6298,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             focusPlansPanel();
             return;
           }
-          if (t === "pro") upgradePlan("elite");
-          else upgradePlan("pro");
+          if (t === "pro") upgradePlan("elite", "first_success_cta");
+          else upgradePlan("pro", "first_success_cta");
         },
         { once: true }
       );
@@ -7612,6 +7813,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const payload = buildSupportPayload();
     if (!payload.message || state.sending) return;
 
+    const inboundTrim = String(payload.message || "").trimStart();
+    const wasDemo = inboundTrim.startsWith(DEMO_THREAD_TAG);
+
     clearComposerValueMoment();
     clearComposerFlash();
 
@@ -7632,6 +7836,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     }
 
     const row = addAssistantMessage("");
+    if (row && row.dataset) row.dataset.demoThread = wasDemo ? "1" : "0";
     const replyNode = getAssistantCopyNode(row);
     if (replyNode) replyNode.innerHTML = createTypingMarkup();
 
@@ -7750,6 +7955,20 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         markActivationStep("analyzed");
         if (activationIntegrationsSatisfied()) markActivationStep("integrations");
         syncActivationChecklistUI();
+        postGrowthEvent("ticket_processed", {
+          demo: wasDemo ? "1" : "0",
+          tool_status: String(data.tool_status || ""),
+          action: String(data.action || data.decision?.action || ""),
+        });
+        try {
+          if (deriveAutoManualExecution(data).label === "Auto-resolved") {
+            postGrowthEvent("auto_execution", {
+              path: "sovereign_auto",
+              demo: wasDemo ? "1" : "0",
+              tool_status: String(data.tool_status || ""),
+            });
+          }
+        } catch (_) {}
       }
       updateSystemNarrative(data);
       // Refresh recent tickets quietly (return trigger).
@@ -7975,7 +8194,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     await loadRevenueMetrics();
   }
 
-  async function upgradePlan(tier) {
+  async function upgradePlan(tier, triggerHint) {
     if (!tier) return;
 
     if (!state.token || !state.username) {
@@ -7986,10 +8205,15 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     try {
       await loadDashboardSummary();
 
+      const trig =
+        typeof triggerHint === "string" && triggerHint.trim()
+          ? triggerHint.trim().slice(0, 200)
+          : takePendingUpgradeTrigger() || "unspecified";
+
       const res = await fetch(`${API}/billing/upgrade`, {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify({ tier })
+        body: JSON.stringify({ tier, upgrade_trigger: trig })
       });
 
       const data = await res.json().catch(() => ({}));
@@ -8055,7 +8279,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     setCtaLoading(btn, true, "Opening Stripe checkout…");
     try {
-      await upgradePlan(desired);
+      await upgradePlan(
+        desired,
+        (btn.dataset && btn.dataset.upgradeTrigger) || "plans_surface_card"
+      );
     } catch (err) {
       setNotice("error", "Upgrade failed", err?.message || "Could not open checkout.");
     } finally {
@@ -8867,7 +9094,7 @@ function bindEvents() {
       if (btn.hidden || btn.disabled) return;
       e.preventDefault();
       refreshUpgradeValueSummary();
-      upgradePlan(btn.dataset.upgrade || "");
+      upgradePlan(btn.dataset.upgrade || "", "plans_sidebar");
     });
 
     // Plans surface CTAs live outside the sidebar; wire them globally.
@@ -9163,6 +9390,10 @@ function bindEvents() {
       const tierLabel = formatTier(state.tier || "free");
       const extra = __billingCheckoutReturn.detail ? ` ${__billingCheckoutReturn.detail}` : "";
       __billingCheckoutReturn = { kind: null, detail: "" };
+      postGrowthEvent("checkout_return_success", {
+        tier: String(state.tier || ""),
+        username: String(state.username || ""),
+      });
       setNotice(
         "success",
         "Subscription active",

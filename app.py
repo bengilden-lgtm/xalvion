@@ -1021,6 +1021,7 @@ class TicketReplySendRequest(BaseModel):
 
 class UpgradeRequest(BaseModel):
     tier: str
+    upgrade_trigger: str | None = None
 
 
 class AdminUserAction(BaseModel):
@@ -3070,6 +3071,7 @@ for _router_mod, _router_label in (
     ("routes.billing", "billing"),
     ("routes.dashboard", "dashboard"),
     ("routes.support", "support"),
+    ("routes.growth", "growth"),
 ):
     try:
         _module = __import__(_router_mod, fromlist=["router"])

@@ -9,3 +9,4 @@ aurum.db-wal
 aurum.db-shm
 outreach_queue.json
 learned_rules.json
+growth_insights.jsonl

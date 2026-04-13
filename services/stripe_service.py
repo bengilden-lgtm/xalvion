@@ -615,12 +615,17 @@ def validate_upgrade_request(desired: str, current_tier: str) -> None:
         raise HTTPException(status_code=400, detail="Downgrades not supported")
 
 
-def create_checkout_session_for_user(user: Any, desired: str) -> Any:
+def create_checkout_session_for_user(user: Any, desired: str, upgrade_trigger: str | None = None) -> Any:
     if not _app.STRIPE_KEY:
         raise HTTPException(status_code=500, detail="Stripe not configured")
     price_id = _app.PRICE_MAP.get(desired, "")
     if not price_id:
         raise HTTPException(status_code=500, detail=f"No Stripe price configured for {desired}")
+
+    trig = (upgrade_trigger or "").strip()[:200]
+    meta = {"username": user.username, "tier": desired}
+    if trig:
+        meta["upgrade_trigger"] = trig
 
     try:
         session = stripe.checkout.Session.create(
@@ -628,7 +633,7 @@ def create_checkout_session_for_user(user: Any, desired: str) -> Any:
             line_items=[{"price": price_id, "quantity": 1}],
             success_url=_app.CHECKOUT_SUCCESS_URL,
             cancel_url=_app.CHECKOUT_CANCEL_URL,
-            metadata={"username": user.username, "tier": desired},
+            metadata=meta,
             subscription_data={"metadata": {"username": user.username, "tier": desired}},
             client_reference_id=user.username,
         )

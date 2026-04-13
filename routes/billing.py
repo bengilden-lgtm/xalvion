@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 import app as app_mod
+from growth_insights import append_insight, log_conversion_paid
 from services import email_service, guest_preview_service, stripe_service
 
 router = APIRouter(tags=["billing"])
@@ -217,7 +218,13 @@ def upgrade_plan(
     stripe_service.validate_upgrade_request(desired, current_tier)
 
     if app_mod.STRIPE_KEY and app_mod.PRICE_MAP.get(desired):
-        session = stripe_service.create_checkout_session_for_user(user, desired)
+        trig = (getattr(req, "upgrade_trigger", None) or "").strip()[:200]
+        session = stripe_service.create_checkout_session_for_user(user, desired, upgrade_trigger=trig or None)
+        append_insight(
+            "upgrade_checkout_started",
+            actor=str(getattr(user, "username", "") or ""),
+            props={"desired": desired, "from": app_mod.get_public_plan_name(user), "trigger": trig},
+        )
         return {
             "mode": "checkout",
             "checkout_url": session.url,
@@ -237,10 +244,16 @@ def upgrade_plan(
             ),
         )
 
+    trig = (getattr(req, "upgrade_trigger", None) or "").strip()[:200]
     user.tier = desired
     db.commit()
     db.refresh(user)
     usage_summary = app_mod.get_usage_summary(user)
+    append_insight(
+        "upgrade_direct",
+        actor=str(getattr(user, "username", "") or ""),
+        props={"tier": desired, "trigger": trig},
+    )
     return {
         "mode": "direct",
         "message": f"Upgraded to {desired}",
@@ -322,6 +335,16 @@ async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)
                 upgraded_user = stripe_service.apply_successful_upgrade(
                     db, username, tier, stripe_subscription_id=sub_id or None
                 )
+                if upgraded_user:
+                    utrig = ""
+                    try:
+                        utrig = str(metadata.get("upgrade_trigger") or "")[:200]
+                    except Exception:
+                        utrig = ""
+                    try:
+                        log_conversion_paid(username, tier, utrig or None)
+                    except Exception:
+                        logger.warning("growth_conversion_log_failed", exc_info=True)
                 if not upgraded_user:
                     outcome = "skipped"
                     detail = f"User not found: {username!r}"
