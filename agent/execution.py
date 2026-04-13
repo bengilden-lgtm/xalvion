@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict
 
 from actions import (
@@ -112,6 +113,9 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
 
     if action == "credit":
         result = issue_credit(payload["customer"], amount)
+        EXEC_MODE = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+        verified = EXEC_MODE == "live"
+        result = {**result, "verified": verified}
         return {"action": "credit", "amount": amount, "tool_result": result, "tool_status": result.get("status", "credit_issued")}
 
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
