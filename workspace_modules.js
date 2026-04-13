@@ -449,29 +449,22 @@
           return "review";
         })();
 
-        const tokens = [];
-        if (sr !== null && similar >= 5) {
-          tokens.push({ key: "success", label: `${Math.round(sr * 100)}% resolved`, tone: severity });
-        } else {
-          tokens.push({ key: "success", label: "Thin history", tone: "review" });
+        const thinHistory = !(sr !== null && similar >= 5);
+        const histPhrase = thinHistory ? "limited history" : "solid precedent";
+        const simN = Math.max(0, Math.floor(similar));
+        const simPhrase = simN === 1 ? "1 similar case" : `${simN} similar cases`;
+        let contextLine = `Context: ${histPhrase} · ${simPhrase}`;
+        if (reopenRisk === "high" || reopenRisk === "medium") {
+          contextLine += ` · reopen ${reopenRisk}`;
         }
-        tokens.push({ key: "cases", label: `${similar || 0} similar cases`, tone: "review" });
-        tokens.push({
-          key: "reopen",
-          label: `Reopen: ${reopenRisk === "unknown" ? "—" : reopenRisk}`,
-          tone: reopenRisk === "high" ? "risk" : reopenRisk === "low" ? "safe" : "review",
-        });
-        tokens.push({
-          key: "band",
-          label: `Confidence: ${Number.isFinite(conf) && conf > 0 ? conf.toFixed(2) : "—"}`,
-          tone: band === "tight" ? "safe" : band === "moderate" ? "review" : "risk",
-        });
 
         const why = Array.isArray(td?.why_factors) ? td.why_factors.map((x) => String(x || "").trim()).filter(Boolean) : [];
 
         return {
           severity,
-          tokens: tokens.slice(0, 4),
+          /** Single-line context for the decision panel (replaces multi-chip strip). */
+          contextLine,
+          tokens: [],
           conservativeNote,
           why: why.slice(0, 3),
           raw: td,

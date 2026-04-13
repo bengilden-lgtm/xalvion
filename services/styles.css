@@ -1780,9 +1780,9 @@ select.refund-select{ padding-right: 34px; }
   padding: 8px 12px;
   cursor:pointer;
   list-style: none;
-  color: color-mix(in oklab, var(--text-3) 55%, var(--text-2));
+  color: color-mix(in oklab, var(--text-3) 45%, var(--text-4));
   font-weight: 500;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 .assistant-meta-fold-summary::-webkit-details-marker{ display:none; }
 .assistant-meta-fold-body{
@@ -1798,12 +1798,12 @@ select.refund-select{ padding-right: 34px; }
   display:inline-flex;
   align-items:center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 5px 9px;
   border-radius: var(--r-pill);
   border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
-  background: color-mix(in oklab, var(--bg2) 52%, transparent);
-  color: var(--text-2);
-  font-size: 12.5px;
+  background: color-mix(in oklab, var(--bg2) 42%, transparent);
+  color: var(--text-3);
+  font-size: 12px;
 }
 .meta-chip svg{ width: 14px; height: 14px; opacity: .85; }
 .meta-chip strong{ font-weight: 650; }
@@ -1826,6 +1826,36 @@ select.refund-select{ padding-right: 34px; }
 .decision-panel--safe-clear{
   border-top-color: color-mix(in oklab, var(--success) 16%, var(--border));
 }
+
+/* Primary decision callout — scanned before actions */
+.decision-callout{
+  width: 100%;
+  margin: 0 0 12px 0;
+  padding: 14px 16px 13px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--line) 55%, var(--accent) 12%);
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklab, var(--accent) 10%, var(--surface-soft)),
+    color-mix(in oklab, var(--bg2) 40%, transparent)
+  );
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+.decision-callout-title{
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  color: var(--text);
+}
+.decision-callout-confidence{
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: color-mix(in oklab, var(--text-muted) 88%, var(--accent) 22%);
+}
+
 .decision-trust-block{
   margin-top: 10px;
 }
@@ -1841,6 +1871,18 @@ select.refund-select{ padding-right: 34px; }
   padding: 6px 0 0 0;
 }
 .trust-strip:empty{ display:none; }
+.trust-strip--context{
+  flex-wrap: wrap;
+  white-space: normal;
+  padding-top: 2px;
+}
+.trust-context-line{
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.45;
+  color: var(--text-3);
+}
 .trust-pill{
   display: inline-flex;
   align-items: center;
@@ -2060,13 +2102,13 @@ select.refund-select{ padding-right: 34px; }
 }
 .decision-panel-top{
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
   position: static;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding-top: 4px;
+  padding-bottom: 8px;
 }
 .decision-controls{
   display: flex;
@@ -2074,6 +2116,23 @@ select.refund-select{ padding-right: 34px; }
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  flex: 1 1 220px;
+}
+.decision-controls-secondary{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.decision-controls-primary{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.decision-controls-tertiary{
+  display: inline-flex;
+  align-items: center;
 }
 
 .consequence-signal{
@@ -2155,6 +2214,24 @@ select.refund-select{ padding-right: 34px; }
   background: color-mix(in oklab, var(--xv-glass-2) 92%, transparent);
   border-color: color-mix(in oklab, var(--line-3) 92%, transparent);
   color: var(--text);
+}
+.op-action--tertiary{
+  min-height: 34px;
+  padding: 0 12px;
+  border-color: color-mix(in oklab, var(--line-3) 55%, transparent);
+  background: transparent;
+  color: var(--text-3);
+  font-weight: 550;
+  opacity: 0.92;
+}
+.op-action--tertiary:hover:not(:disabled){
+  background: color-mix(in oklab, var(--xv-glass) 70%, transparent);
+  border-color: color-mix(in oklab, var(--line-3) 78%, transparent);
+  color: var(--text-2);
+  opacity: 1;
+}
+.op-action--tertiary .op-action__icon{
+  opacity: 0.72;
 }
 .op-action--ghost-danger{
   border-color: color-mix(in oklab, var(--danger) 22%, var(--line));
@@ -4544,6 +4621,19 @@ details > summary{ user-select:none; }
   border: 1px solid var(--xv-pill-border);
   background: linear-gradient(165deg, rgba(124,92,252,.10), rgba(255,255,255,.03));
   box-shadow: 0 10px 28px rgba(0,0,0,.18);
+}
+.ticket-result-summary--metadata{
+  opacity: 0.92;
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+}
+.ticket-result-summary--metadata .ticket-result-summary__v{
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.ticket-result-summary--metadata .ticket-result-summary__value-strip,
+.ticket-result-summary--metadata .ticket-result-summary__mode-why{
+  color: var(--text-3);
 }
 .ticket-result-summary__title{
   font-size: 11px;

@@ -373,7 +373,7 @@ if (typeof window.pulseRail !== "function") {
     let band = "moderate";
     if (pct >= 80) band = "solid";
     else if (pct < 55) band = "cautious";
-    return { pct, band, line: `Confidence ${pct}% (${band} — verify risky cases)` };
+    return { pct, band, line: `${pct}% (${band})` };
   }
 
   function formatOutboundEmailLine(data = {}) {
@@ -495,7 +495,7 @@ if (typeof window.pulseRail !== "function") {
       row?.dataset?.demoThread === "1"
         ? `<div class="ticket-result-summary__demo" role="note"><strong>Demo</strong> — synthetic scenario only; not real customer data. Summary shows how decisions are structured.</div>`
         : "";
-    host.className = "ticket-result-summary js-ticket-result-summary";
+    host.className = "ticket-result-summary js-ticket-result-summary ticket-result-summary--metadata";
     host.innerHTML = `
       ${demoBanner}
       <div class="ticket-result-summary__title">Result</div>
@@ -842,8 +842,41 @@ if (typeof window.pulseRail !== "function") {
               flex-wrap:wrap !important;
               align-items:center !important;
             }
+            body[data-ui="claude"] .decision-controls-primary{ margin-left:auto !important; }
+            body[data-ui="claude"] .decision-callout{
+              margin: 0 0 10px 0 !important;
+              padding: 12px 13px 11px !important;
+              border-radius: 14px !important;
+              border: 1px solid rgba(255,255,255,0.10) !important;
+              background: rgba(255,255,255,0.04) !important;
+              box-shadow: 0 14px 34px rgba(0,0,0,0.22) !important;
+            }
+            body[data-ui="claude"] .decision-callout-title{
+              font-size: 15.5px !important;
+              font-weight: 750 !important;
+              color: rgba(246,242,235,0.96) !important;
+              line-height: 1.32 !important;
+            }
+            body[data-ui="claude"] .decision-callout-confidence{
+              margin-top: 5px !important;
+              font-size: 12.5px !important;
+              font-weight: 650 !important;
+              color: rgba(215,225,242,0.78) !important;
+            }
+            body[data-ui="claude"] .trust-context-line{
+              color: rgba(205,215,242,0.72) !important;
+              font-size: 12px !important;
+              line-height: 1.45 !important;
+            }
             body[data-ui="claude"] .decision-panel-top{
               margin-bottom:2px !important;
+            }
+            body[data-ui="claude"] .op-action--tertiary{
+              border: 1px solid rgba(255,255,255,0.06) !important;
+              background: transparent !important;
+              color: rgba(205,215,242,0.68) !important;
+              height: 30px !important;
+              padding: 0 10px !important;
             }
             body[data-ui="claude"] .op-action{
               display:inline-flex !important;
@@ -4280,7 +4313,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             </div>
             <div class="ticket-result-summary js-ticket-result-summary" hidden aria-live="polite"></div>
             <div class="customer-message-label reply-hero-label">Suggested reply</div>
-              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Drafted with policy and risk checks; your approval still governs what ships.</div>
+              <div class="reply-value-reinforcement js-reply-reinforcement" hidden>Policy-checked. You approve before sending.</div>
               <div class="reply-text js-reply-text">${bodyHtml}</div>
             </div>
           </div>
@@ -5405,17 +5438,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const approval = getApprovalContext(data);
     if (approval.requiresApproval && !approval.approved) {
       el.hidden = false;
-      el.textContent = "Money or policy is on the line — nothing ships until you approve, edit, or reject.";
+      el.textContent = "Money or policy on the line — approve, edit, or reject before sending.";
     } else {
-      try {
-        const fmt = globalThis.__XALVION_FORMAT__;
-        const gov = fmt?.deriveGovernorPresentation ? fmt.deriveGovernorPresentation(data) : null;
-        if (gov && gov.mode === "auto") {
-          el.hidden = false;
-          el.textContent = "Routine path — quick operator check, then send when it reads right.";
-          return;
-        }
-      } catch {}
       el.hidden = true;
       el.textContent = "";
     }
@@ -5774,6 +5798,45 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     return { cls: "signal-safe", text: "Routine path", title: "No billing hold — quick read, then send when satisfied." };
   }
 
+  function buildWorkspaceDecisionCallout(data = {}, approval = null) {
+    const appr = approval || getApprovalContext(data);
+    const dec = data.decision || data.sovereign_decision || {};
+    const action = String(data.action || dec.action || "none").toLowerCase();
+    const confRaw = Number(data.confidence ?? dec.confidence ?? 0);
+    let pct = null;
+    if (Number.isFinite(confRaw) && confRaw > 0) {
+      pct = confRaw <= 1.001 ? Math.round(confRaw * 100) : Math.round(confRaw);
+    }
+    const riskLower = (() => {
+      try {
+        const fmt = globalThis.__XALVION_FORMAT__;
+        const gov = fmt?.deriveGovernorPresentation?.(data);
+        const lbl = String(gov?.riskLabel || "").trim();
+        if (lbl) return lbl.replace(/\s*·\s*.+$/, "").trim().toLowerCase();
+        if (gov?.mode === "blocked") return "blocked";
+      } catch {}
+      const c = confRaw <= 1.001 ? confRaw : confRaw / 100;
+      if (!Number.isFinite(c) || c <= 0) return "uncertain risk";
+      if (c >= 0.8) return "low risk";
+      if (c >= 0.55) return "medium risk";
+      return "higher risk";
+    })();
+    const actionVerb = (() => {
+      if (appr.requiresApproval && !appr.approved) {
+        if (action === "refund") return "Approve refund";
+        if (action === "credit") return "Approve credit";
+        if (action === "charge") return "Approve charge";
+        return "Approve & release";
+      }
+      if (action === "review") return "Hold for review";
+      return "Send reply";
+    })();
+    return {
+      headline: `Recommended: ${actionVerb} (${riskLower})`,
+      confidenceLine: pct != null ? `${pct}% confidence` : "Confidence unavailable",
+    };
+  }
+
   function syncDecisionIntegrationHint(panel, data, approval) {
     const hint = panel?.querySelector?.("[data-role='integration-hint']");
     if (!hint) return;
@@ -5871,13 +5934,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       panel.classList.add("decision-panel--safe-clear");
     }
     panel.innerHTML = `
+      <div class="decision-callout" data-role="decision-callout" aria-live="polite"></div>
       <div class="decision-panel-top">
         <span class="consequence-signal ${sig.cls}" data-role="consequence">${escapeHtml(sig.text)}</span>
         <div class="decision-controls" data-role="controls"></div>
       </div>
       <div class="decision-microcopy" data-role="micro" style="display:none"></div>
       <div class="decision-trust-block">
-        <div class="trust-strip" data-role="trust-strip" aria-label="Readiness signals"></div>
+        <div class="trust-strip" data-role="trust-strip" aria-label="Context"></div>
         <div class="trust-strip-detail" data-role="trust-detail" aria-hidden="true"></div>
       </div>
       <div class="xv-governor-surface" data-role="governor" hidden></div>
@@ -5897,7 +5961,37 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     });
 
     const cons = panel.querySelector("[data-role='consequence']");
-    if (cons && sig.title) cons.setAttribute("title", sig.title);
+    const decisionCalloutEl = panel.querySelector("[data-role='decision-callout']");
+    if (decisionCalloutEl) {
+      const co = buildWorkspaceDecisionCallout(data, approval);
+      decisionCalloutEl.innerHTML = `<div class="decision-callout-title">${escapeHtml(co.headline)}</div><div class="decision-callout-confidence">${escapeHtml(co.confidenceLine)}</div>`;
+      decisionCalloutEl.hidden = false;
+    }
+    const hideConsequence = /signal-safe/.test(sig.cls) && !pendingGate;
+    if (cons) {
+      if (hideConsequence) {
+        cons.hidden = true;
+        cons.removeAttribute("title");
+      } else {
+        cons.hidden = false;
+        const confRaw = Number(data.confidence ?? data.decision?.confidence ?? data.sovereign_decision?.confidence ?? 0);
+        let pct = null;
+        if (Number.isFinite(confRaw) && confRaw > 0) {
+          pct = confRaw <= 1.001 ? Math.round(confRaw * 100) : Math.round(confRaw);
+        }
+        if (/signal-safe/.test(sig.cls) && pct != null) {
+          let riskWord = "Low risk";
+          try {
+            const fmt = globalThis.__XALVION_FORMAT__;
+            const gov = fmt?.deriveGovernorPresentation?.(data);
+            const lbl = String(gov?.riskLabel || "").trim();
+            if (lbl) riskWord = lbl.replace(/\s*·\s*.+$/, "").trim();
+          } catch {}
+          cons.textContent = `${riskWord} · ${pct}% confidence`;
+        }
+        if (sig.title) cons.setAttribute("title", sig.title);
+      }
+    }
 
     const controls = panel.querySelector("[data-role='controls']");
     const microEl = panel.querySelector("[data-role='micro']");
@@ -5919,11 +6013,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     // Default decision microcopy (kept minimal, high-signal).
     if (pendingGate || /signal-approval/.test(sig.cls)) {
-      setMicrocopy("Human approval gate — AI prepared this; nothing customer-facing ships until you sign off.", "hold");
+      setMicrocopy("Approval gate — review, then approve or reject.", "hold");
     } else if (/signal-review|signal-high-risk|signal-blocked/.test(sig.cls)) {
-      setMicrocopy("Pause — read the verified reply before it reaches the customer.", "risk");
+      setMicrocopy("Read the reply carefully before it reaches the customer.", "risk");
     } else if (/signal-safe/.test(sig.cls)) {
-      setMicrocopy("Policy read looks routine — still your send; actions stay auditable.", "safe");
+      setMicrocopy("");
     } else {
       setMicrocopy("");
     }
@@ -5934,11 +6028,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         fmt?.buildTrustDominanceStrip
           ? fmt.buildTrustDominanceStrip(data)
           : null;
-      if (trustStripEl && strip && Array.isArray(strip.tokens) && strip.tokens.length) {
-        trustStripEl.className = `trust-strip tone-${escapeHtml(strip.severity || "review")}`;
-        trustStripEl.innerHTML = strip.tokens
-          .map((t) => `<span class="trust-pill tone-${escapeHtml(t.tone || "review")}" data-token="${escapeHtml(t.key)}">${escapeHtml(t.label)}</span>`)
-          .join("");
+      const ctxLine = strip && typeof strip.contextLine === "string" ? strip.contextLine.trim() : "";
+      if (trustStripEl && ctxLine) {
+        trustStripEl.className = `trust-strip trust-strip--context tone-${escapeHtml(strip.severity || "review")}`;
+        trustStripEl.innerHTML = `<span class="trust-context-line">${escapeHtml(ctxLine)}</span>`;
         const detailLines = []
           .concat(strip.conservativeNote ? [strip.conservativeNote] : [])
           .concat(Array.isArray(strip.why) ? strip.why : []);
@@ -5957,8 +6050,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           trustStripEl.removeAttribute("title");
         }
       } else if (trustStripEl) {
-        trustStripEl.className = "trust-strip tone-review";
-        trustStripEl.innerHTML = `<span class="trust-pill tone-review">Limited history — we stay conservative</span>`;
+        trustStripEl.className = "trust-strip trust-strip--context tone-review";
+        trustStripEl.innerHTML = `<span class="trust-context-line">Context: limited history · 0 similar cases</span>`;
         trustStripEl.setAttribute("title", "Limited comparable history — treat this as a cautious read.");
         if (trustDetailEl) {
           trustDetailEl.innerHTML = "";
@@ -6028,6 +6121,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       } else if (pill === "Rejected") {
         panel.classList.add("decision-state-rejected");
       }
+      if (decisionCalloutEl) decisionCalloutEl.hidden = true;
+      if (cons) cons.hidden = true;
       controls.innerHTML = `<span class="decision-state-pill">${escapeHtml(pill)}</span>`;
       if (note) {
         noteEl.textContent = note;
@@ -6325,6 +6420,19 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     const wireActions = () => {
       controls.innerHTML = "";
+      if (decisionCalloutEl) decisionCalloutEl.hidden = false;
+      if (cons) {
+        const hideConsequenceRow = /signal-safe/.test(sig.cls) && !pendingGate;
+        cons.hidden = hideConsequenceRow;
+        if (!hideConsequenceRow && sig.title) cons.setAttribute("title", sig.title);
+      }
+      const secondary = document.createElement("div");
+      secondary.className = "decision-controls-secondary";
+      const primary = document.createElement("div");
+      primary.className = "decision-controls-primary";
+      const tertiary = document.createElement("div");
+      tertiary.className = "decision-controls-tertiary";
+
       const rej = document.createElement("button");
       rej.type = "button";
       rej.className = "op-action op-action--ghost-danger";
@@ -6347,7 +6455,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       setApproveIdle();
       const cp = document.createElement("button");
       cp.type = "button";
-      cp.className = "op-action op-action--secondary";
+      cp.className = "op-action op-action--tertiary";
       cp.setAttribute("aria-label", "Copy reply");
       cp.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.copy}</span><span class="op-action__label">Copy</span>`;
 
@@ -6363,7 +6471,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         } catch (_) {}
       });
 
-      controls.append(rej, ed, ap, cp);
+      secondary.append(rej, ed);
+      primary.append(ap);
+      tertiary.append(cp);
+      controls.append(secondary, primary, tertiary);
 
       ed.addEventListener("click", () => {
         showErr("");
@@ -6730,7 +6841,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const toolStatusDisplay = translateToolStatus(toolStatus);
     const internalNote = String(output.internal_note || "").trim();
     const policyNote = String(data.reason || decision.reason || "").trim();
-    const execDetail = String(data.execution?.detail || data.tool_result?.message || "").trim();
+    const replyBlob = String(data.reply || data.response || data.final || data.ticket?.final_reply || "").trim();
+    const mergedTr = mergedToolResult(data);
+    let execDetail = String(data.execution?.detail || "").trim();
+    if (!execDetail && mergedTr && mergedTr.message != null) execDetail = String(mergedTr.message).trim();
+    if (execDetail && replyBlob.includes(execDetail)) execDetail = "";
+    const orderDisconnected = "No live order data connected";
+    if (execDetail === orderDisconnected && replyBlob.includes(orderDisconnected)) execDetail = "";
+    if (execDetail && policyNote === execDetail) execDetail = "";
 
     let governorBlock = "";
     try {
