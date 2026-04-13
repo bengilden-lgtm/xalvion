@@ -2239,8 +2239,8 @@ def apply_learning_feedback(runtime_ticket: dict[str, Any], result: dict[str, An
     safe_execute(learn_from_ticket, runtime_ticket, decision, outcome)
 
 
-def check_requires_approval(action: str, amount: float) -> bool:
-    return execution_requires_operator_gate(action, amount)
+def check_requires_approval(action: str, amount: float, *, plan_tier: str | None = None) -> bool:
+    return execution_requires_operator_gate(action, amount, plan_tier=plan_tier)
 
 
 def build_approval_hold_message(action: str, amount: float) -> str:
@@ -2340,7 +2340,7 @@ def finalize_agent_result_for_operator_policy(
         action = str(decision.get("action", "none") or "none").strip().lower()
         amount = round(float(decision.get("amount", 0) or 0), 2)
         governor_present = bool(decision.get("governor_reason") or decision.get("execution_mode"))
-        if check_requires_approval(action, amount):
+        if decision.get("requires_approval"):
             decision.update(
                 {
                     "requires_approval": True,

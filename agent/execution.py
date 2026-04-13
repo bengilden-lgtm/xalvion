@@ -56,7 +56,12 @@ def normalize_action_payload(payload: Dict[str, Any] | None) -> Dict[str, Any]:
 
 def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Dict[str, Any]:
     safe_action = dict(normalize_action_payload(action_payload))
-    if execution_requires_operator_gate(safe_action["action"], safe_action["amount"]):
+    _tier = str(ticket.get("plan_tier", "free") or "free")
+    if execution_requires_operator_gate(
+        safe_action["action"],
+        safe_action["amount"],
+        plan_tier=_tier,
+    ):
         safe_action["requires_approval"] = True
     action = safe_action["action"]
     amount = safe_action["amount"]

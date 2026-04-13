@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+from governor import normalize_plan_tier, plan_limits
 
 VALID_MODES = {"conservative", "balanced", "delight", "fraud_aware"}
 
@@ -20,19 +22,38 @@ MAX_AUTO_CREDIT_AMOUNT: float = 30.0
 MAX_APPROVAL_THRESHOLD: float = 25.0
 
 
-def execution_requires_operator_gate(action: str, amount: Any) -> bool:
+def execution_requires_operator_gate(
+    action: str,
+    refund_amount: Any,
+    *,
+    plan_tier: Optional[str] = None,
+) -> bool:
     """
     Single source of truth for “must not auto-execute without operator approval”.
-    Mirrors FastAPI workspace policy (app.check_requires_approval) so agent execution
-    cannot drift from API gates.
+    Aligns with governor plan_limits (can_auto_refund / max_refund) and workspace policy.
+
+    - charge: always requires approval.
+    - refund: free tier is always manual; pro/elite auto-execute only when can_auto_refund
+      and refund_amount is within tier max_refund.
+    - credit: optional LIVE_MODE high-amount threshold (unchanged).
     """
     norm = str(action or "none").strip().lower()
     try:
-        value = float(amount or 0)
+        value = float(refund_amount or 0)
     except (TypeError, ValueError):
         value = 0.0
-    if norm in {"refund", "charge"}:
+    if norm == "charge":
         return True
+    if norm == "refund":
+        tier = normalize_plan_tier(plan_tier or "free")
+        limits = plan_limits(tier)
+        if not bool(limits.get("can_auto_refund")):
+            return True
+        try:
+            cap = float(limits.get("max_refund") or 0)
+        except (TypeError, ValueError):
+            cap = 0.0
+        return value > cap
     live = os.getenv("LIVE_MODE", "false").strip().lower() == "true"
     try:
         thresh = float(os.getenv("APPROVAL_THRESHOLD", str(MAX_APPROVAL_THRESHOLD)))
@@ -834,7 +855,7 @@ def compute_execution_tier(
 
     if requires_approval:
         return "approval_required"
-    if act in {"refund", "charge"} and float(amount or 0) > 0:
+    if act == "charge" and float(amount or 0) > 0:
         return "approval_required"
     if float(confidence or 0) < 0.78:
         return "approval_required"

@@ -169,15 +169,43 @@ class TestBusinessImpactProjection:
 
 
 class TestExecutionOperatorGate:
-    def test_refund_always_gated(self):
+    def test_refund_free_tier_always_manual(self):
         from actions import execution_requires_operator_gate
 
-        assert execution_requires_operator_gate("refund", 10) is True
+        assert execution_requires_operator_gate("refund", 10, plan_tier="free") is True
+        assert execution_requires_operator_gate("refund", 5, plan_tier="free") is True
+
+    def test_refund_pro_within_limit_not_gated(self):
+        from actions import execution_requires_operator_gate
+
+        assert execution_requires_operator_gate("refund", 40, plan_tier="pro") is False
+        assert execution_requires_operator_gate("refund", 50, plan_tier="pro") is False
+
+    def test_refund_pro_over_limit_gated(self):
+        from actions import execution_requires_operator_gate
+
+        assert execution_requires_operator_gate("refund", 51, plan_tier="pro") is True
+
+    def test_refund_elite_within_limit_not_gated(self):
+        from actions import execution_requires_operator_gate
+
+        assert execution_requires_operator_gate("refund", 75, plan_tier="elite") is False
+        assert execution_requires_operator_gate("refund", 100, plan_tier="elite") is False
+
+    def test_refund_elite_over_limit_gated(self):
+        from actions import execution_requires_operator_gate
+
+        assert execution_requires_operator_gate("refund", 101, plan_tier="elite") is True
+
+    def test_refund_unknown_tier_defaults_free_like(self):
+        from actions import execution_requires_operator_gate
+
+        assert execution_requires_operator_gate("refund", 10, plan_tier="unknown_plan") is True
 
     def test_charge_always_gated(self):
         from actions import execution_requires_operator_gate
 
-        assert execution_requires_operator_gate("charge", 5) is True
+        assert execution_requires_operator_gate("charge", 5, plan_tier="elite") is True
 
     def test_credit_not_gated_when_not_live(self, monkeypatch):
         from actions import execution_requires_operator_gate
@@ -216,6 +244,28 @@ class TestAgentExecuteActionApproval:
         assert out["action"] == "refund"
         assert out["amount"] == 20
         assert out.get("tool_result", {}).get("status") == "pending_approval"
+
+    def test_refund_pro_tier_can_execute_when_not_gated(self, monkeypatch):
+        import agent as agent_mod
+
+        def _fake_refund(customer, amt):
+            return {"status": "success", "customer": customer, "amount": amt}
+
+        monkeypatch.setattr(agent_mod, "process_refund", _fake_refund)
+        ticket = {
+            "issue_type": "general_support",
+            "issue": "please refund",
+            "customer": "pytest_user",
+            "order_status": "unknown",
+            "plan_tier": "pro",
+        }
+        out = agent_mod.execute_action(
+            ticket,
+            {"action": "refund", "amount": 30, "requires_approval": False},
+        )
+        assert out["tool_status"] == "success"
+        assert out["action"] == "refund"
+        assert out["amount"] == 30
 
 
 # =============================================================================

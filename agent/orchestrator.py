@@ -371,7 +371,12 @@ def run_agent(
             "confidence": confidence,
         }
 
-    if execution_requires_operator_gate(final_action.get("action", "none"), final_action.get("amount", 0)):
+    _tier = str(ticket.get("plan_tier", "free") or "free")
+    if execution_requires_operator_gate(
+        final_action.get("action", "none"),
+        final_action.get("amount", 0),
+        plan_tier=_tier,
+    ):
         final_action = {**final_action, "requires_approval": True}
 
     # --- Outcome intelligence + structural confidence (before governor; governor may tighten further) ---
