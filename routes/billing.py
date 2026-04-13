@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 import app as app_mod
-from services import guest_preview_service, stripe_service
+from services import email_service, guest_preview_service, stripe_service
 
 router = APIRouter(tags=["billing"])
 
@@ -37,6 +37,7 @@ def integration_status(
         "stripe_scope": scope,
         "mode": mode_label,
         "stripe_mode": mode_label,
+        "smtp_ready": bool(email_service.smtp_ready()),
     }
 
 

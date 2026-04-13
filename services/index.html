@@ -41,7 +41,7 @@
               fill="rgba(255,255,255,0.28)" letter-spacing="3.5">AUTONOMOUS SUPPORT</text>
           </svg>
         </a>
-        <span id="commandModeLine" class="command-mode-pill" translate="no">Drafts and actions prepared · you approve what ships</span>
+        <span id="commandModeLine" class="command-mode-pill" translate="no">AI prepares · you approve · verified actions only</span>
       </div>
       <div class="command-strip-center command-strip-center--align">
         <div class="command-status-chip command-status-chip--stack" role="status" aria-live="polite">
@@ -163,6 +163,7 @@
 
                   <footer class="composer-wrap composer-dock xv-composer-foot" id="workspaceComposerDock">
                   <div id="inlineLimitBanner" class="inline-limit" hidden aria-live="polite"></div>
+                  <div id="xvActivationChecklist" class="xv-activation-checklist" hidden aria-label="Getting started checklist"></div>
                   <div id="composerValueMoment" class="composer-value-moment" hidden aria-live="polite"></div>
                   <div class="composer-unified">
                     <div class="composer composer-chat" id="composerSurface" aria-describedby="composerStatusLine">
@@ -179,7 +180,7 @@
                       <div class="composer-input-row composer-input-wrap composer-field">
                         <div class="composer-input-shell">
                           <div class="composer-field-inner">
-                            <textarea id="messageInput" placeholder="Paste a customer message — Xalvion drafts a reply; you approve before anything ships." autocomplete="off"></textarea>
+                            <textarea id="messageInput" placeholder="Paste or import a ticket — AI prepares the reply and next step; you approve before anything ships." autocomplete="off"></textarea>
                             <button id="sendBtn" class="send-btn" type="button" aria-label="Send message"></button>
                           </div>
                         </div>
@@ -299,14 +300,14 @@
                   <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(760px, 100%);">
                     <div class="cld-cap-pill" translate="no">Integrations</div>
                     <h2 class="cld-welcome-headline" style="margin-top:10px;">Connect tools once. Operate faster.</h2>
-                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Stripe unlocks live billing actions from inside the workflow.</p>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Connect Stripe for live refunds you approve, and SMTP when you want this workspace to send customer email — no generic setup wall; prompts appear when an action needs them.</p>
 
                     <div class="tier-card stripe-card" id="stripeCard" style="margin-top:16px;">
                       <div class="stripe-card-head">
                         <div class="stripe-card-title">
                           <span class="stripe-brand">Stripe</span>
                           <p id="stripeIntegrationCopy" class="stripe-card-desc">
-                            Connect Stripe to execute refunds instead of only preparing them.
+                            Connect Stripe when you are ready to run live refunds you have approved — nothing moves until you sign off.
                           </p>
                         </div>
                         <span id="stripeStatus" class="stripe-status-pill" aria-live="polite">Loading…</span>
@@ -332,7 +333,19 @@
                           Disconnect Stripe
                         </button>
                       </div>
-                      <div class="muted-copy stripe-trust-line">Secure billing powered by Stripe</div>
+                      <div class="muted-copy stripe-trust-line">Stripe handles money movement; Xalvion never stores card numbers.</div>
+                    </div>
+
+                    <div class="tier-card stripe-card" id="smtpCard" style="margin-top:14px;">
+                      <div class="stripe-card-head">
+                        <div class="stripe-card-title">
+                          <span class="stripe-brand">Email (SMTP)</span>
+                          <p id="smtpIntegrationCopy" class="stripe-card-desc">
+                            When SMTP is configured, approved sends can go out from this server. Otherwise you copy the verified draft to your helpdesk — nothing is faked as “sent.”
+                          </p>
+                        </div>
+                        <span id="smtpStatusPill" class="stripe-status-pill" aria-live="polite">Checking…</span>
+                      </div>
                     </div>
                   </div>
                 </div>

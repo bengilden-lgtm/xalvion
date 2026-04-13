@@ -22,6 +22,12 @@
   const GUEST_USAGE_LIMIT = 3;
   const FREE_USAGE_LIMIT = 12;
   const GUEST_USAGE_RESET_WINDOW_MS = 12 * 60 * 60 * 1000;
+  const ONBOARDING_FLOW_DISMISSED_KEY = "xalvion_onboarding_flow_v1_dismissed";
+  const ACTIVATION_STEPS_KEY = "xalvion_activation_steps_v1";
+  const ACTIVATION_SKIP_INTEGRATIONS_KEY = "xalvion_activation_skip_integrations_v1";
+  const ACTIVATION_CHECKLIST_DISMISSED_KEY = "xalvion_activation_checklist_dismissed_v1";
+  const FIRST_OUTCOME_CELEBRATION_KEY = "xalvion_first_outcome_celebration_v1";
+  const MANUAL_FRICTION_KEY = "xalvion_manual_friction_count_v1";
 
   function authDebugLog(label, detail) {
     if (__auth?.authDebugLog) return __auth.authDebugLog(label, detail);
@@ -169,7 +175,10 @@ if (typeof window.pulseRail !== "function") {
     sidebarJumpRevenueBtn: document.getElementById("sidebarJumpRevenueBtn"),
     accessDrawer: document.getElementById("accessDrawer"),
     accessDrawerBody: document.getElementById("accessDrawerBody"),
-    closeAccessDrawerBtn: document.getElementById("closeAccessDrawerBtn")
+    closeAccessDrawerBtn: document.getElementById("closeAccessDrawerBtn"),
+    xvActivationChecklist: document.getElementById("xvActivationChecklist"),
+    smtpStatusPill: document.getElementById("smtpStatusPill"),
+    smtpIntegrationCopy: document.getElementById("smtpIntegrationCopy")
   };
 
   const state = {
@@ -187,6 +196,7 @@ if (typeof window.pulseRail !== "function") {
     latestRun: null,
     stickToBottom: true,
     stripeConnected: false,
+    smtpReady: false,
     stripeAccountId: "",
     stripeMode: "",
     refundHistory: [],
@@ -370,7 +380,7 @@ if (typeof window.pulseRail !== "function") {
     if (String(tr.status || "").toLowerCase() === "sent" && String(tr.to || "").includes("@")) {
       return `Email sent to: ${String(tr.to).trim()}`;
     }
-    return "Email not sent — configure SMTP";
+    return "Email not sent — SMTP not configured on this server (copy the verified draft to your helpdesk).";
   }
 
   function derivePlanLimitValueLine(data = {}) {
@@ -1619,6 +1629,107 @@ if (typeof window.pulseRail !== "function") {
         font-size: 12px !important;
       }
 
+      .xv-onboarding-flow {
+        margin: 0 0 14px 0;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.03);
+      }
+      .xv-onboarding-flow-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .xv-onboarding-flow-title {
+        font-size: 12px;
+        font-weight: 750;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(230,236,255,0.82);
+      }
+      .xv-onboarding-flow-steps {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 13px;
+        line-height: 1.55;
+        color: rgba(224,234,255,0.9);
+      }
+      .xv-onboarding-flow-steps li { margin: 4px 0; }
+      .xv-demo-pill,
+      .xv-demo-inline-label {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 750;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 170, 96, 0.45);
+        color: rgba(255, 220, 196, 0.96);
+        background: rgba(255, 140, 64, 0.12);
+      }
+      .xv-activation-checklist {
+        max-width: min(720px, 92vw);
+        margin: 0 auto 10px auto;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(141,108,255,0.22);
+        background: rgba(141,108,255,0.06);
+      }
+      .xv-act-inner { font-size: 13px; line-height: 1.45; color: rgba(224,234,255,0.92); }
+      .xv-act-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .xv-act-title { font-weight: 750; font-size: 13px; }
+      .xv-act-lead { font-size: 12px; margin: 0 0 8px 0; }
+      .xv-act-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin: 4px 0;
+        font-size: 12.5px;
+      }
+      .xv-act-row--done { opacity: 0.78; }
+      .xv-act-check { font-weight: 800; width: 16px; flex: none; }
+      .xv-act-skip { margin-top: 8px; font-size: 12px !important; }
+      .xv-first-outcome-callout {
+        margin: 0 0 12px 0;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(96, 220, 170, 0.35);
+        background: rgba(96, 220, 170, 0.08);
+      }
+      .xv-first-outcome-kicker {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: rgba(190, 255, 224, 0.95);
+        margin-bottom: 6px;
+      }
+      .xv-first-outcome-copy { margin: 0 0 6px 0; font-size: 13px; line-height: 1.5; }
+      .decision-panel-integration-hint {
+        margin: 8px 0 0 0;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 200, 120, 0.28);
+        background: rgba(255, 200, 120, 0.06);
+        font-size: 12.5px;
+        line-height: 1.45;
+      }
+      .decision-panel-integration-hint-inner .btn {
+        margin-top: 10px;
+        width: 100%;
+        max-width: 280px;
+      }
+
       @media (max-width: 1200px) {
         #messages {
           padding: 24px 20px 160px;
@@ -1650,6 +1761,211 @@ if (typeof window.pulseRail !== "function") {
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function loadActivationSteps() {
+    const empty = { analyzed: false, reviewedSummary: false, shipped: false, integrations: false };
+    try {
+      const raw = localStorage.getItem(ACTIVATION_STEPS_KEY);
+      if (!raw) return { ...empty };
+      const o = JSON.parse(raw);
+      return { ...empty, ...(o && typeof o === "object" ? o : {}) };
+    } catch {
+      return { ...empty };
+    }
+  }
+
+  function saveActivationSteps(steps) {
+    try {
+      localStorage.setItem(ACTIVATION_STEPS_KEY, JSON.stringify(steps));
+    } catch {
+      /* no-op */
+    }
+  }
+
+  function markActivationStep(key) {
+    const cur = loadActivationSteps();
+    if (cur[key]) return;
+    cur[key] = true;
+    saveActivationSteps(cur);
+    syncActivationChecklistUI();
+  }
+
+  function activationIntegrationsSatisfied() {
+    if (!isAuthenticated()) return true;
+    try {
+      if (localStorage.getItem(ACTIVATION_SKIP_INTEGRATIONS_KEY) === "1") return true;
+    } catch {
+      /* no-op */
+    }
+    const tierLc = String(state.tier || "free").toLowerCase();
+    const stripeNeeded = tierLc === "pro" || tierLc === "elite" || tierLc === "dev";
+    const stripeOk = !stripeNeeded || state.stripeConnected;
+    const smtpOk = state.smtpReady;
+    return stripeOk && smtpOk;
+  }
+
+  function activationChecklistDismissed() {
+    try {
+      return localStorage.getItem(ACTIVATION_CHECKLIST_DISMISSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function activationChecklistComplete() {
+    const s = loadActivationSteps();
+    return Boolean(
+      s.analyzed && s.reviewedSummary && s.shipped && (s.integrations || activationIntegrationsSatisfied())
+    );
+  }
+
+  function shouldShowActivationChecklist() {
+    if (activationChecklistDismissed()) return false;
+    if (activationChecklistComplete()) return false;
+    return true;
+  }
+
+  function syncActivationChecklistUI() {
+    const host = els.xvActivationChecklist;
+    if (!host) return;
+    if (!shouldShowActivationChecklist()) {
+      host.hidden = true;
+      host.innerHTML = "";
+      return;
+    }
+    const s = loadActivationSteps();
+    const integDone = Boolean(s.integrations || activationIntegrationsSatisfied());
+    const row = (done, label) => `
+      <div class="xv-act-row${done ? " xv-act-row--done" : ""}" role="listitem">
+        <span class="xv-act-check" aria-hidden="true">${done ? "✓" : "○"}</span>
+        <span class="xv-act-label">${escapeHtml(label)}</span>
+      </div>`;
+    host.hidden = false;
+    host.innerHTML = `
+      <div class="xv-act-inner" role="list">
+        <div class="xv-act-head">
+          <span class="xv-act-title">First success</span>
+          <button type="button" class="xv-act-dismiss ghost-btn" id="xvActDismissChecklist" aria-label="Dismiss checklist">×</button>
+        </div>
+        <p class="xv-act-lead muted-copy">About three minutes to your first meaningful outcome — work top to bottom.</p>
+        ${row(s.analyzed, "Analyze your first ticket (paste below or pick a sample)")}
+        ${row(s.reviewedSummary, "Review the result summary and decision details")}
+        ${row(s.shipped, "Approve, edit, or send one customer-visible action")}
+        ${row(integDone, "Connect Stripe or SMTP if a live refund or send needs them")}
+        <button type="button" class="xv-act-skip ghost-btn" id="xvActSkipIntegrations">Not using refunds or server email yet</button>
+      </div>`;
+    host.querySelector("#xvActDismissChecklist")?.addEventListener("click", () => {
+      try {
+        localStorage.setItem(ACTIVATION_CHECKLIST_DISMISSED_KEY, "1");
+      } catch {
+        /* no-op */
+      }
+      syncActivationChecklistUI();
+    });
+    host.querySelector("#xvActSkipIntegrations")?.addEventListener("click", () => {
+      try {
+        localStorage.setItem(ACTIVATION_SKIP_INTEGRATIONS_KEY, "1");
+      } catch {
+        /* no-op */
+      }
+      markActivationStep("integrations");
+    });
+  }
+
+  function onboardingFlowDismissed() {
+    try {
+      return localStorage.getItem(ONBOARDING_FLOW_DISMISSED_KEY) === "1";
+    } catch {
+      return true;
+    }
+  }
+
+  function buildOnboardingFlowCalloutHtml() {
+    if (!isClaudeShell() || onboardingFlowDismissed()) return "";
+    return `
+      <div class="xv-onboarding-flow" role="region" aria-label="How Xalvion works">
+        <div class="xv-onboarding-flow-head">
+          <span class="xv-onboarding-flow-title">How it works</span>
+          <button type="button" class="xv-onboarding-flow-dismiss ghost-btn" id="xvOnboardingFlowDismiss" aria-label="Dismiss getting started tip">×</button>
+        </div>
+        <ol class="xv-onboarding-flow-steps">
+          <li><strong>Paste or import</strong> a ticket into the composer.</li>
+          <li><strong>AI prepares</strong> the reply and proposed next step — auditable, not hidden.</li>
+          <li><strong>You approve</strong> when money, policy, or send risk is involved.</li>
+          <li><strong>Execute or send</strong> on your terms — or copy out if integrations are not wired yet.</li>
+        </ol>
+      </div>`;
+  }
+
+  function bindOnboardingFlowCallout(host) {
+    if (!host) return;
+    host.querySelector("#xvOnboardingFlowDismiss")?.addEventListener("click", () => {
+      try {
+        localStorage.setItem(ONBOARDING_FLOW_DISMISSED_KEY, "1");
+      } catch {
+        /* no-op */
+      }
+      host.querySelector(".xv-onboarding-flow")?.remove();
+    });
+  }
+
+  function bumpManualFriction() {
+    let n = 0;
+    try {
+      n = Math.max(0, Number(localStorage.getItem(MANUAL_FRICTION_KEY) || 0) || 0);
+    } catch {
+      n = 0;
+    }
+    n += 1;
+    try {
+      localStorage.setItem(MANUAL_FRICTION_KEY, String(n));
+    } catch {
+      /* no-op */
+    }
+    const tierLc = String(state.tier || "free").toLowerCase();
+    if (tierLc === "elite" || tierLc === "dev") return;
+    if (n < 3) return;
+    if (state.atLimit || state.approachingLimit) return;
+    state.usageInlineCtaUntil = Date.now() + 120 * 1000;
+    setUsageInlineCta({
+      tone: "neutral",
+      copy: "You have repeated manual handoffs (email or billing). Paid tiers remove those bottlenecks while keeping human approval on sensitive moves.",
+      cta: tierLc === "pro" ? "See Elite headroom" : "See Pro execution",
+      targetTier: tierLc === "pro" ? "elite" : "pro",
+    });
+  }
+
+  async function refreshIntegrationsStatus() {
+    await loadIntegrations();
+  }
+
+  function isFirstOutcomeCelebrationPending() {
+    try {
+      return localStorage.getItem(FIRST_OUTCOME_CELEBRATION_KEY) !== "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function markFirstOutcomeCelebrated() {
+    try {
+      localStorage.setItem(FIRST_OUTCOME_CELEBRATION_KEY, "1");
+    } catch {
+      /* no-op */
+    }
+  }
+
+  function recordWorkspaceOutcomeClosing(normalized) {
+    const n = normalized && typeof normalized === "object" ? normalized : {};
+    markActivationStep("shipped");
+    if (activationIntegrationsSatisfied()) markActivationStep("integrations");
+    syncActivationChecklistUI();
+    loadIntegrations().catch(() => {});
+    const emailLine = formatOutboundEmailLine(n);
+    if (emailLine.includes("SMTP not configured")) bumpManualFriction();
+    const tst = String(n.tool_status || "").toLowerCase();
+    if (tst === "approved_pending_execution") bumpManualFriction();
   }
 
   function isAuthenticated() {
@@ -2272,19 +2588,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         "warning",
         locked?.primary || "Live refund execution is a Pro feature",
         locked?.secondary ||
-          "You can still review prepared decisions on Free — Pro runs Stripe execution in-place when connected, with approvals intact."
+          "Prepared refunds stay visible and human-verified on Free. Upgrade when you are routinely executing billing work — not on first exploration."
       );
-      // Product-native upgrade CTA lives in the usage strip (subtle, no spam).
-      const tierLc = String(state.tier || "free").toLowerCase();
-      if (tierLc !== "elite" && tierLc !== "dev") {
-        state.usageInlineCtaUntil = Date.now() + 120 * 1000;
-        setUsageInlineCta({
-          tone: "neutral",
-          copy: "You approved the motion — Pro runs it live in Stripe with a clean audit trail.",
-          cta: "Unlock live execution",
-          targetTier: "pro",
-        });
-      }
       return;
     }
     try {
@@ -2374,6 +2679,17 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         locked?.secondary ||
           "You can still review prepared decisions on Free — Pro runs Stripe execution in-place when connected, with approvals intact."
       );
+      return;
+    }
+
+    if (!state.stripeConnected) {
+      setNotice(
+        "warning",
+        "Connect Stripe to run this refund",
+        "This action executes in your Stripe account. Open Integrations → Connect Stripe, then return here."
+      );
+      closeRefundModal();
+      setSurface("integrations");
       return;
     }
 
@@ -2477,8 +2793,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
       if (els.stripeIntegrationCopy) {
         els.stripeIntegrationCopy.textContent = connected
-          ? "Stripe is connected. Refund execution is now live for this workspace."
-          : "Connect Stripe to execute refunds instead of only preparing them.";
+          ? "Stripe is connected — live refunds you approve can run from this workspace with a full audit trail."
+          : "When a refund needs Stripe, connect here — until then decisions stay prepared and human-verified, not silently executed.";
       }
     }
 
@@ -2490,7 +2806,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       state.stripeConnected = false;
       state.stripeAccountId = "";
       state.stripeMode = "";
+      state.smtpReady = false;
       updateStripeUI();
+      syncSmtpIntegrationChrome();
       return;
     }
 
@@ -2505,6 +2823,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
       state.stripeConnected = Boolean(data.stripe_connected);
       state.stripeAccountId = String(data.stripe_account_id || "");
+      state.smtpReady = Boolean(data.smtp_ready);
 
       const livemode =
         typeof data.stripe_livemode === "boolean"
@@ -2520,11 +2839,39 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       );
 
       updateStripeUI();
+      syncSmtpIntegrationChrome();
     } catch (error) {
       state.stripeConnected = false;
       state.stripeAccountId = "";
       state.stripeMode = "";
+      state.smtpReady = false;
       updateStripeUI();
+      syncSmtpIntegrationChrome();
+    }
+    if (activationIntegrationsSatisfied()) markActivationStep("integrations");
+  }
+
+  function syncSmtpIntegrationChrome() {
+    if (els.smtpStatusPill) {
+      if (!state.token) {
+        els.smtpStatusPill.textContent = "Sign in to check";
+      } else if (state.smtpReady) {
+        els.smtpStatusPill.textContent = "Ready";
+      } else {
+        els.smtpStatusPill.textContent = "Not configured";
+      }
+    }
+    if (els.smtpIntegrationCopy) {
+      if (!state.token) {
+        els.smtpIntegrationCopy.textContent =
+          "Create a free account, then configure SMTP on the server if you want approved sends to deliver from here.";
+      } else if (state.smtpReady) {
+        els.smtpIntegrationCopy.textContent =
+          "SMTP is configured — approved sends can deliver from this server with a clear audit trail.";
+      } else {
+        els.smtpIntegrationCopy.textContent =
+          "SMTP is not configured — when you approve a send, copy the verified draft to your helpdesk until outbound email is wired here.";
+      }
     }
   }
 
@@ -2634,7 +2981,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const chargeId = String(els.chargeIdInput?.value || els.refundChargeInput?.value || "").trim();
 
     if (!state.stripeConnected) {
-      setNotice("warning", "Stripe required", "Connect Stripe before executing live refunds.");
+      setNotice(
+        "warning",
+        "Connect Stripe to run this refund",
+        "Open Integrations → Connect Stripe, then retry from the composer or refund UI."
+      );
+      setSurface("integrations");
       return;
     }
 
@@ -2812,6 +3164,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     syncCommandStripCapacity();
     refreshUpgradeValueSummary();
     refreshEmptyStateContent();
+    syncActivationChecklistUI();
     if (!state.sending) refreshComposerIdleHint();
     applyComposerInteractiveLock();
     syncPlansPanelChrome();
@@ -3065,6 +3418,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     }
     const tier = String(state.tier || "free").toLowerCase();
     if (tier === "elite" || tier === "dev") return;
+    // Defer upgrade nudges until capacity is constrained — avoids pushing plans during first value discovery.
+    if (!state.atLimit) return;
     const conf = Number(data.confidence ?? data.decision?.confidence ?? 0);
     const og = String(data.outcome_intelligence?.latest?.tier || "").toLowerCase();
     const money = Number(data.amount ?? 0);
@@ -3073,30 +3428,6 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (!strong) return;
     state.postRunValueMomentUntil = Date.now() + 100 * 1000;
     renderComposerValueMoment(tier);
-
-    // Also surface a single inline CTA inside the usage strip (product-native, no spam).
-    const churn = Number(data?.triage?.churn_risk ?? 0);
-    const govMode = String(data?.governor_mode ?? data?.governor?.mode ?? "").toLowerCase();
-    const target = tier === "pro" ? "elite" : "pro";
-    const { tickets, minutes } = getValueSnapshot();
-    const valueProof = tickets || minutes ? `Session: ${tickets} tickets · ~${minutes} min back.` : "Session value logged.";
-    if (churn >= 7) {
-      state.usageInlineCtaUntil = Date.now() + 90 * 1000;
-      setUsageInlineCta({
-        tone: "risk",
-        copy: `That run protected a fragile customer. ${valueProof}`,
-        cta: tier === "pro" ? "Remove limits on Elite" : "Run more tickets without stopping",
-        targetTier: target,
-      });
-    } else if (govMode === "auto") {
-      state.usageInlineCtaUntil = Date.now() + 90 * 1000;
-      setUsageInlineCta({
-        tone: "safe",
-        copy: `Policy check passed — paid tiers keep this flow uninterrupted at higher volume.`,
-        cta: tier === "pro" ? "Unlock Elite headroom" : "Unlock live execution",
-        targetTier: target,
-      });
-    }
   }
 
   function renderComposerValueMoment(tierLc) {
@@ -3639,7 +3970,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (els.commandModeLine) {
       els.commandModeLine.textContent = state.latestRun
         ? "Session active"
-        : "Drafts and actions prepared · you approve what ships";
+        : "AI prepares · you approve · verified actions only";
     }
     syncCommandStripCapacity();
 
@@ -3674,7 +4005,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (!els.systemPanelCopy) return;
 
     if (!data) {
-      els.systemPanelCopy.textContent = "Paste a ticket or pick an example chip — your draft shows up here.";
+      els.systemPanelCopy.textContent =
+        "Paste or import a ticket — AI prepares the decision; you approve when needed; then execute or send. Nothing is hidden or faked.";
       return;
     }
 
@@ -3966,11 +4298,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       return `
       <div class="empty-card empty-card-launch empty-card-launch--claude empty-card-onboarding" role="status">
         ${roiHeroStripMarkup()}
+        ${buildOnboardingFlowCalloutHtml()}
         <div class="xv-empty-hero">
           <p class="xv-empty-kicker" translate="no">Operator console</p>
           <h2 class="cld-welcome-headline">${escapeHtml(`${greet}${name ? `, ${name}` : ""}`)}</h2>
-          <p class="cld-welcome-lead">Paste a customer message — Xalvion drafts the reply and next action. <strong>You approve</strong> before billing or tools run.</p>
-          <p class="cld-welcome-prompt onboarding-subline">Start in the composer below, or open the queue when you want the next case surfaced for you.</p>
+          <p class="cld-welcome-lead">Paste or import a ticket — <strong>AI prepares</strong> the reply and next step. <strong>You approve</strong> when money, policy, or send risk is on the line — then <strong>execute or send</strong>.</p>
+          <p class="cld-welcome-prompt onboarding-subline">No live tickets yet? Use <strong>Example openers</strong> in the composer or open the queue — <span class="xv-demo-inline-label">Preview / demo</span> samples are labeled and are not your production queue.</p>
         </div>
         <details class="xv-queue-details">
           <summary class="xv-queue-details-summary">Queue <span id="xvQueueSummaryChip" class="xv-queue-summary-chip">…</span></summary>
@@ -4121,11 +4454,15 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const isDemo =
       String(item?.data_origin || "").toLowerCase() === "demo" || String(item?.source || "").toLowerCase() === "sim";
     const demoCls = isDemo ? " xv-inbox-item--demo" : "";
+    const demoPill = isDemo
+      ? `<span class="xv-demo-pill" translate="no">Preview / demo</span>`
+      : "";
     return `
       <button type="button" class="xv-inbox-item${demoCls}" data-act="inbox-open" data-inbox-id="${escapeHtml(String(item?.id || ""))}" data-issue-category="${escapeHtml(issueCategory)}">
         <div class="xv-inbox-item-top">
           <span class="xv-inbox-item-id">${escapeHtml(metaLeft)}</span>
           <span class="xv-inbox-item-meta">${escapeHtml(metaRight || "Incoming")}</span>
+          ${demoPill}
           <span class="meta-chip ${escapeHtml(tone)}">${ICONS.shield}<span>${escapeHtml(badge)}</span></span>
         </div>
         <div class="xv-inbox-item-preview">${escapeHtml(preview || "Open ticket")}</div>
@@ -4165,7 +4502,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (dataset === "demo") {
       banner.className = "xv-inbox-dataset-banner xv-inbox-dataset-banner--demo";
       banner.textContent =
-        "Demo mode is on — these are synthetic sample tickets. They are not live ingestion and are not mixed with your real queue.";
+        "Preview / demo dataset — synthetic tickets for learning the UI. They are not live customer data and are never treated as production traffic.";
     } else {
       banner.className = "xv-inbox-dataset-banner";
       banner.textContent = "";
@@ -4189,7 +4526,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     incomingNode.innerHTML = incoming.length
       ? incoming.slice(0, 6).map(buildInboxTicketButton).join("")
-      : `<div class="xv-inbox-empty">No new tickets. Paste a ticket below to start a run.</div>`;
+      : `<div class="xv-inbox-empty">No live tickets in this workspace yet. Paste a real ticket below to run your first case, or open <strong>Example openers</strong> to test the flow — demo rows are labeled <span class="xv-demo-inline-label">Preview / demo</span> so they never look like production.</div>`;
 
     if (recommended) {
       const tone = inboxTone(recommended);
@@ -4201,10 +4538,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         String(recommended?.data_origin || "").toLowerCase() === "demo" ||
         String(recommended?.source || "").toLowerCase() === "sim";
       const recoDemoCls = recoDemo ? " xv-inbox-reco-btn--demo" : "";
+      const recoDemoPill = recoDemo ? `<span class="xv-demo-pill" translate="no">Preview / demo</span>` : "";
       recNode.innerHTML = `
         <button type="button" class="xv-inbox-reco-btn${recoDemoCls}" data-act="inbox-open" data-inbox-id="${escapeHtml(String(recommended.id || ""))}" data-issue-category="${escapeHtml(issueCategory)}">
           <div class="xv-inbox-reco-top">
             <span class="meta-chip ${escapeHtml(tone)}">${ICONS.pulse}<span>${escapeHtml(title)}</span></span>
+            ${recoDemoPill}
             <span class="xv-inbox-reco-id">${escapeHtml(formatInboxId(recommended.id))}</span>
           </div>
           <div class="xv-inbox-reco-preview">${escapeHtml(preview || "Open recommended case")}</div>
@@ -4382,6 +4721,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
   function bindEmptyStateActions(empty) {
     if (!empty) return;
+    bindOnboardingFlowCallout(empty);
     empty.querySelector("#emptyUpgradeCta")?.addEventListener("click", () => {
       if (!isAuthenticated()) {
         focusPlansPanel();
@@ -5207,6 +5547,55 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     return { cls: "signal-safe", text: "Routine path", title: "No billing hold — quick read, then send when satisfied." };
   }
 
+  function syncDecisionIntegrationHint(panel, data, approval) {
+    const hint = panel?.querySelector?.("[data-role='integration-hint']");
+    if (!hint) return;
+    const action = String(data?.action || data?.decision?.action || "").toLowerCase();
+    const moneyActs = action === "refund" || action === "credit" || action === "charge";
+    const tierLc = String(state.tier || "free").toLowerCase();
+    const paid = tierLc === "pro" || tierLc === "elite" || tierLc === "dev";
+    const wantsEmail = Boolean(String(data?.ticket?.customer_email || "").includes("@"));
+    const pendingGate = Boolean(approval?.requiresApproval && !approval?.approved);
+    const lines = [];
+    if (pendingGate && moneyActs && paid && !state.stripeConnected) {
+      lines.push(
+        "This approval can execute a live billing move in Stripe. Connect Stripe under Integrations first if you want it to run automatically — nothing is faked as completed."
+      );
+    }
+    if (pendingGate && wantsEmail && !state.smtpReady) {
+      lines.push(
+        "Outbound SMTP is not configured on this server. You can still approve and copy the verified reply to your helpdesk — configure email under Integrations when you want sends from here."
+      );
+    }
+    if (!lines.length) {
+      hint.hidden = true;
+      hint.innerHTML = "";
+      return;
+    }
+    hint.hidden = false;
+    hint.innerHTML = `
+      <div class="decision-panel-integration-hint-inner">
+        ${lines.map((t) => `<p>${escapeHtml(t)}</p>`).join("")}
+        <button type="button" class="btn xv-int-open-integrations">Open Integrations</button>
+      </div>`;
+    hint.querySelector(".xv-int-open-integrations")?.addEventListener("click", () => setSurface("integrations"), {
+      once: true,
+    });
+  }
+
+  function maybeNudgeIntegrationsFromApproveError(message) {
+    const m = String(message || "").toLowerCase();
+    if (m.includes("stripe") || m.includes("payment_intent") || m.includes("connect")) {
+      setNotice("warning", "Stripe needed", "Connect Stripe under Integrations, then try approving again.");
+      setSurface("integrations");
+      return;
+    }
+    if (m.includes("smtp") || m.includes("email") || m.includes("send")) {
+      setNotice("warning", "Email delivery blocked", "Configure SMTP under Integrations, or copy the verified reply to your helpdesk.");
+      setSurface("integrations");
+    }
+  }
+
   function mountOperatorDecisionPanel(row, data, initialReply) {
     row.querySelector(".decision-panel")?.remove();
     const msgBody = row.querySelector(".msg-body");
@@ -5242,11 +5631,13 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       </div>
       <div class="xv-governor-surface" data-role="governor" hidden></div>
       <div class="decision-panel-note" data-role="note" style="display:none"></div>
+      <div class="decision-panel-integration-hint" data-role="integration-hint" hidden></div>
       <div class="decision-panel-error" data-role="err" style="display:none"></div>
       <div class="edit-mode-container" data-role="edit" style="display:none"></div>
       <div class="xv-next-action" data-role="next" style="display:none"></div>
     `;
     mountTarget.appendChild(panel);
+    syncDecisionIntegrationHint(panel, data, approval);
 
     // Decision-ready animation hook (fade-in) + state scoping for CSS.
     panel.classList.remove("xv-decision-enter");
@@ -5406,7 +5797,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         const approved = pill === "Approved" || pill === "Sent as edited";
         nextWrap.style.display = approved ? "block" : "none";
         nextWrap.innerHTML = approved ? buildNextActionHtml() : "";
-        if (approved) bindNextActionHandlers(nextWrap);
+        if (approved) {
+          bindNextActionHandlers(nextWrap);
+          if (isFirstOutcomeCelebrationPending()) markFirstOutcomeCelebrated();
+        }
       }
       renderTicketResultSummary(row, data);
     };
@@ -5416,7 +5810,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const n = effectiveTicketCount();
       const mins = estimateTimeSavedMinutes();
       const momentum = momentumLine();
-      const integrationHint = n >= 2 ? "Connect your system to auto-fill tracking, refunds, and orders" : "";
+      const integrationHint = n >= 4 ? "Connect your system to auto-fill tracking, refunds, and orders" : "";
       const tierLc = String(state.tier || "free").toLowerCase();
       const conv = getPhase2Core()?.conversion || null;
       const postValueNudge = conv?.buildPostValueUpgradeNudge
@@ -5434,7 +5828,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         !postValueNudge && n >= 5
           ? "You’re on a roll — add headroom before a hard cap slows the queue"
           : "";
-      const canShowAutomation = !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev";
+      const canShowAutomation = !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev" && n >= 3;
       const automationBlock = canShowAutomation
         ? `<div class="xv-next-nudge">
             <div class="xv-next-nudge-copy">${
@@ -5466,8 +5860,19 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           </div>`
         : "";
 
+      const firstOut = isFirstOutcomeCelebrationPending();
+      const firstBlock = firstOut
+        ? `<div class="xv-first-outcome-callout" role="status">
+            <div class="xv-first-outcome-kicker">First success</div>
+            <p class="xv-first-outcome-copy"><strong>What happened:</strong> You ran a full decision loop — AI prepared, you approved, and the outcome is on the record.</p>
+            <p class="xv-first-outcome-copy"><strong>What you saved:</strong> ${escapeHtml(mins > 0 ? `Roughly ${mins} minutes of operator time on this path.` : "Time on drafting, policy checks, and copy iteration.")}</p>
+            <p class="xv-first-outcome-copy muted-copy"><strong>What paid plans add:</strong> Higher included runs, live Stripe execution after approval, and server-side email sends when SMTP is configured — same human gate, less tab switching.</p>
+          </div>`
+        : "";
+
       return `
         <div class="xv-next-success" role="status" aria-live="polite">
+          ${firstBlock}
           <div class="xv-next-success-title">Ticket resolved successfully</div>
           <div class="xv-next-success-sub">${escapeHtml(formatOutboundEmailLine(data))}</div>
           <div class="xv-next-audit" aria-label="Outcome">
@@ -5550,6 +5955,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       return;
     }
     if (approval.approved) {
+      recordWorkspaceOutcomeClosing(data);
       setTerminal("Approved", "Reply ready — send when satisfied.");
       return;
     }
@@ -5678,12 +6084,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
               updateLatestRunCard(normalized);
               updateSystemNarrative(normalized);
               updateTopbarStatus();
+              recordWorkspaceOutcomeClosing(normalized);
               setNotice(
                 "success",
                 "Ticket resolved successfully",
                 [response.message || "Outcome recorded.", formatOutboundEmailLine(normalized)].filter(Boolean).join(" ")
               );
             } catch (error) {
+              maybeNudgeIntegrationsFromApproveError(error.message);
               showErr(error.message || "Approve failed.");
               [rej, ed, ap].forEach((b) => {
                 b.disabled = false;
@@ -5775,12 +6183,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             updateLatestRunCard(normalized);
             updateSystemNarrative(normalized);
             updateTopbarStatus();
+            recordWorkspaceOutcomeClosing(normalized);
             setNotice(
               "success",
               "Ticket resolved successfully",
               [response.message || "Outcome recorded.", formatOutboundEmailLine(normalized)].filter(Boolean).join(" ")
             );
           } catch (error) {
+            maybeNudgeIntegrationsFromApproveError(error.message);
             showErr(error.message || "Approve failed.");
             [rej, ed, ap].forEach((b) => {
               b.disabled = false;
@@ -5789,6 +6199,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           }
           return;
         }
+        recordWorkspaceOutcomeClosing(data);
         setTerminal("Approved", "Reply ready — send when it reads right.");
         setNotice(
           "success",
@@ -6270,6 +6681,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
         event.preventDefault();
         event.stopPropagation();
+        const willOpen = !detailsEl.open;
+        if (willOpen && cls.contains("details-wrap") && els.messages?.contains(detailsEl)) {
+          markActivationStep("reviewedSummary");
+        }
         animateDetailsToggle(detailsEl, !detailsEl.open);
       },
       true
@@ -7168,6 +7583,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       updateRevenueCard(data);
       updateLatestRunCard(data);
       maybeShowPostRunValueMoment(data);
+      if (!isStreamFailureResult(data)) {
+        markActivationStep("analyzed");
+        if (activationIntegrationsSatisfied()) markActivationStep("integrations");
+        syncActivationChecklistUI();
+      }
       updateSystemNarrative(data);
       // Refresh recent tickets quietly (return trigger).
       // Prefer server truth when available, but keep working if offline.
@@ -8515,7 +8935,10 @@ function bindEvents() {
 
     if (isClaudeShell()) {
       if (els.composerStatusLine) els.composerStatusLine.textContent = "";
-      if (els.messageInput) els.messageInput.placeholder = "Paste a ticket or describe the issue…";
+      if (els.messageInput) {
+        els.messageInput.placeholder =
+          "Paste or import a ticket — AI prepares; you approve before anything ships.";
+      }
       syncComposerAriaDescribedBy();
     }
 
@@ -8556,6 +8979,7 @@ function bindEvents() {
     const meResult = await hydrateMe();
     await loadDashboardSummary();
     await loadIntegrations();
+    syncActivationChecklistUI();
     await loadRefundHistory();
     await loadCrmLeads();
     await loadRevenueMetrics();
