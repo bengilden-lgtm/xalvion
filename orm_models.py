@@ -49,6 +49,7 @@ class Ticket(Base):
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
     username = Column(String, nullable=False, index=True)
+    customer_email = Column(String(320), nullable=True)
     channel = Column(String, default="web")
     source = Column(String, default="workspace")
     status = Column(String, default="new", index=True)

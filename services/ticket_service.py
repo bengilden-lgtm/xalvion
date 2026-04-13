@@ -13,6 +13,7 @@ from app_utils import (
     _safe_source,
     _safe_status,
     get_plan_name,
+    resolve_customer_email_for_ticket,
 )
 from orm_models import ActionLog, Ticket
 from sqlalchemy.orm import Session
@@ -27,6 +28,14 @@ def create_ticket_record(
 ) -> Any:
     now = _now_iso()
     owner = (storage_username or "").strip() or str(getattr(user, "username", "unknown") or "unknown")
+    req_ctx = getattr(req, "request_context", None) or {}
+    if not isinstance(req_ctx, dict):
+        req_ctx = {}
+    customer_email = resolve_customer_email_for_ticket(
+        request_context=req_ctx,
+        customer_email=getattr(req, "customer_email", None),
+    ) or None
+
     bootstrap_ticket = build_support_ticket(
         req.message,
         user_id=owner,
@@ -39,12 +48,14 @@ def create_ticket_record(
             "channel": _safe_channel(req.channel),
             "source": _safe_source(req.source),
             "customer_history": {},
+            "customer_email": customer_email,
         },
     )
     ticket = Ticket(
         created_at=now,
         updated_at=now,
         username=owner,
+        customer_email=customer_email,
         channel=_safe_channel(req.channel),
         source=_safe_source(req.source),
         subject=(req.message or "")[:300],
@@ -153,6 +164,7 @@ def serialize_ticket(ticket: Any) -> dict[str, Any]:
         "created_at": ticket.created_at,
         "updated_at": ticket.updated_at,
         "username": ticket.username,
+        "customer_email": getattr(ticket, "customer_email", None) or "",
         "channel": ticket.channel,
         "source": ticket.source,
         "status": ticket.status,

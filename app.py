@@ -92,6 +92,7 @@ from app_utils import (
     _safe_status,
     _tier_upgrade_unlocks,
     get_plan_name,
+    resolve_customer_email_for_ticket,
 )
 from orm_models import ActionLog, Ticket, User
 
@@ -854,6 +855,22 @@ def _import_orm_submodules() -> None:
             logger.warning(msg)
 
 
+def ensure_ticket_columns() -> None:
+    try:
+        inspector = inspect(engine)
+        columns = {col["name"] for col in inspector.get_columns("tickets")}
+        additions: list[str] = []
+        if "customer_email" not in columns:
+            additions.append("ALTER TABLE tickets ADD COLUMN customer_email VARCHAR(320)")
+        if additions:
+            with engine.begin() as conn:
+                for statement in additions:
+                    conn.execute(text(statement))
+    except Exception as exc:
+        STARTUP_ISSUES.append(f"ticket_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
+        logger.error("ensure_ticket_columns_failed detail=%s", str(exc)[:500], exc_info=True)
+
+
 def ensure_user_columns() -> None:
     try:
         inspector = inspect(engine)
@@ -893,6 +910,7 @@ def _startup_database() -> None:
     logger.info("DB schema ensured")
     print("DB schema ensured", flush=True)
     ensure_user_columns()
+    ensure_ticket_columns()
     migrate_legacy_operator_usage_into_rollups()
     try:
         ensure_outcome_log_columns()
@@ -944,6 +962,8 @@ class SupportRequest(BaseModel):
     refund_reason: str | None = None
     channel: str | None = None
     source: str | None = None
+    customer_email: str | None = None
+    request_context: dict[str, Any] | None = None
 
     @field_validator("message")
     @classmethod
@@ -954,6 +974,46 @@ class SupportRequest(BaseModel):
         if len(text) > 10000:
             raise ValueError("message too long")
         return text
+
+    @field_validator("customer_email")
+    @classmethod
+    def validate_customer_email(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        if "@" not in s:
+            raise ValueError("customer_email must look like an email address")
+        if len(s) > 320:
+            raise ValueError("customer_email too long")
+        return s
+
+    @field_validator("request_context")
+    @classmethod
+    def validate_request_context(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        if v is None:
+            return None
+        if not isinstance(v, dict):
+            raise ValueError("request_context must be an object")
+        return v
+
+
+class TicketReplySendRequest(BaseModel):
+    """Optional overrides when emailing ``ticket.final_reply`` to the customer."""
+
+    body: str | None = None
+    subject: str | None = None
+
+    @field_validator("subject")
+    @classmethod
+    def validate_subject(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        return s[:998]
 
 
 class UpgradeRequest(BaseModel):
@@ -1633,6 +1693,13 @@ def build_agent_meta(
         op_mode = get_operator_mode(db)
     else:
         op_mode = "balanced"
+    req_ctx = req.request_context or {}
+    if not isinstance(req_ctx, dict):
+        req_ctx = {}
+    resolved_email = resolve_customer_email_for_ticket(
+        request_context=req_ctx,
+        customer_email=req.customer_email,
+    )
     return {
         "sentiment": req.sentiment if req.sentiment is not None else 5,
         "ltv": req.ltv if req.ltv is not None else 0,
@@ -1644,6 +1711,7 @@ def build_agent_meta(
         "operator_mode": op_mode,
         "channel": _safe_channel(req.channel),
         "source": _safe_source(req.source),
+        "customer_email": resolved_email or None,
     }
 
 
@@ -1668,6 +1736,13 @@ except Exception as exc:
     ) -> Ticket:
         now = _now_iso()
         owner = (storage_username or "").strip() or str(getattr(user, "username", "unknown") or "unknown")
+        req_ctx = getattr(req, "request_context", None) or {}
+        if not isinstance(req_ctx, dict):
+            req_ctx = {}
+        customer_email = resolve_customer_email_for_ticket(
+            request_context=req_ctx,
+            customer_email=getattr(req, "customer_email", None),
+        ) or None
         bootstrap_ticket = build_support_ticket(
             req.message,
             user_id=owner,
@@ -1680,12 +1755,14 @@ except Exception as exc:
                 "channel": _safe_channel(req.channel),
                 "source": _safe_source(req.source),
                 "customer_history": {},
+                "customer_email": customer_email,
             },
         )
         ticket = Ticket(
             created_at=now,
             updated_at=now,
             username=owner,
+            customer_email=customer_email,
             channel=_safe_channel(req.channel),
             source=_safe_source(req.source),
             subject=(req.message or "")[:300],
@@ -1788,6 +1865,7 @@ except Exception as exc:
             "created_at": ticket.created_at,
             "updated_at": ticket.updated_at,
             "username": ticket.username,
+            "customer_email": getattr(ticket, "customer_email", None) or "",
             "channel": ticket.channel,
             "source": ticket.source,
             "status": ticket.status,
@@ -2180,6 +2258,20 @@ def build_runtime_ticket(
     ticket = normalize_ticket(raw_ticket)
     ticket["customer_history"] = user_memory
     ticket["triage"] = ticket.get("triage") or triage_ticket(ticket, user_memory)
+    req_ctx = req.request_context or {}
+    if not isinstance(req_ctx, dict):
+        req_ctx = {}
+    resolved_email = resolve_customer_email_for_ticket(
+        request_context=req_ctx,
+        customer_email=req.customer_email,
+    )
+    if resolved_email:
+        ticket["customer_email"] = resolved_email
+    merged_rc = {**req_ctx}
+    if resolved_email and not str(merged_rc.get("sender") or "").strip():
+        merged_rc["sender"] = resolved_email
+    if merged_rc:
+        ticket["request_context"] = merged_rc
     return ticket
 
 
@@ -2597,6 +2689,7 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
                 refund_reason=(req.refund_reason or None),
                 channel=ticket.channel or "web",
                 source=ticket.source or "workspace",
+                customer_email=str(getattr(ticket, "customer_email", None) or "").strip() or None,
             )
             payload = apply_real_actions(payload, support_req, user)
             payload.setdefault("decision", {}).update({
@@ -2721,11 +2814,25 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
             ticket_id,
             getattr(user, "username", "") or "?",
         )
+        req_ctx = req.request_context or {}
+        if not isinstance(req_ctx, dict):
+            req_ctx = {}
+        resolved_email = resolve_customer_email_for_ticket(
+            request_context=req_ctx,
+            customer_email=req.customer_email,
+        )
+        agent_ctx = AgentRequestContext(
+            surface="workspace",
+            sender=resolved_email or (str(req_ctx.get("sender") or "").strip() or None),
+            subject=str(req_ctx.get("subject") or "").strip() or None,
+            thread_id=str(req_ctx.get("thread_id") or "").strip() or None,
+        ).model_dump()
+
         result = run_sovereign_execution_pipeline(
             message=req.message,
             principal_id=principal_id,
             meta=build_agent_meta(req, user, operator_mode=op_mode),
-            request_context=AgentRequestContext(surface="workspace").model_dump(),
+            request_context=agent_ctx,
             plan_tier=get_plan_name(user),
             billing_user=user,
             billing_req=req,
@@ -3348,11 +3455,18 @@ def _persist_sovereign_result(
     triage = result.get("triage_metadata") or {}
     output = result.get("output") or {}
     request_context = result.get("request_context") or {}
+    if not isinstance(request_context, dict):
+        request_context = {}
+    persisted_customer_email = resolve_customer_email_for_ticket(
+        request_context=request_context,
+        customer_email=None,
+    ) or None
 
     ticket = Ticket(
         created_at=now,
         updated_at=now,
         username=username,
+        customer_email=persisted_customer_email,
         channel="email",
         source="extension",
         status=_safe_status(decision.get("status", "new")),
@@ -3462,6 +3576,7 @@ def analyze_extension_ticket(
         operator_mode = get_operator_mode(db)
 
     ext_meta = _build_extension_meta(req, operator_mode, plan_tier, priority_routing)
+    ext_ctx = _build_extension_context(req).model_dump()
     billing_req = SupportRequest(
         message=req.text,
         sentiment=req.sentiment,
@@ -3471,6 +3586,8 @@ def analyze_extension_ticket(
         charge_id=req.charge_id,
         channel="email",
         source="extension",
+        customer_email=str(req.sender or "").strip() or None,
+        request_context=ext_ctx,
     )
     result = run_sovereign_execution_pipeline(
         message=req.text,

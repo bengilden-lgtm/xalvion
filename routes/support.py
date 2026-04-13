@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 import app as app_mod
 from app_utils import _me_capacity_message, _tier_upgrade_unlocks
+from services import email_service
 
 router = APIRouter(tags=["support"])
 
@@ -73,6 +74,7 @@ def _apply_ticket_search(q, search_term: str):
         | app_mod.Ticket.final_reply.ilike(term)
         | app_mod.Ticket.internal_note.ilike(term)
         | app_mod.Ticket.issue_type.ilike(term)
+        | app_mod.Ticket.customer_email.ilike(term)
     )
 
 
@@ -226,6 +228,64 @@ def ticket_queue_counts(
         "statuses": status_counts,
         "operator_mode": app_mod.get_operator_mode(db),
     }
+
+
+@router.post("/tickets/{ticket_id}/reply/send")
+def send_ticket_reply(
+    ticket_id: int,
+    req: app_mod.TicketReplySendRequest,
+    user: app_mod.User = Depends(app_mod.get_current_user),
+    x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
+    db: Session = Depends(app_mod.get_db),
+):
+    """Email ``final_reply`` to the customer using persisted ``customer_email`` (never ``username``)."""
+    if not getattr(user, "username", "") or user.username == "guest":
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    ticket = db.query(app_mod.Ticket).filter(app_mod.Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    owner_key = _ticket_owner_key(user, x_guest_client)
+    if getattr(user, "username", "") != app_mod.ADMIN_USERNAME:
+        if app_mod.is_session_guest(user) and not owner_key:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        if not owner_key or ticket.username != owner_key:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+    reply_body = (req.body or "").strip() or str(ticket.final_reply or "").strip()
+    delivery = email_service.send_ticket_reply_email(
+        ticket=ticket,
+        reply_body=reply_body,
+        subject=req.subject,
+    )
+    status = str(delivery.get("status") or "")
+    if status == "pending_manual":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": delivery.get("code") or "send_blocked",
+                "message": delivery.get("message") or "Reply cannot be sent by email for this ticket.",
+            },
+        )
+    if status == "transport_unavailable":
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": delivery.get("code") or "smtp_not_configured",
+                "message": delivery.get("message") or "Outbound email transport is not configured.",
+            },
+        )
+    if status == "error":
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": delivery.get("code") or "smtp_send_failed",
+                "message": delivery.get("message") or "Email delivery failed.",
+            },
+        )
+
+    return {"ok": True, "delivery": delivery}
 
 
 @router.get("/tickets/{ticket_id}")

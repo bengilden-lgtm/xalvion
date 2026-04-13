@@ -69,6 +69,27 @@ def _tier_upgrade_unlocks(tier: str) -> str:
     return ""
 
 
+def normalize_customer_email(value: Any) -> str:
+    """Return a trimmed RFC-ish local@domain string, or empty if unusable for delivery."""
+    raw = str(value or "").strip()
+    if not raw or "@" not in raw:
+        return ""
+    return raw[:320]
+
+
+def resolve_customer_email_for_ticket(
+    *,
+    request_context: dict[str, Any] | None = None,
+    customer_email: str | None = None,
+) -> str:
+    """Prefer ``request_context.sender``, then explicit ``customer_email`` on the support payload."""
+    ctx = request_context if isinstance(request_context, dict) else {}
+    sender = normalize_customer_email(ctx.get("sender"))
+    if sender:
+        return sender
+    return normalize_customer_email(customer_email)
+
+
 def _me_capacity_message(tier: str, remaining: int) -> str:
     t = str(tier or "free").strip().lower()
     if t == "elite":
