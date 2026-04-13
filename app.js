@@ -496,34 +496,60 @@ if (typeof window.pulseRail !== "function") {
         ? `<div class="ticket-result-summary__demo" role="note"><strong>Demo</strong> — synthetic scenario only; not real customer data. Summary shows how decisions are structured.</div>`
         : "";
     host.className = "ticket-result-summary js-ticket-result-summary ticket-result-summary--metadata";
+    const execExplain = String(exec.detail || "").trim();
+    const smtpNote = String(emailLine || "").trim();
+    const sysLine = String(valueLine || "").trim();
+    const modeWhy = String(mode.why || "").trim();
+    const hasMoreDetail = Boolean(execExplain || smtpNote || sysLine || modeWhy);
+    const moreBlock = hasMoreDetail
+      ? `<details class="ticket-result-summary__more">
+      <summary class="ticket-result-summary__more-summary"><span>Delivery, execution notes, and system context</span><span class="ticket-result-summary__more-chev" aria-hidden="true"></span></summary>
+      <div class="ticket-result-summary__more-body">
+        ${
+          execExplain
+            ? `<div class="ticket-result-summary__detail-block">
+            <div class="ticket-result-summary__detail-k">Execution</div>
+            <div class="ticket-result-summary__detail-v">${escapeHtml(execExplain)}</div>
+          </div>`
+            : ""
+        }
+        <div class="ticket-result-summary__detail-block">
+          <div class="ticket-result-summary__detail-k">SMTP / email</div>
+          <div class="ticket-result-summary__detail-v">${escapeHtml(smtpNote)}</div>
+        </div>
+        <div class="ticket-result-summary__detail-block">
+          <div class="ticket-result-summary__detail-k">System</div>
+          <div class="ticket-result-summary__detail-v">${escapeHtml(sysLine)}</div>
+          <div class="ticket-result-summary__mode-row ticket-result-summary__mode-row--nested">
+            <span class="ticket-result-summary__mode-pill">${escapeHtml(mode.label)}</span>
+            <span class="ticket-result-summary__mode-why">${escapeHtml(modeWhy)}</span>
+          </div>
+        </div>
+      </div>
+    </details>`
+      : "";
     host.innerHTML = `
       ${demoBanner}
       <div class="ticket-result-summary__title">Result</div>
-      <div class="ticket-result-summary__grid" role="group" aria-label="Ticket outcome">
+      <div class="ticket-result-summary__grid ticket-result-summary__grid--top" role="group" aria-label="Ticket outcome">
         <div class="ticket-result-summary__cell">
           <div class="ticket-result-summary__k">Action taken</div>
           <div class="ticket-result-summary__v">${escapeHtml(actionTakenLabel(data))}</div>
         </div>
         <div class="ticket-result-summary__cell">
-          <div class="ticket-result-summary__k">Execution</div>
+          <div class="ticket-result-summary__k">Execution status</div>
           <div class="ticket-result-summary__v">${escapeHtml(exec.headline)}</div>
-          <div class="ticket-result-summary__hint">${escapeHtml(exec.detail)}</div>
         </div>
         <div class="ticket-result-summary__cell">
-          <div class="ticket-result-summary__k">Time saved (est.)</div>
-          <div class="ticket-result-summary__v">~${escapeHtml(String(mins))} min</div>
+          <div class="ticket-result-summary__k">Time saved</div>
+          <div class="ticket-result-summary__v">~${escapeHtml(String(mins))} min <span class="ticket-result-summary__est">est.</span></div>
         </div>
         <div class="ticket-result-summary__cell">
           <div class="ticket-result-summary__k">Confidence</div>
           <div class="ticket-result-summary__v">${escapeHtml(conf.line)}</div>
         </div>
       </div>
-      <div class="ticket-result-summary__value-strip">${escapeHtml(valueLine)}</div>
-      <div class="ticket-result-summary__mode-row">
-        <span class="ticket-result-summary__mode-pill">${escapeHtml(mode.label)}</span>
-        <span class="ticket-result-summary__mode-why">${escapeHtml(mode.why)}</span>
-      </div>
-      <div class="ticket-result-summary__email" data-tone="neutral">${escapeHtml(emailLine)}</div>
+      ${moreBlock}
     `;
     host.hidden = false;
   }
@@ -932,16 +958,21 @@ if (typeof window.pulseRail !== "function") {
             body[data-ui="claude"] .decision-state-pill{
               display:inline-flex !important;
               align-items:center !important;
-              height:30px !important;
-              padding:0 10px !important;
+              min-height:30px !important;
+              height:auto !important;
+              padding:6px 12px !important;
               border-radius:999px !important;
               border:1px solid rgba(255,255,255,0.10) !important;
               background: rgba(255,255,255,0.03) !important;
               color: rgba(246,242,235,0.86) !important;
               font-weight:650 !important;
-              letter-spacing:0.06em !important;
-              text-transform:uppercase !important;
-              font-size:11.5px !important;
+              letter-spacing:0.01em !important;
+              text-transform:none !important;
+              font-size:12px !important;
+              line-height:1.25 !important;
+              white-space:normal !important;
+              max-width:100% !important;
+              text-align:left !important;
             }
             body[data-ui="claude"] .decision-state-rejected .decision-state-pill {
               border-color: rgba(239,68,68,0.45) !important;
@@ -1327,6 +1358,200 @@ if (typeof window.pulseRail !== "function") {
         border: none !important;
         box-shadow: none !important;
         backdrop-filter: none !important;
+      }
+
+      .xv-workspace-zone {
+        display: block;
+      }
+      .xv-workspace-zone + .xv-workspace-zone {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.055);
+      }
+      .xv-zone--next .assistant-footer {
+        margin-top: 10px;
+        padding: 10px 0 0;
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.045);
+      }
+
+      .ticket-result-summary__grid--top .ticket-result-summary__cell .ticket-result-summary__v {
+        line-height: 1.3;
+      }
+      .ticket-result-summary__est {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(150, 160, 192, 0.55);
+        margin-left: 4px;
+      }
+      .ticket-result-summary__more {
+        margin-top: 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(0, 0, 0, 0.14);
+      }
+      .ticket-result-summary__more-summary {
+        list-style: none;
+        cursor: pointer;
+        user-select: none;
+        padding: 8px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(180, 190, 220, 0.72);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .ticket-result-summary__more-summary::-webkit-details-marker {
+        display: none;
+      }
+      .ticket-result-summary__more-chev::before {
+        content: "+";
+        display: inline-block;
+        font-weight: 700;
+        color: rgba(160, 170, 200, 0.65);
+        transition: transform 0.15s ease;
+      }
+      .ticket-result-summary__more[open] .ticket-result-summary__more-chev::before {
+        content: "−";
+      }
+      .ticket-result-summary__more-body {
+        padding: 0 10px 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .ticket-result-summary__detail-block {
+        margin-top: 10px;
+        font-size: 12px;
+        line-height: 1.45;
+        color: rgba(200, 208, 232, 0.82);
+      }
+      .ticket-result-summary__detail-k {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(138, 146, 173, 0.62);
+        margin-bottom: 4px;
+      }
+      .ticket-result-summary__detail-v {
+        color: rgba(215, 222, 245, 0.88);
+      }
+      .ticket-result-summary__mode-row--nested {
+        margin-top: 8px;
+      }
+
+      .xv-int-lead {
+        margin: 0 0 6px 0;
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.02em;
+        color: rgba(210, 218, 245, 0.88);
+      }
+      .xv-int-checklist {
+        margin: 0 0 8px 16px;
+        padding: 0;
+        font-size: 12px;
+        line-height: 1.45;
+        color: rgba(190, 198, 225, 0.78);
+      }
+      .xv-int-checklist li {
+        margin: 3px 0;
+      }
+      .xv-int-footnote {
+        margin: 0 0 10px 0;
+        font-size: 11.5px;
+        line-height: 1.4;
+      }
+
+      .automation-upsell--stacked {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .automation-upsell-stack {
+        width: 100%;
+      }
+      .automation-upsell--stacked .automation-upsell-cta {
+        align-self: flex-end;
+      }
+
+      .xv-next-nudge--stacked {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .xv-next-nudge-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+      }
+      .xv-next-nudge-row .xv-next-nudge-copy {
+        flex: 1 1 200px;
+      }
+
+      .xv-first-outcome-list {
+        margin: 0 0 10px 0;
+        padding-left: 18px;
+        font-size: 13px;
+        line-height: 1.45;
+        color: rgba(224, 234, 255, 0.94);
+      }
+      .xv-first-outcome-list--compact {
+        font-size: 12.5px;
+        margin-bottom: 8px;
+        color: rgba(210, 220, 245, 0.88);
+      }
+      .xv-first-outcome-list li {
+        margin: 4px 0;
+      }
+      .xv-first-outcome-minihead {
+        margin: 10px 0 4px 0;
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: rgba(190, 255, 224, 0.78);
+      }
+      .xv-first-outcome-foot {
+        margin: 0 0 8px 0;
+        font-size: 12px;
+      }
+      .xv-growth-feedback-block--quiet {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.1);
+        opacity: 0.82;
+      }
+      .xv-growth-feedback-eyebrow {
+        margin: 0 0 6px 0;
+        font-size: 10px;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(160, 170, 200, 0.52);
+      }
+      .xv-growth-feedback-block--quiet .xv-growth-q {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: rgba(185, 195, 225, 0.72);
+      }
+      .xv-first-outcome-cta--quiet {
+        font-size: 12px;
+        padding: 6px 12px;
+        font-weight: 600;
+      }
+      .xv-growth-surface {
+        margin-top: 12px;
+        padding-top: 0;
+        border-top: none;
       }
 
       .reply-hero-label {
@@ -1811,12 +2036,12 @@ if (typeof window.pulseRail !== "function") {
       .xv-demo-lab__title { font-size: 13px; font-weight: 650; color: rgba(245, 248, 255, 0.95); }
       .xv-demo-lab__hint { font-size: 12px; color: rgba(205, 215, 242, 0.78); margin: 0 0 10px 0; line-height: 1.45; }
       .xv-demo-lab__actions { display: flex; flex-wrap: wrap; gap: 8px; }
-      .xv-growth-surface { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); }
       .xv-growth-feedback-block .xv-growth-q { font-size: 12px; font-weight: 600; margin: 8px 0 4px 0; color: rgba(215,225,242,.9); }
       .xv-growth-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
       .xv-growth-row .ghost-btn.is-selected { border-color: rgba(96, 220, 170, 0.55); background: rgba(96,220,170,.12); }
       .xv-growth-ta { width: 100%; min-height: 52px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.2); color: inherit; font: inherit; resize: vertical; margin-bottom: 8px; }
       .xv-growth-referral { margin-top: 10px; }
+      .xv-growth-surface > .xv-growth-referral:first-child { margin-top: 0; }
       .xv-growth-referral-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
       .xv-growth-referral-input { flex: 1; min-width: 200px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.25); color: rgba(215,225,242,.95); font: 12px/1.3 ui-monospace,monospace; }
       .decision-panel-integration-hint {
@@ -4331,6 +4556,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       role === "assistant"
         ? `<div class="msg-body assistant-canvas">
         <div class="assistant-result-stack">
+          <section class="xv-workspace-zone xv-zone--result" aria-label="Result">
           <div class="customer-message-block">
             <div class="reply-body">
               <div class="assistant-context-line js-assistant-context" hidden></div>
@@ -4344,9 +4570,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
               <div class="reply-text js-reply-text">${bodyHtml}</div>
             </div>
           </div>
+          </section>
+          <section class="xv-workspace-zone xv-zone--decision" aria-label="Decision">
           <div class="assistant-decision-slot" data-slot="decision"></div>
+          </section>
+          <section class="xv-workspace-zone xv-zone--next" aria-label="Next steps">
           <div class="assistant-brief-slot" data-slot="brief"></div>
           <div class="assistant-footer js-assistant-footer"></div>
+          </section>
         </div>
       </div>`
         : `<div class="msg-body">
@@ -5274,14 +5505,22 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (!footer) return;
 
     const upsell = document.createElement("div");
-    upsell.className = "automation-upsell";
+    upsell.className = "automation-upsell automation-upsell--stacked";
     const ctaLabel = tier === "pro" ? "Review Elite runway" : "Review Pro execution";
     const copy =
       tier === "pro"
-        ? "When volume is real, Elite is the layer that keeps routing and automation from bumping the ceiling mid-shift."
-        : "When you’re ready, Pro moves prepared billing actions into live execution — still approval-first, still auditable.";
+        ? "Elite adds headroom when routing and automation would otherwise hit limits mid-shift."
+        : "Pro runs prepared billing moves in-product after you approve — same audit trail.";
+    const bullets =
+      tier === "pro"
+        ? `<li>Raise limits for sustained queue depth</li><li>Keep approvals and traceability as-is</li>`
+        : `<li>Connect Stripe for live refunds after approval</li><li>Raise monthly run limits vs Free</li>`;
     upsell.innerHTML = `
-      <div class="automation-upsell-copy">${escapeHtml(copy)}</div>
+      <div class="automation-upsell-stack">
+        <p class="xv-int-lead">To fully automate this:</p>
+        <ul class="xv-int-checklist">${bullets}</ul>
+        <p class="automation-upsell-copy">${escapeHtml(copy)}</p>
+      </div>
       <button type="button" class="automation-upsell-cta">${escapeHtml(ctaLabel)}</button>
     `;
     const btn = upsell.querySelector("button");
@@ -5875,19 +6114,33 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const chunks = [];
     if (showStripeConnect) {
       chunks.push(
-        `<p><strong>Live refund needs Stripe connected.</strong> AI prepared this decision for your review — connect Stripe, then approve to execute here. Nothing is marked paid until Stripe confirms.</p>
+        `<p class="xv-int-lead">To fully automate this:</p>
+        <ul class="xv-int-checklist">
+          <li>Connect Stripe for this workspace</li>
+          <li>Approve again to execute the refund here</li>
+        </ul>
+        <p class="xv-int-footnote muted-copy">Nothing is marked paid until Stripe confirms.</p>
         <div class="xv-int-actions"><button type="button" class="btn xv-int-connect-stripe">Connect Stripe</button></div>`
       );
     } else if (showStripePlan) {
       chunks.push(
-        `<p><strong>Auto refunds are off on Free.</strong> You still get a verified recommendation — run it in Stripe yourself, or move to Pro to execute the same approved refund here (within limits) with Stripe connected.</p>
-        <div class="xv-int-actions"><button type="button" class="btn xv-int-compare-plans">Enable auto refunds</button></div>
-        <p class="muted-copy" style="margin-top:10px;font-size:12px;line-height:1.45;">You can downgrade anytime · No risk to try · Works with your existing tools</p>`
+        `<p class="xv-int-lead">To fully automate this:</p>
+        <ul class="xv-int-checklist">
+          <li>Move to Pro for in-workspace execution (within limits)</li>
+          <li>Connect Stripe when you want refunds to run here</li>
+        </ul>
+        <p class="xv-int-footnote muted-copy">You can downgrade anytime · No risk to try · Works with your existing tools</p>
+        <div class="xv-int-actions"><button type="button" class="btn xv-int-compare-plans">Enable auto refunds</button></div>`
       );
     }
     if (showSmtpConfigure) {
       chunks.push(
-        `<p><strong>Customer email send needs SMTP.</strong> Approve when the text is right — configure outbound email here, or copy the verified draft to your helpdesk. Sends are not simulated as delivered.</p>
+        `<p class="xv-int-lead">To fully automate this:</p>
+        <ul class="xv-int-checklist">
+          <li>Configure outbound email (SMTP) for sends after approval</li>
+          <li>Or copy the verified draft to your helpdesk</li>
+        </ul>
+        <p class="xv-int-footnote muted-copy">Server-side sends are not simulated as delivered.</p>
         <div class="xv-int-actions"><button type="button" class="btn xv-int-configure-email">Configure email (SMTP)</button></div>`
       );
     }
@@ -6142,7 +6395,15 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       }
       if (decisionCalloutEl) decisionCalloutEl.hidden = true;
       if (cons) cons.hidden = true;
-      controls.innerHTML = `<span class="decision-state-pill">${escapeHtml(pill)}</span>`;
+      const pillDisplay =
+        pill === "Approved"
+          ? "✓ Approved — ready to execute"
+          : pill === "Sent as edited"
+            ? "✓ Approved — recorded as edited"
+            : pill === "Edited"
+              ? "✓ Edited — copy when ready"
+              : pill;
+      controls.innerHTML = `<span class="decision-state-pill">${escapeHtml(pillDisplay)}</span>`;
       if (note) {
         noteEl.textContent = note;
         noteEl.style.display = "block";
@@ -6204,7 +6465,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         tierLc !== "dev" &&
         (state.atLimit || n >= 10);
       const automationBlock = canShowAutomation
-        ? `<div class="xv-next-nudge">
+        ? `<div class="xv-next-nudge xv-next-nudge--stacked">
+            <p class="xv-int-lead">To fully automate this:</p>
+            <ul class="xv-int-checklist">${
+              tierLc === "pro"
+                ? "<li>Raise limits before peak volume hits the ceiling</li><li>Keep the same approval-first loop</li>"
+                : "<li>Run approved refunds in Stripe from here (within limits)</li><li>Raise ticket ceiling vs Free</li>"
+            }</ul>
+            <div class="xv-next-nudge-row">
             <div class="xv-next-nudge-copy">${
               tierLc === "pro"
                 ? "Elite removes the last manual bottlenecks at scale — same approvals, highest limits."
@@ -6213,24 +6481,37 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             <button type="button" class="xv-next-nudge-cta" data-act="enable-automation">${
               tierLc === "pro" ? "Handle more tickets automatically — Elite" : "Enable auto refunds — Pro"
             }</button>
+            </div>
           </div>`
         : "";
       const integrationBlock = integrationHint
-        ? `<div class="xv-next-nudge">
+        ? `<div class="xv-next-nudge xv-next-nudge--stacked">
+            <p class="xv-int-lead">To fully automate this:</p>
+            <ul class="xv-int-checklist"><li>Connect Stripe for this workspace</li><li>Finish refunds in-place after approval</li></ul>
+            <div class="xv-next-nudge-row">
             <div class="xv-next-nudge-copy">${escapeHtml(integrationHint)}.</div>
             <button type="button" class="xv-next-nudge-cta" data-act="connect-integrations">Open Integrations</button>
+            </div>
           </div>`
         : "";
       const volumeBlock = volumeHint
-        ? `<div class="xv-next-nudge xv-next-nudge--subtle">
+        ? `<div class="xv-next-nudge xv-next-nudge--subtle xv-next-nudge--stacked">
+            <p class="xv-int-lead">To fully automate this:</p>
+            <ul class="xv-int-checklist"><li>Add plan headroom before limits interrupt the shift</li></ul>
+            <div class="xv-next-nudge-row">
             <div class="xv-next-nudge-copy">${escapeHtml(volumeHint)}.</div>
             <button type="button" class="xv-next-nudge-cta" data-act="upgrade">Handle more tickets automatically</button>
+            </div>
           </div>`
         : "";
       const postValueBlock = postValueNudge
-        ? `<div class="xv-next-nudge xv-next-nudge--subtle">
+        ? `<div class="xv-next-nudge xv-next-nudge--subtle xv-next-nudge--stacked">
+            <p class="xv-int-lead">To fully automate this:</p>
+            <ul class="xv-int-checklist"><li>Connect Stripe when refunds should run in-workspace</li><li>Raise limits if you are pacing against the cap</li></ul>
+            <div class="xv-next-nudge-row">
             <div class="xv-next-nudge-copy">${escapeHtml(postValueNudge.primary)} ${escapeHtml(postValueNudge.secondary)}</div>
             <button type="button" class="xv-next-nudge-cta" data-act="upgrade">${escapeHtml(postValueNudge.cta || "View plans")}</button>
+            </div>
           </div>`
         : "";
 
@@ -6248,13 +6529,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       } catch (_) {
         growthFeedbackDone = false;
       }
-      const growthPulseBlock = firstOut
-        ? `<div class="xv-growth-surface" data-xv-growth-surface>
-            ${
-              growthFeedbackDone
-                ? ""
-                : `<div class="xv-growth-feedback-block">
-              <p class="xv-first-outcome-copy"><strong>Quick pulse (optional)</strong></p>
+      const growthFeedbackBlock =
+        growthFeedbackDone || !firstOut
+          ? ""
+          : `<div class="xv-growth-feedback-block xv-growth-feedback-block--quiet">
+              <p class="xv-growth-feedback-eyebrow">Optional feedback</p>
               <div class="xv-growth-q">Was this useful?</div>
               <div class="xv-growth-row" role="group" aria-label="Was this useful">
                 <button type="button" class="ghost-btn" data-growth-useful="yes">Yes</button>
@@ -6263,9 +6542,10 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
               </div>
               <div class="xv-growth-q">What would make you pay for this?</div>
               <textarea class="xv-growth-ta" rows="2" maxlength="1200" placeholder="Even one sentence helps." data-growth-pay></textarea>
-              <button type="button" class="btn xv-first-outcome-cta" data-growth-feedback-send>Send feedback</button>
-            </div>`
-            }
+              <button type="button" class="btn xv-first-outcome-cta xv-first-outcome-cta--quiet" data-growth-feedback-send>Send feedback</button>
+            </div>`;
+      const growthPulseBlock = firstOut
+        ? `<div class="xv-growth-surface" data-xv-growth-surface>
             <div class="xv-growth-referral">
               <p class="xv-first-outcome-copy muted-copy"><strong>Know someone handling support?</strong> Share this link.</p>
               <div class="xv-growth-referral-row">
@@ -6273,6 +6553,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
                 <button type="button" class="ghost-btn" data-growth-copy>Copy link</button>
               </div>
             </div>
+            ${growthFeedbackBlock}
           </div>`
         : "";
 
@@ -6285,12 +6566,27 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             }</button>
           </div>
           <p class="muted-copy xv-first-outcome-reassure" style="margin-top:10px;font-size:12px;line-height:1.45">You can downgrade anytime · No risk to try · Works with your existing tools</p>`;
+      const saveBullets =
+        mins > 0
+          ? `<li>About <strong>${escapeHtml(String(mins))} minutes</strong> of drafting and back-and-forth avoided on this path.</li>`
+          : `<li>Drafting time, policy double-checks, and risky copy you did not have to invent from scratch.</li>`;
       const firstBlock = firstOut
         ? `<div class="xv-first-outcome-callout" role="status">
             <div class="xv-first-outcome-kicker">First success — you shipped a real loop</div>
-            <p class="xv-first-outcome-copy"><strong>What happened:</strong> AI prepared a verified decision and reply; you approved when it mattered; the workspace logged the outcome — nothing hidden or simulated as done.</p>
-            <p class="xv-first-outcome-copy"><strong>What you saved:</strong> ${escapeHtml(mins > 0 ? `About ${mins} minutes of operator drafting and back-and-forth on this path.` : "Drafting time, policy double-checks, and risky copy iterations you did not have to invent from scratch.")}</p>
-            <p class="xv-first-outcome-copy muted-copy"><strong>What a paid plan automates next:</strong> higher ticket limits, refunds you approve executed in Stripe (within limits), and fewer copy-paste sends when SMTP is connected — you still approve sensitive moves.</p>
+            <ul class="xv-first-outcome-list">
+              <li><strong>AI</strong> made the decision and customer-ready reply.</li>
+              <li><strong>You</strong> approved the action at the gate.</li>
+              <li><strong>System</strong> recorded the outcome — nothing simulated as done.</li>
+            </ul>
+            <p class="xv-first-outcome-minihead">What you saved</p>
+            <ul class="xv-first-outcome-list xv-first-outcome-list--compact">${saveBullets}</ul>
+            <p class="xv-first-outcome-minihead muted-copy">On a paid plan, you can next</p>
+            <ul class="xv-first-outcome-list xv-first-outcome-list--compact muted-copy">
+              <li>Raise ticket limits.</li>
+              <li>Run approved refunds in Stripe here (within limits).</li>
+              <li>Send fewer manual pastes when SMTP is connected.</li>
+            </ul>
+            <p class="xv-first-outcome-foot muted-copy">You still approve sensitive moves.</p>
             ${firstSuccessCta}
             ${growthPulseBlock}
           </div>`
@@ -7171,6 +7467,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         const managed =
           cls.contains("details-wrap") ||
           cls.contains("assistant-meta-fold") ||
+          cls.contains("ticket-result-summary__more") ||
           cls.contains("auth-hints-fold") ||
           cls.contains("sidebar-more") ||
           cls.contains("stripe-more") ||

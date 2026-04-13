@@ -1596,6 +1596,17 @@ select.refund-select{ padding-right: 34px; }
   justify-content: space-between;
   gap: 12px;
 }
+.automation-upsell--stacked{
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.automation-upsell-stack{
+  width: 100%;
+}
+.automation-upsell--stacked .automation-upsell-cta{
+  align-self: flex-end;
+}
 .automation-upsell-copy{
   color: var(--text-2);
   font-size: 13px;
@@ -2278,6 +2289,10 @@ select.refund-select{ padding-right: 34px; }
   border-radius: var(--r-pill);
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.25;
+  white-space: normal;
+  max-width: 100%;
+  text-align: left;
   color: color-mix(in oklab, var(--accent) 60%, var(--text-muted));
   border: 1px solid color-mix(in oklab, var(--xv-pill-border) 70%, var(--line));
   background: color-mix(in oklab, var(--xv-pill-wash) 74%, transparent);
@@ -2466,6 +2481,22 @@ select.refund-select{ padding-right: 34px; }
 }
 .xv-next-nudge-cta:hover{ filter: brightness(1.05); }
 .xv-next-nudge-cta:focus-visible{ outline: none; box-shadow: var(--ring); }
+.xv-next-nudge--stacked{
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.xv-next-nudge-row{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+.xv-next-nudge-row .xv-next-nudge-copy{
+  flex: 1 1 200px;
+}
 
 /* Edit reply sheet */
 .edit-mode-container{
@@ -4834,6 +4865,173 @@ details > summary{ user-select:none; }
   font-size: 12px;
   font-weight: 500;
   color: var(--text-2);
+}
+.ticket-result-summary__grid--top .ticket-result-summary__v{
+  line-height: 1.3;
+}
+.ticket-result-summary__est{
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-left: 4px;
+}
+.ticket-result-summary__more{
+  margin-top: 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  background: color-mix(in oklab, var(--bg2) 40%, transparent);
+}
+.ticket-result-summary__more-summary{
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ticket-result-summary__more-summary::-webkit-details-marker{ display: none; }
+.ticket-result-summary__more-chev::before{
+  content: "+";
+  display: inline-block;
+  font-weight: 700;
+  color: var(--text-4);
+}
+.ticket-result-summary__more[open] .ticket-result-summary__more-chev::before{
+  content: "−";
+}
+.ticket-result-summary__more-body{
+  padding: 0 10px 10px;
+  border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+}
+.ticket-result-summary__detail-block{
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.ticket-result-summary__detail-k{
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-bottom: 4px;
+}
+.ticket-result-summary__detail-v{
+  color: var(--text-2);
+}
+.ticket-result-summary__mode-row--nested{
+  margin-top: 8px;
+}
+
+.xv-workspace-zone{
+  display: block;
+}
+.xv-workspace-zone + .xv-workspace-zone{
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+}
+.xv-zone--next .assistant-footer{
+  margin-top: 10px;
+  padding: 10px 0 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  border-top: 1px solid color-mix(in oklab, var(--line) 55%, transparent);
+}
+
+.xv-int-lead{
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+}
+.xv-int-checklist{
+  margin: 0 0 8px 16px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.xv-int-checklist li{
+  margin: 3px 0;
+}
+.xv-int-footnote{
+  margin: 0 0 10px 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.decision-panel-integration-hint-inner .xv-int-lead{
+  margin-top: 2px;
+}
+
+.xv-first-outcome-list{
+  margin: 0 0 10px 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.xv-first-outcome-list--compact{
+  font-size: 12.5px;
+  margin-bottom: 8px;
+  color: var(--text-2);
+}
+.xv-first-outcome-list li{
+  margin: 4px 0;
+}
+.xv-first-outcome-minihead{
+  margin: 10px 0 4px 0;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, #5ee4a8 42%, var(--text-3));
+}
+.xv-first-outcome-foot{
+  margin: 0 0 8px 0;
+  font-size: 12px;
+}
+.xv-growth-feedback-block--quiet{
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed color-mix(in oklab, var(--line) 80%, transparent);
+  opacity: 0.82;
+}
+.xv-growth-feedback-eyebrow{
+  margin: 0 0 6px 0;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.xv-growth-feedback-block--quiet .xv-growth-q{
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.xv-first-outcome-cta--quiet{
+  font-size: 12px;
+  padding: 6px 12px;
+  font-weight: 600;
+}
+.xv-growth-surface{
+  margin-top: 12px;
+}
+.xv-growth-referral{
+  margin-top: 10px;
+}
+.xv-growth-surface > .xv-growth-referral:first-child{
+  margin-top: 0;
 }
 
 /* —— Plan limit upgrade pressure —— */
