@@ -66,19 +66,83 @@ def validate_rule(rule: Dict[str, Any]) -> bool:
     condition = rule.get("condition")
     if condition is None or not isinstance(condition, dict):
         return False
+    if not condition:
+        return False
+    # Executor (actions.apply_learned_rules) uses sentiment_lte / ltv_gte, not string ops.
+    if "sentiment" in condition:
+        return False
+    if isinstance(condition.get("ltv"), str):
+        return False
+    issue_type = condition.get("issue_type")
+    if not isinstance(issue_type, str) or not issue_type.strip():
+        return False
+    if not any(k in condition for k in ("sentiment_lte", "ltv_gte", "urgency_gte")):
+        return False
+    slte = condition.get("sentiment_lte")
+    if slte is not None:
+        try:
+            sb = int(slte)
+        except (TypeError, ValueError):
+            return False
+        if sb < 1 or sb > 10:
+            return False
+    lgte = condition.get("ltv_gte")
+    if lgte is not None:
+        try:
+            lb = int(lgte)
+        except (TypeError, ValueError):
+            return False
+        if lb < 0:
+            return False
+    ug = condition.get("urgency_gte")
+    if ug is not None:
+        try:
+            int(ug)
+        except (TypeError, ValueError):
+            return False
     if act.get("type") == "refund":
         return False
     return True
 
 
+def _rule_matches_eval_context(rule: Dict[str, Any], ticket: Dict[str, Any]) -> bool:
+    """Same condition semantics as actions.apply_learned_rules."""
+    cond = rule.get("condition", {})
+    if not isinstance(cond, dict):
+        return False
+    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
+    sentiment = int(ticket.get("sentiment", 5) or 5)
+    ltv = max(0, int(ticket.get("ltv", 0) or 0))
+    triage = ticket.get("triage") or {}
+    issue_ok = cond.get("issue_type") in (None, issue_type)
+    try:
+        bound_sent = int(cond.get("sentiment_lte", 10) or 10)
+    except (TypeError, ValueError):
+        bound_sent = 10
+    try:
+        bound_ltv = int(cond.get("ltv_gte", 0) or 0)
+    except (TypeError, ValueError):
+        bound_ltv = 0
+    try:
+        bound_urg = int(cond.get("urgency_gte", 0) or 0)
+    except (TypeError, ValueError):
+        bound_urg = 0
+    sentiment_ok = sentiment <= bound_sent
+    ltv_ok = ltv >= bound_ltv
+    urgency_ok = int(triage.get("urgency", 0) or 0) >= bound_urg
+    return bool(issue_ok and sentiment_ok and ltv_ok and urgency_ok)
+
+
 def simulate_rule(rule: Dict[str, Any]) -> bool:
-    test_cases = [{"ltv": 100, "sentiment": 8}, {"ltv": 900, "sentiment": 2}, {"ltv": 300, "sentiment": 5}]
-    for test in test_cases:
-        cond = rule.get("condition", {})
-        if "sentiment" in cond:
-            if test["sentiment"] > 5 and int(rule["action"].get("amount", 0) or 0) > 20:
-                return False
-    return True
+    cond = rule.get("condition", {})
+    if not isinstance(cond, dict):
+        return False
+    it = str(cond.get("issue_type") or "general_support")
+    if _rule_matches_eval_context(rule, {"issue_type": it, "sentiment": 3, "ltv": 100, "triage": {}}):
+        return True
+    if _rule_matches_eval_context(rule, {"issue_type": it, "sentiment": 7, "ltv": 950, "triage": {}}):
+        return True
+    return False
 
 
 def _candidate_rule(ticket: Dict[str, Any], decision: Dict[str, Any]) -> Dict[str, Any] | None:
@@ -86,9 +150,21 @@ def _candidate_rule(ticket: Dict[str, Any], decision: Dict[str, Any]) -> Dict[st
     ltv = int(ticket.get("ltv", 0) or 0)
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
     if sentiment <= 3 and decision.get("action") == "none":
-        return {"trigger": "low_sentiment_no_action", "condition": {"sentiment": "<=3", "issue_type": issue_type}, "action": {"type": "credit", "amount": 15}, "weight": 1.0, "last_used": time.time()}
+        return {
+            "trigger": "low_sentiment_no_action",
+            "condition": {"sentiment_lte": 3, "issue_type": issue_type},
+            "action": {"type": "credit", "amount": 15},
+            "weight": 1.0,
+            "last_used": time.time(),
+        }
     if ltv > 800 and decision.get("action") == "none":
-        return {"trigger": "high_ltv_protection", "condition": {"ltv": ">800", "issue_type": issue_type}, "action": {"type": "credit", "amount": 30}, "weight": 1.0, "last_used": time.time()}
+        return {
+            "trigger": "high_ltv_protection",
+            "condition": {"ltv_gte": 801, "issue_type": issue_type},
+            "action": {"type": "credit", "amount": 30},
+            "weight": 1.0,
+            "last_used": time.time(),
+        }
     return None
 
 
@@ -631,13 +707,7 @@ def apply_learned_rules(ticket: Dict[str, Any], top_rules: List[Dict[str, Any]] 
         return None
     rules = sorted(rules, key=lambda x: float(x.get("weight", 0)), reverse=True)
     for rule in rules:
-        cond = rule.get("condition", {})
-        if "sentiment" in cond and int(ticket.get("sentiment", 10) or 10) <= 3:
-            rule["last_used"] = time.time()
-            if not top_rules:
-                save_rules(rules)
-            return rule["action"]
-        if "ltv" in cond and int(ticket.get("ltv", 0) or 0) > 800:
+        if _rule_matches_eval_context(rule, ticket):
             rule["last_used"] = time.time()
             if not top_rules:
                 save_rules(rules)

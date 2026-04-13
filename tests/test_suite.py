@@ -354,7 +354,7 @@ class TestLearning:
         from learning import validate_rule
         rule = {
             "trigger": "test",
-            "condition": {"sentiment": "<=3"},
+            "condition": {"issue_type": "general_support", "sentiment_lte": 3},
             "action": {"type": "refund", "amount": 20},
         }
         assert validate_rule(rule) is False
@@ -363,7 +363,7 @@ class TestLearning:
         from learning import validate_rule
         rule = {
             "trigger": "test",
-            "condition": {"sentiment": "<=3"},
+            "condition": {"issue_type": "general_support", "sentiment_lte": 3},
             "action": {"type": "credit", "amount": 51},
         }
         assert validate_rule(rule) is False
@@ -372,20 +372,28 @@ class TestLearning:
         from learning import validate_rule
         rule = {
             "trigger": "test",
-            "condition": {"sentiment": "<=3"},
+            "condition": {"issue_type": "general_support", "sentiment_lte": 3},
             "action": {"type": "credit", "amount": 15},
         }
         assert validate_rule(rule) is True
 
-    def test_validate_rule_accepts_empty_condition(self):
+    def test_validate_rule_rejects_empty_condition(self):
         from learning import validate_rule
         rule = {
             "trigger": "test",
             "condition": {},
             "action": {"type": "none", "amount": 0},
         }
-        # Empty dict condition is valid (was the original bug — False positive)
-        assert validate_rule(rule) is True
+        assert validate_rule(rule) is False
+
+    def test_validate_rule_rejects_legacy_sentiment_string(self):
+        from learning import validate_rule
+        rule = {
+            "trigger": "test",
+            "condition": {"issue_type": "general_support", "sentiment": "<=3"},
+            "action": {"type": "credit", "amount": 15},
+        }
+        assert validate_rule(rule) is False
 
     def test_validate_rule_rejects_malformed(self):
         from learning import validate_rule
