@@ -28,6 +28,8 @@
   const ACTIVATION_CHECKLIST_DISMISSED_KEY = "xalvion_activation_checklist_dismissed_v1";
   const FIRST_OUTCOME_CELEBRATION_KEY = "xalvion_first_outcome_celebration_v1";
   const MANUAL_FRICTION_KEY = "xalvion_manual_friction_count_v1";
+  /** Set when URL contains `?checkout=` after Stripe Billing return; consumed after `hydrateMe`. */
+  let __billingCheckoutReturn = { kind: null, detail: "" };
 
   function authDebugLog(label, detail) {
     if (__auth?.authDebugLog) return __auth.authDebugLog(label, detail);
@@ -226,7 +228,8 @@ if (typeof window.pulseRail !== "function") {
     /** Short-lived composer status flash after a successful run (value moment, non-blocking). */
     composerFlashUntil: 0,
     composerFlashText: "",
-    _composerFlashTimer: null
+    _composerFlashTimer: null,
+    lastPendingManualNudgeAt: 0
   };
 
   function dashboardHasWorkspaceActivity(data) {
@@ -416,6 +419,12 @@ if (typeof window.pulseRail !== "function") {
         why: "This case needs a human judgment, follow-up, or helpdesk step before it is truly closed.",
       };
     }
+    if (tst === "pending_manual") {
+      return {
+        label: "Pending manual",
+        why: "Email or billing did not finish in-product — connect SMTP or Stripe, or move to a tier that runs approved actions here.",
+      };
+    }
     if (["refunded", "credit_issued", "success"].includes(tst) || (impact.auto_resolved && tst && tst !== "unknown")) {
       return {
         label: "Auto-resolved",
@@ -439,6 +448,7 @@ if (typeof window.pulseRail !== "function") {
     const tst = String(data.tool_status || "").toLowerCase();
     if (auto.label === "Requires approval") return { headline: "Pending", detail: auto.why };
     if (auto.label === "Manual required") return { headline: "Manual", detail: auto.why };
+    if (auto.label === "Pending manual") return { headline: "Awaiting setup", detail: auto.why };
     if (auto.label === "Auto-resolved") return { headline: "Executed", detail: auto.why };
     if (tst === "approved_pending_execution") return { headline: "Pending", detail: auto.why };
     if (String(data.action || "none").toLowerCase() === "none") return { headline: "Ready", detail: "No billing tool run on this ticket — reply only." };
@@ -1937,8 +1947,24 @@ if (typeof window.pulseRail !== "function") {
     state.usageInlineCtaUntil = Date.now() + 120 * 1000;
     setUsageInlineCta({
       tone: "neutral",
-      copy: "You have repeated manual handoffs (email or billing). Paid tiers reduce that friction while keeping human approval on sensitive moves — upgrade when the pattern sticks, not on day one.",
-      cta: tierLc === "pro" ? "See Elite headroom" : "See Pro execution",
+      copy: "You keep approving the same manual handoffs — paid tiers remove manual steps (SMTP, Stripe in-workspace) while you still sign off on sensitive moves.",
+      cta: tierLc === "pro" ? "Remove manual steps — Elite" : "Automate this — Pro",
+      targetTier: tierLc === "pro" ? "elite" : "pro",
+    });
+  }
+
+  function maybeNudgePendingManualUpgrade() {
+    const tierLc = String(state.tier || "free").toLowerCase();
+    if (tierLc === "elite" || tierLc === "dev") return;
+    if (state.atLimit) return;
+    const now = Date.now();
+    if (state.lastPendingManualNudgeAt && now - state.lastPendingManualNudgeAt < 90000) return;
+    state.lastPendingManualNudgeAt = now;
+    state.usageInlineCtaUntil = Date.now() + 120 * 1000;
+    setUsageInlineCta({
+      tone: "neutral",
+      copy: "This outcome stayed pending_manual — usually email or billing needs an integration or a paid execution lane. Unlock automation so fewer tickets stop here.",
+      cta: tierLc === "pro" ? "Unlock automation — Elite" : "Unlock automation — Pro",
       targetTier: tierLc === "pro" ? "elite" : "pro",
     });
   }
@@ -1973,6 +1999,7 @@ if (typeof window.pulseRail !== "function") {
     if (emailLine.includes("SMTP not configured")) bumpManualFriction();
     const tst = String(n.tool_status || "").toLowerCase();
     if (tst === "approved_pending_execution") bumpManualFriction();
+    if (tst === "pending_manual") maybeNudgePendingManualUpgrade();
   }
 
   function isAuthenticated() {
@@ -2140,9 +2167,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         !isAuthenticated()
           ? "Create free account"
           : tierLc === "pro"
-            ? "Remove limits on Elite"
-            : "Unlock live execution";
-      const secondaryLabel = isAuthenticated() ? "Compare plans" : "Log in";
+            ? "Handle more tickets on Elite"
+            : "Handle more tickets automatically";
+      const secondaryLabel = isAuthenticated() ? "See plan differences" : "Log in";
       const eyebrowSafe = eyebrow || (!isAuthenticated() ? "Preview" : "Capacity");
       banner.dataset.conversionMoment = !isAuthenticated() ? "preview_cap" : tierLc === "pro" ? "included_pro" : "included_free";
       banner.innerHTML = `
@@ -2545,7 +2572,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
       if (els.openRefundModalBtn) {
         els.openRefundModalBtn.disabled = !allowed;
-        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Unlock live Stripe execution";
+        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Enable auto refunds";
       }
 
       if (els.executeRefundBtn) {
@@ -2555,13 +2582,13 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       if (els.refundModalNote) {
         els.refundModalNote.textContent = allowed
           ? "Live refund execution is on for this plan — paste a PaymentIntent or Charge ID from Stripe."
-          : "Refund decisions stay prepared here; Pro unlocks audited execution in-place when Stripe is connected.";
+          : "Auto refunds from the workspace are off on this plan — Pro enables them (within limits) after you approve.";
       }
 
       if (els.refundCenterCopy) {
         els.refundCenterCopy.textContent = allowed
           ? "Paste a PaymentIntent or Charge ID and run the refund without leaving the operator workspace."
-          : "This is a power feature: live execution stays on Pro+ so billing moves stay gated, traceable, and operator-controlled.";
+          : "Free prepares billing moves; Pro runs approved refunds in Stripe from here — same governance.";
       }
       if (els.refundUpgradeTease) {
         const d = state.dashboardStats || {};
@@ -2572,7 +2599,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           ? "Stripe execution from the workspace · Pro and Elite"
           : money > 0 || actions > 0
             ? `You’ve already surfaced ${formatMoney(money)} across ${actions} billing motion${actions === 1 ? "" : "s"} — Pro finishes the loop with live refunds here.`
-            : "Free prepares the decision; Pro runs the refund with Stripe connected — same approvals, no console.";
+            : "Enable auto refunds on Pro — same approvals, refunds run in Stripe from here when connected.";
       }
     }
 
@@ -2593,9 +2620,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         : null;
       setNotice(
         "warning",
-        locked?.primary || "Live refund execution is a Pro feature",
+        locked?.primary || "Auto refunds need Pro or Elite",
         locked?.secondary ||
-          "Prepared refunds stay visible and human-verified on Free. Upgrade when you are routinely executing billing work — not on first exploration."
+          "Free prepares refunds you run manually in Stripe. Pro executes approved refunds here (within limits) when Stripe is connected."
       );
       return;
     }
@@ -3024,6 +3051,34 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     }
   }
 
+  function consumeBillingCheckoutParams() {
+    try {
+      const url = new URL(window.location.href);
+      const checkout = String(url.searchParams.get("checkout") || "").toLowerCase();
+      if (!checkout) return;
+      const detailRaw = url.searchParams.get("detail") || "";
+      let detail = detailRaw;
+      try {
+        detail = decodeURIComponent(detailRaw.replace(/\+/g, " "));
+      } catch {
+        detail = detailRaw;
+      }
+      __billingCheckoutReturn = {
+        kind: checkout === "success" ? "success" : checkout === "cancel" ? "cancel" : null,
+        detail,
+      };
+      url.searchParams.delete("checkout");
+      url.searchParams.delete("detail");
+      window.history.replaceState(
+        {},
+        document.title,
+        url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : "") + url.hash
+      );
+    } catch {
+      __billingCheckoutReturn = { kind: null, detail: "" };
+    }
+  }
+
   function hydrateStripeCallbackState() {
     const p2 = getPhase2();
     if (phase2WorkspaceReady() && p2?.stripeEngine?.hydrateStripeCallbackState) {
@@ -3446,11 +3501,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       /* no-op */
     }
     const isPro = tierLc === "pro";
-    const headline = isPro ? "You’re clearing the queue — Elite keeps that rhythm" : "Strong run — don’t let capacity cut the streak";
+    const headline = isPro ? "You’re clearing the queue — Elite adds runway" : "Strong run — don’t let limits stall the queue";
     const sub = isPro
-      ? "Elite adds runway and team headroom so you never hit a wall mid-shift — same approvals, same audit trail."
-      : "Pro unlocks live Stripe execution when connected and 500 included runs — remove limits and keep flow uninterrupted.";
-    const cta = isPro ? "See Elite" : "Unlock Pro";
+      ? "Elite is highest limits and full automation after your approvals — same audit trail."
+      : "Pro raises limits and enables auto refunds (within limits) in-workspace when Stripe is connected — you still approve.";
+    const cta = isPro ? "Handle more tickets automatically — Elite" : "Enable auto refunds — Pro";
     const target = isPro ? "elite" : "pro";
     el.dataset.conversionMoment = "post_high_value_run";
     el.hidden = false;
@@ -3697,7 +3752,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       el.style.display = "block";
       el.className = "usage-at-limit-upgrade";
       const isGuest = !isAuthenticated();
-      const primaryCta = isGuest ? "Create free account" : tier === "pro" ? "Upgrade to Elite" : "Upgrade to Pro";
+      const primaryCta = isGuest
+        ? "Create free account"
+        : tier === "pro"
+          ? "Handle more tickets automatically — Elite"
+          : "Enable auto refunds — Pro";
       const secondaryHint = isGuest
         ? "Preview runs are capped — a free account adds monthly included runs and saved threads."
         : "Included runs for this window are used — unlock headroom before the queue feels it.";
@@ -3712,8 +3771,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         </ul>
         <div class="usage-at-limit-upgrade__actions">
           <button type="button" class="btn usage-at-limit-upgrade__primary">${escapeHtml(primaryCta)}</button>
-          <button type="button" class="ghost-btn usage-at-limit-upgrade__secondary">Compare plans</button>
-        </div>`;
+          <button type="button" class="ghost-btn usage-at-limit-upgrade__secondary">See plan differences</button>
+        </div>
+        <p class="muted-copy usage-at-limit-upgrade__reassure" style="margin-top:10px;font-size:12px;">You can downgrade anytime · No risk to try · Works with your existing tools</p>`;
       el.querySelector(".usage-at-limit-upgrade__primary")?.addEventListener(
         "click",
         () => {
@@ -3778,8 +3838,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const ctaLabel = pressure?.cta
       ? `${pressure.cta} →`
       : tier === "pro"
-        ? "Add Elite headroom →"
-        : "Upgrade for continuity →";
+        ? "Handle more tickets automatically — Elite →"
+        : "Enable auto refunds — Pro →";
 
     // Render as a subtle, inline CTA inside the usage strip (no buttons everywhere).
     el.style.display = "none";
@@ -3788,7 +3848,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     setUsageInlineCta({
       tone: String(pressure?.tone || "neutral"),
       copy: [story, capLine, unlock].filter(Boolean).join(" "),
-      cta: ctaLabel.replace(/\s*→\s*$/, "").trim() || (tier === "pro" ? "Add Elite headroom" : "Upgrade for continuity"),
+      cta: ctaLabel.replace(/\s*→\s*$/, "").trim() || (tier === "pro" ? "Handle more tickets automatically — Elite" : "Enable auto refunds — Pro"),
       targetTier: ctaTier,
     });
   }
@@ -4233,25 +4293,46 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     if (atCap) {
       if (isClaudeShell()) {
-        return `
+        return guest
+          ? `
       <div class="empty-card limit-moment-card limit-moment-card--claude">
-        <h2 class="limit-moment-card__title">You’ve used your free runs</h2>
-        <p class="limit-moment-card__lead">Upgrade to keep resolving tickets with approval-safe AI.</p>
-        <button type="button" class="limit-cta limit-cta--claude" id="emptyUpgradeCta">Upgrade now</button>
-        <button type="button" class="limit-secondary-link limit-secondary-link--claude" id="emptyFreeAccountCta">Create free account</button>
+        <h2 class="limit-moment-card__title">Preview runs used</h2>
+        <p class="limit-moment-card__lead">Create a free account for monthly included tickets, or compare paid tiers for automation.</p>
+        <button type="button" class="limit-cta limit-cta--claude" id="emptyFreeAccountCta">Create free account</button>
+        <button type="button" class="limit-secondary-link limit-secondary-link--claude" id="emptyUpgradeCta">See plan differences</button>
+      </div>`
+          : `
+      <div class="empty-card limit-moment-card limit-moment-card--claude">
+        <h2 class="limit-moment-card__title">Included runs used for this window</h2>
+        <p class="limit-moment-card__lead">Move up a tier for higher limits and in-workspace refunds you approve — same governance.</p>
+        <button type="button" class="limit-cta limit-cta--claude" id="emptyUpgradeCta">Handle more tickets automatically</button>
+        <button type="button" class="limit-secondary-link limit-secondary-link--claude" id="emptySecondaryCap">See plan differences</button>
       </div>`;
       }
-      return `
+      return guest
+        ? `
       <div class="empty-card limit-moment-card empty-card-premium empty-card-conversion">
-        <h2>You’ve used your free runs</h2>
-        <p class="limit-moment-lead">Upgrade to keep resolving tickets with approval-safe AI.</p>
+        <h2>Preview runs used</h2>
+        <p class="limit-moment-lead">Create a free account for monthly included tickets, or compare paid tiers.</p>
         <div class="empty-flow-strip empty-flow-strip-compact" aria-hidden="true">
           <span>Prepare</span>
           <span>Approve</span>
           <span>Execute</span>
         </div>
-        <button type="button" class="limit-cta" id="emptyUpgradeCta">Upgrade now</button>
-        <button type="button" class="limit-secondary-link" id="emptyFreeAccountCta">Create free account</button>
+        <button type="button" class="limit-cta" id="emptyFreeAccountCta">Create free account</button>
+        <button type="button" class="limit-secondary-link" id="emptyUpgradeCta">See plan differences</button>
+      </div>`
+        : `
+      <div class="empty-card limit-moment-card empty-card-premium empty-card-conversion">
+        <h2>Included runs used for this window</h2>
+        <p class="limit-moment-lead">Higher tiers add headroom and remove manual billing steps after you approve.</p>
+        <div class="empty-flow-strip empty-flow-strip-compact" aria-hidden="true">
+          <span>Prepare</span>
+          <span>Approve</span>
+          <span>Execute</span>
+        </div>
+        <button type="button" class="limit-cta" id="emptyUpgradeCta">Handle more tickets automatically</button>
+        <button type="button" class="limit-secondary-link" id="emptySecondaryCap">See plan differences</button>
       </div>`;
     }
 
@@ -4756,6 +4837,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     });
     empty.querySelector("#emptyFreeAccountCta")?.addEventListener("click", () => {
       focusAccessPanel();
+    });
+    empty.querySelector("#emptySecondaryCap")?.addEventListener("click", () => {
+      focusPlansPanel();
     });
 
     empty.querySelector("[data-act='continue-last']")?.addEventListener("click", async () => {
@@ -5594,8 +5678,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       );
     } else if (showStripePlan) {
       chunks.push(
-        `<p><strong>Live billing execution is not on this plan.</strong> AI still prepares a verified recommendation you can run manually in Stripe. Upgrade when you routinely execute refunds here — not required to learn the loop.</p>
-        <div class="xv-int-actions"><button type="button" class="btn xv-int-compare-plans">Compare plans</button></div>`
+        `<p><strong>Auto refunds are off on Free.</strong> You still get a verified recommendation — run it in Stripe yourself, or move to Pro to execute the same approved refund here (within limits) with Stripe connected.</p>
+        <div class="xv-int-actions"><button type="button" class="btn xv-int-compare-plans">Enable auto refunds</button></div>
+        <p class="muted-copy" style="margin-top:10px;font-size:12px;line-height:1.45;">You can downgrade anytime · No risk to try · Works with your existing tools</p>`
       );
     }
     if (showSmtpConfigure) {
@@ -5875,19 +5960,24 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         : null;
       const volumeHint =
         !postValueNudge && (state.atLimit || n >= 14)
-          ? "You are brushing against capacity — add headroom when limits start breaking your flow"
+          ? "You are brushing against capacity — add headroom before limits interrupt your shift"
           : "";
+      const firstOut = isFirstOutcomeCelebrationPending();
       const canShowAutomation =
-        !state.automationUpsellShown && tierLc !== "elite" && tierLc !== "dev" && (state.atLimit || n >= 10);
+        !firstOut &&
+        !state.automationUpsellShown &&
+        tierLc !== "elite" &&
+        tierLc !== "dev" &&
+        (state.atLimit || n >= 10);
       const automationBlock = canShowAutomation
         ? `<div class="xv-next-nudge">
             <div class="xv-next-nudge-copy">${
               tierLc === "pro"
-                ? "Volume week ahead? Elite keeps approvals the same — with runway that doesn’t quit."
-                : "Unlock live execution on Pro — you still sign off on every billing move."
+                ? "Elite removes the last manual bottlenecks at scale — same approvals, highest limits."
+                : "Pro removes manual Stripe tab work after you approve — auto refunds within limits, higher ticket ceiling."
             }</div>
             <button type="button" class="xv-next-nudge-cta" data-act="enable-automation">${
-              tierLc === "pro" ? "See Elite" : "Unlock Pro"
+              tierLc === "pro" ? "Handle more tickets automatically — Elite" : "Enable auto refunds — Pro"
             }</button>
           </div>`
         : "";
@@ -5900,7 +5990,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const volumeBlock = volumeHint
         ? `<div class="xv-next-nudge xv-next-nudge--subtle">
             <div class="xv-next-nudge-copy">${escapeHtml(volumeHint)}.</div>
-            <button type="button" class="xv-next-nudge-cta" data-act="upgrade">Compare plans</button>
+            <button type="button" class="xv-next-nudge-cta" data-act="upgrade">Handle more tickets automatically</button>
           </div>`
         : "";
       const postValueBlock = postValueNudge
@@ -5910,13 +6000,22 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           </div>`
         : "";
 
-      const firstOut = isFirstOutcomeCelebrationPending();
+      const firstSuccessCta =
+        tierLc === "elite" || tierLc === "dev"
+          ? ""
+          : `<div class="xv-first-outcome-actions" style="margin-top:12px">
+            <button type="button" class="btn xv-first-outcome-cta" data-act="first-success-upgrade">${
+              tierLc === "pro" ? "Handle more tickets automatically — Elite" : "Enable auto refunds — Pro"
+            }</button>
+          </div>
+          <p class="muted-copy xv-first-outcome-reassure" style="margin-top:10px;font-size:12px;line-height:1.45">You can downgrade anytime · No risk to try · Works with your existing tools</p>`;
       const firstBlock = firstOut
         ? `<div class="xv-first-outcome-callout" role="status">
             <div class="xv-first-outcome-kicker">First success — you shipped a real loop</div>
             <p class="xv-first-outcome-copy"><strong>What happened:</strong> AI prepared a verified decision and reply; you approved when it mattered; the workspace logged the outcome — nothing hidden or simulated as done.</p>
             <p class="xv-first-outcome-copy"><strong>What you saved:</strong> ${escapeHtml(mins > 0 ? `About ${mins} minutes of operator drafting and back-and-forth on this path.` : "Drafting time, policy double-checks, and risky copy iterations you did not have to invent from scratch.")}</p>
-            <p class="xv-first-outcome-copy muted-copy"><strong>On paid plans you can automate further:</strong> higher included runs, live Stripe moves after the same approval gate, and SMTP sends from this host — still human-in-the-loop on sensitive actions.</p>
+            <p class="xv-first-outcome-copy muted-copy"><strong>What a paid plan automates next:</strong> higher ticket limits, refunds you approve executed in Stripe (within limits), and fewer copy-paste sends when SMTP is connected — you still approve sensitive moves.</p>
+            ${firstSuccessCta}
           </div>`
         : "";
 
@@ -5990,6 +6089,19 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       host.querySelector("[data-act='upgrade']")?.addEventListener("click", () => {
         focusPlansPanel();
       });
+      host.querySelector("[data-act='first-success-upgrade']")?.addEventListener(
+        "click",
+        () => {
+          const t = String(state.tier || "free").toLowerCase();
+          if (!isAuthenticated()) {
+            focusPlansPanel();
+            return;
+          }
+          if (t === "pro") upgradePlan("elite");
+          else upgradePlan("pro");
+        },
+        { once: true }
+      );
     }
 
     const postPill = row.dataset.opPostPill;
@@ -7633,6 +7745,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       updateRevenueCard(data);
       updateLatestRunCard(data);
       maybeShowPostRunValueMoment(data);
+      if (String(data.tool_status || "").toLowerCase() === "pending_manual") maybeNudgePendingManualUpgrade();
       if (!isStreamFailureResult(data)) {
         markActivationStep("analyzed");
         if (activationIntegrationsSatisfied()) markActivationStep("integrations");
@@ -7884,6 +7997,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
       if (data.checkout_url) {
         refreshUpgradeValueSummary();
+        setNotice(
+          "info",
+          "Opening Stripe checkout",
+          "Confirm the subscription on Stripe’s secure page — when you finish, you return here with higher limits unlocked."
+        );
         window.location.href = data.checkout_url;
         return;
       }
@@ -7935,7 +8053,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (!desired) return;
     if (btn.disabled || btn.hidden) return;
 
-    setCtaLoading(btn, true, "Opening checkout…");
+    setCtaLoading(btn, true, "Opening Stripe checkout…");
     try {
       await upgradePlan(desired);
     } catch (err) {
@@ -8962,6 +9080,7 @@ function bindEvents() {
 
     ensurePreviewClientId();
     hydrateStripeCallbackState();
+    consumeBillingCheckoutParams();
     buildKeyboardOverlay();
     ensureOpsCard();
     ensureOutcomeIntelCard();
@@ -9040,6 +9159,27 @@ function bindEvents() {
         "Session reset",
         "Your saved login no longer matches an account on this server. Log in again to use billing and Stripe."
       );
+    } else if (__billingCheckoutReturn?.kind === "success" && state.username) {
+      const tierLabel = formatTier(state.tier || "free");
+      const extra = __billingCheckoutReturn.detail ? ` ${__billingCheckoutReturn.detail}` : "";
+      __billingCheckoutReturn = { kind: null, detail: "" };
+      setNotice(
+        "success",
+        "Subscription active",
+        `You’re back in Xalvion on ${tierLabel}.${extra} Limits refresh automatically; reload once if a number still looks stale.`
+      );
+      setSurface("workspace");
+    } else if (__billingCheckoutReturn?.kind === "success" && !state.username) {
+      __billingCheckoutReturn = { kind: null, detail: "" };
+      setNotice(
+        "info",
+        "Checkout finished",
+        "Log in with the account you upgraded — your new limits appear after the workspace syncs."
+      );
+    } else if (__billingCheckoutReturn?.kind === "cancel") {
+      const d = __billingCheckoutReturn.detail;
+      __billingCheckoutReturn = { kind: null, detail: "" };
+      setNotice("info", "Checkout closed", d || "No plan change. Upgrade anytime from Plans when you’re ready.");
     } else if (!state.username) {
       setNotice("info", "Ready when you are", "Paste a ticket below to see your first draft.");
     } else {

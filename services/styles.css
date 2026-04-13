@@ -4068,6 +4068,53 @@ details > summary{ user-select:none; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
+.plan-compare-compact{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 10px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--surface-soft) 10%, transparent);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.plan-compare-compact--sidebar{
+  margin-top: 10px;
+  padding: 10px 8px;
+  gap: 8px;
+  font-size: 11px;
+}
+.plan-compare-col{
+  min-width: 0;
+}
+.plan-compare-name{
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.plan-compare-list{
+  margin: 0;
+  padding-left: 14px;
+  color: var(--text-4);
+}
+.plan-compare-list li{
+  margin: 0 0 4px 0;
+}
+.plans-upgrade-confidence{
+  margin: 10px 0 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-4);
+  text-align: center;
+}
+@media (max-width: 720px){
+  .plan-compare-compact{ grid-template-columns: 1fr; }
+}
 .trust-chip-row{
   display: flex;
   flex-wrap: wrap;

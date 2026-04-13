@@ -86,7 +86,7 @@ export function createStripeEngine({ refundStore, apiClient } = {}) {
 
       if (els.openRefundModalBtn) {
         els.openRefundModalBtn.disabled = !allowed;
-        els.openRefundModalBtn.textContent = allowed ? "Open refunds" : "Upgrade to unlock";
+        els.openRefundModalBtn.textContent = allowed ? "Open refunds" : "Enable auto refunds";
       }
 
       if (els.executeRefundBtn) {
@@ -96,7 +96,7 @@ export function createStripeEngine({ refundStore, apiClient } = {}) {
       if (els.refundModalNote) {
         els.refundModalNote.textContent = allowed
           ? "Live refund execution is available on this plan. Use a PaymentIntent or Charge ID from Stripe."
-          : "Live refund execution is locked on this plan. Upgrade to enable billing actions from the workspace.";
+          : "Auto refunds from the workspace are off on this plan — Pro enables them (within limits) after you approve.";
       }
 
       if (els.refundCenterCopy) {
@@ -115,7 +115,7 @@ export function createStripeEngine({ refundStore, apiClient } = {}) {
           ? "Execute refunds from the workspace · Available on Pro and Elite"
           : money > 0 || actions > 0
             ? `Your workspace already logged ${fm(money)} across ${actions} billing motions — Pro turns that into live Stripe execution here.`
-            : "Close the loop on Free → Pro: execute refunds from the workspace with Stripe connected — no context switch.";
+            : "Enable auto refunds on Pro — same approvals, refunds run in Stripe from here when connected.";
       }
 
     },
