@@ -1,9 +1,23 @@
 from __future__ import annotations
 
+"""
+lead_engine.py — Legacy lead capture utilities using the shared persistence store.
+
+Owns:
+  - CLI-friendly helpers to add/list/update leads (LeadRepository wrappers)
+
+Does NOT own:
+  - Persistence implementation (state_store.py / db.py)
+  - Outreach CRM queue (backend/crm/outreach.py)
+
+Imports from:
+  - state_store (LeadPayload, LeadRepository)
+"""
+
 from datetime import datetime
 from typing import Any
 
-from persistence_layer import LeadPayload, LeadRepository
+from state_store import LeadPayload, LeadRepository
 
 _repo = LeadRepository()
 

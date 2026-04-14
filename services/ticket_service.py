@@ -1,5 +1,23 @@
 from __future__ import annotations
 
+"""
+services/ticket_service.py — Canonical ticket CRUD and serialization helpers.
+
+Owns:
+  - Ticket row creation and update helpers (create_ticket_record, update_ticket_from_result)
+  - Action logging (log_action)
+  - Ticket serialization utilities (serialize_ticket, serialize_ticket_with_log)
+  - Demo inbox ticket generation (generate_simulated_inbox_tickets)
+
+Does NOT own:
+  - FastAPI app wiring or route handlers (app.py)
+  - DB engine/session setup (db.py)
+  - Plan configuration (plan_config.py)
+
+Imports from:
+  - actions, app_utils, orm_models (internal)
+"""
+
 from typing import Any
 
 from actions import build_ticket as build_support_ticket

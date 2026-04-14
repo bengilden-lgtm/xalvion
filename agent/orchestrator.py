@@ -1,5 +1,22 @@
 from __future__ import annotations
 
+"""
+agent/orchestrator.py — Agent orchestration for sovereign decisioning and execution.
+
+Owns:
+  - run_agent() high-level decision → execution pipeline wiring
+  - Integration points between actions/brain/memory/tools/learning/outcomes
+
+Does NOT own:
+  - FastAPI routes or HTTP schemas (app.py, schemas.py)
+  - Plan configuration (plan_config.py)
+  - Final authority financial policy (governor.py)
+
+Imports from:
+  - actions, brain, memory, tools, models (internal)
+  - analytics, feedback, learning, outcome_store (internal integrations)
+"""
+
 import logging
 import uuid
 from typing import Any, Dict
@@ -30,69 +47,13 @@ from models import (
     TriageMetadata,
 )
 
-try:
-    from analytics import log_event
-except Exception as _analytics_imp_err:
-    logger.warning(
-        "analytics.log_event unavailable; events will not be recorded",
-        exc_info=True,
-    )
-
-    def log_event(user_input, response, confidence, quality, **kwargs):  # noqa: ANN001
-        return None
-
-
-try:
-    from feedback import process_feedback
-except Exception as _feedback_imp_err:
-    logger.warning("feedback.process_feedback unavailable", exc_info=True)
-
-    def process_feedback(user_input, response, quality):
-        raise RuntimeError("feedback module unavailable") from _feedback_imp_err
-
-
-try:
-    from learning import get_pattern_expectation, learn_from_ticket
-except Exception as _learning_imp_err:
-    logger.warning("learning module unavailable for learn_from_ticket / get_pattern_expectation", exc_info=True)
-
-    def learn_from_ticket(ticket, decision, outcome, outcome_key=None):
-        raise RuntimeError("learning.learn_from_ticket unavailable") from _learning_imp_err
-
-    def get_pattern_expectation(ticket, decision):
-        raise RuntimeError("learning.get_pattern_expectation unavailable") from _learning_imp_err
-
-
-try:
-    from outcome_store import get_decision_outcome_stats as _get_decision_outcome_stats
-    from outcome_store import log_outcome as _log_outcome
-except Exception as _outcome_store_imp_err:
-    logger.warning("outcome_store.log_outcome unavailable", exc_info=True)
-
-    def _log_outcome(
-        outcome_key,
-        user_id,
-        action,
-        amount,
-        issue_type,
-        tool_result,
-        auto_resolved=True,
-        approved_by_human=False,
-        is_simulated=False,
-        execution_layer="agent_tool",
-    ):
-        raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
-
-    def _get_decision_outcome_stats(issue_type, action, *, limit=300):
-        return {
-            "similar_case_count": 0,
-            "historical_success_rate": None,
-            "historical_reopen_rate": None,
-            "outcome_confidence_band": "medium",
-            "failure_rate": None,
-            "reverse_rate": None,
-            "dispute_rate": None,
-        }
+from analytics import log_event
+from feedback import process_feedback
+from learning import get_pattern_expectation, learn_from_ticket
+from outcome_store import (
+    get_decision_outcome_stats as _get_decision_outcome_stats,
+    log_outcome as _log_outcome,
+)
 
 
 from agent.execution import execute_action, normalize_action_payload, should_attach_order_context

@@ -1,12 +1,17 @@
 """
-governor.py
-Final authority governance layer between decisioning and execution.
+governor.py — Final authority policy gate between decisioning and execution.
 
-Hard constraints:
-- Pure + deterministic (no IO, no external calls).
-- No DB writes.
-- Dict-in / dict-out API.
-- Conservative defaults: on ambiguity, force review (never crash).
+Owns:
+  - Deterministic financial policy limits (plan_limits)
+  - Deterministic risk scoring and validation (compute_governor_risk, validate_decision, gate_execution)
+
+Does NOT own:
+  - Plan display configuration (labels, dashboard_access, monthly_limit) — see plan_config.py
+  - Stripe configuration
+  - Any IO (DB/network/filesystem)
+
+Imports from:
+  - (none — pure policy module)
 """
 
 from __future__ import annotations
@@ -29,6 +34,9 @@ def normalize_plan_tier(plan_tier: str) -> str:
     return "free"
 
 
+# Authoritative financial policy limits (max_refund, can_auto_refund, etc.)
+# Plan display config (monthly_limit, label, dashboard_access) lives in plan_config.py.
+# These two must be kept in sync when adding new tiers.
 def plan_limits(plan_tier: str) -> dict:
     """
     Deterministic plan policy limits for financial motions and monthly ticket caps.

@@ -1,19 +1,25 @@
 """
-Xalvion Sovereign Brain — app.py
-Production-grade FastAPI backend for an AI support/ticketing SaaS.
+app.py — FastAPI application entry point and runtime wiring.
 
-This version hardens:
-- auth validation
-- DB/session lifecycle
-- streaming thread safety
-- refund rule enforcement
-- route consistency
-- support pipeline resilience
+Owns:
+  - FastAPI app instance, CORS, middleware
+  - Config constants (env vars, STRIPE_KEY, JWT_SECRET, etc.)
+  - Auth dependencies (get_current_user, require_authenticated_user, require_admin)
+  - Route registration (includes routes from routes/ sub-routers)
+  - Request handlers for /support, /analyze, /dashboard, /health, /inbox
+  - Startup lifecycle (_startup_database, lifespan context)
+  - Rate limiting (check_rate_limit)
 
-Ownership / refactor policy:
-- `app.py` is the orchestration entrypoint: app composition, middleware, mounts, and route wiring.
-- Larger domain blocks should live in responsibility-owned modules and be registered here.
-- Public routes and response shapes must remain stable unless explicitly improved.
+Does NOT own (moved out):
+  - Pydantic schemas → schemas.py
+  - Plan display config → plan_config.py
+  - DB migrations → startup.py
+  - Ticket CRUD logic → services/ticket_service.py
+  - Financial policy → governor.py
+  - Agent execution → agent/orchestrator.py
+
+Imports from:
+  - routes/* (sub-routers), services/*, db, orm_models, orm_app_tables (internal)
 """
 
 from __future__ import annotations
@@ -45,11 +51,29 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, field_validator
 from models import CanonicalAgentResponse, ExtensionAnalyzeRequest, AgentRequestContext
 from sqlalchemy import and_, case, func, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+
+from schemas import *
+from plan_config import (
+    PLAN_CONFIG,
+    PUBLIC_PLAN_TIERS,
+    get_plan_config,
+    get_public_plan_name,
+    get_plan_name,
+    monthly_ticket_limit_for_plan,
+    build_upgrade_payload,
+)
+from startup import (
+    ensure_user_columns,
+    ensure_user_role_column,
+    ensure_ticket_columns,
+    ensure_stripe_status_columns,
+    migrate_memory_blob_to_per_user_keys,
+    migrate_legacy_operator_usage_into_rollups,
+)
 
 from agent import run_agent, build_audit_summary_payload
 from actions import (
@@ -80,7 +104,6 @@ from app_utils import (
     _safe_source,
     _safe_status,
     _tier_upgrade_unlocks,
-    get_plan_name,
     normalize_customer_email,
     resolve_customer_email_for_ticket,
 )
@@ -624,6 +647,10 @@ def _log_throttled_db_issue(path_key: str, exc: BaseException) -> None:
         str(exc)[:500],
     )
 
+# ===========================================================================
+# SECTION: Configuration constants
+# ===========================================================================
+
 # =============================================================================
 # 1. CONFIG
 # =============================================================================
@@ -685,46 +712,6 @@ REFUND_RULES: dict[str, Any] = {
     "min_quality": 0.50,
 }
 
-PLAN_CONFIG: dict[str, dict[str, Any]] = {
-    "free": {
-        "monthly_limit": 12,
-        "history_limit": 20,
-        "streaming": True,
-        "dashboard_access": "basic",
-        "priority_routing": False,
-        "team_seats": 1,
-        "label": "Free",
-    },
-    "pro": {
-        "monthly_limit": 500,
-        "history_limit": 500,
-        "streaming": True,
-        "dashboard_access": "full",
-        "priority_routing": True,
-        "team_seats": 3,
-        "label": "Pro",
-    },
-    "elite": {
-        "monthly_limit": 5000,
-        "history_limit": 5000,
-        "streaming": True,
-        "dashboard_access": "advanced",
-        "priority_routing": True,
-        "team_seats": 20,
-        "label": "Elite",
-    },
-    "dev": {
-        "monthly_limit": 10**9,
-        "history_limit": 10**9,
-        "streaming": True,
-        "dashboard_access": "advanced",
-        "priority_routing": True,
-        "team_seats": 999,
-        "label": "Dev",
-    },
-}
-
-PUBLIC_PLAN_TIERS = {"free", "pro", "elite"}
 PRICE_MAP = {"pro": STRIPE_PRICE_PRO, "elite": STRIPE_PRICE_ELITE}
 
 # Module-level billing availability flag — set at startup by validate_stripe_config().
@@ -827,6 +814,10 @@ LANDING_PATH = os.path.join(BASE_DIR, "landing.html")
 FLUID_DIR = os.path.join(BASE_DIR, "fluid")
 WORKSPACE_CLIENT_DIR = os.path.join(BASE_DIR, "workspace-client")
 
+# ===========================================================================
+# SECTION: Application factory (CORS, middleware, route registration)
+# ===========================================================================
+
 # =============================================================================
 # FastAPI App + CORS
 # =============================================================================
@@ -878,6 +869,10 @@ app.add_middleware(PlanUsageWarningMiddleware)
 # 2. DATABASE ENGINE
 # =============================================================================
 
+# ===========================================================================
+# SECTION: Database setup and shared dependencies
+# ===========================================================================
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 _rate_log: dict[str, list[float]] = {}
@@ -896,74 +891,9 @@ def db_session() -> Generator[Session, None, None]:
 # 3. MODELS
 # =============================================================================
 
-
-def ensure_ticket_columns() -> None:
-    try:
-        inspector = inspect(engine)
-        columns = {col["name"] for col in inspector.get_columns("tickets")}
-        additions: list[str] = []
-        if "customer_email" not in columns:
-            additions.append("ALTER TABLE tickets ADD COLUMN customer_email VARCHAR(320)")
-        if additions:
-            with engine.begin() as conn:
-                for statement in additions:
-                    conn.execute(text(statement))
-    except Exception as exc:
-        STARTUP_ISSUES.append(f"ticket_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
-        logger.error("ensure_ticket_columns_failed detail=%s", str(exc)[:500], exc_info=True)
-
-
-def ensure_user_columns() -> None:
-    try:
-        inspector = inspect(engine)
-        columns = {col["name"] for col in inspector.get_columns("users")}
-        additions = []
-        if "stripe_connected" not in columns:
-            additions.append("ALTER TABLE users ADD COLUMN stripe_connected INTEGER DEFAULT 0 NOT NULL")
-        if "stripe_account_id" not in columns:
-            additions.append("ALTER TABLE users ADD COLUMN stripe_account_id VARCHAR")
-        if "stripe_livemode" not in columns:
-            additions.append("ALTER TABLE users ADD COLUMN stripe_livemode INTEGER DEFAULT 0 NOT NULL")
-        if "stripe_scope" not in columns:
-            additions.append("ALTER TABLE users ADD COLUMN stripe_scope VARCHAR")
-        if "stripe_subscription_id" not in columns:
-            additions.append("ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(128)")
-        if additions:
-            with engine.begin() as conn:
-                for statement in additions:
-                    conn.execute(text(statement))
-    except Exception as exc:
-        STARTUP_ISSUES.append(f"user_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
-        logger.error("ensure_user_columns_failed detail=%s", str(exc)[:500], exc_info=True)
-
-
-def ensure_user_role_column() -> None:
-    """Add the ``role`` column to the users table if it does not exist yet (idempotent)."""
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'operator'"))
-        logger.info("ensure_user_role_column: role column added")
-    except Exception:
-        # Column already exists — this is the expected path after first migration.
-        pass
-
-
-def ensure_stripe_status_columns() -> None:
-    try:
-        with engine.begin() as conn:
-            conn.execute(text(
-                "ALTER TABLE users ADD COLUMN stripe_subscription_status VARCHAR"
-            ))
-    except Exception:
-        pass
-    try:
-        with engine.begin() as conn:
-            conn.execute(text(
-                "ALTER TABLE users ADD COLUMN stripe_tier_source VARCHAR DEFAULT 'manual'"
-            ))
-    except Exception:
-        pass
-
+# ===========================================================================
+# SECTION: Startup lifecycle
+# ===========================================================================
 
 @app.on_event("startup")
 def _startup_database() -> None:
@@ -1019,133 +949,12 @@ def _safe_op_mode(value: Any, default: str = "balanced") -> str:
     return v if v in VALID_OP_MODES else default
 
 # =============================================================================
-# 5. PYDANTIC SCHEMAS
-# =============================================================================
-
-
-class AuthRequest(BaseModel):
-    username: str
-    password: str
-
-
-class SupportRequest(BaseModel):
-    message: str
-    sentiment: int | None = None
-    ltv: int | None = None
-    order_status: str | None = None
-    payment_intent_id: str | None = None
-    charge_id: str | None = None
-    refund_reason: str | None = None
-    channel: str | None = None
-    source: str | None = None
-    customer_email: str | None = None
-    request_context: dict[str, Any] | None = None
-
-    @field_validator("message")
-    @classmethod
-    def validate_message(cls, v: str) -> str:
-        text = (v or "").strip()
-        if not text:
-            raise ValueError("message required")
-        if len(text) > 10000:
-            raise ValueError("message too long")
-        return text
-
-    @field_validator("customer_email")
-    @classmethod
-    def validate_customer_email(cls, v: str | None) -> str | None:
-        if v is None:
-            return None
-        s = str(v).strip()
-        if not s:
-            return None
-        if "@" not in s:
-            raise ValueError("customer_email must look like an email address")
-        if len(s) > 320:
-            raise ValueError("customer_email too long")
-        return s
-
-    @field_validator("request_context")
-    @classmethod
-    def validate_request_context(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
-        if v is None:
-            return None
-        if not isinstance(v, dict):
-            raise ValueError("request_context must be an object")
-        return v
-
-
-class TicketReplySendRequest(BaseModel):
-    """Optional overrides when emailing ``ticket.final_reply`` to the customer."""
-
-    body: str | None = None
-    subject: str | None = None
-
-    @field_validator("subject")
-    @classmethod
-    def validate_subject(cls, v: str | None) -> str | None:
-        if v is None:
-            return None
-        s = str(v).strip()
-        if not s:
-            return None
-        return s[:998]
-
-
-class UpgradeRequest(BaseModel):
-    tier: str
-    upgrade_trigger: str | None = None
-
-
-class AdminUserAction(BaseModel):
-    username: str
-
-
-class OperatorModeRequest(BaseModel):
-    mode: str
-
-    @field_validator("mode")
-    @classmethod
-    def validate_mode(cls, v: str) -> str:
-        normalized = (v or "").strip().lower()
-        if normalized not in VALID_OP_MODES:
-            raise ValueError(f"mode must be one of {sorted(VALID_OP_MODES)}")
-        return normalized
-
-
-class TicketStatusRequest(BaseModel):
-    status: str | None = None
-    queue: str | None = None
-    priority: str | None = None
-    internal_note: str | None = None
-
-
-class RefundActionRequest(BaseModel):
-    payment_intent_id: str | None = None
-    charge_id: str | None = None
-    amount: float | None = None
-    refund_reason: str | None = None
-
-
-class ApprovalDecisionRequest(BaseModel):
-    payment_intent_id: str | None = None
-    charge_id: str | None = None
-    refund_reason: str | None = None
-    internal_note: str | None = None
-    # Customer-facing reply refined in workspace before approve (optional, capped).
-    final_reply: str | None = None
-
-
-class ChargeActionRequest(BaseModel):
-    customer_id: str
-    payment_method_id: str
-    amount: int
-    currency: str = "usd"
-    description: str | None = None
-
-# =============================================================================
 # 6. AUTH HELPERS
 # =============================================================================
+
+# ===========================================================================
+# SECTION: Auth dependencies
+# ===========================================================================
 
 
 def get_db():
@@ -1377,6 +1186,10 @@ def resolve_rate_limit_key(user: User, guest_client_id: str | None) -> str:
     return str(getattr(user, "username", "") or "unknown")
 
 
+# ===========================================================================
+# SECTION: Rate limiting
+# ===========================================================================
+
 def check_rate_limit(actor_key: str) -> bool:
     key = str(actor_key or "").strip()[:96] or "__unknown__"
     now = time.time()
@@ -1420,26 +1233,6 @@ def check_rate_limit(actor_key: str) -> bool:
 # 7. PLAN & USAGE HELPERS
 # =============================================================================
 
-def get_public_plan_name(user: User | None) -> str:
-    tier = get_plan_name(user)
-    return tier if tier in PUBLIC_PLAN_TIERS else "free"
-
-
-def get_plan_config(tier: str | None) -> dict[str, Any]:
-    return PLAN_CONFIG.get((tier or "free").strip().lower(), PLAN_CONFIG["free"])
-
-
-def monthly_ticket_limit_for_plan(plan_name: str) -> int:
-    """Canonical monthly ticket cap from ``governor.plan_limits`` (falls back to ``PLAN_CONFIG``)."""
-    from governor import normalize_plan_tier, plan_limits
-
-    raw = plan_limits(normalize_plan_tier(plan_name)).get("monthly_tickets")
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return int(get_plan_config(plan_name)["monthly_limit"])
-
-
 def get_usage_summary(user: User | None) -> dict[str, Any]:
     plan_name = get_plan_name(user)
     plan = get_plan_config(plan_name)
@@ -1474,28 +1267,6 @@ def get_usage_summary(user: User | None) -> dict[str, Any]:
         "approaching_limit": approaching_limit,
         "dashboard_access": plan["dashboard_access"],
         "priority_routing": plan["priority_routing"],
-    }
-
-
-def build_upgrade_payload(current_tier: str) -> dict[str, Any]:
-    current_key = current_tier if current_tier in PUBLIC_PLAN_TIERS else "free"
-    suggestions = ["pro", "elite"] if current_key == "free" else ["elite"] if current_key == "pro" else []
-    return {
-        "current_tier": current_key,
-        "available_upgrades": suggestions,
-        "plans": {
-            tier: {
-                "label": cfg["label"],
-                "monthly_limit": monthly_ticket_limit_for_plan(tier),
-                "history_limit": cfg["history_limit"],
-                "dashboard_access": cfg["dashboard_access"],
-                "priority_routing": cfg["priority_routing"],
-                "team_seats": cfg["team_seats"],
-                "checkout_ready": bool(PRICE_MAP.get(tier)),
-            }
-            for tier, cfg in PLAN_CONFIG.items()
-            if tier in PUBLIC_PLAN_TIERS
-        },
     }
 
 
@@ -1612,6 +1383,10 @@ def normalize_workspace_id(raw: str | None) -> str:
     return s
 
 
+# ===========================================================================
+# SECTION: Usage accounting
+# ===========================================================================
+
 def operator_billing_period_key(now: datetime | None = None) -> str:
     dt = now or datetime.now(timezone.utc)
     if dt.tzinfo is None:
@@ -1656,34 +1431,6 @@ def bump_operator_usage_workspace(
     row.run_count = int(row.run_count or 0) + d
     db.flush()
     return account_operator_usage_sum(db, uname, pkey)
-
-
-def migrate_legacy_operator_usage_into_rollups() -> None:
-    """One-time style migration: seed monthly rollups from legacy ``users.usage`` when rollups are empty."""
-    try:
-        period = operator_billing_period_key()
-        with db_session() as db:
-            for u in db.query(User).all():
-                uname = str(getattr(u, "username", "") or "").strip()
-                if not uname or uname in {"guest", "dev_user"}:
-                    continue
-                if account_operator_usage_sum(db, uname, period) > 0:
-                    continue
-                legacy = int(getattr(u, "usage", 0) or 0)
-                if legacy <= 0:
-                    continue
-                db.merge(
-                    OperatorMonthlyUsage(
-                        account_username=uname[:96],
-                        workspace_id="default",
-                        period_key=period,
-                        run_count=legacy,
-                    )
-                )
-            db.commit()
-    except Exception as exc:
-        STARTUP_ISSUES.append(f"operator_usage_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
-        logger.warning("migrate_legacy_operator_usage_failed detail=%s", str(exc)[:400], exc_info=True)
 
 
 def enforce_guest_preview_allow(client_id: str | None) -> None:
@@ -1810,220 +1557,14 @@ def build_agent_meta(
     }
 
 
-try:
-    from services import ticket_service
-
-    create_ticket_record = ticket_service.create_ticket_record
-    update_ticket_from_result = ticket_service.update_ticket_from_result
-    log_action = ticket_service.log_action
-    serialize_ticket = ticket_service.serialize_ticket
-    serialize_ticket_with_log = ticket_service.serialize_ticket_with_log
-except Exception as exc:
-    STARTUP_ISSUES.append(f"ticket_service_import_failed:{type(exc).__name__}:{str(exc)[:180]}")
-    logger.warning("ticket_service import failed; using local compatibility helpers", exc_info=True)
-
-    def create_ticket_record(
-        db: Session,
-        user: User,
-        req: SupportRequest,
-        *,
-        storage_username: str | None = None,
-    ) -> Ticket:
-        now = _now_iso()
-        owner = (storage_username or "").strip() or str(getattr(user, "username", "unknown") or "unknown")
-        req_ctx = getattr(req, "request_context", None) or {}
-        if not isinstance(req_ctx, dict):
-            req_ctx = {}
-        customer_email = resolve_customer_email_for_ticket(
-            request_context=req_ctx,
-            customer_email=getattr(req, "customer_email", None),
-        ) or None
-        bootstrap_ticket = build_support_ticket(
-            req.message,
-            user_id=owner,
-            meta={
-                "sentiment": req.sentiment if req.sentiment is not None else 5,
-                "ltv": req.ltv if req.ltv is not None else 0,
-                "order_status": req.order_status if req.order_status is not None else "unknown",
-                "plan_tier": get_plan_name(user),
-                "operator_mode": "balanced",
-                "channel": _safe_channel(req.channel),
-                "source": _safe_source(req.source),
-                "customer_history": {},
-                "customer_email": customer_email,
-            },
-        )
-        ticket = Ticket(
-            created_at=now,
-            updated_at=now,
-            username=owner,
-            customer_email=customer_email,
-            channel=_safe_channel(req.channel),
-            source=_safe_source(req.source),
-            subject=(req.message or "")[:300],
-            customer_message=(req.message or "")[:10000],
-            status="new",
-            queue="new",
-            priority="medium",
-            risk_level="medium",
-            issue_type=str(bootstrap_ticket.get("issue_type", "general_support") or "general_support")[:64],
-        )
-        db.add(ticket)
-        db.commit()
-        db.refresh(ticket)
-        return ticket
-
-    def update_ticket_from_result(db: Session, ticket: Ticket, result: dict[str, Any]) -> Ticket:
-        decision = result.get("decision") or {}
-        triage = result.get("triage") or {}
-        output = result.get("output") or {}
-        action = str(result.get("action", "none") or "none")
-        raw_queue = str(decision.get("queue", "new") or "new")
-        tool_status = str(result.get("tool_status", "") or "").lower()
-        if tool_status in {"pending_approval", "manual_review", "approved_pending_execution"}:
-            status = "waiting"
-        elif raw_queue == "resolved":
-            status = "resolved"
-        elif action in {"refund", "credit"}:
-            if tool_status in {"refunded", "credit_issued", "success"}:
-                status = "resolved"
-            elif tool_status in {"refund_failed", "error", "failed"}:
-                status = "escalated"
-            else:
-                status = "waiting"
-        elif action == "none":
-            status = "resolved"
-        else:
-            status = "escalated"
-        ticket.updated_at = _now_iso()
-        ticket.status = _safe_status(status)
-        ticket.queue = _safe_queue(raw_queue)
-        ticket.priority = _safe_priority(decision.get("priority") or (result.get("meta") or {}).get("priority") or "medium")
-        ticket.risk_level = _safe_risk(decision.get("risk_level") or "medium")
-        ticket.issue_type = str(result.get("issue_type", "general_support") or "general_support")[:64]
-        ticket.final_reply = str(result.get("reply", result.get("final", "")) or "")[:8000]
-        ticket.internal_note = str(output.get("internal_note") or "")[:2000]
-        ticket.action = action
-        ticket.amount = float(result.get("amount", 0) or 0)
-        ticket.confidence = float(result.get("confidence", 0) or 0)
-        ticket.quality = float(result.get("quality", 0) or 0)
-        ticket.requires_approval = int(bool(decision.get("requires_approval", False)))
-        ticket.approved = 0
-        ticket.urgency = _clamp(triage.get("urgency", 0), 0, 99)
-        ticket.churn_risk = _clamp(triage.get("churn_risk", 0), 0, 99)
-        ticket.refund_likelihood = _clamp(triage.get("refund_likelihood", 0), 0, 99)
-        ticket.abuse_likelihood = _clamp(triage.get("abuse_likelihood", 0), 0, 99)
-        ticket.complexity = _clamp(triage.get("complexity", 0), 0, 99)
-        db.commit()
-        db.refresh(ticket)
-        return ticket
-
-    def log_action(
-        db: Session,
-        *,
-        username: str,
-        ticket_id: int | None = None,
-        action: str,
-        amount: float,
-        issue_type: str,
-        reason: str,
-        status: str,
-        confidence: float,
-        quality: float,
-        message_snippet: str,
-        requires_approval: bool = False,
-        approved: bool = False,
-    ) -> ActionLog:
-        entry = ActionLog(
-            timestamp=_now_iso(),
-            username=username,
-            ticket_id=ticket_id,
-            action=action,
-            amount=round(float(amount or 0), 2),
-            issue_type=issue_type,
-            reason=(reason or "")[:500],
-            status=status,
-            confidence=round(float(confidence or 0), 4),
-            quality=round(float(quality or 0), 4),
-            message_snippet=(message_snippet or "")[:200],
-            requires_approval=int(requires_approval),
-            approved=int(approved),
-        )
-        db.add(entry)
-        db.commit()
-        db.refresh(entry)
-        return entry
-
-    def serialize_ticket(ticket: Ticket) -> dict[str, Any]:
-        _note = str(getattr(ticket, "internal_note", "") or "")
-        _delivery_match = re.search(r'\[email_delivery:([^\]]+)\]', _note)
-        _delivery_status = _delivery_match.group(1) if _delivery_match else None
-        _delivery_label_map = {
-            "sent":                 "Email delivered",
-            "transport_unavailable": "Email not sent — SMTP not configured",
-            "error":                "Email failed — delivery error",
-            "pending_manual":       "Email not sent — missing customer address",
-        }
-        out = {
-            "id": ticket.id,
-            "created_at": ticket.created_at,
-            "updated_at": ticket.updated_at,
-            "username": ticket.username,
-            "customer_email": getattr(ticket, "customer_email", None) or "",
-            "channel": ticket.channel,
-            "source": ticket.source,
-            "status": ticket.status,
-            "queue": ticket.queue,
-            "priority": ticket.priority,
-            "risk_level": ticket.risk_level,
-            "issue_type": ticket.issue_type,
-            "subject": ticket.subject,
-            "customer_message": ticket.customer_message,
-            "final_reply": ticket.final_reply,
-            "internal_note": ticket.internal_note,
-            "action": ticket.action,
-            "amount": ticket.amount,
-            "confidence": ticket.confidence,
-            "quality": ticket.quality,
-            "requires_approval": bool(ticket.requires_approval),
-            "approved": bool(ticket.approved),
-            "urgency": ticket.urgency,
-            "churn_risk": ticket.churn_risk,
-            "refund_likelihood": ticket.refund_likelihood,
-            "abuse_likelihood": ticket.abuse_likelihood,
-            "complexity": ticket.complexity,
-            "email_delivery_status": _delivery_status,
-            "email_delivery_label": (
-                _delivery_label_map.get(_delivery_status, "Not yet sent")
-                if _delivery_status else "Not yet sent"
-            ),
-        }
-        return out
-
-    def serialize_ticket_with_log(ticket: Ticket, db: Session) -> dict[str, Any]:
-        base = serialize_ticket(ticket)
-        log = (
-            db.query(ActionLog)
-            .filter(ActionLog.ticket_id == ticket.id)
-            .order_by(ActionLog.id.desc())
-            .first()
-        )
-        if log:
-            base["action_log"] = {
-                "log_id": log.id,
-                "action": log.action,
-                "amount": log.amount,
-                "status": log.status,
-                "reason": log.reason,
-                "confidence": log.confidence,
-                "quality": log.quality,
-                "requires_approval": bool(log.requires_approval),
-                "approved": bool(log.approved),
-                "timestamp": log.timestamp,
-            }
-        else:
-            base["action_log"] = None
-        return base
+from services.ticket_service import (
+    create_ticket_record,
+    update_ticket_from_result,
+    log_action,
+    serialize_ticket,
+    serialize_ticket_with_log,
+    generate_simulated_inbox_tickets,
+)
 
 
 def _attach_trust_layer(result: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
@@ -3491,6 +3032,10 @@ def _inbox_bucket_tags(item: dict[str, Any]) -> list[str]:
     return tags
 
 
+# ===========================================================================
+# SECTION: Request handlers — dashboard and inbox
+# ===========================================================================
+
 @app.get("/inbox/pull")
 def inbox_pull(
     limit: int = 8,
@@ -3722,6 +3267,10 @@ def extension_operator_entitlements_slice(
         "upgrade": upgrade,
     }
 
+
+# ===========================================================================
+# SECTION: Request handlers — workspace (/support, /analyze)
+# ===========================================================================
 
 @app.post("/analyze")
 def analyze_extension_ticket(

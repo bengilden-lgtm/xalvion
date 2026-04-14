@@ -1,8 +1,22 @@
 from __future__ import annotations
 
+"""
+ingestion.py — Knowledge ingestion helper using the shared persistence store.
+
+Owns:
+  - ingest_data() and retrieve_knowledge() convenience wrappers
+
+Does NOT own:
+  - Persistence implementation (state_store.py / db.py)
+  - FastAPI routes (app.py)
+
+Imports from:
+  - state_store (KnowledgePayload, KnowledgeRepository)
+"""
+
 from typing import Any
 
-from persistence_layer import KnowledgePayload, KnowledgeRepository
+from state_store import KnowledgePayload, KnowledgeRepository
 
 _repo = KnowledgeRepository()
 

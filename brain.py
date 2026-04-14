@@ -1,5 +1,22 @@
 from __future__ import annotations
 
+"""
+brain.py — Persistent learned-rule and system prompt state for the agent.
+
+Owns:
+  - Brain state schema (default_brain / normalize_brain)
+  - Persistence helpers (load_brain / save_brain)
+  - Learned rule scoring and suppression bookkeeping
+
+Does NOT own:
+  - Request handling / HTTP routes (app.py)
+  - Ticket execution or policy gating (actions.py, governor.py)
+  - Storage engine implementation (db.py/state_store.py)
+
+Imports from:
+  - state_store (load_state, save_state)
+"""
+
 import threading
 import time
 from typing import Any, Dict, List
