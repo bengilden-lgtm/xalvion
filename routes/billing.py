@@ -225,6 +225,58 @@ def actions_charge(
     req: app_mod.ChargeActionRequest,
     user: app_mod.User = Depends(app_mod.require_authenticated_user),
 ):
+    # Route manual charges through the governor before execution.
+    _gov_ticket = {
+        "issue_type": "manual_charge",
+        "sentiment": 5,
+        "abuse_score": 0,
+        "plan_tier": str(getattr(user, "tier", "free") or "free"),
+        "customer_id": str(getattr(req, "customer_id", "") or "").strip(),
+        "payment_method_id": str(getattr(req, "payment_method_id", "") or "").strip(),
+    }
+    _gov_decision = {
+        "action": "charge",
+        "amount": float(getattr(req, "amount", 0) or 0),
+        "confidence": 0.85,
+    }
+    _gov_memory = {
+        "abuse_score": 0,
+        "refund_count": 0,
+        "sentiment_avg": 5,
+    }
+    try:
+        gov_result = governor_mod.gate_execution(_gov_ticket, _gov_decision, _gov_memory)
+    except Exception as _gov_exc:
+        logger.error("governor_gate_failed_manual_charge detail=%s", str(_gov_exc)[:300], exc_info=True)
+        gov_result = {
+            "execution_mode": "review",
+            "requires_approval": True,
+            "governor_reason": "Governor error (soft-fail) — review required",
+        }
+
+    _gov_mode = str(gov_result.get("execution_mode", "review") or "review").strip().lower()
+    if _gov_mode == "blocked":
+        raise HTTPException(
+            status_code=403,
+            detail=str(gov_result.get("governor_reason", "Charge blocked by governor policy.")),
+        )
+
+    # Review means approval gating: do NOT execute Stripe charge.
+    if _gov_mode == "review":
+        return {
+            "ok": False,
+            "status": "requires_approval",
+            "requires_approval": True,
+            "execution_mode": "review",
+            "governor_reason": str(gov_result.get("governor_reason", "Review required under governor policy") or ""),
+            "governor_risk_level": str(gov_result.get("governor_risk_level", "") or ""),
+            "governor_risk_score": int(gov_result.get("governor_risk_score", 0) or 0),
+            "governor_factors": list(gov_result.get("governor_factors") or []),
+            "approved": bool(gov_result.get("approved", False)),
+            "violations": list(gov_result.get("violations") or []),
+        }
+
+    # Allowed/auto (and any unexpected non-blocked, non-review mode) proceeds to execution.
     result = stripe_service.execute_manual_charge(
         user=user,
         customer_id=req.customer_id,
@@ -236,6 +288,23 @@ def actions_charge(
 
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=str(result.get("detail", "Charge failed.")))
+
+    # Preserve governor fields for consistency with the refund route patterns.
+    if isinstance(result, dict):
+        result.setdefault("requires_approval", False)
+        result.setdefault("execution_mode", _gov_mode)
+        if "governor_reason" in gov_result:
+            result.setdefault("governor_reason", str(gov_result.get("governor_reason") or ""))
+        if "governor_risk_level" in gov_result:
+            result.setdefault("governor_risk_level", str(gov_result.get("governor_risk_level") or ""))
+        if "governor_risk_score" in gov_result:
+            result.setdefault("governor_risk_score", int(gov_result.get("governor_risk_score", 0) or 0))
+        if "governor_factors" in gov_result:
+            result.setdefault("governor_factors", list(gov_result.get("governor_factors") or []))
+        if "approved" in gov_result:
+            result.setdefault("approved", bool(gov_result.get("approved", False)))
+        if "violations" in gov_result:
+            result.setdefault("violations", list(gov_result.get("violations") or []))
 
     return result
 
