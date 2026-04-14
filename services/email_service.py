@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import smtplib
+import ssl
 from email.message import EmailMessage
 from typing import Any
 
@@ -89,7 +90,7 @@ def send_ticket_reply_email(
     try:
         with smtplib.SMTP(host, port, timeout=30) as smtp:
             smtp.ehlo()
-            smtp.starttls()
+            smtp.starttls(context=ssl.create_default_context())
             smtp.ehlo()
             if user and password:
                 smtp.login(user, password)

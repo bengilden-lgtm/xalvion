@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from growth_insights import append_insight
@@ -11,6 +12,35 @@ from growth_insights import append_insight
 router = APIRouter(tags=["growth"])
 
 logger = logging.getLogger("xalvion.api")
+
+# In-process fallback rate-limit store for growth endpoints (IP-keyed, 20 req/60s).
+_growth_rate_log: dict[str, list[float]] = {}
+_GROWTH_RATE_LIMIT = 20
+_GROWTH_RATE_WINDOW = 60.0
+
+
+def _growth_check_rate_limit(ip: str) -> bool:
+    """
+    IP-keyed sliding-window rate limiter for unauthenticated growth endpoints.
+    Returns True if the request is allowed, False if the limit is exceeded.
+    Delegates to the DB-backed check_rate_limit when available; falls back to
+    an in-process dict so callers never crash.
+    """
+    key = f"growth_ip:{(ip or 'unknown')[:64]}"
+    try:
+        import app as app_mod
+        return app_mod.check_rate_limit(key)
+    except Exception:
+        pass
+    # In-process fallback
+    now = time.time()
+    cutoff = now - _GROWTH_RATE_WINDOW
+    _growth_rate_log.setdefault(key, [])
+    _growth_rate_log[key] = [t for t in _growth_rate_log[key] if t >= cutoff]
+    if len(_growth_rate_log[key]) >= _GROWTH_RATE_LIMIT:
+        return False
+    _growth_rate_log[key].append(now)
+    return True
 
 
 class GrowthEventIn(BaseModel):
@@ -47,11 +77,15 @@ def _actor_from_headers(
 
 @router.post("/growth/event")
 def ingest_growth_event(
+    request: Request,
     body: GrowthEventIn,
     authorization: str | None = Header(None),
     x_guest: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
 ):
     """Client-side funnel signals (tickets, approvals, auto-path, etc.)."""
+    ip = (request.client.host if request.client else None) or "unknown"
+    if not _growth_check_rate_limit(ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
     actor = _actor_from_headers(authorization, x_guest)
     props = body.props if isinstance(body.props, dict) else {}
     slim: dict[str, Any] = {}
@@ -67,11 +101,15 @@ def ingest_growth_event(
 
 @router.post("/growth/feedback")
 def ingest_growth_feedback(
+    request: Request,
     body: GrowthFeedbackIn,
     authorization: str | None = Header(None),
     x_guest: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
 ):
     """Post–first-success qualitative feedback."""
+    ip = (request.client.host if request.client else None) or "unknown"
+    if not _growth_check_rate_limit(ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
     actor = _actor_from_headers(authorization, x_guest)
     append_insight(
         "feedback",

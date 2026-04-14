@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -v '\\\\.pyc$')",
+      "Bash(grep -v '\\\\.db$')",
+      "Bash(grep -v '\\\\.db-shm$')",
+      "Bash(grep -v '\\\\.db-wal$')"
+    ]
+  }
+}

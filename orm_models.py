@@ -12,6 +12,7 @@ class User(Base):
     password = Column(String, nullable=False)
     usage = Column(Integer, default=0, nullable=False)
     tier = Column(String, default="free", nullable=False)
+    role = Column(String, default="operator", nullable=False)
     stripe_connected = Column(Integer, default=0, nullable=False)
     stripe_account_id = Column(String, nullable=True)
     stripe_livemode = Column(Integer, default=0, nullable=False)

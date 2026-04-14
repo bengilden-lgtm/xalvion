@@ -197,10 +197,18 @@ def login(req: app_mod.AuthRequest, db: Session = Depends(app_mod.get_db)):
         logger.info("login_failed username=%s", username)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if user.username == app_mod.ADMIN_USERNAME and user.tier != "elite":
-        user.tier = "elite"
-        db.commit()
-        db.refresh(user)
+    if user.username == app_mod.ADMIN_USERNAME:
+        needs_commit = False
+        if user.tier != "elite":
+            user.tier = "elite"
+            needs_commit = True
+        # FIX 6: Stamp the role column so require_admin() can check it.
+        if str(getattr(user, "role", "") or "").strip().lower() != "admin":
+            user.role = "admin"
+            needs_commit = True
+        if needs_commit:
+            db.commit()
+            db.refresh(user)
 
     try:
         token = app_mod.create_token(user.username)
