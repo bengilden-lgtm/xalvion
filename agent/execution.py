@@ -11,7 +11,7 @@ from actions import (
     execution_requires_operator_gate,
 )
 from governor import normalize_plan_tier, plan_limits
-from tools import process_refund, issue_credit
+from tools import execute_tool
 
 ALLOWED_ACTIONS = {"none", "refund", "credit", "review", "charge"}
 # Legacy module-level caps (charges use bounded proposal amounts).
@@ -113,20 +113,31 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
     }
 
     if action == "refund":
-        result = process_refund(payload["customer"], amount)
+        result = execute_tool("refund", payload)
         if result.get("error"):
             return {"action": "review", "amount": 0, "tool_result": result, "tool_status": result.get("error", "error")}
         exec_mode = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
         is_mock = exec_mode != "live"
-        result = {**result, "mock": is_mock, "verified": not is_mock}
-        return {"action": "refund", "amount": amount, "tool_result": result, "tool_status": result.get("status", "success")}
+        # FIX 7: Simulated/mock executions must never report verified_success=True or status="success".
+        if is_mock:
+            result = {**result, "mock": True, "verified": False, "verified_success": False, "status": "simulated", "is_simulated": True}
+        else:
+            result = {**result, "mock": False, "verified": True, "is_simulated": False}
+        tool_status = "simulated" if is_mock else result.get("status", "success")
+        return {"action": "refund", "amount": amount, "tool_result": result, "tool_status": tool_status}
 
     if action == "credit":
-        result = issue_credit(payload["customer"], amount)
+        result = execute_tool("credit", payload)
         EXEC_MODE = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
         verified = EXEC_MODE == "live"
-        result = {**result, "verified": verified, "mock": EXEC_MODE != "live"}
-        return {"action": "credit", "amount": amount, "tool_result": result, "tool_status": result.get("status", "credit_issued")}
+        is_mock = not verified
+        # FIX 7: Simulated/mock executions must never report verified_success=True or status="success".
+        if is_mock:
+            result = {**result, "verified": False, "mock": True, "verified_success": False, "status": "simulated", "is_simulated": True}
+        else:
+            result = {**result, "verified": True, "mock": False, "is_simulated": False}
+        tool_status = "simulated" if is_mock else result.get("status", "credit_issued")
+        return {"action": "credit", "amount": amount, "tool_result": result, "tool_status": tool_status}
 
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
 

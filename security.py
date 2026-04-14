@@ -57,11 +57,45 @@ def assert_production_runtime_safety() -> None:
     environment = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
     secret = (os.getenv("JWT_SECRET", "") or "").strip()
     lowered = secret.lower()
-    if environment == "production":
-        insecure = (not secret) or any(marker in lowered for marker in _INSECURE_SECRET_MARKERS)
-        if insecure or len(secret) < 32:
-            raise RuntimeError("Refusing to start in production: JWT_SECRET is missing, too short, or using a dev/fallback value.")
-        logger.info("production_runtime_safety_ok")
+
+    # Execution mode safety:
+    # Production must never silently operate in mock mode, since it can appear operational
+    # while performing no real financial actions.
+    exec_mode = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+    if environment == "production" and exec_mode != "live":
+        raise RuntimeError(
+            "Refusing to start in production: XALVION_EXEC_MODE must be 'live' "
+            "(mock mode is unsafe for production)."
+        )
+
+    # Always enforce strong JWT_SECRET regardless of ENVIRONMENT.
+    _KNOWN_WEAK_DEFAULTS = {"change_me", "dev_secret_change_me", ""}
+    insecure = (
+        secret in _KNOWN_WEAK_DEFAULTS
+        or any(marker in lowered for marker in _INSECURE_SECRET_MARKERS)
+        or len(secret) < 32
+    )
+
+    if insecure:
+        # Hard-fail immediately if a live Stripe key is present — money is at risk.
+        stripe_key = (os.getenv("STRIPE_SECRET_KEY", "") or "").strip()
+        if stripe_key.startswith("sk_live_"):
+            raise RuntimeError(
+                "CRITICAL: JWT_SECRET is weak/default while a live Stripe key (sk_live_) is "
+                "configured. Refusing to start — rotate JWT_SECRET to a random 32+ character value."
+            )
+        if environment == "production":
+            raise RuntimeError(
+                "Refusing to start in production: JWT_SECRET is missing, too short, or using a "
+                "dev/fallback value."
+            )
+        logger.warning(
+            "jwt_secret_weak env=%s — set JWT_SECRET to a random 32+ char value before production",
+            environment,
+        )
+        return
+
+    logger.info("production_runtime_safety_ok")
 
 
 def sanitize_input(user_input: str) -> Tuple[str | None, str | None]:

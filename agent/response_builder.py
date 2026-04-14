@@ -1141,6 +1141,20 @@ def _canonicalize_result(
 
     safe_message = normalize_text(customer_message)
 
+    _tool_result = executed.get("tool_result") or {}
+    is_simulated = bool(
+        isinstance(_tool_result, dict)
+        and (
+            _tool_result.get("is_simulated")
+            or (_tool_result.get("mock") and not _tool_result.get("verified"))
+            or str(_tool_result.get("status", "") or "").lower() == "simulated"
+        )
+    )
+    if is_simulated:
+        prefix = "SIMULATION — "
+        if not str(internal_note or "").lstrip().upper().startswith("SIMULATION"):
+            internal_note = f"{prefix}{internal_note}".strip()
+
     canonical = {
         "reply": safe_message,
         "final": safe_message,
@@ -1179,6 +1193,7 @@ def _canonicalize_result(
             "plan_tier": str(ticket.get("plan_tier", "free") or "free"),
             "operator_mode": str(ticket.get("operator_mode", "balanced") or "balanced"),
             "queue": decision["queue"],
+            "execution_mode": "mock" if is_simulated else "live",
         },
         "decision_explanation": decision_explanation,
         "decision_explainability": decision_explainability,
@@ -1194,4 +1209,19 @@ def _canonicalize_result(
     }
     validated = CanonicalAgentResponse.model_validate(canonical).model_dump()
     validated.update({k: v for k, v in canonical.items() if k not in validated})
+
+    # FIX 7: Guard — if the execution was simulated, verified_success must be False in the
+    # canonical result regardless of what upstream fields say.
+    if isinstance(_tool_result, dict) and _tool_result.get("is_simulated"):
+        validated["verified_success"] = False
+        # Also ensure the nested sovereign_decision status reflects simulation.
+        if isinstance(validated.get("sovereign_decision"), dict):
+            sd = validated["sovereign_decision"]
+            if str(sd.get("status", "")).lower() == "success":
+                sd["status"] = "simulated"
+        if isinstance(validated.get("decision"), dict):
+            d = validated["decision"]
+            if str(d.get("status", "")).lower() == "success":
+                d["status"] = "simulated"
+
     return validated

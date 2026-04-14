@@ -253,7 +253,8 @@ def issue_credit(customer, amount):
 # Set XALVION_EXEC_MODE=live in production to route through real APIs.
 # Default is "mock" — refund/credit simulators unless live mode is enabled.
 
-_EXEC_MODE = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+def get_execution_mode() -> str:
+    return (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
 
 
 def execute_tool(
@@ -272,19 +273,37 @@ def execute_tool(
     Fails safely: any live error returns {"status": "live_error", ...}
     which the caller treats as requires_approval=True → review queue.
     """
-    effective_mode = (mode or _EXEC_MODE or "mock").strip().lower()
+    effective_mode = (mode or get_execution_mode() or "mock").strip().lower()
 
     if effective_mode != "live":
         if action == "refund":
-            return process_refund(
+            out = process_refund(
                 payload.get("customer", ""),
                 payload.get("amount", 0),
             )
+            return {
+                **(out or {}),
+                "status": "simulated",
+                "mode": "mock",
+                "mock": True,
+                "is_simulated": True,
+                "verified": False,
+                "verified_success": False,
+            }
         if action == "credit":
-            return issue_credit(
+            out = issue_credit(
                 payload.get("customer", ""),
                 payload.get("amount", 0),
             )
+            return {
+                **(out or {}),
+                "status": "simulated",
+                "mode": "mock",
+                "mock": True,
+                "is_simulated": True,
+                "verified": False,
+                "verified_success": False,
+            }
         if action == "get_order":
             return get_order(
                 str(payload.get("customer", "") or ""),

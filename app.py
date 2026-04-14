@@ -677,11 +677,47 @@ PLAN_CONFIG: dict[str, dict[str, Any]] = {
 PUBLIC_PLAN_TIERS = {"free", "pro", "elite"}
 PRICE_MAP = {"pro": STRIPE_PRICE_PRO, "elite": STRIPE_PRICE_ELITE}
 
+# Module-level billing availability flag — set at startup by validate_stripe_config().
+BILLING_ENABLED: bool = False
+
+
+def validate_stripe_config() -> None:
+    """
+    Validate that STRIPE_PRICE_PRO and STRIPE_PRICE_ELITE are properly configured.
+    Sets the module-level BILLING_ENABLED flag. Called at startup after DB init.
+    A price ID is considered valid when it starts with 'price_' and is longer than 10 chars total.
+    Placeholder values like 'price_...' or very short IDs are treated as unconfigured.
+    """
+    global BILLING_ENABLED
+    pro = (os.getenv("STRIPE_PRICE_PRO", "") or "").strip()
+    elite = (os.getenv("STRIPE_PRICE_ELITE", "") or "").strip()
+
+    def _price_valid(v: str) -> bool:
+        return bool(v) and v.startswith("price_") and len(v) > 10 and not v.startswith("price_...")
+
+    if not _price_valid(pro) or not _price_valid(elite):
+        BILLING_ENABLED = False
+        logger.warning(
+            "BILLING DISABLED: STRIPE_PRICE_PRO/ELITE not configured. "
+            "Upgrade flow will be unavailable."
+        )
+    else:
+        BILLING_ENABLED = True
+        logger.info("billing_enabled stripe_price_pro=%s stripe_price_elite=%s", pro[:20], elite[:20])
+
 # Unauthenticated operator preview (workspace): must match frontend GUEST_USAGE_LIMIT in app.js.
 GUEST_PREVIEW_OPERATOR_LIMIT = int(os.getenv("GUEST_PREVIEW_OPERATOR_LIMIT", "3"))
 
 # Inbox / queue: synthetic sample tickets are opt-in only (never mixed with live DB rows).
 XALVION_DEMO_MODE = os.getenv("XALVION_DEMO_MODE", "false").strip().lower() in ("1", "true", "yes")
+
+# Execution mode (financial actions):
+# Always log clearly at startup so operators can’t confuse simulation with live execution.
+_exec_mode = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+if _exec_mode == "live":
+    logger.info("EXECUTION MODE: LIVE")
+else:
+    logger.warning("EXECUTION MODE: MOCK (unsafe for production)")
 
 if STRIPE_KEY:
     stripe.api_key = STRIPE_KEY
@@ -832,6 +868,17 @@ def ensure_user_columns() -> None:
         logger.error("ensure_user_columns_failed detail=%s", str(exc)[:500], exc_info=True)
 
 
+def ensure_user_role_column() -> None:
+    """Add the ``role`` column to the users table if it does not exist yet (idempotent)."""
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'operator'"))
+        logger.info("ensure_user_role_column: role column added")
+    except Exception:
+        # Column already exists — this is the expected path after first migration.
+        pass
+
+
 @app.on_event("startup")
 def _startup_database() -> None:
     print("BOOT: FastAPI startup hook begin (database)", flush=True)
@@ -848,7 +895,9 @@ def _startup_database() -> None:
         logger.warning("runtime_security_check_skipped detail=%s", str(exc)[:200])
     logger.info("DB schema ensured")
     print("DB schema ensured", flush=True)
+    validate_stripe_config()
     ensure_user_columns()
+    ensure_user_role_column()
     ensure_ticket_columns()
     migrate_legacy_operator_usage_into_rollups()
     try:
@@ -1194,7 +1243,10 @@ def require_authenticated_user(user: User = Depends(get_current_user)) -> User:
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    if not ADMIN_USERNAME or user.username != ADMIN_USERNAME:
+    # FIX 6: Check role field (set at login) in addition to username string comparison.
+    is_admin_username = bool(ADMIN_USERNAME) and user.username == ADMIN_USERNAME
+    is_admin_role = str(getattr(user, "role", "") or "").strip().lower() == "admin"
+    if not (is_admin_username or is_admin_role):
         raise HTTPException(status_code=403, detail="Admin only")
     return user
 
