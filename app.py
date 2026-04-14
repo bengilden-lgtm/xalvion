@@ -817,11 +817,15 @@ if _exec_mode == "live":
     logger.info("EXECUTION MODE: LIVE")
 else:
     if STRIPE_KEY.startswith("sk_live_") and ENVIRONMENT == "production":
-        raise RuntimeError(
-            "CRITICAL: XALVION_EXEC_MODE is not set to 'live' but a live Stripe key is "
-            "configured in production. Refusing to start — set XALVION_EXEC_MODE=live."
+        # DEPLOY FIX: was a module-level raise — moved to STARTUP_ISSUES so uvicorn
+        # can bind and /health can report the degraded state instead of port never opening.
+        _exec_mode_msg = (
+            "CRITICAL: XALVION_EXEC_MODE is not 'live' but a live Stripe key is configured "
+            "in production. Set XALVION_EXEC_MODE=live in Railway environment variables."
         )
-    if ENVIRONMENT == "production":
+        STARTUP_ISSUES.append(f"exec_mode_unsafe:{_exec_mode_msg}")
+        logger.critical(_exec_mode_msg)
+    elif ENVIRONMENT == "production":
         STARTUP_ISSUES.append("execution_mode_mock_in_production")
         logger.error(
             "EXECUTION MODE: MOCK in production (healthcheck will pass, but readiness is degraded). "
@@ -842,11 +846,15 @@ try:
     _assert_production_runtime_safety()
     print("BOOT: production runtime safety check passed (import phase)", flush=True)
 except Exception as exc:
-    env = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
-    if env == "production":
-        raise
-    STARTUP_ISSUES.append(f"prod_safety_skipped:{type(exc).__name__}:{str(exc)[:180]}")
-    logger.warning("production_safety_guard_skipped env=%s detail=%s", env, str(exc)[:200])
+    # DEPLOY FIX: was re-raising in production — deferred to STARTUP_ISSUES so uvicorn
+    # can bind. /health will expose the issue. Operators must fix env vars to clear it.
+    _safety_msg = f"{type(exc).__name__}: {str(exc)[:220]}"
+    STARTUP_ISSUES.append(f"prod_safety_failed:{_safety_msg}")
+    logger.critical(
+        "STARTUP SAFETY FAILURE — app is running in a degraded/unsafe state. "
+        "Fix env vars then redeploy. detail=%s",
+        _safety_msg,
+    )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 _SERVICES_DIR = os.path.join(BASE_DIR, "services")
