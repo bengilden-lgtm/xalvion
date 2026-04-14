@@ -1292,5 +1292,14 @@ def _canonicalize_result(
         "amount":          _amount,
         "tool_status":     _ts,
     }
+    # VERIFICATION FIX: E4 — include required execution_truth keys for UI truth banner
+    validated["execution_truth"].update(
+        {
+            "executed": bool((not _is_sim) and _v_succ),
+            "simulated": bool(_is_sim),
+            "execution_mode": "mock" if _is_sim else "live",
+            "action_taken": f"{_action}{f' ${_amount:.2f}' if _amount and _action in {'refund','credit','charge'} else ''}",
+        }
+    )
 
     return validated

@@ -88,6 +88,8 @@ def _redact_database_url(url: str) -> str:
 
 DATABASE_URL: str = _resolve_url()
 _IS_SQLITE: bool = DATABASE_URL.startswith("sqlite")
+# VERIFICATION FIX: C5 — export IS_POSTGRES for shared backend checks
+IS_POSTGRES: bool = (not _IS_SQLITE) and (DATABASE_URL.startswith("postgresql") or DATABASE_URL.startswith("postgres"))
 
 print(
     f"BOOT: database backend={'sqlite' if _IS_SQLITE else 'non-sqlite'} url={_redact_database_url(DATABASE_URL)}",

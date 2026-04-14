@@ -34,6 +34,12 @@ class ProcessedWebhook(Base):
 class PendingCheckout(Base):
     __tablename__ = "pending_checkouts"
 
+    # VERIFICATION FIX: B6 — provide minimum required columns for pending checkout integrity
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(256), nullable=True, index=True)
+    stripe_session_id = Column(String(128), nullable=True, index=True, unique=True)
+    plan_tier = Column(String(32), nullable=True)
+
     session_id = Column(String(128), primary_key=True)
     username = Column(String(256), nullable=False, index=True)
     tier = Column(String(32), nullable=False)

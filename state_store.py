@@ -22,7 +22,9 @@ from typing import Any, Callable, Iterable
 
 from sqlalchemy import Column, Float, Index, Integer, String, Text
 
-from db import Base, SessionLocal, engine
+import threading
+
+from db import Base, IS_POSTGRES, SessionLocal, engine
 
 
 # ---------------------------------------------------------------------------
@@ -31,6 +33,9 @@ from db import Base, SessionLocal, engine
 
 class AgentState(Base):
     __tablename__ = "agent_state"
+
+# VERIFICATION FIX: C1 — SQLite requires in-process locking for atomic mutate_state
+_SQLITE_STATE_LOCK = threading.RLock()
 
     key        = Column(String(120), primary_key=True)
     value      = Column(Text, nullable=False, default="{}")
@@ -89,7 +94,13 @@ def mutate_state(
     """
     db = SessionLocal()
     try:
-        row = db.query(AgentState).filter(AgentState.key == key).first()
+        _lock = _SQLITE_STATE_LOCK if not IS_POSTGRES else None
+        if _lock:
+            _lock.acquire()
+        if IS_POSTGRES:
+            row = db.query(AgentState).filter(AgentState.key == key).with_for_update().first()
+        else:
+            row = db.query(AgentState).filter(AgentState.key == key).first()
 
         if row is None:
             current = default.copy()
@@ -119,6 +130,11 @@ def mutate_state(
         db.rollback()
         raise
     finally:
+        if not IS_POSTGRES:
+            try:
+                _SQLITE_STATE_LOCK.release()
+            except Exception:
+                pass
         db.close()
 
 

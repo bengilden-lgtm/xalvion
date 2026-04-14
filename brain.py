@@ -21,7 +21,7 @@ import threading
 import time
 from typing import Any, Dict, List
 
-from state_store import load_state, save_state
+from state_store import load_state, mutate_state, save_state
 
 BRAIN_STATE_KEY = "brain_v1"
 
@@ -199,46 +199,22 @@ def get_top_rule_objects(brain: Dict[str, Any], limit: int = 5) -> List[Dict[str
 
 
 def add_rule(brain: Dict[str, Any], rule: Dict[str, Any] | str) -> None:
+    # VERIFICATION FIX: C4 — atomically add/dedupe learned rules under concurrent writes
     normalized = normalize_rule(rule)
     if not normalized:
         return
     trigger = normalized["trigger"]
-    existing = next((r for r in brain["learned_rules"] if r.get("trigger") == trigger), None)
-    if existing is None:
-        brain["learned_rules"].append(normalized)
-        brain["rule_weights"][trigger] = 1
-        brain["rule_scores"][trigger] = 1.0
-        brain["rule_outcomes"][trigger] = {"wins": 0, "losses": 0, "closed_wins": 0}
-        brain.setdefault("rule_stats", {})[trigger] = {
-            "n_total": 0,
-            "n_real_outcomes": 0,
-            "n_self_report_only": 0,
-            "n_operator_approved": 0,
-            "n_operator_override": 0,
-            "n_success": 0,
-            "n_auto_success": 0,
-            "n_reopened": 0,
-            "n_reversed": 0,
-            "n_dispute": 0,
-            "n_closed": 0,
-            "n_good": 0,
-            "n_bad": 0,
-            "underperform_streak": 0,
-            "last_event_ts": 0.0,
-            "last_real_outcome_ts": 0.0,
-            "last_impact_score": None,
-        }
-    else:
-        brain["rule_weights"][trigger] = min(
-            500,
-            int(brain["rule_weights"].get(trigger, 1)) + 1,
-        )
-        brain["rule_scores"][trigger] = min(
-            50.0,
-            round(float(brain["rule_scores"].get(trigger, 1.0)) + 0.2, 4),
-        )
-    update_system_prompt(brain)
-    save_brain(brain)
+
+    def _mutate(current: Dict[str, Any]) -> Dict[str, Any]:
+        b = normalize_brain(dict(current or {}))
+        if not any(r.get("trigger") == trigger for r in (b.get("learned_rules") or [])):
+            b["learned_rules"].append(normalized)
+        update_system_prompt(b)
+        return b
+
+    updated = mutate_state(BRAIN_STATE_KEY, default_brain(), _mutate)
+    brain.clear()
+    brain.update(updated)
 
 
 def _append_rule_audit(brain: Dict[str, Any], trigger: str, event: Dict[str, Any]) -> None:

@@ -15,12 +15,17 @@ def _now() -> float:
     return time.time()
 
 
-def load_memory() -> Dict[str, Any]:
-    return load_state(MEMORY_STATE_KEY, {})
+def _user_key(user_id: str) -> str:
+    # VERIFICATION FIX: C2 — store memory per-user (never a shared memory_v1 blob)
+    return f"{MEMORY_STATE_KEY}:{str(user_id or '').strip() or 'anonymous'}"
 
 
-def save_memory(memory: Dict[str, Any]) -> None:
-    save_state(MEMORY_STATE_KEY, memory)
+def load_memory(user_id: str) -> Dict[str, Any]:
+    return load_state(_user_key(user_id), _default_user_memory())
+
+
+def save_memory(user_id: str, memory: Dict[str, Any]) -> None:
+    save_state(_user_key(user_id), memory)
 
 
 def _default_user_memory() -> Dict[str, Any]:
@@ -169,9 +174,8 @@ def generate_soul_file(user_data: Dict[str, Any]) -> str:
 
 
 def get_user_memory(user_id: str) -> Dict[str, Any]:
-    memory = load_memory()
-    user_data = memory.get(user_id, _default_user_memory())
     merged = _default_user_memory()
+    user_data = load_memory(user_id)
     merged.update(user_data if isinstance(user_data, dict) else {})
     merged = _rebuild_user_metrics(merged)
     merged["soul_file"] = generate_soul_file(merged)
@@ -181,10 +185,8 @@ def get_user_memory(user_id: str) -> Dict[str, Any]:
 def update_memory(user_id: str, ticket: Dict[str, Any], response: str, decision: Dict[str, Any] | None = None) -> None:
     decision = decision or {}
 
-    def _mutate(memory: Dict[str, Any]) -> Dict[str, Any]:
-        current = memory.get(user_id, _default_user_memory())
-        user_data = _default_user_memory()
-        user_data.update(current if isinstance(current, dict) else {})
+    def _mutate(user_data: Dict[str, Any]) -> Dict[str, Any]:
+        user_data = _default_user_memory() if not isinstance(user_data, dict) else {**_default_user_memory(), **user_data}
 
         issue = str(ticket.get("issue", "")).strip()
         sentiment = int(ticket.get("sentiment", 5) or 5)
@@ -212,10 +214,10 @@ def update_memory(user_id: str, ticket: Dict[str, Any], response: str, decision:
         user_data = _rebuild_user_metrics(user_data)
         user_data["soul_file"] = generate_soul_file(user_data)
 
-        memory[user_id] = user_data
-        return memory
+        return user_data
 
-    mutate_state(MEMORY_STATE_KEY, {}, _mutate)
+    # VERIFICATION FIX: C3 — apply memory updates atomically via mutate_state()
+    mutate_state(_user_key(user_id), _default_user_memory(), _mutate)
 
 
 def get_prompt_memory(user_id: str, limit: int = 5) -> str:

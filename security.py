@@ -91,16 +91,11 @@ def assert_production_runtime_safety() -> None:
                 "CRITICAL: JWT_SECRET is weak/default while a live Stripe key (sk_live_) is "
                 "configured. Refusing to start — rotate JWT_SECRET to a random 32+ character value."
             )
-        if environment == "production":
-            raise RuntimeError(
-                "Refusing to start in production: JWT_SECRET is missing, too short, or using a "
-                "dev/fallback value."
-            )
-        logger.warning(
-            "jwt_secret_weak env=%s — set JWT_SECRET to a random 32+ char value before production",
-            environment,
+        # VERIFICATION FIX: S1 — weak JWT_SECRET must hard-fail regardless of environment
+        raise RuntimeError(
+            "JWT_SECRET is missing, too short, or using a dev/fallback value. "
+            "Refusing to start — set JWT_SECRET to a random 32+ character value."
         )
-        return
 
     logger.info("production_runtime_safety_ok")
 

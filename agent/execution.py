@@ -62,6 +62,8 @@ def _normalize_execution_result(result: dict) -> dict:
         tool_status = "simulated"
 
     return {
+        # VERIFICATION FIX: E1 — simulated paths must report status="simulated" at top-level
+        "status": tool_status,
         "action": action,
         "amount": amount,
         "tool_result": {
