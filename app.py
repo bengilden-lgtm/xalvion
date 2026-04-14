@@ -24,6 +24,7 @@ Imports from:
 
 from __future__ import annotations
 
+print("BOOT: app starting", flush=True)
 print("BOOT: starting app import (app.py)", flush=True)
 
 import asyncio
@@ -888,6 +889,7 @@ WORKSPACE_CLIENT_DIR = os.path.join(BASE_DIR, "workspace-client")
 print("BOOT: creating FastAPI app", flush=True)
 app = FastAPI(title="Xalvion Sovereign Brain")
 print("BOOT: FastAPI app instance created", flush=True)
+print("BOOT: FastAPI initialized", flush=True)
 
 if os.path.isdir(FLUID_DIR):
     app.mount("/fluid", StaticFiles(directory=FLUID_DIR), name="fluid")
@@ -3038,31 +3040,34 @@ def serve_static_favicon_svg():
 
 @app.get("/health")
 def health():
-    """Shallow liveness: process is up (use /health/deep for readiness)."""
-    _mode = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
-    return {
-        "status": "ok",
-        "service": "xalvion-sovereign-brain",
-        "execution_mode": _mode,
-        "execution_live": _mode == "live",
-        "startup_ready": bool(STARTUP_READY),
-        "startup_issues": list(STARTUP_ISSUES[-5:]),
-    }
+    """
+    Railway healthchecks require a FAST, LIGHTWEIGHT, ALWAYS-AVAILABLE endpoint.
+
+    This is a pure liveness check: no DB calls, no Stripe calls, no env validation, no external checks.
+    """
+    return {"status": "ok"}
 
 
-@app.get("/health/deep")
-def health_deep(db: Session = Depends(get_db)):
+def _compute_readiness_checks(db: Session) -> tuple[dict[str, Any], bool]:
+    """
+    Readiness is allowed to be strict and dependency-aware. It must never be used by /health.
+
+    Returns (payload, ready_bool).
+    """
     from sqlalchemy import text as _text
 
     checks: dict[str, Any] = {}
     mode = (os.getenv("ENVIRONMENT", "development") or "development").strip()
     checks["mode"] = mode
 
+    ready = True
+
     try:
         db.execute(_text("SELECT 1"))
         checks["database"] = "ok"
     except Exception as exc:
         checks["database"] = f"error: {exc}"
+        ready = False
 
     try:
         checks["users"] = db.query(User).count()
@@ -3070,29 +3075,48 @@ def health_deep(db: Session = Depends(get_db)):
         checks["actions"] = db.query(ActionLog).count()
     except Exception as exc:
         checks["tables"] = f"error: {exc}"
+        ready = False
 
     try:
         checks["operator_mode"] = get_operator_mode(db)
     except Exception as exc:
         checks["operator_mode"] = f"error: {exc}"
+        ready = False
 
     env_lower = mode.lower()
     if env_lower == "production":
         raw_jwt = os.getenv("JWT_SECRET")
         checks["jwt_secret"] = "configured" if (raw_jwt and raw_jwt.strip()) else "missing"
+        if checks["jwt_secret"] == "missing":
+            ready = False
     else:
         checks["jwt_secret"] = "n/a"
 
     checks["stripe"] = "configured" if STRIPE_KEY else "missing"
     checks["openai"] = "configured" if os.getenv("OPENAI_API_KEY", "").strip() else "missing"
 
-    degraded = any(isinstance(v, str) and v.startswith("error") for v in checks.values())
-    if checks.get("jwt_secret") == "missing":
-        degraded = True
-
-    checks["status"] = "degraded" if degraded else "ok"
+    checks["status"] = "ok" if ready else "degraded"
     checks["service"] = "xalvion-sovereign-brain"
-    return checks
+    return checks, ready
+
+
+@app.get("/ready")
+def ready(db: Session = Depends(get_db)):
+    """
+    Readiness: allowed to check dependencies (DB/Stripe/env/integrations).
+    Returns 200 when ready; 503 when degraded/unready.
+    """
+    checks, is_ready = _compute_readiness_checks(db)
+    return JSONResponse(checks, status_code=200 if is_ready else 503)
+
+
+@app.get("/health/deep")
+def health_deep(db: Session = Depends(get_db)):
+    checks, is_ready = _compute_readiness_checks(db)
+    return JSONResponse(checks, status_code=200 if is_ready else 503)
+
+
+print("BOOT: health endpoint ready", flush=True)
 
 
 def _inbox_priority_score(item: dict[str, Any]) -> float:
