@@ -364,17 +364,16 @@ def upgrade_plan(
 
 @router.post("/stripe/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)):
-    # SECURITY: Never rely on module attribute lookups for environment detection.
-    # Read the runtime environment directly so production cannot silently fall back to dev behavior.
-    env = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
-    is_production = env == "production"
+    stripe_key = str(app_mod.STRIPE_KEY or "").strip()
+    webhook_secret = str(app_mod.STRIPE_WEBHOOK_SECRET or "").strip()
+    is_live = stripe_key.startswith("sk_live_")
+    env = str(getattr(app_mod, "ENVIRONMENT", "development") or "development").strip().lower()
 
-    if is_production and not app_mod.STRIPE_WEBHOOK_SECRET:
-        logger.critical(
-            "stripe_webhook_secret_missing env=production route=/stripe/webhook action=reject",
+    if not webhook_secret and (is_live or env == "production"):
+        raise HTTPException(
+            status_code=500,
+            detail="Stripe webhook secret is required in production. Configure STRIPE_WEBHOOK_SECRET."
         )
-        # Fail-safe in production: do not accept any webhook payload without a configured secret.
-        raise HTTPException(status_code=503, detail="Stripe webhook is not configured")
     if not app_mod.STRIPE_KEY:
         raise HTTPException(status_code=500, detail="Stripe not configured")
 
@@ -382,19 +381,22 @@ async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
-        if is_production:
-            global _stripe_webhook_prod_log_emitted
-            if not _stripe_webhook_prod_log_emitted:
-                logger.info("stripe_webhook_verification_enabled env=production mode=strict")
-                _stripe_webhook_prod_log_emitted = True
-            # Production: signature verification is mandatory and must not be bypassable.
-            event = stripe.Webhook.construct_event(payload, sig_header, app_mod.STRIPE_WEBHOOK_SECRET)
+        webhook_secret = str(app_mod.STRIPE_WEBHOOK_SECRET or "").strip()
+        stripe_key = str(app_mod.STRIPE_KEY or "").strip()
+        is_live = stripe_key.startswith("sk_live_")
+
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+        elif is_live:
+            # Live key without webhook secret should have been caught at startup (Fix 2).
+            # If we somehow reach here, refuse to process.
+            raise HTTPException(
+                status_code=500,
+                detail="Cannot process Stripe webhook: STRIPE_WEBHOOK_SECRET is required with a live key."
+            )
         else:
-            # Non-production: allow local/manual testing without Stripe signing, but prefer verification when configured.
-            if app_mod.STRIPE_WEBHOOK_SECRET:
-                event = stripe.Webhook.construct_event(payload, sig_header, app_mod.STRIPE_WEBHOOK_SECRET)
-            else:
-                event = stripe.Event.construct_from(json.loads(payload.decode("utf-8")), stripe.api_key)
+            # Development only — unsigned webhook accepted for local testing
+            event = stripe.Event.construct_from(json.loads(payload.decode("utf-8")), stripe.api_key)
     except stripe.error.SignatureVerificationError as exc:
         logger.warning(
             "stripe_webhook_rejected_invalid_signature env=%s detail=%s",

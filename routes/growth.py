@@ -33,11 +33,15 @@ def _growth_check_rate_limit(ip: str) -> bool:
     except Exception:
         pass
     # In-process fallback
+    # Divide limit by assumed worker count for multi-process safety.
+    # The DB-backed path (primary) is process-safe; this fallback intentionally
+    # uses a lower cap.
+    _EFFECTIVE_FALLBACK_LIMIT = max(1, _GROWTH_RATE_LIMIT // 2)
     now = time.time()
     cutoff = now - _GROWTH_RATE_WINDOW
     _growth_rate_log.setdefault(key, [])
     _growth_rate_log[key] = [t for t in _growth_rate_log[key] if t >= cutoff]
-    if len(_growth_rate_log[key]) >= _GROWTH_RATE_LIMIT:
+    if len(_growth_rate_log[key]) >= _EFFECTIVE_FALLBACK_LIMIT:
         return False
     _growth_rate_log[key].append(now)
     return True

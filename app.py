@@ -589,6 +589,7 @@ STRIPE_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 STRIPE_PRICE_PRO = os.getenv("STRIPE_PRICE_PRO", "").strip()
 STRIPE_PRICE_ELITE = os.getenv("STRIPE_PRICE_ELITE", "").strip()
+ENVIRONMENT: str = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
 
 ALLOW_DIRECT_BILLING_BYPASS = (
     os.getenv("ALLOW_DIRECT_BILLING_BYPASS", "false").strip().lower() == "true"
@@ -703,7 +704,20 @@ def validate_stripe_config() -> None:
         )
     else:
         BILLING_ENABLED = True
-        logger.info("billing_enabled stripe_price_pro=%s stripe_price_elite=%s", pro[:20], elite[:20])
+        webhook_configured = bool((os.getenv("STRIPE_WEBHOOK_SECRET", "") or "").strip())
+        logger.info(
+            "billing_enabled stripe_price_pro=%s stripe_price_elite=%s webhook_secret_configured=%s",
+            pro[:20], elite[:20], webhook_configured
+        )
+
+    if STRIPE_KEY.startswith("sk_live_") and not STRIPE_WEBHOOK_SECRET:
+        _msg = (
+            "CRITICAL: STRIPE_WEBHOOK_SECRET is required in production when a live Stripe key is "
+            "configured. Refusing to start — set STRIPE_WEBHOOK_SECRET in your environment."
+        )
+        if ENVIRONMENT == "production":
+            raise RuntimeError(_msg)
+        logger.warning(_msg)
 
 # Unauthenticated operator preview (workspace): must match frontend GUEST_USAGE_LIMIT in app.js.
 GUEST_PREVIEW_OPERATOR_LIMIT = int(os.getenv("GUEST_PREVIEW_OPERATOR_LIMIT", "3"))
@@ -717,7 +731,13 @@ _exec_mode = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
 if _exec_mode == "live":
     logger.info("EXECUTION MODE: LIVE")
 else:
-    logger.warning("EXECUTION MODE: MOCK (unsafe for production)")
+    if STRIPE_KEY.startswith("sk_live_") or ENVIRONMENT == "production":
+        raise RuntimeError(
+            "CRITICAL: XALVION_EXEC_MODE is not set to 'live' but a live Stripe key or "
+            "production environment is detected. Refusing to start — set "
+            "XALVION_EXEC_MODE=live in your environment."
+        )
+    logger.warning("EXECUTION MODE: MOCK — safe for development only")
 
 if STRIPE_KEY:
     stripe.api_key = STRIPE_KEY
@@ -1246,8 +1266,13 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     # FIX 6: Check role field (set at login) in addition to username string comparison.
     is_admin_username = bool(ADMIN_USERNAME) and user.username == ADMIN_USERNAME
     is_admin_role = str(getattr(user, "role", "") or "").strip().lower() == "admin"
+    if not ADMIN_USERNAME and not is_admin_role:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access requires ADMIN_USERNAME to be configured."
+        )
     if not (is_admin_username or is_admin_role):
-        raise HTTPException(status_code=403, detail="Admin only")
+        raise HTTPException(status_code=403, detail="Admin access required.")
     return user
 
 
@@ -3565,12 +3590,22 @@ def extension_operator_entitlements_slice(
 
 @app.post("/analyze")
 def analyze_extension_ticket(
+    request: Request,
     req: ExtensionAnalyzeRequest,
     authorization: str | None = Header(None),
     x_guest_client: str | None = Header(None, alias="X-Xalvion-Guest-Client"),
     x_workspace: str | None = Header(None, alias="X-Xalvion-Workspace-Id"),
     db: Session = Depends(get_db),
 ):
+    _analyze_ip = "unknown"
+    try:
+        _analyze_ip = request.client.host if request.client else "unknown"
+    except Exception:
+        pass
+    _analyze_ip_key = f"analyze_ip:{(_analyze_ip or 'unknown')[:64]}"
+    if not check_rate_limit(_analyze_ip_key):
+        raise HTTPException(status_code=429, detail="Too many requests.")
+
     wid = normalize_workspace_id(x_workspace)
     period = operator_billing_period_key()
     username = get_current_username_from_header(authorization)
