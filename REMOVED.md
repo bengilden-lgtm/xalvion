@@ -1,0 +1,1 @@
+- persistence_layer.py: removed 2026-04-14. Superseded by state_store.py + db.py.
