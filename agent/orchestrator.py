@@ -513,7 +513,23 @@ def run_agent(
     _pattern_exp = get_pattern_expectation(ticket, final_payload)
 
     update_memory(user_id, ticket, customer_message, final_payload)
-    learn_from_ticket(ticket, final_payload, executed, outcome_key=_outcome_key)
+    _learning_quality_threshold = None
+    try:
+        if isinstance(executed, dict):
+            _learning_quality_threshold = executed.get("learning_quality_threshold", executed.get("quality_threshold"))
+        if _learning_quality_threshold is None and isinstance(_tool_result, dict):
+            _learning_quality_threshold = _tool_result.get(
+                "learning_quality_threshold", _tool_result.get("quality_threshold")
+            )
+        if _learning_quality_threshold is None and isinstance(clean, dict):
+            _learning_quality_threshold = clean.get("learning_quality_threshold", clean.get("quality_threshold"))
+    except Exception:
+        _learning_quality_threshold = None
+
+    if (not _is_simulated) and (
+        _learning_quality_threshold is None or float(quality) > float(_learning_quality_threshold)
+    ):
+        learn_from_ticket(ticket, final_payload, executed, outcome_key=_outcome_key)
     process_feedback(clean, customer_message, quality)
     try:
         log_event(
