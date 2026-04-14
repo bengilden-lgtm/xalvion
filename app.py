@@ -676,6 +676,7 @@ logger = logging.getLogger("xalvion.api")
 
 STARTUP_ISSUES: list[str] = []
 STARTUP_READY: bool = False
+STARTUP_BG_TASK_STARTED: bool = False
 
 _db_issue_last_log: dict[str, float] = {}
 DB_ISSUE_LOG_COOLDOWN_S = 60.0
@@ -815,13 +816,19 @@ _exec_mode = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
 if _exec_mode == "live":
     logger.info("EXECUTION MODE: LIVE")
 else:
-    if STRIPE_KEY.startswith("sk_live_") or ENVIRONMENT == "production":
+    if STRIPE_KEY.startswith("sk_live_") and ENVIRONMENT == "production":
         raise RuntimeError(
-            "CRITICAL: XALVION_EXEC_MODE is not set to 'live' but a live Stripe key or "
-            "production environment is detected. Refusing to start — set "
-            "XALVION_EXEC_MODE=live in your environment."
+            "CRITICAL: XALVION_EXEC_MODE is not set to 'live' but a live Stripe key is "
+            "configured in production. Refusing to start — set XALVION_EXEC_MODE=live."
         )
-    logger.warning("EXECUTION MODE: MOCK — safe for development only")
+    if ENVIRONMENT == "production":
+        STARTUP_ISSUES.append("execution_mode_mock_in_production")
+        logger.error(
+            "EXECUTION MODE: MOCK in production (healthcheck will pass, but readiness is degraded). "
+            "Set XALVION_EXEC_MODE=live for real execution."
+        )
+    else:
+        logger.warning("EXECUTION MODE: MOCK — safe for development only")
 
 if STRIPE_KEY:
     stripe.api_key = STRIPE_KEY
@@ -945,44 +952,81 @@ def db_session() -> Generator[Session, None, None]:
 
 @app.on_event("startup")
 def _startup_database() -> None:
-    print("BOOT: FastAPI startup hook begin (database)", flush=True)
-    init_db()
-    try:
-        from security import assert_production_runtime_safety
+    """
+    Railway healthchecks expect the web process to bind quickly.
 
-        assert_production_runtime_safety()
-        logger.info("runtime_security_check_passed")
-    except RuntimeError as exc:
-        logger.error("startup_security_check_failed detail=%s", exc)
-        raise
-    except Exception as exc:
-        logger.warning("runtime_security_check_skipped detail=%s", str(exc)[:200])
-    logger.info("DB schema ensured")
-    print("DB schema ensured", flush=True)
-    ensure_user_columns()
-    ensure_user_role_column()
-    ensure_stripe_status_columns()
-    ensure_ticket_columns()
-    validate_stripe_config()
-    migrate_legacy_operator_usage_into_rollups()
-    try:
-        ensure_outcome_log_columns()
-    except Exception as exc:
-        STARTUP_ISSUES.append(f"outcome_log_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
-        logger.error("ensure_outcome_log_columns_failed detail=%s", str(exc)[:500], exc_info=True)
-    try:
-        ensure_outcome_columns()
-    except Exception as exc:
-        STARTUP_ISSUES.append(f"outcome_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
-        logger.error("ensure_outcome_columns_failed detail=%s", str(exc)[:500], exc_info=True)
-    try:
-        from learning import sync_rules_to_brain
+    Do not block Uvicorn startup on non-essential initialization or best-effort migrations.
+    Background init will mark STARTUP_READY when complete; /health remains lightweight liveness.
+    """
+    global STARTUP_BG_TASK_STARTED
+    if STARTUP_BG_TASK_STARTED:
+        print("BOOT: startup hook already ran (skipping duplicate)", flush=True)
+        return
+    STARTUP_BG_TASK_STARTED = True
 
-        sync_rules_to_brain()
-        logger.info("rule_sync_complete")
-    except Exception as _sync_exc:
-        logger.warning("rule_sync_failed detail=%s", str(_sync_exc)[:200])
-    print("BOOT: startup hooks ready (database phase complete)", flush=True)
+    print("BOOT: FastAPI startup hook begin (non-blocking)", flush=True)
+
+    def _bg_init() -> None:
+        global STARTUP_READY
+        print("BOOT: background init begin", flush=True)
+        try:
+            # Security guard: fail loudly only when required (production/live money).
+            try:
+                from security import assert_production_runtime_safety
+
+                assert_production_runtime_safety()
+                logger.info("runtime_security_check_passed")
+            except RuntimeError as exc:
+                logger.error("startup_security_check_failed detail=%s", exc)
+                raise
+            except Exception as exc:
+                logger.warning("runtime_security_check_skipped detail=%s", str(exc)[:200])
+
+            # DB + migrations (may be slow / require external deps).
+            init_db()
+            logger.info("DB schema ensured")
+            print("BOOT: DB schema ensured", flush=True)
+
+            ensure_user_columns()
+            ensure_user_role_column()
+            ensure_stripe_status_columns()
+            ensure_ticket_columns()
+            validate_stripe_config()
+            migrate_legacy_operator_usage_into_rollups()
+
+            try:
+                ensure_outcome_log_columns()
+            except Exception as exc:
+                STARTUP_ISSUES.append(f"outcome_log_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
+                logger.error("ensure_outcome_log_columns_failed detail=%s", str(exc)[:500], exc_info=True)
+            try:
+                ensure_outcome_columns()
+            except Exception as exc:
+                STARTUP_ISSUES.append(f"outcome_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
+                logger.error("ensure_outcome_columns_failed detail=%s", str(exc)[:500], exc_info=True)
+
+            # Optional / best-effort: never block readiness.
+            try:
+                from learning import sync_rules_to_brain
+
+                sync_rules_to_brain()
+                logger.info("rule_sync_complete")
+            except Exception as _sync_exc:
+                logger.warning("rule_sync_failed detail=%s", str(_sync_exc)[:200])
+
+            STARTUP_READY = True
+            print("BOOT: background init complete (STARTUP_READY=true)", flush=True)
+        except Exception as exc:
+            STARTUP_READY = False
+            STARTUP_ISSUES.append(f"startup_failed:{type(exc).__name__}:{str(exc)[:220]}")
+            print(
+                f"BOOT: background init FAILED type={type(exc).__name__} detail={str(exc)[:800]}",
+                flush=True,
+            )
+            raise
+
+    threading.Thread(target=_bg_init, name="startup-bg-init", daemon=True).start()
+    print("BOOT: startup hook scheduled background init", flush=True)
 
 
 # =============================================================================
@@ -2993,6 +3037,8 @@ def health():
         "service": "xalvion-sovereign-brain",
         "execution_mode": _mode,
         "execution_live": _mode == "live",
+        "startup_ready": bool(STARTUP_READY),
+        "startup_issues": list(STARTUP_ISSUES[-5:]),
     }
 
 

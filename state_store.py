@@ -33,13 +33,13 @@ from db import Base, IS_POSTGRES, SessionLocal, engine
 
 class AgentState(Base):
     __tablename__ = "agent_state"
-
-# VERIFICATION FIX: C1 — SQLite requires in-process locking for atomic mutate_state
-_SQLITE_STATE_LOCK = threading.RLock()
-
-    key        = Column(String(120), primary_key=True)
-    value      = Column(Text, nullable=False, default="{}")
+    key = Column(String(120), primary_key=True)
+    value = Column(Text, nullable=False, default="{}")
     updated_at = Column(String(32), nullable=False)
+
+
+# SQLite requires in-process locking for atomic mutate_state.
+_SQLITE_STATE_LOCK = threading.RLock()
 
 
 # ---------------------------------------------------------------------------
