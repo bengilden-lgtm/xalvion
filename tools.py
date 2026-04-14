@@ -221,29 +221,91 @@ def get_order(customer: str, context: Optional[str] = None) -> dict[str, Any]:
 
 
 def process_refund(customer, amount):
+    exec_mode = get_execution_mode()
     try:
-        amt = int(amount or 0)
+        amt = float(amount or 0)
     except (TypeError, ValueError):
-        amt = 0
+        amt = 0.0
     if amt > 500_000:
-        return {"error": "Refund exceeds safe limit", "mock": True, "verified": False}
+        return {
+            "ok": False,
+            "status": "error",
+            "error": "Refund exceeds safe limit",
+            "execution_layer": "agent_tool",
+            "exec_mode": exec_mode,
+            "verified": False,
+            "verified_success": False,
+            "is_simulated": exec_mode != "live",
+        }
+
+    if exec_mode != "live":
+        return {
+            "ok": True,
+            "status": "simulated",
+            "simulated": True,
+            "mock": True,
+            "verified": False,
+            "verified_success": False,
+            "is_simulated": True,
+            "execution_layer": "agent_tool",
+            "exec_mode": exec_mode,
+            "message": f"Simulated refund of ${amt:.2f} for {customer} (XALVION_EXEC_MODE={exec_mode})",
+            "amount": amt,
+            "customer": customer,
+        }
 
     return {
-        "status": "success",
-        "customer": customer,
+        "ok": False,
+        "status": "error",
+        "mock": False,
+        "simulated": False,
+        "verified": True,
+        "verified_success": False,
+        "is_simulated": False,
+        "execution_layer": "agent_tool",
+        "exec_mode": "live",
+        "message": "Live refund must be executed via execute_tool('refund', payload) (order_id required).",
         "amount": amt,
-        "mock": True,
-        "verified": False,
+        "customer": customer,
     }
 
 
 def issue_credit(customer, amount):
+    EXEC_MODE = get_execution_mode()
+    verified = EXEC_MODE == "live"
+    if not verified:
+        try:
+            amt = float(amount or 0)
+        except (TypeError, ValueError):
+            amt = 0.0
+        return {
+            "ok": True,
+            "status": "simulated",
+            "simulated": True,
+            "mock": True,
+            "verified": False,
+            "verified_success": False,
+            "is_simulated": True,
+            "execution_layer": "agent_tool",
+            "exec_mode": EXEC_MODE,
+            "message": f"Simulated credit of ${amt:.2f} for {customer} (XALVION_EXEC_MODE={EXEC_MODE})",
+            "amount": amt,
+            "customer": customer,
+        }
+
     return {
-        "status": "credit_issued",
-        "customer": customer,
+        "ok": False,
+        "status": "error",
+        "simulated": False,
+        "mock": False,
+        "verified": True,
+        "verified_success": False,
+        "is_simulated": False,
+        "execution_layer": "agent_tool",
+        "exec_mode": "live",
+        "message": "Live credit must be executed via execute_tool('credit', payload).",
         "amount": amount,
-        "mock": True,
-        "verified": False,
+        "customer": customer,
     }
 
 
@@ -253,8 +315,29 @@ def issue_credit(customer, amount):
 # Set XALVION_EXEC_MODE=live in production to route through real APIs.
 # Default is "mock" — refund/credit simulators unless live mode is enabled.
 
+_EXEC_MODE = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+
+_STRIPE_KEY = (os.getenv("STRIPE_SECRET_KEY", "") or "").strip()
+_IS_LIVE_STRIPE = _STRIPE_KEY.startswith("sk_live_")
+_ENV = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
+
+if _EXEC_MODE != "live" and (_IS_LIVE_STRIPE or _ENV == "production"):
+    import sys
+
+    print(
+        "BOOT FATAL: XALVION_EXEC_MODE is not 'live' but environment is production "
+        "or a live Stripe key is present. Set XALVION_EXEC_MODE=live to proceed.",
+        file=sys.stderr,
+        flush=True,
+    )
+    raise RuntimeError(
+        "XALVION_EXEC_MODE must be 'live' in production. "
+        "Set XALVION_EXEC_MODE=live in your environment variables."
+    )
+
+
 def get_execution_mode() -> str:
-    return (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+    return _EXEC_MODE
 
 
 def execute_tool(
@@ -289,6 +372,8 @@ def execute_tool(
                 "is_simulated": True,
                 "verified": False,
                 "verified_success": False,
+                "execution_layer": "agent_tool",
+                "exec_mode": effective_mode,
             }
         if action == "credit":
             out = issue_credit(
@@ -303,6 +388,8 @@ def execute_tool(
                 "is_simulated": True,
                 "verified": False,
                 "verified_success": False,
+                "execution_layer": "agent_tool",
+                "exec_mode": effective_mode,
             }
         if action == "get_order":
             return get_order(
@@ -394,7 +481,9 @@ def _live_dispatch(action: str, payload: dict) -> dict:
         }
         data = _request("POST", f"/orders/{order_id}/refunds.json", body)
         refund = data.get("refund", {})
+        ok = str(refund.get("id", "")) != ""
         return {
+            "ok": ok,
             "status": "success",
             "customer": payload.get("customer", ""),
             "amount": amount,
@@ -403,6 +492,10 @@ def _live_dispatch(action: str, payload: dict) -> dict:
             "mode": "live",
             "mock": False,
             "verified": True,
+            "verified_success": bool(ok),
+            "is_simulated": False,
+            "execution_layer": "agent_tool",
+            "exec_mode": "live",
         }
 
     if action == "credit":
@@ -416,7 +509,9 @@ def _live_dispatch(action: str, payload: dict) -> dict:
         }
         data = _request("POST", "/gift_cards.json", body)
         gc = data.get("gift_card", {})
+        ok = str(gc.get("id", "")) != ""
         return {
+            "ok": ok,
             "status": "credit_issued",
             "customer": payload.get("customer", ""),
             "amount": amount,
@@ -424,6 +519,10 @@ def _live_dispatch(action: str, payload: dict) -> dict:
             "mode": "live",
             "mock": False,
             "verified": True,
+            "verified_success": bool(ok),
+            "is_simulated": False,
+            "execution_layer": "agent_tool",
+            "exec_mode": "live",
         }
 
     if action == "get_order":

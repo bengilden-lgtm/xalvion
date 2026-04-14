@@ -2173,6 +2173,9 @@ def serialize_support_result(
     trust_audit, outcome_correlation_key = _attach_trust_layer(result)
 
     return {
+        "is_simulated": bool(result.get("is_simulated", False)),
+        "verified_success": bool(result.get("verified_success", False)),
+        "execution_layer": str(result.get("execution_layer", "agent_tool") or "agent_tool"),
         "reply": reply,
         "response": result.get("response", reply),
         "final": result.get("final", reply),
@@ -3288,7 +3291,13 @@ def serve_static_favicon_svg():
 @app.get("/health")
 def health():
     """Shallow liveness: process is up (use /health/deep for readiness)."""
-    return {"status": "ok", "service": "xalvion-sovereign-brain"}
+    _mode = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+    return {
+        "status": "ok",
+        "service": "xalvion-sovereign-brain",
+        "execution_mode": _mode,
+        "execution_live": _mode == "live",
+    }
 
 
 @app.get("/health/deep")
@@ -3715,6 +3724,9 @@ def analyze_extension_ticket(
             )
 
     merged = CanonicalAgentResponse.model_validate(result).model_dump()
+    merged["is_simulated"] = bool(result.get("is_simulated", False))
+    merged["verified_success"] = bool(result.get("verified_success", False))
+    merged["execution_layer"] = str(result.get("execution_layer", "agent_tool") or "agent_tool")
     if entitlements:
         merged["operator_entitlements"] = entitlements
     return JSONResponse(

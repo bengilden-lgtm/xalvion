@@ -69,7 +69,18 @@ try:
 except Exception as _outcome_store_imp_err:
     logger.warning("outcome_store.log_outcome unavailable", exc_info=True)
 
-    def _log_outcome(outcome_key, user_id, action, amount, issue_type, tool_result, auto_resolved=True, approved_by_human=False):
+    def _log_outcome(
+        outcome_key,
+        user_id,
+        action,
+        amount,
+        issue_type,
+        tool_result,
+        auto_resolved=True,
+        approved_by_human=False,
+        is_simulated=False,
+        execution_layer="agent_tool",
+    ):
         raise RuntimeError("outcome_store module unavailable") from _outcome_store_imp_err
 
     def _get_decision_outcome_stats(issue_type, action, *, limit=300):
@@ -433,12 +444,58 @@ def run_agent(
     elif _gov_mode == "review":
         # Review: keep reply generation, but hold any tool execution behind approval gate.
         final_action = {**final_action, "requires_approval": True}
-        executed = execute_action(ticket, final_action)
+        try:
+            executed = execute_action(ticket, final_action)
+        except Exception as _exec_exc:
+            logger.error(
+                "execute_action_raised action=%s issue=%s error=%s",
+                final_action.get("action"),
+                ticket.get("issue_type"),
+                str(_exec_exc)[:300],
+                exc_info=True,
+            )
+            executed = {
+                "action": final_action.get("action", "review"),
+                "amount": 0,
+                "tool_result": {
+                    "status": "execution_error",
+                    "is_simulated": False,
+                    "verified": False,
+                    "verified_success": False,
+                    "error": str(_exec_exc)[:300],
+                },
+                "tool_status": "execution_error",
+                "is_simulated": False,
+                "verified_success": False,
+            }
         thinking_trace.append(_trace("governor_gate", "done", "review"))
         thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
     else:
         # Auto: preserve existing behavior.
-        executed = execute_action(ticket, final_action)
+        try:
+            executed = execute_action(ticket, final_action)
+        except Exception as _exec_exc:
+            logger.error(
+                "execute_action_raised action=%s issue=%s error=%s",
+                final_action.get("action"),
+                ticket.get("issue_type"),
+                str(_exec_exc)[:300],
+                exc_info=True,
+            )
+            executed = {
+                "action": final_action.get("action", "review"),
+                "amount": 0,
+                "tool_result": {
+                    "status": "execution_error",
+                    "is_simulated": False,
+                    "verified": False,
+                    "verified_success": False,
+                    "error": str(_exec_exc)[:300],
+                },
+                "tool_status": "execution_error",
+                "is_simulated": False,
+                "verified_success": False,
+            }
         thinking_trace.append(_trace("governor_gate", "done", "auto"))
         thinking_trace.append(_trace("execute_action", "done", str(executed.get("tool_status", "no_action"))))
     quality = compute_quality(confidence, triage, executed, user_memory, llm_used)
@@ -453,9 +510,15 @@ def run_agent(
     _exec_ts = str(executed.get("tool_status", "") or "").lower()
     _exec_act = str(executed.get("action", "none") or "none")
     _held_for_operator = _exec_ts in {"pending_approval", "manual_review", "approved_pending_execution"}
-    _mock_tr = isinstance(_tool_result, dict) and bool(_tool_result.get("mock"))
-    _vf_tr = _tool_result.get("verified") if isinstance(_tool_result, dict) else None
-    _verified_ok = (not _mock_tr) and (_vf_tr is not False)
+    _is_simulated = bool(
+        executed.get("is_simulated")
+        or (isinstance(_tool_result, dict) and _tool_result.get("is_simulated"))
+    )
+    _verified_success = bool(
+        executed.get("verified_success")
+        or (isinstance(_tool_result, dict) and _tool_result.get("verified_success"))
+    )
+    _verified_ok = _verified_success and not _is_simulated
     _log_outcome(
         outcome_key=_outcome_key,
         user_id=user_id,
@@ -465,6 +528,8 @@ def run_agent(
         tool_result=_tool_result,
         auto_resolved=(not _held_for_operator) and _exec_act in {"refund", "credit", "none"} and _verified_ok,
         approved_by_human=False,
+        is_simulated=_is_simulated,
+        execution_layer=str(executed.get("execution_layer", "agent_tool") or "agent_tool"),
     )
 
     customer_note = normalize_text(
@@ -502,7 +567,7 @@ def run_agent(
         )
     except Exception:
         pass  # analytics write failure never blocks the response
-    if quality > 0.92:
+    if quality > 0.92 and not _is_simulated:
         brain_growth = load_brain()
         add_rule(brain_growth, "Maintain strong clarity and confident tone.")
         save_brain(brain_growth)

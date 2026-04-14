@@ -20,6 +20,63 @@ MAX_CHARGE = int(MAX_AUTO_REFUND_AMOUNT)
 MAX_CREDIT = int(MAX_AUTO_CREDIT_AMOUNT)
 
 
+def _normalize_execution_result(result: dict) -> dict:
+    """
+    Enforce the canonical execution result schema.
+    Every path through execute_action() must produce this shape.
+    """
+    tool_result = result.get("tool_result") or {}
+    tool_status = str(result.get("tool_status", "unknown") or "unknown")
+    action = str(result.get("action", "none") or "none")
+    amount = int(result.get("amount", 0) or 0)
+
+    # is_simulated is authoritative: set if tool_result says so
+    is_simulated = bool(
+        tool_result.get("is_simulated")
+        or tool_result.get("simulated")
+        or tool_result.get("mock")
+        or tool_status == "simulated"
+    )
+
+    # verified_success is ONLY True when live execution completed without error
+    verified_success = (
+        (not is_simulated)
+        and tool_result.get("verified") is True
+        and tool_result.get("verified_success") is not False
+        and tool_status
+        not in {
+            "simulated",
+            "pending_approval",
+            "manual_review",
+            "error",
+            "blocked",
+            "local_tracking",
+            "local_damage_flow",
+            "local_billing_flow",
+            "local_refund_request",
+        }
+    )
+
+    # Normalise tool_status so callers never see raw "success" on a simulated run
+    if is_simulated and tool_status not in {"simulated"}:
+        tool_status = "simulated"
+
+    return {
+        "action": action,
+        "amount": amount,
+        "tool_result": {
+            **(tool_result if isinstance(tool_result, dict) else {"raw": tool_result}),
+            "is_simulated": is_simulated,
+            "verified": (not is_simulated),
+            "verified_success": verified_success,
+        },
+        "tool_status": tool_status,
+        "is_simulated": is_simulated,
+        "verified_success": verified_success,
+        "execution_layer": str(tool_result.get("execution_layer", "agent_tool") or "agent_tool"),
+    }
+
+
 def should_attach_order_context(issue_type: str) -> bool:
     return issue_type in HANDLED_ISSUE_TYPES and issue_type in {"shipping_issue", "damaged_order"}
 
@@ -62,7 +119,7 @@ def normalize_action_payload(payload: Dict[str, Any] | None, *, plan_tier: str |
     }
 
 
-def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Dict[str, Any]:
+def _execute_action_inner(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Dict[str, Any]:
     _tier = str(ticket.get("plan_tier", "free") or "free")
     safe_action = dict(normalize_action_payload(action_payload, plan_tier=_tier))
     if execution_requires_operator_gate(
@@ -188,3 +245,8 @@ def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Di
         "tool_result": integration_result,
         "tool_status": integration_result.get("status", "success"),
     }
+
+
+def execute_action(ticket: Dict[str, Any], action_payload: Dict[str, Any]) -> Dict[str, Any]:
+    raw = _execute_action_inner(ticket, action_payload)
+    return _normalize_execution_result(raw)

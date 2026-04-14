@@ -1142,14 +1142,11 @@ def _canonicalize_result(
     safe_message = normalize_text(customer_message)
 
     _tool_result = executed.get("tool_result") or {}
-    is_simulated = bool(
-        isinstance(_tool_result, dict)
-        and (
-            _tool_result.get("is_simulated")
-            or (_tool_result.get("mock") and not _tool_result.get("verified"))
-            or str(_tool_result.get("status", "") or "").lower() == "simulated"
-        )
-    )
+    # Use the normalized fields from execute_action() first; fall back to tool_result
+    _is_sim_top = bool(executed.get("is_simulated"))
+    _is_sim_inner = bool(isinstance(_tool_result, dict) and _tool_result.get("is_simulated"))
+    _is_simulated = _is_sim_top or _is_sim_inner
+    is_simulated = _is_simulated
     if is_simulated:
         prefix = "SIMULATION — "
         if not str(internal_note or "").lstrip().upper().startswith("SIMULATION"):
@@ -1210,18 +1207,25 @@ def _canonicalize_result(
     validated = CanonicalAgentResponse.model_validate(canonical).model_dump()
     validated.update({k: v for k, v in canonical.items() if k not in validated})
 
-    # FIX 7: Guard — if the execution was simulated, verified_success must be False in the
-    # canonical result regardless of what upstream fields say.
-    if isinstance(_tool_result, dict) and _tool_result.get("is_simulated"):
+    if _is_simulated:
         validated["verified_success"] = False
-        # Also ensure the nested sovereign_decision status reflects simulation.
+        validated["is_simulated"] = True
         if isinstance(validated.get("sovereign_decision"), dict):
             sd = validated["sovereign_decision"]
-            if str(sd.get("status", "")).lower() == "success":
+            if str(sd.get("status", "")).lower() in {"success", "executed"}:
                 sd["status"] = "simulated"
-        if isinstance(validated.get("decision"), dict):
-            d = validated["decision"]
-            if str(d.get("status", "")).lower() == "success":
-                d["status"] = "simulated"
+        # Also mark the top-level status fields
+        if str(validated.get("mode", "")).lower() not in {
+            "blocked",
+            "review",
+            "simulated",
+            "pending_approval",
+        }:
+            validated["mode"] = "simulated"
+    else:
+        # Only set verified_success=True when live execution confirmed
+        validated["verified_success"] = bool(executed.get("verified_success", False))
+
+    validated.setdefault("is_simulated", _is_simulated)
 
     return validated

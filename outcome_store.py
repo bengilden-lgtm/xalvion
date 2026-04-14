@@ -122,6 +122,8 @@ def log_outcome(
     tool_result: dict[str, Any],
     auto_resolved: bool = True,
     approved_by_human: bool = False,
+    is_simulated: bool = False,
+    execution_layer: str = "agent_tool",
 ) -> dict[str, Any]:
     """
     Log the real outcome of an executed action.
@@ -132,12 +134,27 @@ def log_outcome(
     tool_status = str(tool_result.get("status", "unknown") or "unknown")
     is_mock = isinstance(tool_result, dict) and bool(tool_result.get("mock"))
     vf = tool_result.get("verified") if isinstance(tool_result, dict) else None
-    allow_success = (not is_mock) and (vf is not False)
+    allow_success = (not is_mock) and (vf is not False) and (not bool(is_simulated))
     success = 1 if allow_success and tool_status in _SUCCESS_STATUSES else 0
     now         = _now_iso()
 
     db = SessionLocal()
     try:
+        # Persist simulation and layer in the stored payload (JSON blob) so downstream
+        # analytics can exclude simulated runs from real success metrics.
+        tool_result_to_store: dict[str, Any]
+        if isinstance(tool_result, dict):
+            tool_result_to_store = {
+                **tool_result,
+                "is_simulated": bool(is_simulated),
+                "execution_layer": str(execution_layer or "agent_tool"),
+            }
+        else:
+            tool_result_to_store = {
+                "raw": tool_result,
+                "is_simulated": bool(is_simulated),
+                "execution_layer": str(execution_layer or "agent_tool"),
+            }
         row = ActionOutcomeLog(
             outcome_key=str(outcome_key or "")[:64],
             user_id=str(user_id or "")[:120],
@@ -152,7 +169,7 @@ def log_outcome(
             dispute_filed=0,
             ticket_reopened=0,
             crm_closed=0,
-            tool_response_json=_tool_response_json(tool_result if isinstance(tool_result, dict) else {"raw": tool_result}),
+            tool_response_json=_tool_response_json(tool_result_to_store),
             created_at=now,
             updated_at=now,
         )
@@ -1009,14 +1026,29 @@ def get_decision_outcome_stats(
             .limit(lim)
             .all()
         )
-        n = len(rows)
+        if not rows:
+            return dict(neutral)
+
+        # Exclude simulated executions from outcome rates (they must not inflate success metrics).
+        real_rows: list[ActionOutcomeLog] = []
+        for r in rows:
+            try:
+                payload = json.loads(str(r.tool_response_json or "{}"))
+                if isinstance(payload, dict) and bool(payload.get("is_simulated", False)):
+                    continue
+            except Exception:
+                # If parse fails, treat as real (conservative for compatibility with older rows).
+                pass
+            real_rows.append(r)
+
+        n = len(real_rows)
         if n == 0:
             return dict(neutral)
 
-        successes = sum(1 for r in rows if int(r.success or 0))
-        reopened = sum(1 for r in rows if int(getattr(r, "ticket_reopened", 0) or 0))
-        reversed_n = sum(1 for r in rows if int(r.refund_reversed or 0))
-        disputes = sum(1 for r in rows if int(r.dispute_filed or 0))
+        successes = sum(1 for r in real_rows if int(r.success or 0))
+        reopened = sum(1 for r in real_rows if int(getattr(r, "ticket_reopened", 0) or 0))
+        reversed_n = sum(1 for r in real_rows if int(r.refund_reversed or 0))
+        disputes = sum(1 for r in real_rows if int(r.dispute_filed or 0))
 
         sr = round(successes / n, 4)
         rr = round(reopened / n, 4)

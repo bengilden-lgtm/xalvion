@@ -262,38 +262,51 @@ def _execute_ticket_reply_send(
         )
 
     reply_body = (req.body or "").strip() or str(ticket.final_reply or "").strip()
-    delivery = email_service.send_ticket_reply_email(
+    send_result = email_service.send_ticket_reply_email(
         ticket=ticket,
         reply_body=reply_body,
         subject=req.subject,
     )
-    status = str(delivery.get("status") or "")
-    if status == "pending_manual":
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "code": delivery.get("code") or "send_blocked",
-                "message": delivery.get("message") or "Reply cannot be sent by email for this ticket.",
-            },
-        )
+
+    # Persist delivery outcome to ticket regardless of success/failure
+    try:
+        delivery_status = str(send_result.get("status", "unknown") or "unknown")
+        ticket.updated_at = app_mod._now_iso()
+        existing_note = str(ticket.internal_note or "")
+        delivery_tag = f"[email_delivery:{delivery_status}]"
+        if "[email_delivery:" not in existing_note:
+            ticket.internal_note = f"{existing_note} {delivery_tag}".strip()
+        else:
+            import re
+
+            ticket.internal_note = re.sub(
+                r"\[email_delivery:[^\]]*\]",
+                delivery_tag,
+                existing_note,
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.warning("ticket_delivery_status_persist_failed ticket_id=%s", ticket_id, exc_info=True)
+
+    # Return honest status — never return "sent" if SMTP failed
+    status = str(send_result.get("status") or "")
+    if status == "sent":
+        return {"ok": True, "status": "sent", "to": send_result.get("to")}
     if status == "transport_unavailable":
         raise HTTPException(
             status_code=503,
-            detail={
-                "code": delivery.get("code") or "smtp_not_configured",
-                "message": delivery.get("message") or "Outbound email transport is not configured.",
-            },
+            detail=f"Email transport not configured. {send_result.get('message', '')}",
         )
-    if status == "error":
+    if status == "pending_manual":
         raise HTTPException(
-            status_code=502,
-            detail={
-                "code": delivery.get("code") or "smtp_send_failed",
-                "message": delivery.get("message") or "Email delivery failed.",
-            },
+            status_code=422,
+            detail=str(send_result.get("message", "Cannot deliver — missing customer email.")),
         )
-
-    return {"ok": True, "delivery": delivery}
+    raise HTTPException(
+        status_code=502,
+        detail=f"Email delivery failed: {send_result.get('message', 'Unknown error')}",
+    )
 
 
 @router.post("/tickets/{ticket_id}/reply/send")
