@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-04-13T03:55:44.548235+00:00",
+  "updated_at": "2026-04-14T07:08:49.633908+00:00",
   "entries": [
     {
       "lead_id": "2760dc9cd36d4678b90d19932662cee7",
@@ -27,7 +27,7 @@
       "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
       "timestamps": {
         "created_at": "2026-04-12T11:28:02.805583+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": null,
         "reply_time": null,
         "last_followup_time": null
@@ -69,7 +69,7 @@
       "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
       "timestamps": {
         "created_at": "2026-04-12T11:28:04.874443+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": null,
         "reply_time": "2026-04-12T11:28:04.950426+00:00",
         "last_followup_time": null
@@ -101,7 +101,7 @@
       "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
       "timestamps": {
         "created_at": "2026-04-12T11:28:41.641639+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": null,
         "reply_time": null,
         "last_followup_time": null
@@ -143,7 +143,7 @@
       "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
       "timestamps": {
         "created_at": "2026-04-12T11:28:43.898311+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": null,
         "reply_time": "2026-04-12T11:28:43.981983+00:00",
         "last_followup_time": null
@@ -180,7 +180,7 @@
       "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
       "timestamps": {
         "created_at": "2026-04-12T11:29:08.791095+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-12T11:29:08.899063+00:00",
         "reply_time": null,
         "last_followup_time": null
@@ -227,7 +227,7 @@
       "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
       "timestamps": {
         "created_at": "2026-04-12T11:29:10.275945+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-12T11:29:10.334596+00:00",
         "reply_time": "2026-04-12T11:29:10.367448+00:00",
         "last_followup_time": null
@@ -264,7 +264,7 @@
       "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
       "timestamps": {
         "created_at": "2026-04-13T02:14:38.969677+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-13T02:14:39.009375+00:00",
         "reply_time": null,
         "last_followup_time": null
@@ -311,7 +311,7 @@
       "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
       "timestamps": {
         "created_at": "2026-04-13T02:14:39.693406+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-13T02:14:39.725773+00:00",
         "reply_time": "2026-04-13T02:14:39.741792+00:00",
         "last_followup_time": null
@@ -348,7 +348,7 @@
       "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
       "timestamps": {
         "created_at": "2026-04-13T02:29:10.029644+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-13T02:29:10.072737+00:00",
         "reply_time": null,
         "last_followup_time": null
@@ -395,7 +395,7 @@
       "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
       "timestamps": {
         "created_at": "2026-04-13T02:29:10.775822+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-13T02:29:10.813534+00:00",
         "reply_time": "2026-04-13T02:29:10.831929+00:00",
         "last_followup_time": null
@@ -432,7 +432,7 @@
       "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
       "timestamps": {
         "created_at": "2026-04-13T02:53:08.004776+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-13T02:53:08.058219+00:00",
         "reply_time": null,
         "last_followup_time": null
@@ -479,7 +479,7 @@
       "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
       "timestamps": {
         "created_at": "2026-04-13T02:53:08.734044+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-13T02:53:08.775218+00:00",
         "reply_time": "2026-04-13T02:53:08.795861+00:00",
         "last_followup_time": null
@@ -516,7 +516,7 @@
       "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
       "timestamps": {
         "created_at": "2026-04-13T03:55:43.686833+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-13T03:55:43.758245+00:00",
         "reply_time": null,
         "last_followup_time": null
@@ -563,9 +563,345 @@
       "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
       "timestamps": {
         "created_at": "2026-04-13T03:55:44.468696+00:00",
-        "updated_at": "2026-04-13T03:55:44.548235+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
         "last_sent_at": "2026-04-13T03:55:44.520168+00:00",
         "reply_time": "2026-04-13T03:55:44.542906+00:00",
+        "last_followup_time": null
+      }
+    },
+    {
+      "lead_id": "0a547d8724dd45c48e83ff3de65872e2",
+      "source": "reddit",
+      "message_history": [
+        {
+          "type": "initial",
+          "text": "Quick one on \"Zendesk queue is killing us on refunds\": same-week reduction in back-and-forth is the usual outcome.\n\nIf you want, I’ll mirror your rules on a batch so you can compare before committing.",
+          "timestamp": "2026-04-14T07:06:27.505380+00:00"
+        },
+        {
+          "type": "follow_up_scheduled",
+          "text": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+          "timestamp": "2026-04-14T07:06:27.570557+00:00"
+        }
+      ],
+      "replied": false,
+      "reply_text": null,
+      "reply_time": null,
+      "followup_count": 0,
+      "last_followup_time": null,
+      "pipeline_stage": "sent",
+      "booking_status": "none",
+      "last_action_time": "2026-04-14T07:06:27.570557+00:00",
+      "conversion_score": 34.4,
+      "intent_score": 80.0,
+      "high_priority": false,
+      "pending_followup_suggestion": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+      "pending_booking_message": null,
+      "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+      "timestamps": {
+        "created_at": "2026-04-14T07:06:27.505380+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
+        "last_sent_at": "2026-04-14T07:06:27.570557+00:00",
+        "reply_time": null,
+        "last_followup_time": null
+      }
+    },
+    {
+      "lead_id": "8e7a14d7a8e841ecbb2f27e83896638c",
+      "source": "manual",
+      "message_history": [
+        {
+          "type": "initial",
+          "text": "warm_lead — \"Need to cut ticket volume fast\" reads like throughput is the issue.\n\nWe reduce ticket load by tightening decisions (you stay in control).\n\nOpen to a no-cost pass on 5–10 tickets?",
+          "timestamp": "2026-04-14T07:06:28.258474+00:00"
+        },
+        {
+          "type": "follow_up_scheduled",
+          "text": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+          "timestamp": "2026-04-14T07:06:28.307447+00:00"
+        },
+        {
+          "type": "inbound_reply",
+          "text": "Yes — let's schedule something this week.",
+          "timestamp": "2026-04-14T07:06:28.332309+00:00"
+        },
+        {
+          "type": "booking_suggested",
+          "text": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+          "timestamp": "2026-04-14T07:06:28.332309+00:00"
+        }
+      ],
+      "replied": true,
+      "reply_text": "Yes — let's schedule something this week.",
+      "reply_time": "2026-04-14T07:06:28.332309+00:00",
+      "followup_count": 0,
+      "last_followup_time": null,
+      "pipeline_stage": "booked",
+      "booking_status": "link_sent",
+      "last_action_time": "2026-04-14T07:06:28.332309+00:00",
+      "conversion_score": 57.04,
+      "intent_score": 8.0,
+      "high_priority": true,
+      "pending_followup_suggestion": "Love it. Easiest next step: I can run this on your tickets for free on a small batch — you compare before any commitment.\n\nWant me to start with 5–10 live threads?",
+      "pending_booking_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+      "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+      "timestamps": {
+        "created_at": "2026-04-14T07:06:28.258474+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
+        "last_sent_at": "2026-04-14T07:06:28.307447+00:00",
+        "reply_time": "2026-04-14T07:06:28.332309+00:00",
+        "last_followup_time": null
+      }
+    },
+    {
+      "lead_id": "6221a23688694b7d89cfa8b47075bb1a",
+      "source": "reddit",
+      "message_history": [
+        {
+          "type": "initial",
+          "text": "acme_corp — \"Zendesk queue is killing us on refunds\" reads like throughput is the issue.\n\nWe reduce ticket load by tightening decisions (you stay in control).\n\nOpen to a no-cost pass on 5–10 tickets?",
+          "timestamp": "2026-04-14T07:06:47.761105+00:00"
+        },
+        {
+          "type": "follow_up_scheduled",
+          "text": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+          "timestamp": "2026-04-14T07:06:47.826319+00:00"
+        }
+      ],
+      "replied": false,
+      "reply_text": null,
+      "reply_time": null,
+      "followup_count": 0,
+      "last_followup_time": null,
+      "pipeline_stage": "sent",
+      "booking_status": "none",
+      "last_action_time": "2026-04-14T07:06:47.826319+00:00",
+      "conversion_score": 34.4,
+      "intent_score": 80.0,
+      "high_priority": false,
+      "pending_followup_suggestion": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+      "pending_booking_message": null,
+      "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+      "timestamps": {
+        "created_at": "2026-04-14T07:06:47.761105+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
+        "last_sent_at": "2026-04-14T07:06:47.826319+00:00",
+        "reply_time": null,
+        "last_followup_time": null
+      }
+    },
+    {
+      "lead_id": "a9cbc1926bbf4952b4efa06473423248",
+      "source": "manual",
+      "message_history": [
+        {
+          "type": "initial",
+          "text": "warm_lead — saw the pain in: \"Need to cut ticket volume fast\".\n\nWe fix the support workflow bottleneck in about 7 days — free setup, pay only if it works.\n\nI can run this on your tickets for free if you want proof on real volume.",
+          "timestamp": "2026-04-14T07:06:48.580517+00:00"
+        },
+        {
+          "type": "follow_up_scheduled",
+          "text": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+          "timestamp": "2026-04-14T07:06:48.634972+00:00"
+        },
+        {
+          "type": "inbound_reply",
+          "text": "Yes — let's schedule something this week.",
+          "timestamp": "2026-04-14T07:06:48.660618+00:00"
+        },
+        {
+          "type": "booking_suggested",
+          "text": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+          "timestamp": "2026-04-14T07:06:48.660618+00:00"
+        }
+      ],
+      "replied": true,
+      "reply_text": "Yes — let's schedule something this week.",
+      "reply_time": "2026-04-14T07:06:48.660618+00:00",
+      "followup_count": 0,
+      "last_followup_time": null,
+      "pipeline_stage": "booked",
+      "booking_status": "link_sent",
+      "last_action_time": "2026-04-14T07:06:48.660618+00:00",
+      "conversion_score": 57.04,
+      "intent_score": 8.0,
+      "high_priority": true,
+      "pending_followup_suggestion": "Love it. Easiest next step: I can run this on your tickets for free on a small batch — you compare before any commitment.\n\nWant me to start with 5–10 live threads?",
+      "pending_booking_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+      "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+      "timestamps": {
+        "created_at": "2026-04-14T07:06:48.580517+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
+        "last_sent_at": "2026-04-14T07:06:48.634972+00:00",
+        "reply_time": "2026-04-14T07:06:48.660618+00:00",
+        "last_followup_time": null
+      }
+    },
+    {
+      "lead_id": "2ac90f5797ad483cb5ec9b37fb6f272f",
+      "source": "reddit",
+      "message_history": [
+        {
+          "type": "initial",
+          "text": "Hey acme_corp — re your support load (\"Zendesk queue is killing us on refunds\"): teams that wire this cut live ticket volume ~40–50% in week one without adding risk (everything ships with your approval).\n\nWorth trying this on one ticket batch?",
+          "timestamp": "2026-04-14T07:07:22.096071+00:00"
+        },
+        {
+          "type": "follow_up_scheduled",
+          "text": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+          "timestamp": "2026-04-14T07:07:22.260360+00:00"
+        }
+      ],
+      "replied": false,
+      "reply_text": null,
+      "reply_time": null,
+      "followup_count": 0,
+      "last_followup_time": null,
+      "pipeline_stage": "sent",
+      "booking_status": "none",
+      "last_action_time": "2026-04-14T07:07:22.260360+00:00",
+      "conversion_score": 34.4,
+      "intent_score": 80.0,
+      "high_priority": false,
+      "pending_followup_suggestion": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+      "pending_booking_message": null,
+      "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+      "timestamps": {
+        "created_at": "2026-04-14T07:07:22.096071+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
+        "last_sent_at": "2026-04-14T07:07:22.260360+00:00",
+        "reply_time": null,
+        "last_followup_time": null
+      }
+    },
+    {
+      "lead_id": "c5813342e9b34a85b3c2b5eb3e6d0835",
+      "source": "manual",
+      "message_history": [
+        {
+          "type": "initial",
+          "text": "warm_lead — saw the pain in: \"Need to cut ticket volume fast\".\n\nWe fix the support workflow bottleneck in about 7 days — free setup, pay only if it works.\n\nI can run this on your tickets for free if you want proof on real volume.",
+          "timestamp": "2026-04-14T07:07:23.785915+00:00"
+        },
+        {
+          "type": "follow_up_scheduled",
+          "text": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+          "timestamp": "2026-04-14T07:07:23.917668+00:00"
+        },
+        {
+          "type": "inbound_reply",
+          "text": "Yes — let's schedule something this week.",
+          "timestamp": "2026-04-14T07:07:23.974880+00:00"
+        },
+        {
+          "type": "booking_suggested",
+          "text": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+          "timestamp": "2026-04-14T07:07:23.974880+00:00"
+        }
+      ],
+      "replied": true,
+      "reply_text": "Yes — let's schedule something this week.",
+      "reply_time": "2026-04-14T07:07:23.974880+00:00",
+      "followup_count": 0,
+      "last_followup_time": null,
+      "pipeline_stage": "booked",
+      "booking_status": "link_sent",
+      "last_action_time": "2026-04-14T07:07:23.974880+00:00",
+      "conversion_score": 57.04,
+      "intent_score": 8.0,
+      "high_priority": true,
+      "pending_followup_suggestion": "Love it. Easiest next step: I can run this on your tickets for free on a small batch — you compare before any commitment.\n\nWant me to start with 5–10 live threads?",
+      "pending_booking_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+      "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+      "timestamps": {
+        "created_at": "2026-04-14T07:07:23.785915+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
+        "last_sent_at": "2026-04-14T07:07:23.917668+00:00",
+        "reply_time": "2026-04-14T07:07:23.974880+00:00",
+        "last_followup_time": null
+      }
+    },
+    {
+      "lead_id": "b107f9e09e8f4c1d892e33b4bf5c9485",
+      "source": "reddit",
+      "message_history": [
+        {
+          "type": "initial",
+          "text": "On \"Zendesk queue is killing us on refunds\": we shorten refund/reply/escalation loops so agents close the right outcome faster.\n\nHappy to pilot on a small slice of your queue — 10 minutes to see if it matches how you work.",
+          "timestamp": "2026-04-14T07:08:48.759614+00:00"
+        },
+        {
+          "type": "follow_up_scheduled",
+          "text": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+          "timestamp": "2026-04-14T07:08:48.844098+00:00"
+        }
+      ],
+      "replied": false,
+      "reply_text": null,
+      "reply_time": null,
+      "followup_count": 0,
+      "last_followup_time": null,
+      "pipeline_stage": "sent",
+      "booking_status": "none",
+      "last_action_time": "2026-04-14T07:08:48.844098+00:00",
+      "conversion_score": 34.4,
+      "intent_score": 80.0,
+      "high_priority": false,
+      "pending_followup_suggestion": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+      "pending_booking_message": null,
+      "follow_up_message": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+      "timestamps": {
+        "created_at": "2026-04-14T07:08:48.759614+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
+        "last_sent_at": "2026-04-14T07:08:48.844098+00:00",
+        "reply_time": null,
+        "last_followup_time": null
+      }
+    },
+    {
+      "lead_id": "2a055dc7c02a4752a485abd0d15d106f",
+      "source": "manual",
+      "message_history": [
+        {
+          "type": "initial",
+          "text": "On \"Need to cut ticket volume fast\": we shorten refund/reply/escalation loops so agents close the right outcome faster.\n\nHappy to pilot on a small slice of your queue — 10 minutes to see if it matches how you work.",
+          "timestamp": "2026-04-14T07:08:49.540076+00:00"
+        },
+        {
+          "type": "follow_up_scheduled",
+          "text": "Circling back on support throughput — want a no-cost pass on a few live tickets so you can compare handle time?",
+          "timestamp": "2026-04-14T07:08:49.598855+00:00"
+        },
+        {
+          "type": "inbound_reply",
+          "text": "Yes — let's schedule something this week.",
+          "timestamp": "2026-04-14T07:08:49.627264+00:00"
+        },
+        {
+          "type": "booking_suggested",
+          "text": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+          "timestamp": "2026-04-14T07:08:49.627264+00:00"
+        }
+      ],
+      "replied": true,
+      "reply_text": "Yes — let's schedule something this week.",
+      "reply_time": "2026-04-14T07:08:49.627264+00:00",
+      "followup_count": 0,
+      "last_followup_time": null,
+      "pipeline_stage": "booked",
+      "booking_status": "link_sent",
+      "last_action_time": "2026-04-14T07:08:49.627264+00:00",
+      "conversion_score": 57.04,
+      "intent_score": 8.0,
+      "high_priority": true,
+      "pending_followup_suggestion": "Love it. Easiest next step: I can run this on your tickets for free on a small batch — you compare before any commitment.\n\nWant me to start with 5–10 live threads?",
+      "pending_booking_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+      "follow_up_message": "Let’s test it on your tickets — takes ~10 mins. Pick a slot here: https://cal.com/example/10min\n\nIf none of those work, reply with two windows that fit and I’ll adapt.",
+      "timestamps": {
+        "created_at": "2026-04-14T07:08:49.540076+00:00",
+        "updated_at": "2026-04-14T07:08:49.633908+00:00",
+        "last_sent_at": "2026-04-14T07:08:49.598855+00:00",
+        "reply_time": "2026-04-14T07:08:49.627264+00:00",
         "last_followup_time": null
       }
     }
