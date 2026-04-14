@@ -119,6 +119,54 @@ from orm_models import ActionLog, Ticket, User
 
 print("BOOT: db and ORM table modules imported", flush=True)
 
+
+class _GlobalRedactFilter(logging.Filter):
+    _patterns = [
+        re.compile(r"sk_live_[A-Za-z0-9]+"),
+        re.compile(r"whsec_[A-Za-z0-9]+"),
+        re.compile(r"postgresql://[^\s'\"\\]+"),
+        # common forms: smtp_password=..., smtp_password: ..., "smtp_password": "..."
+        re.compile(r'(\bsmtp_password\b\s*[:=]\s*)([^\s,;\'"]+|"[^"]*"|\'[^\']*\')', re.IGNORECASE),
+    ]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+            redacted = msg
+            for p in self._patterns:
+                if "smtp_password" in p.pattern:
+                    redacted = p.sub(r"\1[REDACTED]", redacted)
+                else:
+                    redacted = p.sub("[REDACTED]", redacted)
+            if redacted != msg:
+                record.msg = redacted
+                record.args = ()
+        except Exception:
+            pass
+        return True
+
+
+def _install_global_log_redaction_filter() -> None:
+    f = _GlobalRedactFilter()
+
+    root = logging.getLogger()
+    root.addFilter(f)
+    for h in list(getattr(root, "handlers", []) or []):
+        h.addFilter(f)
+
+    try:
+        mgr = logging.Logger.manager  # type: ignore[attr-defined]
+        for lg in list(getattr(mgr, "loggerDict", {}).values() or []):
+            if isinstance(lg, logging.Logger):
+                lg.addFilter(f)
+                for h in list(getattr(lg, "handlers", []) or []):
+                    h.addFilter(f)
+    except Exception:
+        pass
+
+
+_install_global_log_redaction_filter()
+
 try:
     from learning import learn_from_ticket
 except Exception as _app_learning_imp_err:
