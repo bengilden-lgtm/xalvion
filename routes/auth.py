@@ -24,14 +24,17 @@ def _user_billing_motion_rollups(db: Session, username: str) -> tuple[float, int
         refund_sum = db.query(func.sum(app_mod.ActionLog.amount)).filter(
             app_mod.ActionLog.username == username,
             app_mod.ActionLog.action == "refund",
+            app_mod.ActionLog.status != "simulated",   # Exclude simulated
         ).scalar()
         credit_sum = db.query(func.sum(app_mod.ActionLog.amount)).filter(
             app_mod.ActionLog.username == username,
             app_mod.ActionLog.action == "credit",
+            app_mod.ActionLog.status != "simulated",   # Exclude simulated
         ).scalar()
         actions_done = db.query(app_mod.ActionLog).filter(
             app_mod.ActionLog.username == username,
             app_mod.ActionLog.action.in_(["refund", "credit"]),
+            app_mod.ActionLog.status != "simulated",   # Exclude simulated
         ).count()
         money = float(refund_sum or 0) + float(credit_sum or 0)
         return money, int(actions_done)

@@ -254,6 +254,125 @@ if (typeof window.pulseRail !== "function") {
     return Number(v.credit_volume_usd || 0) + Number(v.refund_volume_usd || 0);
   }
 
+  function getExecutionTruth(data) {
+    // Prefer the structured execution_truth object if present (post-fix backends).
+    if (data && data.execution_truth && data.execution_truth.status) {
+      return data.execution_truth;
+    }
+    // Fallback: derive from scattered flags for backward compatibility.
+    const isSim = !!(data.is_simulated || (data.tool_result && data.tool_result.is_simulated));
+    const vSucc = !!(data.verified_success);
+    const reqAppr = !!(
+      data.requires_approval ||
+      (data.sovereign_decision && data.sovereign_decision.requires_approval)
+    );
+    const ts = String(
+      (data.sovereign_decision && data.sovereign_decision.tool_status) ||
+        data.tool_status ||
+        "unknown"
+    );
+    const action = String(
+      (data.sovereign_decision && data.sovereign_decision.action) || data.action || "none"
+    );
+    const amount = Number(
+      (data.sovereign_decision && data.sovereign_decision.amount) || data.amount || 0
+    );
+
+    if (isSim)
+      return {
+        status: "simulated",
+        label: "Simulated — no action taken",
+        detail: "Mock execution mode is active. No real action occurred.",
+        color: "warning",
+        is_simulated: true,
+        verified_success: false,
+        requires_approval: false,
+        action,
+        amount,
+        tool_status: ts
+      };
+    if (reqAppr || ["pending_approval", "manual_review"].includes(ts))
+      return {
+        status: "pending_approval",
+        label: "Staged — awaiting approval",
+        detail: "Recommended but not executed. Approve to proceed.",
+        color: "neutral",
+        is_simulated: false,
+        verified_success: false,
+        requires_approval: true,
+        action,
+        amount,
+        tool_status: ts
+      };
+    if (vSucc)
+      return {
+        status: "executed",
+        label: "Executed — action confirmed",
+        detail: "Action was processed and confirmed.",
+        color: "success",
+        is_simulated: false,
+        verified_success: true,
+        requires_approval: false,
+        action,
+        amount,
+        tool_status: ts
+      };
+    if (action === "none" || ["no_action", "reply_only"].includes(ts))
+      return {
+        status: "reply_only",
+        label: "Reply prepared — no financial action",
+        detail: "No financial action was recommended or taken.",
+        color: "info",
+        is_simulated: false,
+        verified_success: false,
+        requires_approval: false,
+        action,
+        amount,
+        tool_status: ts
+      };
+    return {
+      status: "assist_only",
+      label: "Assist mode — review needed",
+      detail: "A recommendation was prepared. Manual review required.",
+      color: "neutral",
+      is_simulated: false,
+      verified_success: false,
+      requires_approval: false,
+      action,
+      amount,
+      tool_status: ts
+    };
+  }
+
+  function renderExecutionTruthBanner(truth) {
+    if (!truth) return "";
+    const colorClass =
+      {
+        warning: "truth-banner--warning",
+        success: "truth-banner--success",
+        neutral: "truth-banner--neutral",
+        error: "truth-banner--error",
+        info: "truth-banner--info"
+      }[truth.color] || "truth-banner--neutral";
+
+    const simTag = truth.is_simulated
+      ? '<span class="truth-badge truth-badge--sim">SIMULATED</span>'
+      : truth.verified_success
+        ? '<span class="truth-badge truth-badge--live">LIVE</span>'
+        : "";
+
+    return `<div class="truth-banner ${colorClass}" role="status" aria-live="polite">
+      <span class="truth-banner__label">${escapeHtml(truth.label)}</span>
+      ${simTag}
+      <span class="truth-banner__detail">${escapeHtml(truth.detail)}</span>
+    </div>`;
+  }
+
+  function shouldWarnSimulatedMetrics(dashboardData) {
+    const em = dashboardData && dashboardData.execution_mode;
+    return em && !em.is_live;
+  }
+
   function getValueSnapshot() {
     const d = state.dashboardStats || {};
     const vs = state.valueSignals && typeof state.valueSignals === "object" ? state.valueSignals : {};
@@ -547,6 +666,7 @@ if (typeof window.pulseRail !== "function") {
       row?.dataset?.demoThread === "1"
         ? `<div class="ticket-result-summary__demo" role="note"><strong>Demo</strong> — synthetic scenario only; not real customer data. Summary shows how decisions are structured.</div>`
         : "";
+    const truthBanner = renderExecutionTruthBanner(getExecutionTruth(data));
     host.className = "ticket-result-summary js-ticket-result-summary ticket-result-summary--metadata";
     const execExplain = String(exec.detail || "").trim();
     const smtpNote = String(emailLine || "").trim();
@@ -581,6 +701,7 @@ if (typeof window.pulseRail !== "function") {
     </details>`
       : "";
     host.innerHTML = `
+      ${truthBanner}
       ${demoBanner}
       <div class="ticket-result-summary__title">Result</div>
       <div class="ticket-result-summary__grid ticket-result-summary__grid--top" role="group" aria-label="Ticket outcome">
@@ -812,6 +933,37 @@ if (typeof window.pulseRail !== "function") {
   };
 
   function ensureInjectedStyles() {
+    const _truthBannerCSS = `
+    .truth-banner {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 10px 14px; border-radius: 6px; margin-bottom: 12px;
+      font-size: 13px; line-height: 1.4; border-left: 3px solid currentColor;
+    }
+    .truth-banner--warning  { background: #fef9ec; color: #92620a; border-color: #f59e0b; }
+    .truth-banner--success  { background: #f0fdf4; color: #166534; border-color: #22c55e; }
+    .truth-banner--neutral  { background: #f8fafc; color: #475569; border-color: #94a3b8; }
+    .truth-banner--error    { background: #fef2f2; color: #991b1b; border-color: #ef4444; }
+    .truth-banner--info     { background: #eff6ff; color: #1e40af; border-color: #3b82f6; }
+    .truth-banner__label    { font-weight: 600; white-space: nowrap; }
+    .truth-banner__detail   { color: inherit; opacity: 0.85; }
+    .truth-badge            {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 2px 6px; border-radius: 3px; letter-spacing: 0.04em;
+      flex-shrink: 0; align-self: center;
+    }
+    .truth-badge--sim  { background: #fef3c7; color: #92620a; border: 1px solid #fcd34d; }
+    .truth-badge--live { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  `;
+
+    try {
+      if (!document.querySelector('style[data-xv-truth-styles="1"]')) {
+        const truthStyle = document.createElement("style");
+        truthStyle.setAttribute("data-xv-truth-styles", "1");
+        truthStyle.textContent = _truthBannerCSS;
+        document.head.appendChild(truthStyle);
+      }
+    } catch {}
+
     // In Claude-mode we keep the bulk of styling in `styles.css`, but we still
     // allow a small, surgical runtime override for spacing/rail/composer rhythm.
     // This avoids architecture changes while letting us refine the merged UI.
@@ -2489,7 +2641,7 @@ if (typeof window.pulseRail !== "function") {
     const tm = Number((vg && vg.time_saved_minutes) ?? estimateAgentMinutesSavedFromDashboard(d));
     const parts = [];
     if (Number.isFinite(tickets) && tickets > 0) parts.push(`${Math.floor(tickets)} ticket${tickets === 1 ? "" : "s"} handled`);
-    if (money > 0) parts.push(`${formatMoney(money)} in billing motions`);
+    if (money > 0) parts.push(`${formatMoney(money)} in billing motions${shouldWarnSimulatedMetrics(d) ? " (simulation data)" : ""}`);
     if (actions > 0) parts.push(`${actions} billing action${actions === 1 ? "" : "s"} prepared`);
     if (tm > 0) parts.push(`~${Math.round(tm)} min operator time back`);
     return parts.length ? `${parts.join(" · ")}. ` : "";
@@ -4149,7 +4301,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const primaryLine = narrative?.primary
       ? narrative.primary
       : hasValue
-        ? `Value logged this workspace: ~${mins} min back · ${formatMoney(money)} in billing motions · ${tickets} ticket${tickets === 1 ? "" : "s"} handled · ${actions} action${actions === 1 ? "" : "s"} prepared.`
+        ? `Value logged this workspace: ~${mins} min back · ${formatMoney(money)} in billing motions${shouldWarnSimulatedMetrics(d) ? " (simulation data)" : ""} · ${tickets} ticket${tickets === 1 ? "" : "s"} handled · ${actions} action${actions === 1 ? "" : "s"} prepared.`
         : "";
 
     const secondaryLine = narrative?.secondary ? narrative.secondary : "";

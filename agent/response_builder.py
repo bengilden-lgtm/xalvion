@@ -1228,4 +1228,69 @@ def _canonicalize_result(
 
     validated.setdefault("is_simulated", _is_simulated)
 
+    # --- Execution truth summary ---
+    _is_sim   = bool(validated.get("is_simulated", False))
+    _v_succ   = bool(validated.get("verified_success", False))
+    _ts       = str((validated.get("sovereign_decision") or {}).get("tool_status", "")
+                    or validated.get("tool_status", "unknown"))
+    _action   = str((validated.get("sovereign_decision") or {}).get("action", "none")
+                    or "none")
+    _amount   = float((validated.get("sovereign_decision") or {}).get("amount", 0) or 0)
+    _req_appr = bool((validated.get("sovereign_decision") or {}).get("requires_approval", False))
+
+    if _is_sim:
+        _truth_status  = "simulated"
+        _truth_label   = "Simulated — no action taken"
+        _truth_detail  = (
+            "This run used mock execution mode. No refund, credit, or charge was "
+            "processed. Set XALVION_EXEC_MODE=live to enable real execution."
+        )
+        _truth_color   = "warning"   # Maps to amber/yellow in the UI
+    elif _req_appr or _ts in {"pending_approval", "manual_review", "approved_pending_execution"}:
+        _truth_status  = "pending_approval"
+        _truth_label   = "Staged — awaiting approval"
+        _truth_detail  = (
+            f"The AI recommended {'a ' + _action if _action != 'none' else 'an action'}"
+            + (f" of ${_amount:.2f}" if _amount > 0 else "")
+            + ". Nothing has been sent or executed — this requires your approval."
+        )
+        _truth_color   = "neutral"
+    elif _v_succ and not _is_sim:
+        _truth_status  = "executed"
+        _truth_label   = "Executed — action confirmed"
+        _truth_detail  = (
+            f"{'Refund' if _action == 'refund' else 'Credit' if _action == 'credit' else 'Action'}"
+            + (f" of ${_amount:.2f}" if _amount > 0 else "")
+            + " was processed and confirmed by the payment system."
+        )
+        _truth_color   = "success"
+    elif _ts in {"blocked", "manual_review"} and not _req_appr:
+        _truth_status  = "blocked"
+        _truth_label   = "Blocked — governor policy"
+        _truth_detail  = "The governor blocked this action. No execution occurred."
+        _truth_color   = "error"
+    elif _action == "none" or _ts in {"no_action", "reply_only"}:
+        _truth_status  = "reply_only"
+        _truth_label   = "Reply prepared — no financial action"
+        _truth_detail  = "The AI prepared a reply. No financial action was recommended or taken."
+        _truth_color   = "info"
+    else:
+        _truth_status  = "assist_only"
+        _truth_label   = "Assist mode — manual review needed"
+        _truth_detail  = "The AI provided a recommendation. Manual review is required to proceed."
+        _truth_color   = "neutral"
+
+    validated["execution_truth"] = {
+        "status":          _truth_status,
+        "label":           _truth_label,
+        "detail":          _truth_detail,
+        "color":           _truth_color,
+        "is_simulated":    _is_sim,
+        "verified_success": _v_succ,
+        "requires_approval": _req_appr,
+        "action":          _action,
+        "amount":          _amount,
+        "tool_status":     _ts,
+    }
+
     return validated

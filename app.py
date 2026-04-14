@@ -308,6 +308,21 @@ def dashboard_summary_handler(
             pass
         _merge_get_metrics_into_dashboard_payload(cached, file_metrics)
         _attach_outcome_intelligence_optional(cached, principal)
+        _exec_mode_val = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+        _is_live_exec  = _exec_mode_val == "live"
+        _live_stripe   = (STRIPE_KEY or "").startswith("sk_live_")
+        cached["execution_mode"] = {
+            "mode":          _exec_mode_val,
+            "is_live":       _is_live_exec,
+            "label":         "Live execution" if _is_live_exec else "Simulation mode",
+            "detail":        (
+                "Real refunds, credits, and charges are processed via your connected order system."
+                if _is_live_exec else
+                "Actions are simulated. Set XALVION_EXEC_MODE=live to enable real execution."
+            ),
+            "color":         "success" if _is_live_exec else "warning",
+            "stripe_live":   _live_stripe,
+        }
         return cached
 
     try:
@@ -363,7 +378,10 @@ def dashboard_summary_handler(
                 func.avg(case((ActionLog.confidence > 0, ActionLog.confidence), else_=None)).label("avg_conf"),
                 func.avg(case((ActionLog.quality > 0, ActionLog.quality), else_=None)).label("avg_qual"),
             )
-            .filter(ActionLog.username == principal)
+            .filter(
+                ActionLog.username == principal,
+                ActionLog.status != "simulated",
+            )
             .one_or_none()
         )
 
@@ -460,6 +478,21 @@ def dashboard_summary_handler(
                 "billing_actions_count": actions_done,
             },
         }
+        _exec_mode_val = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+        _is_live_exec  = _exec_mode_val == "live"
+        _live_stripe   = (STRIPE_KEY or "").startswith("sk_live_")
+        result["execution_mode"] = {
+            "mode":          _exec_mode_val,
+            "is_live":       _is_live_exec,
+            "label":         "Live execution" if _is_live_exec else "Simulation mode",
+            "detail":        (
+                "Real refunds, credits, and charges are processed via your connected order system."
+                if _is_live_exec else
+                "Actions are simulated. Set XALVION_EXEC_MODE=live to enable real execution."
+            ),
+            "color":         "success" if _is_live_exec else "warning",
+            "stripe_live":   _live_stripe,
+        }
         _merge_get_metrics_into_dashboard_payload(result, file_metrics)
         with _dashboard_summary_cache_lock:
             _dashboard_snap_by_principal[principal] = dict(result)
@@ -470,6 +503,21 @@ def dashboard_summary_handler(
         _log_throttled_db_issue("GET /dashboard/summary", exc)
         fb = _dashboard_summary_fallback(user, db, file_metrics, principal)
         _attach_outcome_intelligence_optional(fb, principal)
+        _exec_mode_val = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+        _is_live_exec  = _exec_mode_val == "live"
+        _live_stripe   = (STRIPE_KEY or "").startswith("sk_live_")
+        fb["execution_mode"] = {
+            "mode":          _exec_mode_val,
+            "is_live":       _is_live_exec,
+            "label":         "Live execution" if _is_live_exec else "Simulation mode",
+            "detail":        (
+                "Real refunds, credits, and charges are processed via your connected order system."
+                if _is_live_exec else
+                "Actions are simulated. Set XALVION_EXEC_MODE=live to enable real execution."
+            ),
+            "color":         "success" if _is_live_exec else "warning",
+            "stripe_live":   _live_stripe,
+        }
         return fb
 
 
@@ -1907,7 +1955,16 @@ except Exception as exc:
         return entry
 
     def serialize_ticket(ticket: Ticket) -> dict[str, Any]:
-        return {
+        _note = str(getattr(ticket, "internal_note", "") or "")
+        _delivery_match = re.search(r'\[email_delivery:([^\]]+)\]', _note)
+        _delivery_status = _delivery_match.group(1) if _delivery_match else None
+        _delivery_label_map = {
+            "sent":                 "Email delivered",
+            "transport_unavailable": "Email not sent — SMTP not configured",
+            "error":                "Email failed — delivery error",
+            "pending_manual":       "Email not sent — missing customer address",
+        }
+        out = {
             "id": ticket.id,
             "created_at": ticket.created_at,
             "updated_at": ticket.updated_at,
@@ -1935,7 +1992,13 @@ except Exception as exc:
             "refund_likelihood": ticket.refund_likelihood,
             "abuse_likelihood": ticket.abuse_likelihood,
             "complexity": ticket.complexity,
+            "email_delivery_status": _delivery_status,
+            "email_delivery_label": (
+                _delivery_label_map.get(_delivery_status, "Not yet sent")
+                if _delivery_status else "Not yet sent"
+            ),
         }
+        return out
 
     def serialize_ticket_with_log(ticket: Ticket, db: Session) -> dict[str, Any]:
         base = serialize_ticket(ticket)
@@ -2905,6 +2968,28 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
             impact=impact,
             user=user,
         )
+        # Guarantee execution_truth is always present in the API response.
+        # If the backend built it (response_builder fix), it passes through.
+        # If not (old code path), build a minimal version here.
+        if "execution_truth" not in result or not isinstance(result.get("execution_truth"), dict):
+            _is_sim = bool(result.get("is_simulated", False))
+            _v_succ = bool(result.get("verified_success", False))
+            _req_a  = bool(result.get("requires_approval", False))
+            result["execution_truth"] = {
+                "status":           "simulated" if _is_sim else
+                                    "pending_approval" if _req_a else
+                                    "executed" if _v_succ else "assist_only",
+                "label":            "Simulated — no action taken" if _is_sim else
+                                    "Staged — awaiting approval" if _req_a else
+                                    "Executed — action confirmed" if _v_succ else
+                                    "Assist mode — review needed",
+                "is_simulated":     _is_sim,
+                "verified_success": _v_succ,
+                "requires_approval": _req_a,
+                "color":            "warning" if _is_sim else
+                                    "neutral" if _req_a else
+                                    "success" if _v_succ else "neutral",
+            }
         try:
             apply_learning_feedback(runtime_ticket, result)
         except Exception as _learn_exc:
@@ -2924,21 +3009,40 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
             if not t:
                 raise RuntimeError("ticket row missing at persist")
             update_ticket_from_result(db, t, result)
-            action_entry = log_action(
-                db,
-                username=principal_id,
-                ticket_id=t.id,
-                action=str(result.get("action", "none")),
-                amount=float(result.get("amount", 0) or 0),
-                issue_type=str(result.get("issue_type", "general_support")),
-                reason=str(result.get("reason", "")),
-                status=str(result.get("tool_status", "executed")),
-                confidence=float(result.get("confidence", 0) or 0),
-                quality=float(result.get("quality", 0) or 0),
-                message_snippet=(req.message or "")[:200],
-                requires_approval=needs_approval,
-                approved=False,
+            _exec_truth = result.get("execution_truth") or {}
+            _is_simulated_run = bool(
+                _exec_truth.get("is_simulated")
+                or result.get("is_simulated")
+                or str(_exec_truth.get("status", "")).lower() == "simulated"
             )
+
+            action_entry: ActionLog | None = None
+            if not _is_simulated_run:
+                # Only write to ActionLog when real execution occurred
+                # (existing ActionLog write code here — unchanged)
+                action_entry = log_action(
+                    db,
+                    username=principal_id,
+                    ticket_id=t.id,
+                    action=str(result.get("action", "none")),
+                    amount=float(result.get("amount", 0) or 0),
+                    issue_type=str(result.get("issue_type", "general_support")),
+                    reason=str(result.get("reason", "")),
+                    status=str(result.get("tool_status", "executed")),
+                    confidence=float(result.get("confidence", 0) or 0),
+                    quality=float(result.get("quality", 0) or 0),
+                    message_snippet=(req.message or "")[:200],
+                    requires_approval=needs_approval,
+                    approved=False,
+                )
+            else:
+                user_id_for_log = principal_id
+                logger.info(
+                    "action_log_skipped_simulated user=%s action=%s amount=%s",
+                    user_id_for_log,
+                    result.get("action", "none"),
+                    result.get("amount", 0),
+                )
 
             ser_user: User = user
             guest_preview_snapshot: dict[str, Any] | None = None
@@ -2956,15 +3060,18 @@ def run_support(req: SupportRequest, user: User, guest_client_id: str | None = N
 
             serialized = serialize_support_result(result, ser_user, guest_preview=guest_preview_snapshot)
             serialized["ticket"] = serialize_ticket_with_log(t, db)
-            serialized["action_log"] = serialized["ticket"].get("action_log") or {
-                "log_id": action_entry.id,
-                "action": action_entry.action,
-                "amount": action_entry.amount,
-                "status": action_entry.status,
-                "requires_approval": bool(action_entry.requires_approval),
-                "approved": bool(action_entry.approved),
-                "timestamp": action_entry.timestamp,
-            }
+            if action_entry is not None:
+                serialized["action_log"] = serialized["ticket"].get("action_log") or {
+                    "log_id": action_entry.id,
+                    "action": action_entry.action,
+                    "amount": action_entry.amount,
+                    "status": action_entry.status,
+                    "requires_approval": bool(action_entry.requires_approval),
+                    "approved": bool(action_entry.approved),
+                    "timestamp": action_entry.timestamp,
+                }
+            else:
+                serialized["action_log"] = serialized["ticket"].get("action_log") or None
             serialized["operator_mode"] = get_operator_mode(db)
             serialized["shadow_decision"] = shadow_decision
             serialized["runtime_ticket"] = runtime_ticket
@@ -3689,6 +3796,28 @@ def analyze_extension_ticket(
         billing_user=user,
         billing_req=billing_req,
     )
+    # Guarantee execution_truth is always present in the API response.
+    # If the backend built it (response_builder fix), it passes through.
+    # If not (old code path), build a minimal version here.
+    if "execution_truth" not in result or not isinstance(result.get("execution_truth"), dict):
+        _is_sim = bool(result.get("is_simulated", False))
+        _v_succ = bool(result.get("verified_success", False))
+        _req_a  = bool(result.get("requires_approval", False))
+        result["execution_truth"] = {
+            "status":           "simulated" if _is_sim else
+                                "pending_approval" if _req_a else
+                                "executed" if _v_succ else "assist_only",
+            "label":            "Simulated — no action taken" if _is_sim else
+                                "Staged — awaiting approval" if _req_a else
+                                "Executed — action confirmed" if _v_succ else
+                                "Assist mode — review needed",
+            "is_simulated":     _is_sim,
+            "verified_success": _v_succ,
+            "requires_approval": _req_a,
+            "color":            "warning" if _is_sim else
+                                "neutral" if _req_a else
+                                "success" if _v_succ else "neutral",
+        }
 
     _persist_sovereign_result(
         db,
