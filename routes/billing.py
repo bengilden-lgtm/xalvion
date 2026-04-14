@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from urllib.parse import quote_plus
 
 import stripe
@@ -9,12 +10,15 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 import app as app_mod
+import governor as governor_mod
 from growth_insights import append_insight, log_conversion_paid
 from services import email_service, guest_preview_service, stripe_service
 
 router = APIRouter(tags=["billing"])
 
 logger = logging.getLogger("xalvion.api")
+
+_stripe_webhook_prod_log_emitted = False
 
 
 @router.get("/integrations/status")
@@ -152,6 +156,43 @@ def actions_refund(
     req: app_mod.RefundActionRequest,
     user: app_mod.User = Depends(app_mod.require_authenticated_user),
 ):
+    # FIX 5: Route manual refunds through the governor before execution.
+    _gov_ticket = {
+        "issue_type": "manual_refund",
+        "sentiment": 5,
+        "abuse_score": 0,
+        "plan_tier": str(getattr(user, "tier", "free") or "free"),
+    }
+    _gov_decision = {
+        "action": "refund",
+        "amount": float(req.amount or 0),
+        "auto_refund_allowed": False,
+        "confidence": 0.85,
+    }
+    _gov_memory = {
+        "abuse_score": 0,
+        "refund_count": 0,
+        "sentiment_avg": 5,
+    }
+    try:
+        gov_result = governor_mod.gate_execution(_gov_ticket, _gov_decision, _gov_memory)
+    except Exception as _gov_exc:
+        logger.error("governor_gate_failed_manual_refund detail=%s", str(_gov_exc)[:300], exc_info=True)
+        gov_result = {
+            "execution_mode": "review",
+            "requires_approval": True,
+            "governor_reason": "Governor error (soft-fail) — review required",
+        }
+
+    _gov_mode = str(gov_result.get("execution_mode", "review") or "review").strip().lower()
+    if _gov_mode == "blocked":
+        raise HTTPException(
+            status_code=403,
+            detail=str(gov_result.get("governor_reason", "Refund blocked by governor policy.")),
+        )
+
+    requires_approval = _gov_mode == "review"
+
     result = stripe_service.execute_real_refund(
         amount=float(req.amount or 0),
         payment_intent_id=req.payment_intent_id,
@@ -172,6 +213,9 @@ def actions_refund(
 
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=str(result.get("detail", "Refund failed.")))
+
+    if requires_approval:
+        result["requires_approval"] = True
 
     return result
 
@@ -213,61 +257,55 @@ def upgrade_plan(
     user: app_mod.User = Depends(app_mod.require_authenticated_user),
     db: Session = Depends(app_mod.get_db),
 ):
+    # FIX 3: Billing must be configured before any upgrade attempt.
+    if not app_mod.BILLING_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail="Billing not configured. Contact support.",
+        )
+
     desired = (req.tier or "").strip().lower()
     current_tier = app_mod.get_public_plan_name(user)
     stripe_service.validate_upgrade_request(desired, current_tier)
 
-    if app_mod.STRIPE_KEY and app_mod.PRICE_MAP.get(desired):
-        trig = (getattr(req, "upgrade_trigger", None) or "").strip()[:200]
-        session = stripe_service.create_checkout_session_for_user(user, desired, upgrade_trigger=trig or None)
-        append_insight(
-            "upgrade_checkout_started",
-            actor=str(getattr(user, "username", "") or ""),
-            props={"desired": desired, "from": app_mod.get_public_plan_name(user), "trigger": trig},
-        )
-        return {
-            "mode": "checkout",
-            "checkout_url": session.url,
-            "session_id": session.id,
-            "tier": current_tier,
-            "usage": int(getattr(user, "usage", 0) or 0),
-            "limit": app_mod.get_plan_config(current_tier)["monthly_limit"],
-            "remaining": max(0, app_mod.get_plan_config(current_tier)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)),
-        }
-
-    if not app_mod.ALLOW_DIRECT_BILLING_BYPASS:
+    # FIX 4: ALLOW_DIRECT_BILLING_BYPASS removed — upgrade ALWAYS goes through Stripe checkout.
+    if not app_mod.STRIPE_KEY:
         raise HTTPException(
-            status_code=500,
-            detail=(
-                "Stripe not fully configured. Set STRIPE_SECRET_KEY and price IDs, "
-                "or enable ALLOW_DIRECT_BILLING_BYPASS for local testing."
-            ),
+            status_code=503,
+            detail="Billing not configured. Contact support.",
         )
 
     trig = (getattr(req, "upgrade_trigger", None) or "").strip()[:200]
-    user.tier = desired
-    db.commit()
-    db.refresh(user)
-    usage_summary = app_mod.get_usage_summary(user)
+    session = stripe_service.create_checkout_session_for_user(user, desired, upgrade_trigger=trig or None)
     append_insight(
-        "upgrade_direct",
+        "upgrade_checkout_started",
         actor=str(getattr(user, "username", "") or ""),
-        props={"tier": desired, "trigger": trig},
+        props={"desired": desired, "from": app_mod.get_public_plan_name(user), "trigger": trig},
     )
     return {
-        "mode": "direct",
-        "message": f"Upgraded to {desired}",
-        "tier": usage_summary["tier"],
-        "usage": usage_summary["usage"],
-        "limit": usage_summary["limit"],
-        "remaining": usage_summary["remaining"],
+        "mode": "checkout",
+        "checkout_url": session.url,
+        "session_id": session.id,
+        "tier": current_tier,
+        "usage": int(getattr(user, "usage", 0) or 0),
+        "limit": app_mod.get_plan_config(current_tier)["monthly_limit"],
+        "remaining": max(0, app_mod.get_plan_config(current_tier)["monthly_limit"] - int(getattr(user, "usage", 0) or 0)),
     }
 
 
 @router.post("/stripe/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)):
-    if not app_mod.STRIPE_WEBHOOK_SECRET and getattr(app_mod, "ENVIRONMENT", "development") == "production":
-        raise HTTPException(status_code=500, detail="Stripe webhook secret not configured")
+    # SECURITY: Never rely on module attribute lookups for environment detection.
+    # Read the runtime environment directly so production cannot silently fall back to dev behavior.
+    env = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
+    is_production = env == "production"
+
+    if is_production and not app_mod.STRIPE_WEBHOOK_SECRET:
+        logger.critical(
+            "stripe_webhook_secret_missing env=production route=/stripe/webhook action=reject",
+        )
+        # Fail-safe in production: do not accept any webhook payload without a configured secret.
+        raise HTTPException(status_code=503, detail="Stripe webhook is not configured")
     if not app_mod.STRIPE_KEY:
         raise HTTPException(status_code=500, detail="Stripe not configured")
 
@@ -275,11 +313,26 @@ async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
-        event = (
-            stripe.Webhook.construct_event(payload, sig_header, app_mod.STRIPE_WEBHOOK_SECRET)
-            if app_mod.STRIPE_WEBHOOK_SECRET
-            else stripe.Event.construct_from(json.loads(payload.decode("utf-8")), stripe.api_key)
+        if is_production:
+            global _stripe_webhook_prod_log_emitted
+            if not _stripe_webhook_prod_log_emitted:
+                logger.info("stripe_webhook_verification_enabled env=production mode=strict")
+                _stripe_webhook_prod_log_emitted = True
+            # Production: signature verification is mandatory and must not be bypassable.
+            event = stripe.Webhook.construct_event(payload, sig_header, app_mod.STRIPE_WEBHOOK_SECRET)
+        else:
+            # Non-production: allow local/manual testing without Stripe signing, but prefer verification when configured.
+            if app_mod.STRIPE_WEBHOOK_SECRET:
+                event = stripe.Webhook.construct_event(payload, sig_header, app_mod.STRIPE_WEBHOOK_SECRET)
+            else:
+                event = stripe.Event.construct_from(json.loads(payload.decode("utf-8")), stripe.api_key)
+    except stripe.error.SignatureVerificationError as exc:
+        logger.warning(
+            "stripe_webhook_rejected_invalid_signature env=%s detail=%s",
+            env,
+            str(exc)[:300],
         )
+        raise HTTPException(status_code=400, detail="Invalid Stripe signature") from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Webhook parse failed: {exc}") from exc
 
