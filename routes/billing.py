@@ -351,6 +351,19 @@ def upgrade_plan(
         actor=str(getattr(user, "username", "") or ""),
         props={"desired": desired, "from": app_mod.get_public_plan_name(user), "trigger": trig},
     )
+    try:
+        db.add(app_mod.PendingCheckout(
+            session_id=session.id,
+            username=user.username,
+            tier=desired,
+            created_at=app_mod._now_iso(),
+            status="pending",
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.warning("pending_checkout_record_failed session=%s", session.id, exc_info=True)
+        # Non-fatal: checkout still proceeds
     return {
         "mode": "checkout",
         "checkout_url": session.url,
@@ -456,22 +469,39 @@ async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)
                     sub_id = sub_raw.strip()
                 elif sub_raw is not None:
                     sub_id = str(getattr(sub_raw, "id", "") or "").strip()
-                upgraded_user = stripe_service.apply_successful_upgrade(
+                upgrade_result = stripe_service.apply_successful_upgrade(
                     db, username, tier, stripe_subscription_id=sub_id or None
                 )
-                if upgraded_user:
-                    utrig = ""
-                    try:
-                        utrig = str(metadata.get("upgrade_trigger") or "")[:200]
-                    except Exception:
+                upgraded_user = upgrade_result.get("user") if upgrade_result.get("ok") else None
+                if upgrade_result.get("ok"):
+                    if upgrade_result.get("result") == "upgraded" and upgraded_user:
                         utrig = ""
-                    try:
-                        log_conversion_paid(username, tier, utrig or None)
-                    except Exception:
-                        logger.warning("growth_conversion_log_failed", exc_info=True)
-                if not upgraded_user:
+                        try:
+                            utrig = str(metadata.get("upgrade_trigger") or "")[:200]
+                        except Exception:
+                            utrig = ""
+                        try:
+                            log_conversion_paid(username, tier, utrig or None)
+                        except Exception:
+                            logger.warning("growth_conversion_log_failed", exc_info=True)
+                    elif upgrade_result.get("result") == "already_on_tier":
+                        outcome = "skipped"
+                        detail = f"User {username!r} already on {tier}"
+                else:
                     outcome = "skipped"
-                    detail = f"User not found: {username!r}"
+                    detail = str(upgrade_result.get("result") or "upgrade_failed")
+
+                try:
+                    pending = db.query(app_mod.PendingCheckout).filter(
+                        app_mod.PendingCheckout.session_id == session_id
+                    ).first()
+                    if pending:
+                        pending.status = "completed"
+                        pending.completed_at = app_mod._now_iso()
+                        db.commit()
+                except Exception:
+                    db.rollback()
+                    logger.warning("pending_checkout_update_failed session=%s", session_id, exc_info=True)
             else:
                 outcome = "skipped"
                 detail = "Missing username or tier in event payload"
@@ -497,3 +527,81 @@ async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)
             pass
 
     return {"received": True, "type": event_type, "outcome": outcome}
+
+
+@router.post("/billing/recover")
+def billing_recover(
+    user: app_mod.User = Depends(app_mod.require_authenticated_user),
+    db: Session = Depends(app_mod.get_db),
+):
+    """
+    Check for a pending Stripe checkout that completed but was not applied.
+    Queries Stripe directly for the most recent pending checkout session for
+    this user, and applies the upgrade if Stripe confirms payment_status=paid.
+    """
+    if not app_mod.STRIPE_KEY:
+        raise HTTPException(status_code=503, detail="Billing not configured.")
+
+    pending = (
+        db.query(app_mod.PendingCheckout)
+        .filter(
+            app_mod.PendingCheckout.username == user.username,
+            app_mod.PendingCheckout.status == "pending",
+        )
+        .order_by(app_mod.PendingCheckout.created_at.desc())
+        .first()
+    )
+
+    if not pending:
+        return {"ok": True, "result": "no_pending_checkout", "tier": app_mod.get_public_plan_name(user)}
+
+    try:
+        session = stripe.checkout.Session.retrieve(pending.session_id)
+    except Exception:
+        logger.warning("billing_recover_stripe_lookup_failed session=%s", pending.session_id, exc_info=True)
+        raise HTTPException(status_code=502, detail="Could not verify checkout status with Stripe.")
+
+    payment_status = str(getattr(session, "payment_status", "") or "")
+    session_status = str(getattr(session, "status", "") or "")
+
+    if payment_status == "paid" and session_status == "complete":
+        tier = (getattr(session, "metadata", {}) or {}).get("tier", "")
+        if not tier:
+            tier = stripe_service.infer_tier_from_checkout_session(pending.session_id)
+        if not tier:
+            raise HTTPException(status_code=422, detail="Could not determine tier from Stripe session.")
+
+        sub_raw = getattr(session, "subscription", None)
+        sub_id = ""
+        if isinstance(sub_raw, str):
+            sub_id = sub_raw
+        elif sub_raw is not None:
+            sub_id = str(getattr(sub_raw, "id", "") or "")
+
+        result = stripe_service.apply_successful_upgrade(
+            db, user.username, tier,
+            stripe_subscription_id=sub_id or None,
+            tier_source="recovery",
+        )
+        pending.status = "completed"
+        pending.completed_at = app_mod._now_iso()
+        db.commit()
+
+        return {
+            "ok": True,
+            "result": "recovered",
+            "tier": tier,
+            "upgrade_result": result.get("result"),
+        }
+
+    elif session_status == "expired":
+        pending.status = "expired"
+        db.commit()
+        return {"ok": True, "result": "session_expired", "tier": app_mod.get_public_plan_name(user)}
+
+    return {
+        "ok": True,
+        "result": "not_yet_complete",
+        "payment_status": payment_status,
+        "tier": app_mod.get_public_plan_name(user),
+    }

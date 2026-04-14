@@ -643,22 +643,43 @@ def create_checkout_session_for_user(user: Any, desired: str, upgrade_trigger: s
     return session
 
 
-def apply_successful_upgrade(db: Session, username: str, tier: str, *, stripe_subscription_id: str | None = None) -> Any:
-    user = db.query(_app.User).filter(_app.User.username == username).first()
+def apply_successful_upgrade(
+    db: Session,
+    username: str,
+    tier: str,
+    *,
+    stripe_subscription_id: str | None = None,
+    tier_source: str = "webhook",
+) -> dict[str, Any]:
+    user = (
+        db.query(_app.User)
+        .filter(_app.User.username == username)
+        .with_for_update()
+        .first()
+    )
     if not user:
-        return None
+        return {"ok": False, "result": "user_not_found", "user": None}
 
     desired = (tier or "").strip().lower()
     if desired not in {"pro", "elite"}:
-        return user
+        return {"ok": True, "result": "already_on_tier", "user": user}
+
+    if str(getattr(user, "tier", "") or "").strip().lower() == desired:
+        return {"ok": True, "result": "already_on_tier", "user": user}
 
     user.tier = desired
+    if hasattr(user, "stripe_subscription_status"):
+        user.stripe_subscription_status = "active"
+    if hasattr(user, "stripe_tier_source"):
+        user.stripe_tier_source = (tier_source or "webhook")[:16]
+
     sid = (stripe_subscription_id or "").strip()
     if sid and hasattr(user, "stripe_subscription_id"):
         user.stripe_subscription_id = sid[:128]
+
     db.commit()
     db.refresh(user)
-    return user
+    return {"ok": True, "result": "upgraded", "user": user}
 
 
 def infer_tier_from_checkout_session(session_id: str) -> str:
@@ -807,25 +828,145 @@ def sync_user_tier_from_stripe_subscription(
 
 
 def apply_subscription_deleted(db: Session, subscription: Any) -> tuple[str, str]:
-    username = subscription_username(subscription)
-    if not username:
-        return "skipped", "Missing username in subscription metadata"
     sub_id = str(_subscription_field(subscription, "id", "") or "").strip()
-    user = downgrade_user_to_free(db, username, subscription_id=sub_id or None)
+    username = subscription_username(subscription)
+
+    if not username:
+        customer_id = str(_subscription_field(subscription, "customer", "") or "").strip()
+        if customer_id and _app.STRIPE_KEY:
+            try:
+                cust = stripe.Customer.retrieve(customer_id)
+                meta = _metadata_from_stripe_object(getattr(cust, "metadata", None))
+                username = (meta.get("username") or "").strip()
+            except Exception:
+                username = ""
+
+    if not username:
+        return "skipped", f"Missing username for subscription {sub_id}"
+
+    user = (
+        db.query(_app.User)
+        .filter(_app.User.username == username)
+        .with_for_update()
+        .first()
+    )
     if not user:
-        return "skipped", f"User not found: {username!r}"
-    return "ok", f"Downgraded {username} to free"
+        return "skipped", f"User not found: {username!r} subscription={sub_id}"
+
+    if str(getattr(user, "tier", "") or "").strip().lower() == "dev":
+        return "ok", f"Preserved dev tier for {username} subscription={sub_id}"
+
+    stored = str(getattr(user, "stripe_subscription_id", "") or "").strip()
+    if stored and stored != sub_id:
+        return (
+            "skipped",
+            f"Subscription {sub_id} does not match user's active sub — not downgrading",
+        )
+
+    user.tier = "free"
+    if hasattr(user, "stripe_subscription_status"):
+        user.stripe_subscription_status = "canceled"
+    if hasattr(user, "stripe_tier_source"):
+        user.stripe_tier_source = "webhook"
+    db.commit()
+    db.refresh(user)
+    return "ok", f"Downgraded {username} to free subscription={sub_id}"
 
 
 def apply_subscription_updated(db: Session, subscription: Any) -> tuple[str, str]:
-    username = subscription_username(subscription)
+    sub_id = str(getattr(subscription, "id", "") or "")
+    sub_status = str(getattr(subscription, "status", "") or "")
+    metadata = getattr(subscription, "metadata", {}) or {}
+    username = ""
+    try:
+        username = str((metadata or {}).get("username", "") or "")
+    except Exception:
+        username = ""
+    username = username.strip()
+
     if not username:
-        return "skipped", "Missing username in subscription metadata"
-    tier = infer_tier_from_subscription(subscription)
-    sub_id = str(_subscription_field(subscription, "id", "") or "").strip()
-    user = sync_user_tier_from_stripe_subscription(
-        db, username, tier, stripe_subscription_id=sub_id or None
+        return "skipped", f"Missing username in subscription metadata subscription={sub_id}"
+
+    user = (
+        db.query(_app.User)
+        .filter(_app.User.username == username)
+        .with_for_update()
+        .first()
     )
     if not user:
-        return "skipped", f"User not found: {username!r}"
-    return "ok", f"Synced {username} to tier={tier}"
+        return "skipped", f"User not found: {username!r} subscription={sub_id}"
+
+    status_norm = sub_status.strip().lower()
+    if status_norm in {"past_due", "unpaid"}:
+        if hasattr(user, "stripe_subscription_status"):
+            user.stripe_subscription_status = status_norm
+        db.commit()
+        logger.warning("subscription_payment_issue username=%s status=%s", username, status_norm)
+        return (
+            "payment_issue",
+            f"Subscription {sub_id} is {status_norm} — tier held pending retry",
+        )
+
+    if status_norm == "canceled":
+        return apply_subscription_deleted(db, subscription)
+
+    if status_norm == "active":
+        tier = infer_tier_from_subscription(subscription)
+        if tier and tier != "free":
+            apply_successful_upgrade(
+                db,
+                username,
+                tier,
+                stripe_subscription_id=(sub_id or None),
+                tier_source="webhook",
+            )
+            if hasattr(user, "stripe_subscription_status"):
+                user.stripe_subscription_status = "active"
+            db.commit()
+            db.refresh(user)
+            return "ok", f"Synced {username} to tier={tier} subscription={sub_id}"
+
+        if hasattr(user, "stripe_subscription_status"):
+            user.stripe_subscription_status = "active"
+        db.commit()
+        return "ok", f"Subscription {sub_id} active — no tier change"
+
+    if status_norm in {"trialing", "incomplete"}:
+        if hasattr(user, "stripe_subscription_status"):
+            user.stripe_subscription_status = status_norm
+        db.commit()
+        return "ok", f"Subscription {sub_id} trialing/incomplete — no tier change"
+
+    if hasattr(user, "stripe_subscription_status"):
+        user.stripe_subscription_status = status_norm
+    db.commit()
+    return "ok", f"Subscription {sub_id} updated status={sub_status}"
+
+
+def validate_plan_access(user: Any) -> dict[str, Any]:
+    """
+    Returns whether the user's current tier is considered valid.
+    A free-tier user is always valid.
+    A pro/elite user is valid if stripe_subscription_status is "active" or "trialing"
+    OR if stripe_tier_source is "manual" (manually granted by admin).
+    """
+    tier = str(getattr(user, "tier", "free") or "free").strip().lower()
+    if tier in {"free", "dev"}:
+        return {"valid": True, "tier": tier, "reason": "free_tier"}
+
+    sub_status = str(getattr(user, "stripe_subscription_status", "") or "").strip().lower()
+    tier_source = str(getattr(user, "stripe_tier_source", "") or "").strip().lower()
+
+    if tier_source == "manual":
+        return {"valid": True, "tier": tier, "reason": "manually_granted"}
+
+    if sub_status in {"active", "trialing"}:
+        return {"valid": True, "tier": tier, "reason": "active_subscription"}
+
+    if sub_status in {"past_due", "unpaid"}:
+        return {"valid": True, "tier": tier, "reason": "grace_period", "warning": "payment_due"}
+
+    if sub_status in {"canceled", "incomplete_expired"}:
+        return {"valid": False, "tier": tier, "reason": "subscription_ended"}
+
+    return {"valid": True, "tier": tier, "reason": "status_unknown", "warning": "subscription_status_unverified"}

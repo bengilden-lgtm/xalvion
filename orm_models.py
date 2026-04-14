@@ -18,6 +18,8 @@ class User(Base):
     stripe_livemode = Column(Integer, default=0, nullable=False)
     stripe_scope = Column(String, nullable=True)
     stripe_subscription_id = Column(String(128), nullable=True)
+    stripe_subscription_status = Column(String(32), nullable=True)
+    stripe_tier_source = Column(String(16), nullable=True)  # "webhook" | "manual" | "bypass"
 
 
 class ActionLog(Base):

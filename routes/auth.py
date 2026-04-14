@@ -136,6 +136,7 @@ def me(
         "is_admin": user.username == app_mod.ADMIN_USERNAME,
         "stripe_connected": bool(getattr(user, "stripe_connected", 0)),
         "stripe_account_id": getattr(user, "stripe_account_id", None),
+        "stripe_subscription_status": str(getattr(user, "stripe_subscription_status", "") or ""),
         "usage_pct": round(usage_pct, 4),
         "approaching_limit": approaching_limit,
         "at_limit": at_limit,

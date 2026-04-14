@@ -88,6 +88,7 @@ from orm_app_tables import (
     GuestPreviewUsage,
     OperatorMonthlyUsage,
     OperatorState,
+    PendingCheckout,
     ProcessedWebhook,
     RateLimitEvent,
 )
@@ -899,6 +900,23 @@ def ensure_user_role_column() -> None:
         pass
 
 
+def ensure_stripe_status_columns() -> None:
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "ALTER TABLE users ADD COLUMN stripe_subscription_status VARCHAR"
+            ))
+    except Exception:
+        pass
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "ALTER TABLE users ADD COLUMN stripe_tier_source VARCHAR DEFAULT 'manual'"
+            ))
+    except Exception:
+        pass
+
+
 @app.on_event("startup")
 def _startup_database() -> None:
     print("BOOT: FastAPI startup hook begin (database)", flush=True)
@@ -915,10 +933,11 @@ def _startup_database() -> None:
         logger.warning("runtime_security_check_skipped detail=%s", str(exc)[:200])
     logger.info("DB schema ensured")
     print("DB schema ensured", flush=True)
-    validate_stripe_config()
     ensure_user_columns()
     ensure_user_role_column()
+    ensure_stripe_status_columns()
     ensure_ticket_columns()
+    validate_stripe_config()
     migrate_legacy_operator_usage_into_rollups()
     try:
         ensure_outcome_log_columns()

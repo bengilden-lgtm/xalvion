@@ -31,6 +31,18 @@ class ProcessedWebhook(Base):
     detail = Column(Text, default="")
 
 
+class PendingCheckout(Base):
+    __tablename__ = "pending_checkouts"
+
+    session_id = Column(String(128), primary_key=True)
+    username = Column(String(256), nullable=False, index=True)
+    tier = Column(String(32), nullable=False)
+    created_at = Column(String(32), nullable=False)
+    completed_at = Column(String(32), nullable=True)
+    status = Column(String(32), nullable=False, default="pending")
+    # status: "pending" | "completed" | "expired" | "failed"
+
+
 class GuestPreviewUsage(Base):
     """Server-side tally for unauthenticated workspace preview runs (abuse hardening)."""
 
