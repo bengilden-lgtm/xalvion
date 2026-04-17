@@ -1093,6 +1093,55 @@ if (typeof window.pulseRail !== "function") {
               font-weight: 650 !important;
               color: rgba(215,225,242,0.78) !important;
             }
+            body[data-ui="claude"] .decision-callout-subtext{
+              margin-top: 4px !important;
+              font-size: 12.5px !important;
+              font-weight: 650 !important;
+              color: rgba(215,225,242,0.88) !important;
+              letter-spacing: 0.01em !important;
+            }
+            body[data-ui="claude"] .decision-callout-note,
+            body[data-ui="claude"] .decision-callout-preview{
+              margin-top: 4px !important;
+              font-size: 12.5px !important;
+              font-weight: 600 !important;
+              color: rgba(205,215,242,0.72) !important;
+              line-height: 1.45 !important;
+            }
+            body[data-ui="claude"] .decision-callout-why{
+              margin-top: 7px !important;
+              padding-top: 7px !important;
+              border-top: 1px solid rgba(255,255,255,0.08) !important;
+            }
+            body[data-ui="claude"] .decision-callout-why summary{
+              list-style: none !important;
+              cursor: pointer !important;
+              user-select: none !important;
+              font-size: 12.5px !important;
+              font-weight: 700 !important;
+              color: rgba(215,225,242,0.86) !important;
+            }
+            body[data-ui="claude"] .decision-callout-why summary::-webkit-details-marker{ display:none !important; }
+            body[data-ui="claude"] .decision-callout-why summary::after{
+              content: "▸" !important;
+              display: inline-block !important;
+              margin-left: 8px !important;
+              opacity: 0.7 !important;
+              transform: translateY(-1px) !important;
+            }
+            body[data-ui="claude"] .decision-callout-why[open] summary::after{
+              content: "▾" !important;
+              opacity: 0.75 !important;
+            }
+            body[data-ui="claude"] .decision-callout-why ul{
+              margin: 7px 0 0 16px !important;
+              padding: 0 !important;
+              color: rgba(205,215,242,0.72) !important;
+              font-size: 12.5px !important;
+              line-height: 1.45 !important;
+              font-weight: 600 !important;
+            }
+            body[data-ui="claude"] .decision-callout-why li{ margin: 4px 0 !important; }
             body[data-ui="claude"] .trust-context-line{
               color: rgba(205,215,242,0.72) !important;
               font-size: 12px !important;
@@ -6626,18 +6675,49 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       if (r.includes("low")) return "Low risk";
       return r ? r.replace(/\b\w/g, (m) => m.toUpperCase()) : "Risk";
     })();
-    const suggested = (() => {
-      if (appr.requiresApproval && !appr.approved) return `Suggested action: ${actionWord} — ${riskWordTitle}`;
-      if (action === "review") return `Suggested action: ${actionWord} — ${riskWordTitle}`;
-      return `Suggested action: Reply — ${riskWordTitle}`;
+    const pendingGate = Boolean(appr.requiresApproval && !appr.approved);
+    const headline = (() => {
+      if (pendingGate) return `Pending action: ${actionWord} — ${riskWordTitle}`;
+      if (action === "review") return `Pending action: ${actionWord} — ${riskWordTitle}`;
+      return `Pending action: Reply — ${riskWordTitle}`;
     })();
     const confidenceLine = (() => {
       if (pct == null) return "Confidence unavailable";
       const band = pct >= 85 ? "High" : pct >= 65 ? "Medium" : "Low";
       return `Confidence: ${band} (${pct}%)`;
     })();
+    const subtext = appr.requiresApproval ? "Requires your approval" : "";
+    const noActionLine = appr.requiresApproval ? "No action will be taken until approved" : "";
+    const execPreview = action === "refund" ? "If approved: refund will be issued via Stripe" : "";
+    const whyBullets = (() => {
+      const bullets = [];
+      const main = explainWhyAction(data);
+      if (main) bullets.push(main);
+      const verdict = safetyVerdictLine(data);
+      if (verdict) bullets.push(verdict);
+      const sigLine = signalsSummaryLine(data);
+      if (sigLine) bullets.push(`Signals: ${sigLine}`);
+      const queueLine = queueMeansLine({ decision: dec });
+      if (queueLine) bullets.push(queueLine);
+      if (Number.isFinite(Number(appr.amount)) && Number(appr.amount) > 0) {
+        bullets.push(`Prepared amount: ${formatMoney(Number(appr.amount))}`);
+      }
+      const seen = new Set();
+      const uniq = [];
+      for (const b of bullets) {
+        const k = collapseWsForDedupe(String(b || "")).toLowerCase();
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        uniq.push(String(b));
+      }
+      return uniq.slice(0, 5);
+    })();
     return {
-      headline: suggested,
+      headline,
+      subtext,
+      noActionLine,
+      execPreview,
+      whyBullets,
       confidenceLine,
     };
   }
@@ -6824,7 +6904,19 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const decisionCalloutEl = panel.querySelector("[data-role='decision-callout']");
     if (decisionCalloutEl) {
       const co = buildWorkspaceDecisionCallout(data, approval);
-      decisionCalloutEl.innerHTML = `<div class="decision-callout-title">${escapeHtml(co.headline)}</div><div class="decision-callout-confidence">${escapeHtml(co.confidenceLine)}</div>`;
+      const whyHtml =
+        Array.isArray(co.whyBullets) && co.whyBullets.length
+          ? `<details class="decision-callout-why"><summary>Why this decision</summary><ul>${co.whyBullets
+              .map((b) => `<li>${escapeHtml(String(b))}</li>`)
+              .join("")}</ul></details>`
+          : "";
+      decisionCalloutEl.innerHTML = `<div class="decision-callout-title">${escapeHtml(co.headline)}</div>${
+        co.subtext ? `<div class="decision-callout-subtext">${escapeHtml(co.subtext)}</div>` : ""
+      }${
+        co.noActionLine ? `<div class="decision-callout-note">${escapeHtml(co.noActionLine)}</div>` : ""
+      }${
+        co.execPreview ? `<div class="decision-callout-preview">${escapeHtml(co.execPreview)}</div>` : ""
+      }${whyHtml}<div class="decision-callout-confidence">${escapeHtml(co.confidenceLine)}</div>`;
       decisionCalloutEl.hidden = false;
     }
     const hideConsequence = /signal-safe/.test(sig.cls) && !pendingGate;
