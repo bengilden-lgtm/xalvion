@@ -281,8 +281,8 @@ if (typeof window.pulseRail !== "function") {
     if (isSim)
       return {
         status: "simulated",
-        label: "Simulated — no action taken",
-        detail: "Simulation mode is active. No real actions were taken.",
+        label: "Simulation mode",
+        detail: "No real actions will be taken.",
         color: "warning",
         is_simulated: true,
         verified_success: false,
@@ -294,8 +294,8 @@ if (typeof window.pulseRail !== "function") {
     if (reqAppr || ["pending_approval", "manual_review"].includes(ts))
       return {
         status: "pending_approval",
-        label: "Staged — awaiting approval",
-        detail: "Prepared and awaiting approval. No action has been taken yet.",
+        label: "Awaiting operator approval",
+        detail: "No action will be taken until approved.",
         color: "neutral",
         is_simulated: false,
         verified_success: false,
@@ -2689,7 +2689,7 @@ if (typeof window.pulseRail !== "function") {
     return `
       <div class="xv-onboarding-flow" role="region" aria-label="How Xalvion works">
         <div class="xv-onboarding-flow-head">
-          <p class="xv-onboarding-flow-tagline">Paste a ticket. AI prepares. You approve before sending.</p>
+          <p class="xv-onboarding-flow-tagline">Paste a support ticket. AI prepares the decision; you approve before anything happens.</p>
           <button type="button" class="xv-onboarding-flow-dismiss ghost-btn" id="xvOnboardingFlowDismiss" aria-label="Dismiss getting started tip">×</button>
         </div>
         <details class="xv-onboarding-flow-more">
@@ -5971,6 +5971,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     if (row && row.dataset) row.dataset.prepSeconds = String(fixed);
     el.textContent = `AI prepared this in ${fixed.toFixed(1)}s`;
     el.hidden = false;
+    // Entrance: chip should appear just after the decision card settles.
+    try {
+      el.classList.remove("xv-prep-chip-enter");
+      window.setTimeout(() => {
+        el.classList.add("xv-prep-chip-enter");
+        window.setTimeout(() => el.classList.remove("xv-prep-chip-enter"), 520);
+      }, 220);
+    } catch {}
   }
 
   function formatAuditStamp(epochOrIso) {
@@ -6604,19 +6612,33 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       if (c >= 0.55) return "medium risk";
       return "higher risk";
     })();
-    const actionVerb = (() => {
-      if (appr.requiresApproval && !appr.approved) {
-        if (action === "refund") return "Approve refund";
-        if (action === "credit") return "Approve credit";
-        if (action === "charge") return "Approve charge";
-        return "Approve & release";
-      }
-      if (action === "review") return "Hold for review";
-      return "Send reply";
+    const actionWord = (() => {
+      if (action === "refund") return "Refund";
+      if (action === "credit") return "Credit";
+      if (action === "charge") return "Charge";
+      if (action === "review") return "Review";
+      return "Action";
+    })();
+    const riskWordTitle = (() => {
+      const r = String(riskLower || "").trim().toLowerCase();
+      if (r.includes("high") || r.includes("blocked")) return "High risk";
+      if (r.includes("medium")) return "Medium risk";
+      if (r.includes("low")) return "Low risk";
+      return r ? r.replace(/\b\w/g, (m) => m.toUpperCase()) : "Risk";
+    })();
+    const suggested = (() => {
+      if (appr.requiresApproval && !appr.approved) return `Suggested action: ${actionWord} — ${riskWordTitle}`;
+      if (action === "review") return `Suggested action: ${actionWord} — ${riskWordTitle}`;
+      return `Suggested action: Reply — ${riskWordTitle}`;
+    })();
+    const confidenceLine = (() => {
+      if (pct == null) return "Confidence unavailable";
+      const band = pct >= 85 ? "High" : pct >= 65 ? "Medium" : "Low";
+      return `Confidence: ${band} (${pct}%)`;
     })();
     return {
-      headline: `Recommended: ${actionVerb} (${riskLower})`,
-      confidenceLine: pct != null ? `${pct}% confidence` : "Confidence unavailable",
+      headline: suggested,
+      confidenceLine,
     };
   }
 
@@ -6772,6 +6794,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       <div class="decision-callout" data-role="decision-callout" aria-live="polite"></div>
       <div class="decision-panel-top">
         <span class="consequence-signal ${sig.cls}" data-role="consequence">${escapeHtml(sig.text)}</span>
+        <span class="xv-exec-boundary" data-role="exec-boundary" aria-live="polite"></span>
         <div class="decision-controls" data-role="controls"></div>
       </div>
       <div class="xv-action-feedback-host" data-role="action-feedback" hidden></div>
@@ -6797,6 +6820,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     });
 
     const cons = panel.querySelector("[data-role='consequence']");
+    const execBoundaryEl = panel.querySelector("[data-role='exec-boundary']");
     const decisionCalloutEl = panel.querySelector("[data-role='decision-callout']");
     if (decisionCalloutEl) {
       const co = buildWorkspaceDecisionCallout(data, approval);
@@ -6828,6 +6852,23 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         if (sig.title) cons.setAttribute("title", sig.title);
       }
     }
+
+    // Execution boundary: never leave operators unsure about live vs simulation.
+    try {
+      const actionLc = String(data?.action || data?.decision?.action || data?.sovereign_decision?.action || "").toLowerCase();
+      const moneyActs = actionLc === "refund" || actionLc === "credit" || actionLc === "charge";
+      const tierLc = String(state.tier || "free").toLowerCase();
+      const paid = tierLc === "pro" || tierLc === "elite" || tierLc === "dev";
+      const truth = getExecutionTruth(data);
+      const isSimulation = Boolean(truth?.is_simulated || (!paid && moneyActs) || (moneyActs && paid && !state.stripeConnected));
+      if (execBoundaryEl) {
+        execBoundaryEl.hidden = false;
+        execBoundaryEl.dataset.status = isSimulation ? "simulation" : "live";
+        execBoundaryEl.innerHTML = isSimulation
+          ? `<span class="xv-exec-boundary__title">Simulation mode</span><span class="xv-exec-boundary__sub">No real actions will be taken</span>`
+          : `<span class="xv-exec-boundary__title">Live execution enabled</span><span class="xv-exec-boundary__sub">Refunds are processed after approval</span>`;
+      }
+    } catch {}
 
     const controls = panel.querySelector("[data-role='controls']");
     const microEl = panel.querySelector("[data-role='micro']");
@@ -7415,16 +7456,30 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const ap = document.createElement("button");
       ap.type = "button";
       const approveLabel = pendingGate ? "Approve & release" : "Approve";
+      const approveAction = String(data?.action || data?.decision?.action || data?.sovereign_decision?.action || "none").toLowerCase();
+      const approveIdleLabel =
+        pendingGate && approveAction
+          ? approveAction === "refund"
+            ? "Approve refund"
+            : approveAction === "credit"
+              ? "Approve credit"
+              : approveAction === "charge"
+                ? "Approve charge"
+                : approveLabel
+          : approveLabel;
       const setApproveIdle = () => {
         ap.classList.remove("is-loading");
+        ap.classList.remove("xv-hold-active");
+        ap.classList.remove("xv-hold-armed");
+        ap.style.removeProperty("--xv-hold-pct");
         ap.removeAttribute("aria-busy");
-        ap.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.approve}</span><span class="op-action__label">${approveLabel}</span>`;
+        ap.innerHTML = `<span class="xv-hold-fill" aria-hidden="true"></span><span class="op-action__icon" aria-hidden="true">${ICONS.approve}</span><span class="op-action__label">${escapeHtml(approveIdleLabel)}</span>`;
       };
       const setApproveStage = (stageLabel) => {
         const lbl = String(stageLabel || "").trim();
         ap.classList.add("is-loading");
         ap.setAttribute("aria-busy", "true");
-        ap.innerHTML = `<span class="op-action__icon" aria-hidden="true"><span class="xv-inline-spinner"></span></span><span class="op-action__label">${escapeHtml(lbl)}</span>`;
+        ap.innerHTML = `<span class="xv-hold-fill" aria-hidden="true"></span><span class="op-action__icon" aria-hidden="true"><span class="xv-inline-spinner"></span></span><span class="op-action__label">${escapeHtml(lbl)}</span>`;
       };
       ap.className = pendingGate ? "op-action op-action--primary op-action--primary--hold" : "op-action op-action--primary";
       ap.title = pendingGate
@@ -7460,6 +7515,100 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       primary.append(ap);
       tertiary.append(cp);
       controls.append(secondary, primary, tertiary);
+
+      const runApproveExecution = async () => {
+        showErr("");
+        clearActionFeedback();
+        if (!ticketId && pendingGate) {
+          showErr("No ticket id.");
+          return;
+        }
+        if (pendingGate && !approval.canApprove) {
+          showErr("Sign in as the ticket owner to approve.");
+          return;
+        }
+        if (pendingGate && approval.canApprove) {
+          [rej, ed, ap].forEach((b) => {
+            b.disabled = true;
+          });
+          setApproveStage("Approving…");
+          // Minimum visible processing: never “instant”.
+          await sleep(460);
+          const execLabel = approveAction === "refund" ? "Executing refund…" : "Executing…";
+          setApproveStage(execLabel);
+          panel.classList.add("xv-executing");
+          const execStageStart = perfNow();
+          try {
+            const response = await resolveApproval(ticketId, "approve", {
+              payment_intent_id: approval.paymentIntentId,
+              charge_id: approval.chargeId,
+              refund_reason: "requested_by_customer"
+            });
+            const normalized = normalizeWorkspaceResult(normalizeApprovalResponse(response, data));
+            state.latestRun = normalized;
+            rebindResultFooter(row, normalized);
+            updateStatsFromResult(normalized);
+            updateRevenueCard(normalized);
+            updateLatestRunCard(normalized);
+            updateSystemNarrative(normalized);
+            updateTopbarStatus();
+            recordWorkspaceOutcomeClosing(normalized);
+            // Ensure executing stage is perceptible even on fast paths.
+            const execVisible = perfNow() - execStageStart;
+            if (execVisible < 420) await sleep(420 - execVisible);
+            ap.classList.remove("is-loading");
+            ap.innerHTML = `<span class="xv-hold-fill" aria-hidden="true"></span><span class="op-action__icon xv-check-anim" aria-hidden="true">${ICONS.check}</span><span class="op-action__label">${approveAction === "refund" ? "Refund processed" : "Completed"}</span>`;
+            panel.classList.remove("xv-executing");
+            pulseSuccess(panel);
+            if (approveAction === "refund") {
+              showActionFeedback("success", "Refund processed", "Refund processed successfully");
+            } else {
+              const act = String(normalized.action || normalized.decision?.action || "action").toLowerCase();
+              const amt = Number(normalized.amount || 0) || 0;
+              const amtText = amt > 0 ? ` ${formatMoney(amt)}` : "";
+              const title =
+                act === "refund"
+                  ? `Refund executed${amtText}`
+                  : act === "credit"
+                    ? `Credit executed${amtText}`
+                    : act === "charge"
+                      ? `Charge executed${amtText}`
+                      : "Execution completed";
+              showActionFeedback("success", title, "Outcome recorded — no silent side effects.");
+            }
+            setNotice(
+              "success",
+              "Ticket resolved successfully",
+              [response.message || "Outcome recorded.", formatOutboundEmailLine(normalized)].filter(Boolean).join(" ")
+            );
+          } catch (error) {
+            maybeNudgeIntegrationsFromApproveError(error.message);
+            const execVisible = perfNow() - execStageStart;
+            if (execVisible < 420) await sleep(420 - execVisible);
+            panel.classList.remove("xv-executing");
+            panel.classList.add("xv-executing-failed");
+            window.setTimeout(() => panel.classList.remove("xv-executing-failed"), 820);
+            showErr(error.message || "Execution failed — no action taken.");
+            showActionFeedback(
+              "error",
+              "Execution failed",
+              "Execution failed — no action taken"
+            );
+            [rej, ed, ap].forEach((b) => {
+              b.disabled = false;
+            });
+            setApproveIdle();
+          }
+          return;
+        }
+        recordWorkspaceOutcomeClosing(data);
+        setTerminal("Approved", "Prepared reply is ready. No execution hold on this run.");
+        setNotice(
+          "success",
+          "Ticket resolved successfully",
+          ["No billing hold on this run — copy or send on your timeline.", formatOutboundEmailLine(data)].filter(Boolean).join(" ")
+        );
+      };
 
       ed.addEventListener("click", () => {
         showErr("");
@@ -7525,7 +7674,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             setApproveStage("Approving…");
             try {
               await sleep(460);
-              setApproveStage("Executing…");
+              setApproveStage(approveAction === "refund" ? "Executing refund…" : "Executing…");
               const execStageStart = perfNow();
               const response = await resolveApproval(ticketId, "approve", {
                 payment_intent_id: approval.paymentIntentId,
@@ -7621,90 +7770,64 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         }
       });
 
+      // Keyboard users: keep click behavior (Enter/Space).
       ap.addEventListener("click", async () => {
-        showErr("");
-        clearActionFeedback();
-        if (!ticketId && pendingGate) {
-          showErr("No ticket id.");
-          return;
-        }
-        if (pendingGate && !approval.canApprove) {
-          showErr("Sign in as the ticket owner to approve.");
-          return;
-        }
-        if (pendingGate && approval.canApprove) {
-          [rej, ed, ap].forEach((b) => {
-            b.disabled = true;
-          });
-          const stageStart = perfNow();
-          setApproveStage("Approving…");
-          // Minimum visible processing: never “instant”.
-          await sleep(460);
-          setApproveStage("Executing…");
-          const execStageStart = perfNow();
-          try {
-            const response = await resolveApproval(ticketId, "approve", {
-              payment_intent_id: approval.paymentIntentId,
-              charge_id: approval.chargeId,
-              refund_reason: "requested_by_customer"
-            });
-            const normalized = normalizeWorkspaceResult(normalizeApprovalResponse(response, data));
-            state.latestRun = normalized;
-            rebindResultFooter(row, normalized);
-            updateStatsFromResult(normalized);
-            updateRevenueCard(normalized);
-            updateLatestRunCard(normalized);
-            updateSystemNarrative(normalized);
-            updateTopbarStatus();
-            recordWorkspaceOutcomeClosing(normalized);
-            // Ensure executing stage is perceptible even on fast paths.
-            const execVisible = perfNow() - execStageStart;
-            if (execVisible < 420) await sleep(420 - execVisible);
-            ap.classList.remove("is-loading");
-            ap.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.check}</span><span class="op-action__label">Completed</span>`;
-            pulseSuccess(panel);
-            const act = String(normalized.action || normalized.decision?.action || "action").toLowerCase();
-            const amt = Number(normalized.amount || 0) || 0;
-            const amtText = amt > 0 ? ` ${formatMoney(amt)}` : "";
-            const title =
-              act === "refund"
-                ? `Refund executed${amtText}`
-                : act === "credit"
-                  ? `Credit executed${amtText}`
-                  : act === "charge"
-                    ? `Charge executed${amtText}`
-                    : "Execution completed";
-            showActionFeedback("success", title, "Outcome recorded — no silent side effects.");
-            setNotice(
-              "success",
-              "Ticket resolved successfully",
-              [response.message || "Outcome recorded.", formatOutboundEmailLine(normalized)].filter(Boolean).join(" ")
-            );
-          } catch (error) {
-            maybeNudgeIntegrationsFromApproveError(error.message);
-            const execVisible = perfNow() - execStageStart;
-            if (execVisible < 420) await sleep(420 - execVisible);
-            showErr(error.message || "Execution failed — no action taken.");
-            showActionFeedback(
-              "error",
-              "Execution failed — no action taken",
-              "Nothing was executed. Fix the blocker, then approve again."
-            );
-            [rej, ed, ap].forEach((b) => {
-              b.disabled = false;
-            });
-            setApproveIdle();
-          }
-          return;
-        }
-        recordWorkspaceOutcomeClosing(data);
-        setTerminal("Approved", "Prepared reply is ready. No execution hold on this run.");
-        setNotice(
-          "success",
-          "Ticket resolved successfully",
-          ["No billing hold on this run — copy or send on your timeline.", formatOutboundEmailLine(data)].filter(Boolean).join(" ")
-        );
+        if (ap.dataset.xvHold === "1") return;
+        await runApproveExecution();
       });
+
+      // Hold-to-confirm for consequential approvals (pointer only).
+      if (pendingGate && approval.canApprove) {
+        ap.classList.add("xv-holdable");
+        ap.setAttribute("aria-label", `${approveIdleLabel}. Hold to approve.`);
+        let holdRaf = 0;
+        let holdStart = 0;
+        let holdArmed = false;
+        const HOLD_MS = 650;
+        const cancelHold = () => {
+          ap.dataset.xvHold = "0";
+          holdArmed = false;
+          holdStart = 0;
+          if (holdRaf) cancelAnimationFrame(holdRaf);
+          holdRaf = 0;
+          if (!ap.classList.contains("is-loading")) setApproveIdle();
+        };
+        const tick = () => {
+          if (!holdArmed || !holdStart) return;
+          const elapsed = perfNow() - holdStart;
+          const pct = Math.max(0, Math.min(1, elapsed / HOLD_MS));
+          ap.style.setProperty("--xv-hold-pct", String(pct));
+          ap.classList.add("xv-hold-active");
+          ap.innerHTML = `<span class="xv-hold-fill" aria-hidden="true"></span><span class="op-action__icon" aria-hidden="true">${ICONS.approve}</span><span class="op-action__label">${escapeHtml(pct > 0.06 ? "Confirming…" : "Hold to approve")}</span>`;
+          if (pct >= 1) {
+            ap.dataset.xvHold = "1";
+            holdArmed = false;
+            if (holdRaf) cancelAnimationFrame(holdRaf);
+            holdRaf = 0;
+            // Trigger existing approval execution path.
+            runApproveExecution();
+            return;
+          }
+          holdRaf = requestAnimationFrame(tick);
+        };
+        ap.addEventListener(
+          "pointerdown",
+          (e) => {
+            if (e.button != null && e.button !== 0) return;
+            if (ap.disabled || ap.classList.contains("is-loading")) return;
+            ap.dataset.xvHold = "0";
+            holdArmed = true;
+            holdStart = perfNow();
+            ap.classList.add("xv-hold-armed");
+            ap.setPointerCapture?.(e.pointerId);
+            tick();
+          },
+          { passive: true }
+        );
+        ap.addEventListener("pointerup", cancelHold, { passive: true });
+        ap.addEventListener("pointercancel", cancelHold, { passive: true });
+        ap.addEventListener("pointerleave", cancelHold, { passive: true });
+      }
     };
 
     wireActions();
@@ -10479,7 +10602,7 @@ function bindEvents() {
     if (isClaudeShell()) {
       if (els.composerStatusLine) els.composerStatusLine.textContent = "";
       if (els.messageInput) {
-        els.messageInput.placeholder = "Paste a ticket. AI prepares. You approve before sending.";
+        els.messageInput.placeholder = "Paste a support ticket";
       }
       syncComposerAriaDescribedBy();
     }
@@ -10558,7 +10681,7 @@ function bindEvents() {
       __billingCheckoutReturn = { kind: null, detail: "" };
       setNotice("info", "Checkout closed", d || "No plan change. Upgrade anytime from Plans when you’re ready.");
     } else if (!state.username) {
-      setNotice("info", "Ready when you are", "Paste a ticket below to see your first draft.");
+      setNotice("info", "Ready when you are", "Paste a support ticket below. AI prepares the refund decision; you approve before anything happens.");
     } else {
       setNotice("success", "Workspace synced", `Signed in as ${state.username}. The operator workspace is ready.`);
     }
