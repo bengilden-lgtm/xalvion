@@ -38,7 +38,7 @@
             <text x="34" y="34"
               font-family="'Helvetica Neue',Arial,sans-serif"
               font-size="5.5" font-weight="400"
-              fill="rgba(255,255,255,0.28)" letter-spacing="3.5">AUTONOMOUS SUPPORT</text>
+              fill="rgba(255,255,255,0.28)" letter-spacing="3.5">APPROVAL-FIRST REFUNDS</text>
           </svg>
         </a>
         <span id="commandModeLine" class="command-mode-pill" translate="no">Verified actions · approval-first workspace</span>
@@ -214,29 +214,29 @@
                   <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(840px, 100%);">
                     <div class="cld-cap-pill" id="plansSurfaceStatusPill" translate="no">Plans</div>
                     <h2 class="cld-welcome-headline" style="margin-top:10px;">Choose capacity that matches your workload.</h2>
-                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Higher tiers remove the friction you feel on Free — more tickets, less copy-paste, refunds you approve can run in Stripe. Same approval gate at every tier.</p>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Higher tiers remove the friction you feel on Free — more tickets handled per month, fewer manual steps, and the ability to execute approved refunds in Stripe from the workspace (when connected). Same approval gate at every tier.</p>
                     <div class="plan-compare-compact" role="region" aria-label="Plans at a glance">
                       <div class="plan-compare-col">
                         <div class="plan-compare-name">Free</div>
                         <ul class="plan-compare-list">
                           <li>Limited tickets</li>
-                          <li>Manual approvals</li>
-                          <li>No automation</li>
+                          <li>Approval-first workflow</li>
+                          <li>No in-workspace refund execution</li>
                         </ul>
                       </div>
                       <div class="plan-compare-col">
                         <div class="plan-compare-name">Pro</div>
                         <ul class="plan-compare-list">
                           <li>Higher limits</li>
-                          <li>Auto refunds (within limits)</li>
-                          <li>Faster resolution</li>
+                          <li>Execute approved refunds (Stripe)</li>
+                          <li>Fewer manual steps</li>
                         </ul>
                       </div>
                       <div class="plan-compare-col">
                         <div class="plan-compare-name">Elite</div>
                         <ul class="plan-compare-list">
                           <li>Highest limits</li>
-                          <li>Full automation</li>
+                          <li>More throughput headroom</li>
                           <li>Priority performance</li>
                         </ul>
                       </div>
@@ -258,7 +258,7 @@
                         </div>
                         <ul class="plan-offer-features">
                           <li><strong>Tickets included</strong>: 3</li>
-                          <li><strong>Automation</strong>: no</li>
+                          <li><strong>Refund execution</strong>: no</li>
                           <li><strong>Integrations</strong>: no</li>
                           <li><strong>Best for</strong>: evaluation</li>
                         </ul>
@@ -275,8 +275,8 @@
                         </div>
                         <ul class="plan-offer-features">
                           <li><strong>Tickets included</strong>: 12 / month</li>
-                          <li><strong>Automation</strong>: no</li>
-                          <li><strong>Integrations</strong>: limited (connect + prepare)</li>
+                          <li><strong>Refund execution</strong>: no (prepare only)</li>
+                          <li><strong>Integrations</strong>: connect + prepare</li>
                           <li><strong>Best for</strong>: solo operators &amp; low volume</li>
                         </ul>
                         <button type="button" class="plan-cta plan-cta--secondary" data-open-access="login"><span>Already have an account?</span></button>
@@ -292,11 +292,11 @@
                         </div>
                         <ul class="plan-offer-features">
                           <li><strong>Tickets included</strong>: 500 / month</li>
-                          <li><strong>Automation</strong>: guided (approval-first)</li>
-                          <li><strong>Integrations</strong>: Stripe execution + workflow hooks</li>
+                          <li><strong>Refund execution</strong>: yes (after approval)</li>
+                          <li><strong>Integrations</strong>: Stripe refund execution + workflow hooks</li>
                           <li><strong>Best for</strong>: growing support volume</li>
                         </ul>
-                        <button type="button" class="plan-cta plan-cta--primary" data-upgrade="pro"><span>Enable auto refunds — Pro</span></button>
+                        <button type="button" class="plan-cta plan-cta--primary" data-upgrade="pro"><span>Unlock refund execution — Pro</span></button>
                       </article>
 
                       <article class="plan-offer plan-offer--elite" data-plan-tier="elite" id="planEliteCard">
@@ -310,11 +310,11 @@
                         </div>
                         <ul class="plan-offer-features">
                           <li><strong>Tickets included</strong>: 5,000 / month</li>
-                          <li><strong>Automation</strong>: high-volume workflows</li>
+                          <li><strong>Refund execution</strong>: yes (after approval)</li>
                           <li><strong>Integrations</strong>: full workflow integration</li>
                           <li><strong>Best for</strong>: support teams &amp; high throughput</li>
                         </ul>
-                        <button type="button" class="plan-cta plan-cta--secondary" data-upgrade="elite"><span>Handle more tickets automatically — Elite</span></button>
+                        <button type="button" class="plan-cta plan-cta--secondary" data-upgrade="elite"><span>Increase capacity — Elite</span></button>
                       </article>
                     </div>
                   </div>
@@ -327,7 +327,7 @@
                   <div class="empty-card empty-card-launch--claude" style="text-align:left; max-width: min(760px, 100%);">
                     <div class="cld-cap-pill" translate="no">Integrations</div>
                     <h2 class="cld-welcome-headline" style="margin-top:10px;">Connect tools once. Operate faster.</h2>
-                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Connect Stripe for live refunds you approve, and SMTP when you want this workspace to send customer email — no generic setup wall; prompts appear when an action needs them.</p>
+                    <p class="cld-welcome-prompt" style="max-width:none; margin-top:8px; margin-left:0;">Connect Stripe to execute refunds you’ve approved. Configure SMTP only if you want this workspace to send customer email from the server. If SMTP is not configured, drafts stay drafts — nothing is shown as “sent.”</p>
 
                     <div class="tier-card stripe-card" id="stripeCard" style="margin-top:16px;">
                       <div class="stripe-card-head">
@@ -559,11 +559,11 @@
       <div class="refund-dialog-head">
         <div class="refund-dialog-title">
           <h3>Refund UI</h3>
-          <p>Paste a PaymentIntent or Charge ID, optionally set a partial amount, and run a live refund from the workspace.</p>
+          <p>Paste a PaymentIntent or Charge ID, optionally set a partial amount, then execute a refund in Stripe from the workspace.</p>
         </div>
         <button id="closeRefundModalBtn" class="refund-close" type="button" aria-label="Close refund UI">×</button>
       </div>
-      <div id="refundModalNote" class="refund-inline-note">Refund execution is locked until your plan allows live billing actions.</div>
+      <div id="refundModalNote" class="refund-inline-note">Refund execution is locked until your plan allows live refunds and Stripe is connected.</div>
       <div class="refund-form-grid">
         <label class="refund-field">
           <span class="refund-label">PaymentIntent ID</span>
@@ -588,7 +588,7 @@
       </div>
       <div class="refund-footer">
         <button id="cancelRefundModalBtn" class="ghost-btn" type="button">Cancel</button>
-        <button id="executeRefundBtn" class="btn" type="button">Run refund</button>
+        <button id="executeRefundBtn" class="btn" type="button">Execute refund</button>
       </div>
     </div>
   </div>

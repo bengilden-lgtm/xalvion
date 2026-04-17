@@ -282,7 +282,7 @@ if (typeof window.pulseRail !== "function") {
       return {
         status: "simulated",
         label: "Simulated — no action taken",
-        detail: "Mock execution mode is active. No real action occurred.",
+        detail: "Simulation mode is active. No real actions were taken.",
         color: "warning",
         is_simulated: true,
         verified_success: false,
@@ -295,7 +295,7 @@ if (typeof window.pulseRail !== "function") {
       return {
         status: "pending_approval",
         label: "Staged — awaiting approval",
-        detail: "Recommended but not executed. Approve to proceed.",
+        detail: "Prepared and awaiting approval. No action has been taken yet.",
         color: "neutral",
         is_simulated: false,
         verified_success: false,
@@ -307,8 +307,8 @@ if (typeof window.pulseRail !== "function") {
     if (vSucc)
       return {
         status: "executed",
-        label: "Executed — action confirmed",
-        detail: "Action was processed and confirmed.",
+        label: "Executed — confirmed",
+        detail: "The connected tool confirmed execution.",
         color: "success",
         is_simulated: false,
         verified_success: true,
@@ -569,9 +569,9 @@ if (typeof window.pulseRail !== "function") {
     }
     const rem = Number(data.remaining ?? data.entitlement?.remaining ?? state.remaining ?? 0);
     if (Number.isFinite(rem) && rem > 0) {
-      return "Auto-executed under your plan limits when policy, Stripe, and SMTP are ready.";
+      return "Runs available this cycle · approvals stay explicit.";
     }
-    return "Included runs for this cycle are used — Pro adds live execution and higher limits.";
+    return "Included runs for this cycle are used — Pro adds higher limits and in-workspace refund execution when Stripe is connected.";
   }
 
   function deriveAutoManualExecution(data = {}) {
@@ -600,8 +600,8 @@ if (typeof window.pulseRail !== "function") {
     }
     if (["refunded", "credit_issued", "success"].includes(tst) || (impact.auto_resolved && tst && tst !== "unknown")) {
       return {
-        label: "Auto-resolved",
-        why: "Policy and tooling allowed the motion to finish without extra gates on this path.",
+        label: "Completed",
+        why: "The system recorded completion for this ticket. Use the execution banner to confirm whether anything ran live or was simulated.",
       };
     }
     if (tst === "approved_pending_execution") {
@@ -622,11 +622,11 @@ if (typeof window.pulseRail !== "function") {
     if (auto.label === "Requires approval") return { headline: "Pending — needs your approval", detail: auto.why };
     if (auto.label === "Manual required") return { headline: "Held — needs review", detail: auto.why };
     if (auto.label === "Pending manual") return { headline: "Pending — requires setup", detail: auto.why };
-    if (auto.label === "Auto-resolved") return { headline: "Done — executed", detail: auto.why };
+    if (auto.label === "Completed") return { headline: "Completed", detail: auto.why };
     if (tst === "approved_pending_execution") return { headline: "Pending — requires setup", detail: auto.why };
     if (String(data.action || "none").toLowerCase() === "none")
       return { headline: "Ready — reply only", detail: "No billing tool run on this ticket — reply only." };
-    return { headline: "Done — executed", detail: auto.why };
+    return { headline: "Completed", detail: auto.why };
   }
 
   function actionTakenLabel(data = {}) {
@@ -3157,7 +3157,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
       if (els.openRefundModalBtn) {
         els.openRefundModalBtn.disabled = !allowed;
-        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Enable auto refunds";
+        els.openRefundModalBtn.textContent = allowed ? "Open refund UI" : "Unlock refund execution";
       }
 
       if (els.executeRefundBtn) {
@@ -3166,14 +3166,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
       if (els.refundModalNote) {
         els.refundModalNote.textContent = allowed
-          ? "Live refund execution is on for this plan — paste a PaymentIntent or Charge ID from Stripe."
-          : "Auto refunds from the workspace are off on this plan — Pro enables them (within limits) after you approve.";
+          ? "Refund execution is enabled for this plan — paste a PaymentIntent or Charge ID from Stripe to run a live refund."
+          : "Refund execution from the workspace is locked on this plan — upgrade to Pro to execute approved refunds when Stripe is connected.";
       }
 
       if (els.refundCenterCopy) {
         els.refundCenterCopy.textContent = allowed
           ? "Paste a PaymentIntent or Charge ID and run the refund without leaving the operator workspace."
-          : "Free prepares billing moves; Pro runs approved refunds in Stripe from here — same governance.";
+          : "Free prepares refund decisions; Pro executes approved refunds in Stripe from here when connected — same governance.";
       }
       if (els.refundUpgradeTease) {
         const d = state.dashboardStats || {};
@@ -3184,7 +3184,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           ? "Stripe execution from the workspace · Pro and Elite"
           : money > 0 || actions > 0
             ? `You’ve already surfaced ${formatMoney(money)} across ${actions} billing motion${actions === 1 ? "" : "s"} — Pro finishes the loop with live refunds here.`
-            : "Enable auto refunds on Pro — same approvals, refunds run in Stripe from here when connected.";
+            : "Unlock refund execution on Pro — same approvals, refunds run in Stripe from here when connected.";
       }
     }
 
@@ -3205,9 +3205,9 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         : null;
       setNotice(
         "warning",
-        locked?.primary || "Auto refunds need Pro or Elite",
+        locked?.primary || "Refund execution needs Pro or Elite",
         locked?.secondary ||
-          "Free prepares refunds you run manually in Stripe. Pro executes approved refunds here (within limits) when Stripe is connected."
+          "Free prepares refund decisions you run manually in Stripe. Pro executes approved refunds here (within limits) when Stripe is connected."
       );
       return;
     }
@@ -4340,19 +4340,19 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const primaryCta = isGuest
         ? "Create free account"
         : tier === "pro"
-          ? "Handle more tickets automatically — Elite"
-          : "Enable auto refunds — Pro";
+          ? "Increase capacity — Elite"
+          : "Unlock refund execution — Pro";
       const secondaryHint = isGuest
         ? "Preview runs are capped — a free account adds monthly included runs and saved threads."
         : "Included runs for this window are used — unlock headroom before the queue feels it.";
       el.innerHTML = `
         <div class="usage-at-limit-upgrade__eyebrow">${escapeHtml(isGuest ? "Preview limit reached" : "Plan limit reached")}</div>
-        <div class="usage-at-limit-upgrade__title">Keep auto refunds, higher limits, and faster resolution</div>
+        <div class="usage-at-limit-upgrade__title">Keep approvals moving with more capacity</div>
         <p class="usage-at-limit-upgrade__lead">${escapeHtml(secondaryHint)}</p>
         <ul class="usage-at-limit-upgrade__list">
-          <li><strong>Auto refunds &amp; credits</strong> when Stripe is connected — less tab switching.</li>
+          <li><strong>Execute approved refunds</strong> in Stripe from the workspace (when connected).</li>
           <li><strong>Higher included runs</strong> so volume weeks do not stall mid-shift.</li>
-          <li><strong>Faster resolution</strong> with live execution lanes and clearer approvals.</li>
+          <li><strong>Clearer workflow</strong> with explicit approval and accurate execution status.</li>
         </ul>
         <div class="usage-at-limit-upgrade__actions">
           <button type="button" class="btn usage-at-limit-upgrade__primary">${escapeHtml(primaryCta)}</button>
@@ -4423,8 +4423,8 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const ctaLabel = pressure?.cta
       ? `${pressure.cta} →`
       : tier === "pro"
-        ? "Handle more tickets automatically — Elite →"
-        : "Enable auto refunds — Pro →";
+        ? "Increase capacity — Elite →"
+        : "Unlock refund execution — Pro →";
 
     // Render as a subtle, inline CTA inside the usage strip (no buttons everywhere).
     el.style.display = "none";
@@ -4433,7 +4433,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     setUsageInlineCta({
       tone: String(pressure?.tone || "neutral"),
       copy: [story, capLine, unlock].filter(Boolean).join(" "),
-      cta: ctaLabel.replace(/\s*→\s*$/, "").trim() || (tier === "pro" ? "Handle more tickets automatically — Elite" : "Enable auto refunds — Pro"),
+      cta: ctaLabel.replace(/\s*→\s*$/, "").trim() || (tier === "pro" ? "Increase capacity — Elite" : "Unlock refund execution — Pro"),
       targetTier: ctaTier,
     });
   }
@@ -6362,7 +6362,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         "Connect Stripe when refunds should run here"
       );
       footnotes.push("You can downgrade anytime · No risk to try · Works with your existing tools.");
-      buttons.push({ cls: "xv-int-compare-plans", label: "Enable auto refunds" });
+      buttons.push({ cls: "xv-int-compare-plans", label: "Unlock refund execution" });
     }
     if (showSmtpConfigure) {
       bullets.push(
