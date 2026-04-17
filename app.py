@@ -1029,6 +1029,10 @@ def _startup_database() -> None:
         except Exception as exc:
             STARTUP_READY = False
             STARTUP_ISSUES.append(f"startup_failed:{type(exc).__name__}:{str(exc)[:220]}")
+            try:
+                logger.critical("startup_background_init_failed", exc_info=True)
+            except Exception:
+                pass
             print(
                 f"BOOT: background init FAILED type={type(exc).__name__} detail={str(exc)[:800]}",
                 flush=True,
@@ -1037,6 +1041,7 @@ def _startup_database() -> None:
 
     threading.Thread(target=_bg_init, name="startup-bg-init", daemon=True).start()
     print("BOOT: startup hook scheduled background init", flush=True)
+    print("BOOT: FastAPI startup hook end (background init scheduled)", flush=True)
 
 
 # =============================================================================
@@ -3038,14 +3043,24 @@ def serve_static_favicon_svg():
 # =============================================================================
 
 
-@app.get("/health")
-def health():
+def _health_liveness_response() -> Response:
     """
-    Railway healthchecks require a FAST, LIGHTWEIGHT, ALWAYS-AVAILABLE endpoint.
+    Pure liveness: must be fast and always return HTTP 200 once the process is up.
 
-    This is a pure liveness check: no DB calls, no Stripe calls, no env validation, no external checks.
+    Important: define both `/health` and `/health/` to avoid framework 307 redirects that
+    some platform healthcheckers treat as failure.
     """
-    return {"status": "ok"}
+    return Response(content="ok", media_type="text/plain", status_code=200)
+
+
+@app.api_route("/health", methods=["GET", "HEAD"])
+def health() -> Response:
+    return _health_liveness_response()
+
+
+@app.api_route("/health/", methods=["GET", "HEAD"], include_in_schema=False)
+def health_slash() -> Response:
+    return _health_liveness_response()
 
 
 def _compute_readiness_checks(db: Session) -> tuple[dict[str, Any], bool]:
@@ -3116,7 +3131,7 @@ def health_deep(db: Session = Depends(get_db)):
     return JSONResponse(checks, status_code=200 if is_ready else 503)
 
 
-print("BOOT: health endpoint ready", flush=True)
+print("BOOT: health endpoint ready (GET/HEAD /health and /health/)", flush=True)
 
 
 def _inbox_priority_score(item: dict[str, Any]) -> float:
