@@ -213,7 +213,7 @@ def _learning_signal(
 
     # Operator approval / overrides: best-effort, conservative.
     requires_approval = _safe_bool(d.get("requires_approval", False))
-    held = tool_status in {"pending_approval", "manual_review", "approved_pending_execution"}
+    held = tool_status in {"pending_approval", "manual_review"}
     operator_approved_exec = bool(requires_approval and (not held) and tool_status not in {"", "no_action"})
     operator_override = _safe_bool(d.get("operator_override", False)) or _safe_bool(d.get("override", False))
 

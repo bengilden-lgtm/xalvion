@@ -453,7 +453,7 @@ def compute_quality(
         score += 0.04
     elif tool_status in {"error", "pending_review"}:
         score -= 0.06
-    elif tool_status in {"pending_approval", "manual_review", "approved_pending_execution"}:
+    elif tool_status in {"pending_approval", "manual_review"}:
         score -= 0.04
     action = str(executed.get("action", "none") or "none")
     if action == "review":
@@ -1099,7 +1099,7 @@ def _canonicalize_result(
         "time_saved": float(impact.get("time_saved", 0) or 0),
         "confidence_band": dict(impact.get("confidence_band") or {}),
     }
-    if tool_status in {"pending_approval", "manual_review", "approved_pending_execution"}:
+    if tool_status in {"pending_approval", "manual_review"}:
         impact_projection["auto_resolved"] = False
 
     hd = hard_decision if hard_decision is not None else final_action
@@ -1246,7 +1246,7 @@ def _canonicalize_result(
             "processed. Set XALVION_EXEC_MODE=live to enable real execution."
         )
         _truth_color   = "warning"   # Maps to amber/yellow in the UI
-    elif _req_appr or _ts in {"pending_approval", "manual_review", "approved_pending_execution"}:
+    elif _req_appr or _ts in {"pending_approval", "manual_review"}:
         _truth_status  = "pending_approval"
         _truth_label   = "Staged — awaiting approval"
         _truth_detail  = (

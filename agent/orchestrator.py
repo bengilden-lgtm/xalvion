@@ -470,7 +470,7 @@ def run_agent(
     _tool_result = executed.get("tool_result") or {"status": executed.get("tool_status", "unknown")}
     _exec_ts = str(executed.get("tool_status", "") or "").lower()
     _exec_act = str(executed.get("action", "none") or "none")
-    _held_for_operator = _exec_ts in {"pending_approval", "manual_review", "approved_pending_execution"}
+    _held_for_operator = _exec_ts in {"pending_approval", "manual_review"}
     _is_simulated = bool(
         executed.get("is_simulated")
         or (isinstance(_tool_result, dict) and _tool_result.get("is_simulated"))

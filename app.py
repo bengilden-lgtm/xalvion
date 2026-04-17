@@ -2042,47 +2042,56 @@ def serialize_support_result(
 
 
 def apply_real_actions(result: dict[str, Any], req: SupportRequest, user: User) -> dict[str, Any]:
+    result = dict(result or {})
+    # Single, governor-enforced execution boundary (strict refund-first).
+    from execution_boundary import execute_action as execute_boundary_action
     from services import stripe_service
 
-    result = dict(result or {})
-    if str(result.get("action", "none") or "none").lower() != "refund":
-        return result
-
-    refund_result = stripe_service.execute_real_refund(
-        amount=int(result.get("amount", 0) or 0),
-        payment_intent_id=req.payment_intent_id,
-        charge_id=req.charge_id,
-        refund_reason=req.refund_reason,
-        username=str(getattr(user, "username", "unknown") or "unknown"),
-        issue_type=str(result.get("issue_type", "general_support") or "general_support"),
-        user=user,
-        result=result,
+    action = str(result.get("action", "none") or "none").strip().lower()
+    amount = float(result.get("amount", 0) or 0)
+    ticket_ctx = {
+        "issue_type": str(result.get("issue_type", "general_support") or "general_support"),
+        "plan_tier": str((result.get("meta") or {}).get("plan_tier", getattr(user, "tier", "free")) or "free"),
+        "customer": str(getattr(user, "username", "unknown") or "unknown"),
+        "customer_email": str(getattr(req, "customer_email", "") or "").strip() or None,
+        "sentiment": int((result.get("triage") or {}).get("sentiment", 5) or 5),
+        "abuse_score": int((result.get("history") or {}).get("abuse_score", 0) or 0),
+    }
+    exec_out = execute_boundary_action(
+        ticket=ticket_ctx,
+        proposed_action={"action": action, "amount": amount, **result},
+        memory=dict(result.get("history") or {}),
+        human_approved=False,
+        execution_mode="live",
+        stripe_user=user,
+        stripe_req=req,
     )
 
-    if refund_result.get("ok"):
-        refunded_amount = refund_result.get("amount", result.get("amount", 0))
-        requested_amount = refund_result.get("requested_amount", refunded_amount)
-        capped = bool(refund_result.get("capped", False))
+    # Preserve existing response shape, but make execution truthful.
+    result["governor_decision"] = exec_out.get("governor_decision")
+    result["governor"] = exec_out.get("governor")
+    result["tool_status"] = str(exec_out.get("tool_status", result.get("tool_status", "unknown")) or "unknown")
+    result["tool_result"] = exec_out.get("tool_result") if isinstance(exec_out.get("tool_result"), dict) else {"status": result["tool_status"]}
+    result["is_simulated"] = bool(exec_out.get("is_simulated", False))
+    result["verified_success"] = bool(exec_out.get("verified_success", False))
+
+    if exec_out.get("ok"):
         result["action"] = "refund"
-        result["amount"] = refunded_amount
-        result["reason"] = f"Refund capped to ${refunded_amount:.2f}" if capped else "Refund processed via Stripe"
-        result["tool_status"] = "refunded"
-        result["tool_result"] = {**refund_result, "verified": True, "mock": False}
-        result["impact"] = {"type": "refund", "amount": refunded_amount}
-        if capped:
-            result["response"] = (
-                f"I've processed the refund. Requested ${requested_amount:.2f} but refundable was "
-                f"${refunded_amount:.2f} — refunded the full available balance."
-            )
-            result["final"] = result["response"]
+        result["amount"] = float(exec_out.get("amount", amount) or amount)
+        result["reason"] = "Refund processed via Stripe"
+        result["impact"] = {"type": "refund", "amount": result["amount"]}
         return result
 
-    failure = str(refund_result.get("detail", "Automatic refund failed.")).strip()
+    # Failure / blocked / approval-required: never pretend.
+    ts = str(exec_out.get("tool_status", "") or "").strip().lower()
+    if ts in {"pending_approval"}:
+        # Held for operator approval upstream; keep as-is without executing.
+        return result
+
+    failure = str((exec_out.get("tool_result") or {}).get("detail") or (exec_out.get("tool_result") or {}).get("message") or "Automatic refund failed.").strip()
     result["action"] = "review"
     result["amount"] = 0
     result["reason"] = failure
-    result["tool_status"] = refund_result.get("status", "refund_failed")
-    result["tool_result"] = refund_result
     result["impact"] = {"type": "saved", "amount": 0}
     result["response"] = stripe_service.rewrite_refund_failure_message(failure)
     result["final"] = result["response"]
@@ -2187,7 +2196,7 @@ def hydrate_result_with_engine_context(
 
     execution_status = str(hydrated.get("tool_status") or (hydrated.get("tool_result") or {}).get("status") or "unknown")
     ts_lower = execution_status.lower()
-    pending_exec = ts_lower in {"pending_approval", "manual_review", "approved_pending_execution"}
+    pending_exec = ts_lower in {"pending_approval", "manual_review"}
     ok_financial = (action in {"refund", "credit"} and ts_lower in {"refunded", "credit_issued", "success"}) or (
         action == "charge" and ts_lower == "success"
     )
@@ -2531,42 +2540,16 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
     }
 
     if proposed_action == "refund":
-        if (req.payment_intent_id or "").strip() or (req.charge_id or "").strip():
-            support_req = SupportRequest(
-                message=ticket.customer_message or ticket.subject or "Refund approval",
-                payment_intent_id=(req.payment_intent_id or None),
-                charge_id=(req.charge_id or None),
-                refund_reason=(req.refund_reason or None),
-                channel=ticket.channel or "web",
-                source=ticket.source or "workspace",
-                customer_email=str(getattr(ticket, "customer_email", None) or "").strip() or None,
-            )
-            payload = apply_real_actions(payload, support_req, user)
-            payload.setdefault("decision", {}).update({
-                "action": str(payload.get("action", proposed_action) or proposed_action),
-                "amount": round(float(payload.get("amount", proposed_amount) or proposed_amount), 2),
-                "queue": "resolved",
-                "priority": ticket.priority or "high",
-                "risk_level": ticket.risk_level or "medium",
-                "requires_approval": False,
-                "status": "resolved",
-            })
-            if payload.get("tool_status") == "refunded":
-                payload["reply"] = payload.get("reply") or payload.get("response") or "I’ve approved the refund and it’s now in motion."
-                payload["response"] = payload.get("response") or payload.get("reply")
-                payload["final"] = payload.get("final") or payload.get("response") or payload.get("reply")
-                return payload, "approved"
-
-        hold = (
-            "Approval recorded. Connect Stripe or provide a payment reference to execute this refund from the workspace."
-        )
+        # Execution is handled by the route-level approval boundary.
+        # This legacy helper must not produce "approved_pending_execution".
+        hold = "Approval recorded. Execution will run immediately in the approval route."
         payload["reply"] = hold
         payload["response"] = hold
         payload["final"] = hold
-        payload["tool_status"] = "approved_pending_execution"
-        payload["tool_result"] = {"status": "approved_pending_execution"}
-        payload.setdefault("decision", {}).update({"status": "waiting", "queue": "waiting"})
-        return payload, "approved_pending_execution"
+        payload["tool_status"] = "approved"
+        payload["tool_result"] = {"status": "approved"}
+        payload.setdefault("decision", {}).update({"status": "resolved", "queue": "resolved"})
+        return payload, "approved"
 
     if proposed_action == "credit":
         payload["reply"] = f"I’ve approved the ${proposed_amount:.2f} credit and it’s ready for the next step."
@@ -2601,13 +2584,13 @@ def approve_ticket_action(ticket: Ticket, log: ActionLog, req: ApprovalDecisionR
         return payload, "approved"
 
     if proposed_action == "charge":
-        payload["reply"] = f"I’ve approved the ${proposed_amount:.2f} charge and moved it into the execution path."
+        payload["reply"] = "Charges are not supported in live execution yet."
         payload["response"] = payload["reply"]
         payload["final"] = payload["reply"]
-        payload["tool_status"] = "approved_pending_execution"
-        payload["tool_result"] = {"status": "approved_pending_execution"}
-        payload.setdefault("decision", {}).update({"status": "waiting", "queue": "waiting"})
-        return payload, "approved_pending_execution"
+        payload["tool_status"] = "not_supported"
+        payload["tool_result"] = {"status": "not_supported"}
+        payload.setdefault("decision", {}).update({"status": "waiting", "queue": "waiting", "requires_approval": True})
+        return payload, "not_supported"
 
     payload["reply"] = "I’ve approved the prepared action and moved it into the next step."
     payload["response"] = payload["reply"]
@@ -3015,7 +2998,7 @@ def serve_workspace_bootstrap():
 
 
 @app.get("/debug/refund-mode")
-def debug_refund_mode():
+def debug_refund_mode(admin: User = Depends(require_admin)):  # noqa: ARG001
     return {
         "mode": "platform-fallback-v2-latest-charge",
         "has_stripe_key": bool(STRIPE_KEY),
@@ -3023,7 +3006,7 @@ def debug_refund_mode():
 
 
 @app.get("/debug/payment-intent/{payment_intent_id}")
-def debug_payment_intent(payment_intent_id: str):
+def debug_payment_intent(payment_intent_id: str, admin: User = Depends(require_admin)):  # noqa: ARG001
     try:
         intent = stripe.PaymentIntent.retrieve(
             payment_intent_id,

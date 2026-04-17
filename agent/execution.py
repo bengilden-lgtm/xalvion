@@ -186,17 +186,21 @@ def _execute_action_inner(ticket: Dict[str, Any], action_payload: Dict[str, Any]
         return {"action": "refund", "amount": amount, "tool_result": result, "tool_status": tool_status}
 
     if action == "credit":
-        result = execute_tool("credit", payload)
+        # Strict refund-first execution: credits are not supported for live execution yet.
         EXEC_MODE = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
-        verified = EXEC_MODE == "live"
-        is_mock = not verified
-        # FIX 7: Simulated/mock executions must never report verified_success=True or status="success".
-        if is_mock:
-            result = {**result, "verified": False, "mock": True, "verified_success": False, "status": "simulated", "is_simulated": True}
-        else:
-            result = {**result, "verified": True, "mock": False, "is_simulated": False}
-        tool_status = "simulated" if is_mock else result.get("status", "credit_issued")
-        return {"action": "credit", "amount": amount, "tool_result": result, "tool_status": tool_status}
+        if EXEC_MODE == "live":
+            result = {
+                "status": "not_supported",
+                "type": "credit",
+                "message": "Not supported in live execution yet",
+                "verified": False,
+                "verified_success": False,
+                "is_simulated": False,
+            }
+            return {"action": "credit", "amount": amount, "tool_result": result, "tool_status": "not_supported"}
+        result = execute_tool("credit", payload)
+        result = {**result, "verified": False, "mock": True, "verified_success": False, "status": "simulated", "is_simulated": True}
+        return {"action": "credit", "amount": amount, "tool_result": result, "tool_status": "simulated"}
 
     issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
 
@@ -234,8 +238,18 @@ def _execute_action_inner(ticket: Dict[str, Any], action_payload: Dict[str, Any]
         }
 
     if action == "charge":
-        integration_result = dispatch_integrated_action("charge", payload)
-        return {"action": "charge", "amount": amount, "tool_result": integration_result, "tool_status": integration_result.get("status", "manual_charge_required")}
+        # Strict refund-first execution: charges are not supported for live execution yet.
+        EXEC_MODE = (os.getenv("XALVION_EXEC_MODE", "mock") or "mock").strip().lower()
+        status = "not_supported" if EXEC_MODE == "live" else "pending_review"
+        result = {
+            "status": status,
+            "type": "charge",
+            "message": "Not supported in live execution yet" if EXEC_MODE == "live" else "Charge prepared for manual approval.",
+            "verified": False,
+            "verified_success": False,
+            "is_simulated": False,
+        }
+        return {"action": "charge", "amount": amount, "tool_result": result, "tool_status": status}
 
     integrated_action = "escalate" if action == "review" else action
     integration_result = dispatch_integrated_action(integrated_action, payload)

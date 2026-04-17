@@ -427,7 +427,92 @@ def approve_ticket(
         ticket.final_reply = edited_reply[:8000]
 
     app_mod.append_ticket_internal_note(ticket, req.internal_note or "")
-    payload, log_status = app_mod.approve_ticket_action(ticket, log, req, user)
+
+    # Approval must execute (refund-first strict mode) — no "approved_pending_execution".
+    proposed_action = str(log.action or ticket.action or "none").strip().lower()
+    proposed_amount = round(float(log.amount or ticket.amount or 0), 2)
+
+    logger.info(
+        "approval_trigger ticket_id=%s by=%s action=%s amount=%s",
+        ticket_id,
+        getattr(user, "username", "") or "?",
+        proposed_action,
+        proposed_amount,
+    )
+
+    if proposed_action != "refund":
+        # Strict mode: only refunds may execute.
+        raise HTTPException(status_code=501, detail="Not supported in live execution yet")
+
+    # Execute through the single boundary (governor absolute, human_approved=True).
+    from execution_boundary import execute_action as execute_boundary_action
+
+    ticket_ctx = {
+        "issue_type": str(ticket.issue_type or "general_support"),
+        "plan_tier": str(getattr(user, "tier", "free") or "free"),
+        "customer": str(ticket.username or ""),
+        "customer_email": str(getattr(ticket, "customer_email", None) or "").strip() or None,
+        "sentiment": int(getattr(ticket, "urgency", 50) or 50),  # best-effort; governor is conservative anyway
+    }
+
+    log.status = "executing"
+    db.commit()
+
+    exec_out = execute_boundary_action(
+        ticket=ticket_ctx,
+        proposed_action={"action": proposed_action, "amount": proposed_amount, "issue_type": ticket.issue_type},
+        memory={},
+        human_approved=True,
+        execution_mode="live",
+        stripe_user=user,
+        stripe_req=req,
+    )
+
+    if not exec_out.get("ok"):
+        # Do not mark approved if execution did not happen successfully.
+        # Keep ticket/log in requires_approval state with an explicit failure.
+        err_msg = str((exec_out.get("tool_result") or {}).get("detail") or (exec_out.get("tool_result") or {}).get("message") or "Execution failed.")
+        logger.warning(
+            "approval_execution_failed ticket_id=%s status=%s detail=%s",
+            ticket_id,
+            str(exec_out.get("tool_status", "") or ""),
+            err_msg[:300],
+        )
+        log.status = str(exec_out.get("tool_status", "failed") or "failed")
+        log.reason = (err_msg or "Execution failed.")[:500]
+        log.requires_approval = 1
+        log.approved = 0
+        ticket.requires_approval = 1
+        ticket.approved = 0
+        ticket.status = app_mod._safe_status("waiting")
+        ticket.queue = app_mod._safe_queue(ticket.queue or "waiting")
+        app_mod.append_ticket_internal_note(ticket, f"Approval attempted but execution failed: {err_msg}")
+        db.commit()
+        raise HTTPException(status_code=409, detail=err_msg)
+
+    # Execution succeeded => mark approved+executed truthfully.
+    payload = {
+        "reply": ticket.final_reply or "Approved and executed.",
+        "response": ticket.final_reply or "Approved and executed.",
+        "final": ticket.final_reply or "Approved and executed.",
+        "action": "refund",
+        "amount": float(exec_out.get("amount", proposed_amount) or proposed_amount),
+        "reason": str(log.reason or ticket.internal_note or "Approved by operator"),
+        "issue_type": ticket.issue_type,
+        "tool_status": str(exec_out.get("tool_status", "refunded") or "refunded"),
+        "tool_result": exec_out.get("tool_result") if isinstance(exec_out.get("tool_result"), dict) else {"status": "refunded"},
+        "decision": {
+            "action": "refund",
+            "amount": float(exec_out.get("amount", proposed_amount) or proposed_amount),
+            "queue": "resolved",
+            "priority": ticket.priority,
+            "risk_level": ticket.risk_level,
+            "requires_approval": False,
+            "status": "resolved",
+        },
+        "output": {"internal_note": str(ticket.internal_note or "")},
+    }
+    log_status = "executed"
 
     ticket.updated_at = app_mod._now_iso()
     ticket.action = str(payload.get("action", ticket.action) or ticket.action)

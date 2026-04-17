@@ -156,7 +156,7 @@ def actions_refund(
     req: app_mod.RefundActionRequest,
     user: app_mod.User = Depends(app_mod.require_authenticated_user),
 ):
-    # FIX 5: Route manual refunds through the governor before execution.
+    # Manual refund requests must never execute unless governor allows.
     _gov_ticket = {
         "issue_type": "manual_refund",
         "sentiment": 5,
@@ -185,89 +185,26 @@ def actions_refund(
         }
 
     _gov_mode = str(gov_result.get("execution_mode", "review") or "review").strip().lower()
+    logger.info(
+        "governor_decision route=/actions/refund mode=%s requires_approval=%s reason=%s",
+        _gov_mode,
+        bool(gov_result.get("requires_approval", True)),
+        str(gov_result.get("governor_reason", "") or "")[:300],
+    )
     if _gov_mode == "blocked":
         raise HTTPException(
             status_code=403,
             detail=str(gov_result.get("governor_reason", "Refund blocked by governor policy.")),
         )
 
-    requires_approval = _gov_mode == "review"
-
-    result = stripe_service.execute_real_refund(
-        amount=float(req.amount or 0),
-        payment_intent_id=req.payment_intent_id,
-        charge_id=req.charge_id,
-        refund_reason=req.refund_reason,
-        username=str(getattr(user, "username", "unknown") or "unknown"),
-        issue_type="manual_refund",
-        user=user,
-        result={
-            "action": "refund",
-            "amount": float(req.amount or 0),
-            "issue_type": "manual_refund",
-            "order_status": "unknown",
-            "confidence": 0.99,
-            "quality": 0.99,
-        },
-    )
-
-    if not result.get("ok"):
-        raise HTTPException(status_code=400, detail=str(result.get("detail", "Refund failed.")))
-
-    if requires_approval:
-        result["requires_approval"] = True
-
-    return result
-
-
-@router.post("/actions/charge")
-def actions_charge(
-    req: app_mod.ChargeActionRequest,
-    user: app_mod.User = Depends(app_mod.require_authenticated_user),
-):
-    # Route manual charges through the governor before execution.
-    _gov_ticket = {
-        "issue_type": "manual_charge",
-        "sentiment": 5,
-        "abuse_score": 0,
-        "plan_tier": str(getattr(user, "tier", "free") or "free"),
-        "customer_id": str(getattr(req, "customer_id", "") or "").strip(),
-        "payment_method_id": str(getattr(req, "payment_method_id", "") or "").strip(),
-    }
-    _gov_decision = {
-        "action": "charge",
-        "amount": float(getattr(req, "amount", 0) or 0),
-        "confidence": 0.85,
-    }
-    _gov_memory = {
-        "abuse_score": 0,
-        "refund_count": 0,
-        "sentiment_avg": 5,
-    }
-    try:
-        gov_result = governor_mod.gate_execution(_gov_ticket, _gov_decision, _gov_memory)
-    except Exception as _gov_exc:
-        logger.error("governor_gate_failed_manual_charge detail=%s", str(_gov_exc)[:300], exc_info=True)
-        gov_result = {
-            "execution_mode": "review",
-            "requires_approval": True,
-            "governor_reason": "Governor error (soft-fail) — review required",
-        }
-
-    _gov_mode = str(gov_result.get("execution_mode", "review") or "review").strip().lower()
-    if _gov_mode == "blocked":
-        raise HTTPException(
-            status_code=403,
-            detail=str(gov_result.get("governor_reason", "Charge blocked by governor policy.")),
-        )
-
-    # Review means approval gating: do NOT execute Stripe charge.
     if _gov_mode == "review":
+        # Governor absolute: do not execute real refund on review.
         return {
             "ok": False,
             "status": "requires_approval",
             "requires_approval": True,
             "execution_mode": "review",
+            "detail": "Approval required before executing a live refund.",
             "governor_reason": str(gov_result.get("governor_reason", "Review required under governor policy") or ""),
             "governor_risk_level": str(gov_result.get("governor_risk_level", "") or ""),
             "governor_risk_score": int(gov_result.get("governor_risk_score", 0) or 0),
@@ -276,37 +213,46 @@ def actions_charge(
             "violations": list(gov_result.get("violations") or []),
         }
 
-    # Allowed/auto (and any unexpected non-blocked, non-review mode) proceeds to execution.
-    result = stripe_service.execute_manual_charge(
-        user=user,
-        customer_id=req.customer_id,
-        payment_method_id=req.payment_method_id,
-        amount=req.amount,
-        currency=req.currency,
-        description=req.description,
+    # auto => execute via single boundary (governor absolute)
+    from execution_boundary import execute_action as execute_boundary_action
+
+    ticket_ctx = {
+        "issue_type": "manual_refund",
+        "plan_tier": str(getattr(user, "tier", "free") or "free"),
+        "customer": str(getattr(user, "username", "unknown") or "unknown"),
+        "sentiment": 5,
+        "abuse_score": 0,
+    }
+    exec_out = execute_boundary_action(
+        ticket=ticket_ctx,
+        proposed_action={
+            "action": "refund",
+            "amount": float(req.amount or 0),
+            "issue_type": "manual_refund",
+            "order_status": "unknown",
+            "confidence": 0.99,
+            "quality": 0.99,
+        },
+        memory=_gov_memory,
+        human_approved=False,
+        execution_mode="live",
+        stripe_user=user,
+        stripe_req=req,
     )
 
-    if not result.get("ok"):
-        raise HTTPException(status_code=400, detail=str(result.get("detail", "Charge failed.")))
+    if not exec_out.get("ok"):
+        detail = str((exec_out.get("tool_result") or {}).get("detail") or (exec_out.get("tool_result") or {}).get("message") or "Refund failed.")
+        raise HTTPException(status_code=400, detail=detail)
+    return exec_out.get("tool_result") or {"ok": True, "status": "refunded", "amount": exec_out.get("amount")}
 
-    # Preserve governor fields for consistency with the refund route patterns.
-    if isinstance(result, dict):
-        result.setdefault("requires_approval", False)
-        result.setdefault("execution_mode", _gov_mode)
-        if "governor_reason" in gov_result:
-            result.setdefault("governor_reason", str(gov_result.get("governor_reason") or ""))
-        if "governor_risk_level" in gov_result:
-            result.setdefault("governor_risk_level", str(gov_result.get("governor_risk_level") or ""))
-        if "governor_risk_score" in gov_result:
-            result.setdefault("governor_risk_score", int(gov_result.get("governor_risk_score", 0) or 0))
-        if "governor_factors" in gov_result:
-            result.setdefault("governor_factors", list(gov_result.get("governor_factors") or []))
-        if "approved" in gov_result:
-            result.setdefault("approved", bool(gov_result.get("approved", False)))
-        if "violations" in gov_result:
-            result.setdefault("violations", list(gov_result.get("violations") or []))
 
-    return result
+@router.post("/actions/charge")
+def actions_charge(
+    req: app_mod.ChargeActionRequest,
+    user: app_mod.User = Depends(app_mod.require_authenticated_user),
+):
+    # Strict mode: charges are not supported for live execution yet.
+    raise HTTPException(status_code=501, detail="Not supported in live execution yet")
 
 
 @router.get("/billing/plans")
