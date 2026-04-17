@@ -678,6 +678,8 @@ logger = logging.getLogger("xalvion.api")
 STARTUP_ISSUES: list[str] = []
 STARTUP_READY: bool = False
 STARTUP_BG_TASK_STARTED: bool = False
+STARTUP_CHECKS: dict[str, Any] = {}
+STARTUP_CHECKS_TS: float | None = None
 
 _db_issue_last_log: dict[str, float] = {}
 DB_ISSUE_LOG_COOLDOWN_S = 60.0
@@ -766,6 +768,7 @@ PRICE_MAP = {"pro": STRIPE_PRICE_PRO, "elite": STRIPE_PRICE_ELITE}
 
 # Module-level billing availability flag — set at startup by validate_stripe_config().
 BILLING_ENABLED: bool = False
+STRIPE_CONFIG_OK: bool = True
 
 
 def validate_stripe_config() -> None:
@@ -775,7 +778,7 @@ def validate_stripe_config() -> None:
     A price ID is considered valid when it starts with 'price_' and is longer than 10 chars total.
     Placeholder values like 'price_...' or very short IDs are treated as unconfigured.
     """
-    global BILLING_ENABLED
+    global BILLING_ENABLED, STRIPE_CONFIG_OK
     pro = (os.getenv("STRIPE_PRICE_PRO", "") or "").strip()
     elite = (os.getenv("STRIPE_PRICE_ELITE", "") or "").strip()
 
@@ -796,14 +799,17 @@ def validate_stripe_config() -> None:
             pro[:20], elite[:20], webhook_configured
         )
 
+    STRIPE_CONFIG_OK = True
     if STRIPE_KEY.startswith("sk_live_") and not STRIPE_WEBHOOK_SECRET:
+        STRIPE_CONFIG_OK = False
+        BILLING_ENABLED = False
         _msg = (
-            "CRITICAL: STRIPE_WEBHOOK_SECRET is required in production when a live Stripe key is "
-            "configured. Refusing to start — set STRIPE_WEBHOOK_SECRET in your environment."
+            "CRITICAL: STRIPE_WEBHOOK_SECRET is required when a live Stripe key is configured. "
+            "Readiness will remain degraded until STRIPE_WEBHOOK_SECRET is set."
         )
-        if ENVIRONMENT == "production":
-            raise RuntimeError(_msg)
-        logger.warning(_msg)
+        STARTUP_ISSUES.append("stripe_webhook_secret_missing_for_live_key")
+        logger.critical(_msg)
+        print("BOOT: readiness degraded (stripe webhook secret missing for live key)", flush=True)
 
 # Unauthenticated operator preview (workspace): must match frontend GUEST_USAGE_LIMIT in app.js.
 GUEST_PREVIEW_OPERATOR_LIMIT = int(os.getenv("GUEST_PREVIEW_OPERATOR_LIMIT", "3"))
@@ -856,6 +862,7 @@ except Exception as exc:
         "Fix env vars then redeploy. detail=%s",
         _safety_msg,
     )
+    print("BOOT: readiness degraded (import-phase production safety failure)", flush=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 _SERVICES_DIR = os.path.join(BASE_DIR, "services")
@@ -977,8 +984,13 @@ def _startup_database() -> None:
     print("BOOT: FastAPI startup hook begin (non-blocking)", flush=True)
 
     def _bg_init() -> None:
-        global STARTUP_READY
+        global STARTUP_READY, STARTUP_CHECKS, STARTUP_CHECKS_TS
         print("BOOT: background init begin", flush=True)
+        STARTUP_CHECKS = {
+            "service": "xalvion-sovereign-brain",
+            "phase": "initializing",
+        }
+        STARTUP_CHECKS_TS = time.time()
         try:
             # Security guard: fail loudly only when required (production/live money).
             try:
@@ -987,33 +999,102 @@ def _startup_database() -> None:
                 assert_production_runtime_safety()
                 logger.info("runtime_security_check_passed")
             except RuntimeError as exc:
-                logger.error("startup_security_check_failed detail=%s", exc)
-                raise
+                msg = str(exc)[:500]
+                STARTUP_ISSUES.append(f"runtime_safety_failed:{msg}")
+                STARTUP_CHECKS["runtime_safety"] = "failed"
+                STARTUP_CHECKS["phase"] = "degraded"
+                logger.critical("startup_security_check_failed detail=%s", msg, exc_info=True)
+                print(
+                    "BOOT: background init failure (runtime safety). "
+                    "Liveness remains OK; readiness degraded.",
+                    flush=True,
+                )
+                return
             except Exception as exc:
                 logger.warning("runtime_security_check_skipped detail=%s", str(exc)[:200])
 
             # DB + migrations (may be slow / require external deps).
-            init_db()
-            logger.info("DB schema ensured")
-            print("BOOT: DB schema ensured", flush=True)
+            try:
+                init_db()
+                STARTUP_CHECKS["database_init"] = "ok"
+                logger.info("DB schema ensured")
+                print("BOOT: DB schema ensured", flush=True)
+            except Exception as exc:
+                STARTUP_CHECKS["database_init"] = f"error:{type(exc).__name__}"
+                STARTUP_CHECKS["phase"] = "degraded"
+                STARTUP_ISSUES.append(f"db_init_failed:{type(exc).__name__}:{str(exc)[:220]}")
+                logger.critical("startup_db_init_failed", exc_info=True)
+                print(
+                    "BOOT: background init failure (db init). "
+                    "Liveness remains OK; readiness degraded.",
+                    flush=True,
+                )
+                return
 
-            ensure_user_columns()
-            ensure_user_role_column()
-            ensure_stripe_status_columns()
-            ensure_ticket_columns()
-            validate_stripe_config()
-            migrate_legacy_operator_usage_into_rollups()
+            # Required migrations / schema adjustments for safe operation.
+            try:
+                ensure_user_columns()
+                ensure_user_role_column()
+                ensure_stripe_status_columns()
+                ensure_ticket_columns()
+                STARTUP_CHECKS["migrations_required"] = "ok"
+            except Exception as exc:
+                STARTUP_CHECKS["migrations_required"] = f"error:{type(exc).__name__}"
+                STARTUP_CHECKS["phase"] = "degraded"
+                STARTUP_ISSUES.append(f"required_migration_failed:{type(exc).__name__}:{str(exc)[:220]}")
+                logger.critical("startup_required_migration_failed", exc_info=True)
+                print(
+                    "BOOT: background init failure (required migration). "
+                    "Liveness remains OK; readiness degraded.",
+                    flush=True,
+                )
+                return
+
+            # Configuration validation (must not kill liveness; affects readiness).
+            try:
+                validate_stripe_config()
+                STARTUP_CHECKS["stripe_config"] = "ok" if STRIPE_CONFIG_OK else "degraded"
+                STARTUP_CHECKS["billing_enabled"] = bool(BILLING_ENABLED)
+            except Exception as exc:
+                STARTUP_CHECKS["stripe_config"] = f"error:{type(exc).__name__}"
+                STARTUP_CHECKS["phase"] = "degraded"
+                STARTUP_ISSUES.append(f"stripe_config_validation_failed:{type(exc).__name__}:{str(exc)[:220]}")
+                logger.critical("startup_stripe_config_validation_failed", exc_info=True)
+                print(
+                    "BOOT: background init failure (stripe config validation). "
+                    "Liveness remains OK; readiness degraded.",
+                    flush=True,
+                )
+                return
+
+            try:
+                migrate_legacy_operator_usage_into_rollups()
+                STARTUP_CHECKS["operator_usage_rollups"] = "ok"
+            except Exception as exc:
+                # treat as required for operator correctness (readiness degraded)
+                STARTUP_CHECKS["operator_usage_rollups"] = f"error:{type(exc).__name__}"
+                STARTUP_CHECKS["phase"] = "degraded"
+                STARTUP_ISSUES.append(f"operator_usage_rollups_failed:{type(exc).__name__}:{str(exc)[:220]}")
+                logger.critical("startup_operator_usage_rollups_failed", exc_info=True)
+                print(
+                    "BOOT: background init failure (operator rollups). "
+                    "Liveness remains OK; readiness degraded.",
+                    flush=True,
+                )
+                return
 
             try:
                 ensure_outcome_log_columns()
             except Exception as exc:
                 STARTUP_ISSUES.append(f"outcome_log_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
                 logger.error("ensure_outcome_log_columns_failed detail=%s", str(exc)[:500], exc_info=True)
+                STARTUP_CHECKS["outcome_log_columns"] = f"error:{type(exc).__name__}"
             try:
                 ensure_outcome_columns()
             except Exception as exc:
                 STARTUP_ISSUES.append(f"outcome_columns_migration_failed:{type(exc).__name__}:{str(exc)[:180]}")
                 logger.error("ensure_outcome_columns_failed detail=%s", str(exc)[:500], exc_info=True)
+                STARTUP_CHECKS["outcome_columns"] = f"error:{type(exc).__name__}"
 
             # Optional / best-effort: never block readiness.
             try:
@@ -1023,7 +1104,11 @@ def _startup_database() -> None:
                 logger.info("rule_sync_complete")
             except Exception as _sync_exc:
                 logger.warning("rule_sync_failed detail=%s", str(_sync_exc)[:200])
+                STARTUP_CHECKS["rule_sync"] = f"error:{type(_sync_exc).__name__}"
 
+            STARTUP_CHECKS["phase"] = "ready"
+            STARTUP_CHECKS["startup_issues_count"] = len(STARTUP_ISSUES)
+            STARTUP_CHECKS_TS = time.time()
             STARTUP_READY = True
             print("BOOT: background init complete (STARTUP_READY=true)", flush=True)
         except Exception as exc:
@@ -1037,7 +1122,14 @@ def _startup_database() -> None:
                 f"BOOT: background init FAILED type={type(exc).__name__} detail={str(exc)[:800]}",
                 flush=True,
             )
-            raise
+            print(
+                "BOOT: background init failure (unexpected). Liveness remains OK; readiness degraded.",
+                flush=True,
+            )
+            STARTUP_CHECKS["phase"] = "degraded"
+            STARTUP_CHECKS["unexpected_failure"] = f"{type(exc).__name__}"
+            STARTUP_CHECKS_TS = time.time()
+            return
 
     threading.Thread(target=_bg_init, name="startup-bg-init", daemon=True).start()
     print("BOOT: startup hook scheduled background init", flush=True)
@@ -3116,13 +3208,39 @@ def _compute_readiness_checks(db: Session) -> tuple[dict[str, Any], bool]:
 
 
 @app.get("/ready")
-def ready(db: Session = Depends(get_db)):
+def ready():
     """
     Readiness: allowed to check dependencies (DB/Stripe/env/integrations).
     Returns 200 when ready; 503 when degraded/unready.
     """
-    checks, is_ready = _compute_readiness_checks(db)
-    return JSONResponse(checks, status_code=200 if is_ready else 503)
+    # Must not perform expensive work on each request; rely on startup snapshot + issues.
+    startup_ready = bool(STARTUP_READY)
+    issues = list(STARTUP_ISSUES)
+    checks_snapshot = dict(STARTUP_CHECKS or {})
+    if not checks_snapshot:
+        checks_snapshot = {"service": "xalvion-sovereign-brain", "phase": "initializing"}
+
+    # Treat any recorded startup issues as degraded readiness.
+    is_ready = startup_ready and len(issues) == 0
+
+    payload: dict[str, Any] = {
+        "service": "xalvion-sovereign-brain",
+        "ready": bool(is_ready),
+        "startup_ready": startup_ready,
+        "startup_issues": issues,
+        "startup_checks": checks_snapshot,
+        "startup_checks_ts": STARTUP_CHECKS_TS,
+    }
+
+    if not is_ready:
+        # Explicit operator hint: liveness remains OK.
+        payload["status"] = "degraded"
+        payload["liveness"] = "ok"
+    else:
+        payload["status"] = "ok"
+        payload["liveness"] = "ok"
+
+    return JSONResponse(payload, status_code=200 if is_ready else 503)
 
 
 @app.get("/health/deep")
@@ -3132,6 +3250,7 @@ def health_deep(db: Session = Depends(get_db)):
 
 
 print("BOOT: health endpoint ready (GET/HEAD /health and /health/)", flush=True)
+print("BOOT: ready endpoint ready (GET /ready)", flush=True)
 
 
 def _inbox_priority_score(item: dict[str, Any]) -> float:
