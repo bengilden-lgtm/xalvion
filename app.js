@@ -1299,6 +1299,252 @@ if (typeof window.pulseRail !== "function") {
               font-size:12px !important;
               font-weight:650 !important;
             }
+
+            /* ---------------------------------------------------------------------
+               Micro-interactions pass (trust layer)
+               Precise, responsive, premium — no layout changes
+               --------------------------------------------------------------------- */
+
+            body[data-ui="claude"] .decision-panel,
+            body[data-ui="claude"] .details-wrap,
+            body[data-ui="claude"] .assistant-decision-slot,
+            body[data-ui="claude"] .assistant-brief-slot,
+            body[data-ui="claude"] .ticket-result-summary,
+            body[data-ui="claude"] .decision-panel-note,
+            body[data-ui="claude"] .decision-panel-error{
+              transition: opacity 220ms ease, transform 220ms ease !important;
+              will-change: opacity, transform;
+            }
+
+            body[data-ui="claude"] .xv-soft-fade-in{
+              animation: xvSoftFadeIn 220ms ease both !important;
+            }
+            @keyframes xvSoftFadeIn{
+              from{ opacity:0; transform: translateY(3px); }
+              to{ opacity:1; transform: translateY(0); }
+            }
+            @media (prefers-reduced-motion: reduce){
+              body[data-ui="claude"] .xv-soft-fade-in{ animation:none !important; }
+            }
+
+            /* Hover/press: intentional */
+            body[data-ui="claude"] .op-action,
+            body[data-ui="claude"] .btn,
+            body[data-ui="claude"] .ghost-btn,
+            body[data-ui="claude"] .upgrade-btn,
+            body[data-ui="claude"] .chip,
+            body[data-ui="claude"] .icon-btn{
+              transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease !important;
+            }
+            body[data-ui="claude"] .op-action:hover,
+            body[data-ui="claude"] .btn:hover,
+            body[data-ui="claude"] .ghost-btn:hover,
+            body[data-ui="claude"] .upgrade-btn:hover,
+            body[data-ui="claude"] .chip:hover,
+            body[data-ui="claude"] .icon-btn:hover{
+              transform: translateY(-1px) !important;
+              box-shadow: 0 10px 26px rgba(0,0,0,.20) !important;
+            }
+            body[data-ui="claude"] .op-action:active,
+            body[data-ui="claude"] .btn:active,
+            body[data-ui="claude"] .ghost-btn:active,
+            body[data-ui="claude"] .upgrade-btn:active,
+            body[data-ui="claude"] .chip:active,
+            body[data-ui="claude"] .icon-btn:active{
+              transform: translateY(0) scale(.98) !important;
+            }
+            @media (prefers-reduced-motion: reduce){
+              body[data-ui="claude"] .op-action:hover,
+              body[data-ui="claude"] .btn:hover,
+              body[data-ui="claude"] .ghost-btn:hover,
+              body[data-ui="claude"] .upgrade-btn:hover,
+              body[data-ui="claude"] .chip:hover,
+              body[data-ui="claude"] .icon-btn:hover,
+              body[data-ui="claude"] .op-action:active,
+              body[data-ui="claude"] .btn:active,
+              body[data-ui="claude"] .ghost-btn:active,
+              body[data-ui="claude"] .upgrade-btn:active,
+              body[data-ui="claude"] .chip:active,
+              body[data-ui="claude"] .icon-btn:active{ transform:none !important; }
+            }
+
+            /* Disabled: clear + safe */
+            body[data-ui="claude"] .op-action[disabled]{
+              opacity: .52 !important;
+              cursor: not-allowed !important;
+            }
+            body[data-ui="claude"] .op-action[disabled][data-xv-tooltip]{
+              position: relative !important;
+            }
+            body[data-ui="claude"] .op-action[disabled][data-xv-tooltip]::after{
+              content: attr(data-xv-tooltip);
+              position: absolute;
+              left: 50%;
+              top: calc(100% + 10px);
+              transform: translateX(-50%);
+              padding: 8px 10px;
+              border-radius: 12px;
+              background: rgba(36,33,29,0.98);
+              border: 1px solid rgba(255,255,255,.10);
+              color: rgba(246,242,235,0.92);
+              font-size: 12px;
+              line-height: 1.35;
+              white-space: nowrap;
+              opacity:0;
+              pointer-events:none;
+              transition: opacity 140ms ease;
+              box-shadow: 0 12px 28px rgba(0,0,0,0.16);
+              z-index: 60;
+            }
+            body[data-ui="claude"] .op-action[disabled][data-xv-tooltip]:hover::after{ opacity:1; }
+
+            /* Inline spinner + controlled glow for processing */
+            body[data-ui="claude"] .op-action.is-loading{
+              box-shadow: 0 0 0 1px rgba(209,190,162,0.18), 0 0 0 6px rgba(209,190,162,0.06) !important;
+            }
+            body[data-ui="claude"] .xv-inline-spinner{
+              width:12px;height:12px;border-radius:999px;
+              border:2px solid rgba(246,242,235,0.26);
+              border-top-color: rgba(246,242,235,0.82);
+              display:inline-block;
+              vertical-align:-2px;
+              margin-right:8px;
+              animation: xvSpin 750ms linear infinite;
+            }
+            @keyframes xvSpin{ to{ transform: rotate(360deg); } }
+            @media (prefers-reduced-motion: reduce){
+              body[data-ui="claude"] .xv-inline-spinner{ animation:none !important; }
+            }
+
+            /* Inline confirmations */
+            body[data-ui="claude"] .xv-action-feedback{
+              margin-top: 10px !important;
+              display: grid !important;
+              grid-template-columns: 16px 1fr !important;
+              gap: 8px !important;
+              align-items: start !important;
+              padding: 10px 12px !important;
+              border-radius: 14px !important;
+              border: 1px solid rgba(255,255,255,.08) !important;
+              background: rgba(255,255,255,0.02) !important;
+              opacity: 0;
+              transform: translateY(3px);
+              animation: xvFeedbackIn 220ms ease both;
+            }
+            @keyframes xvFeedbackIn{ to{ opacity:1; transform: translateY(0); } }
+            body[data-ui="claude"] .xv-action-feedback[data-tone="success"]{
+              border-color: rgba(170,196,146,0.22) !important;
+              background: rgba(170,196,146,0.08) !important;
+            }
+            body[data-ui="claude"] .xv-action-feedback[data-tone="error"]{
+              border-color: rgba(210,133,133,0.24) !important;
+              background: rgba(210,133,133,0.08) !important;
+            }
+            body[data-ui="claude"] .xv-action-feedback__icon{
+              width:16px;height:16px;display:grid;place-items:center;
+              color: rgba(246,242,235,0.88);
+            }
+            body[data-ui="claude"] .xv-action-feedback__text{
+              font-size: 12.5px !important;
+              line-height: 1.45 !important;
+              color: rgba(246,242,235,0.92) !important;
+            }
+            body[data-ui="claude"] .xv-action-feedback__sub{
+              margin-top: 2px !important;
+              font-size: 12px !important;
+              color: rgba(224,217,206,0.64) !important;
+            }
+
+            body[data-ui="claude"] .xv-success-pulse{
+              animation: xvSuccessPulse 520ms ease both;
+            }
+            @keyframes xvSuccessPulse{
+              0%{ box-shadow: 0 0 0 0 rgba(170,196,146,0.0); }
+              18%{ box-shadow: 0 0 0 7px rgba(170,196,146,0.10); }
+              100%{ box-shadow: 0 0 0 0 rgba(170,196,146,0.0); }
+            }
+            @media (prefers-reduced-motion: reduce){
+              body[data-ui="claude"] .xv-success-pulse{ animation:none !important; }
+            }
+
+            /* Status pill normalization (data-status variants + pulse hook) */
+            body[data-ui="claude"] .decision-state-pill.xv-badge{
+              display:inline-flex !important;
+              align-items:center !important;
+              gap:8px !important;
+              min-height:28px !important;
+              padding:0 12px !important;
+              border-radius:999px !important;
+              border:1px solid rgba(255,255,255,0.10) !important;
+              background: rgba(255,255,255,0.03) !important;
+              color: rgba(246,242,235,0.90) !important;
+              font-size:12px !important;
+              font-weight:700 !important;
+              letter-spacing:0.01em !important;
+              position: relative !important;
+              overflow: hidden !important;
+            }
+            body[data-ui="claude"] .decision-state-pill.xv-badge[data-status="prepared"]{
+              background: rgba(255,255,255,0.02) !important;
+              border-color: rgba(255,255,255,0.10) !important;
+              color: rgba(224,217,206,0.82) !important;
+            }
+            body[data-ui="claude"] .decision-state-pill.xv-badge[data-status="requires_approval"]{
+              background: rgba(209,190,162,0.10) !important;
+              border-color: rgba(209,190,162,0.22) !important;
+              color: rgba(246,242,235,0.92) !important;
+            }
+            body[data-ui="claude"] .decision-state-pill.xv-badge[data-status="executing"]{
+              background: rgba(59,130,246,0.10) !important;
+              border-color: rgba(59,130,246,0.22) !important;
+              color: rgba(226,236,255,0.92) !important;
+            }
+            body[data-ui="claude"] .decision-state-pill.xv-badge[data-status="executed"]{
+              background: rgba(170,196,146,0.10) !important;
+              border-color: rgba(170,196,146,0.22) !important;
+              color: rgba(246,242,235,0.92) !important;
+            }
+            body[data-ui="claude"] .decision-state-pill.xv-badge[data-status="failed"]{
+              background: rgba(210,133,133,0.10) !important;
+              border-color: rgba(210,133,133,0.22) !important;
+              color: rgba(252,165,165,1) !important;
+            }
+            body[data-ui="claude"] .decision-state-pill.xv-badge[data-status="simulation"]{
+              background: rgba(141,108,255,0.10) !important;
+              border-color: rgba(141,108,255,0.22) !important;
+              color: rgba(236,232,255,0.92) !important;
+            }
+            body[data-ui="claude"] .decision-state-pill.xv-badge.xv-badge-pulse::before{
+              content:"";
+              position:absolute; inset:-2px;
+              border-radius:999px;
+              background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.14), transparent 58%);
+              opacity:0;
+              animation: xvBadgePulse 520ms ease both;
+            }
+            @keyframes xvBadgePulse{
+              0%{ opacity:0; transform: scale(.98); }
+              22%{ opacity:1; transform: scale(1); }
+              100%{ opacity:0; transform: scale(1.02); }
+            }
+            @media (prefers-reduced-motion: reduce){
+              body[data-ui="claude"] .decision-state-pill.xv-badge.xv-badge-pulse::before{ animation:none !important; }
+            }
+
+            /* Thinking dots: calm rhythm */
+            body[data-ui="claude"] .xv-thinking-dot{
+              animation: xvDot 920ms cubic-bezier(.2,.8,.2,1) infinite;
+              background: rgba(224,217,206,0.44);
+            }
+            body[data-ui="claude"] .xv-thinking-dot:nth-child(2){ animation-delay: 120ms; opacity:.72; }
+            body[data-ui="claude"] .xv-thinking-dot:nth-child(3){ animation-delay: 240ms; opacity:.58; }
+            @keyframes xvDot{
+              0%,100%{ transform: translateY(0); opacity:.46; }
+              45%{ transform: translateY(-3px); opacity:.92; }
+            }
+            @media (prefers-reduced-motion: reduce){
+              body[data-ui="claude"] .xv-thinking-dot{ animation:none !important; }
+            }
           `;
           document.head.appendChild(claudeStyle);
         }
@@ -3328,9 +3574,40 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       return;
     }
 
-    if (els.executeRefundBtn) els.executeRefundBtn.disabled = true;
+    const sleep = (ms) => new Promise((r) => window.setTimeout(r, Math.max(0, Number(ms) || 0)));
+    const perfNow = () =>
+      globalThis.performance && typeof globalThis.performance.now === "function"
+        ? globalThis.performance.now()
+        : Date.now();
+
+    const refundBtn = els.executeRefundBtn;
+    const setRefundBtnStage = (label, done = false) => {
+      if (!refundBtn) return;
+      if (!refundBtn.dataset.xvOrig) refundBtn.dataset.xvOrig = refundBtn.textContent || "Execute refund";
+      refundBtn.disabled = true;
+      refundBtn.classList.add("is-loading");
+      refundBtn.setAttribute("aria-busy", "true");
+      refundBtn.innerHTML = done
+        ? `<span class="xv-inline-spinner" style="display:none"></span>${escapeHtml(label)}`
+        : `<span class="xv-inline-spinner"></span>${escapeHtml(label)}`;
+    };
+    const restoreRefundBtn = () => {
+      if (!refundBtn) return;
+      const orig = refundBtn.dataset.xvOrig || "Execute refund";
+      refundBtn.classList.remove("is-loading");
+      refundBtn.removeAttribute("aria-busy");
+      refundBtn.textContent = orig;
+      delete refundBtn.dataset.xvOrig;
+      refundBtn.disabled = !canUseRefundCenter();
+    };
+
+    if (refundBtn) {
+      setRefundBtnStage("Executing…");
+    }
 
     try {
+      await sleep(460);
+      const execStageStart = perfNow();
       const result = await executeStripeRefund({
         paymentIntentId,
         chargeId,
@@ -3339,23 +3616,37 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       });
 
       const amountLabel = Number(result.amount || 0) > 0 ? ` ${formatMoney(result.amount)}` : "";
+      const execVisible = perfNow() - execStageStart;
+      if (execVisible < 420) await sleep(420 - execVisible);
 
       setNotice(
         "success",
-        "Refund processed",
-        `Live refund${amountLabel} completed${result.refund_id ? ` · ${result.refund_id}` : ""}.`
+        "Refund executed",
+        `Refund${amountLabel} executed${result.refund_id ? ` · ${result.refund_id}` : ""}.`
       );
 
       if (els.refundPaymentIntentInput) els.refundPaymentIntentInput.value = "";
       if (els.refundChargeInput) els.refundChargeInput.value = "";
       if (els.refundAmountInput) els.refundAmountInput.value = "";
 
+      if (refundBtn) {
+        refundBtn.classList.remove("is-loading");
+        refundBtn.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.check}</span>Completed`;
+        const pulseTarget = els.refundModal || refundBtn;
+        if (pulseTarget) {
+          pulseTarget.classList.remove("xv-success-pulse");
+          void pulseTarget.offsetWidth;
+          pulseTarget.classList.add("xv-success-pulse");
+          window.setTimeout(() => pulseTarget.classList.remove("xv-success-pulse"), 650);
+        }
+      }
+      await sleep(650);
       closeRefundModal();
       await loadRefundHistory();
     } catch (error) {
-      setNotice("error", "Refund failed", error.message || "Could not execute refund.");
+      setNotice("error", "Execution failed — no action taken", error.message || "Refund was not executed.");
     } finally {
-      if (els.executeRefundBtn) els.executeRefundBtn.disabled = !canUseRefundCenter();
+      restoreRefundBtn();
     }
   }
 
@@ -4728,7 +5019,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           <span class="xv-thinking-icon" aria-hidden="true">${ICONS.xalvionX}</span>
           <span class="xv-thinking-label" translate="no">Xalvion</span>
         </div>
-        <div class="xv-thinking-line">Thinking through the case…</div>
+        <div class="xv-thinking-line">Analyzing ticket…</div>
         <div class="xv-thinking-dots" aria-hidden="true">
           <span class="xv-thinking-dot"></span>
           <span class="xv-thinking-dot"></span>
@@ -6483,6 +6774,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
         <span class="consequence-signal ${sig.cls}" data-role="consequence">${escapeHtml(sig.text)}</span>
         <div class="decision-controls" data-role="controls"></div>
       </div>
+      <div class="xv-action-feedback-host" data-role="action-feedback" hidden></div>
       <div class="decision-microcopy" data-role="micro" style="display:none"></div>
       <div class="decision-trust-block">
         <div class="trust-strip" data-role="trust-strip" aria-label="Context"></div>
@@ -6539,6 +6831,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
     const controls = panel.querySelector("[data-role='controls']");
     const microEl = panel.querySelector("[data-role='micro']");
+    const feedbackHost = panel.querySelector("[data-role='action-feedback']");
     const trustStripEl = panel.querySelector("[data-role='trust-strip']");
     const trustDetailEl = panel.querySelector("[data-role='trust-detail']");
     const govSurfaceEl = panel.querySelector("[data-role='governor']");
@@ -6546,6 +6839,54 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
     const errEl = panel.querySelector("[data-role='err']");
     const editWrap = panel.querySelector("[data-role='edit']");
     const nextWrap = panel.querySelector("[data-role='next']");
+
+    const sleep = (ms) => new Promise((r) => window.setTimeout(r, Math.max(0, Number(ms) || 0)));
+    const perfNow = () =>
+      globalThis.performance && typeof globalThis.performance.now === "function"
+        ? globalThis.performance.now()
+        : Date.now();
+
+    const clearActionFeedback = () => {
+      if (!feedbackHost) return;
+      feedbackHost.innerHTML = "";
+      feedbackHost.hidden = true;
+    };
+
+    const showActionFeedback = (tone, title, sub) => {
+      if (!feedbackHost) return;
+      const t = String(title || "").trim();
+      const s = String(sub || "").trim();
+      if (!t && !s) return;
+      const icon = tone === "success" ? ICONS.check : tone === "error" ? ICONS.warn : ICONS.status;
+      feedbackHost.innerHTML = `
+        <div class="xv-action-feedback" data-tone="${escapeHtml(String(tone || "neutral"))}" role="status" aria-live="polite">
+          <div class="xv-action-feedback__icon" aria-hidden="true">${icon}</div>
+          <div>
+            <div class="xv-action-feedback__text">${escapeHtml(t)}</div>
+            ${s ? `<div class="xv-action-feedback__sub">${escapeHtml(s)}</div>` : ""}
+          </div>
+        </div>
+      `;
+      feedbackHost.hidden = false;
+      try {
+        feedbackHost.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch {}
+    };
+
+    const pulseSuccess = (el) => {
+      if (!el) return;
+      el.classList.remove("xv-success-pulse");
+      void el.offsetWidth;
+      el.classList.add("xv-success-pulse");
+      window.setTimeout(() => el.classList.remove("xv-success-pulse"), 650);
+    };
+
+    const setBadge = (status, label) => {
+      const st = String(status || "").trim();
+      const lb = String(label || "").trim();
+      controls.innerHTML = `<span class="decision-state-pill xv-badge xv-badge-pulse" data-status="${escapeHtml(st)}">${escapeHtml(lb || "")}</span>`;
+      window.setTimeout(() => controls.querySelector(".xv-badge-pulse")?.classList?.remove?.("xv-badge-pulse"), 620);
+    };
 
     const setMicrocopy = (text, tone = "") => {
       if (!microEl) return;
@@ -6667,17 +7008,18 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       }
       if (decisionCalloutEl) decisionCalloutEl.hidden = true;
       if (cons) cons.hidden = true;
-      const pillDisplay =
-        pill === "Approved"
-          ? "✓ Approved — ready to execute"
-          : pill === "Sent as edited"
-            ? "✓ Sent — saved as edited"
-            : pill === "Edited"
-              ? "✓ Edited — copy when ready"
-              : pill === "Rejected"
-                ? "Rejected — not sent"
-                : pill;
-      controls.innerHTML = `<span class="decision-state-pill">${escapeHtml(pillDisplay)}</span>`;
+      const pillKey = String(pill || "").trim();
+      if (pillKey === "Rejected") {
+        setBadge("failed", "Execution failed — no action taken");
+      } else if (pillKey === "Edited") {
+        setBadge("prepared", "Prepared — edited draft ready");
+      } else if (pillKey === "Sent as edited") {
+        setBadge("executed", "Executed — edited reply saved");
+      } else if (pillKey === "Approved") {
+        setBadge("executed", "Executed — approval recorded");
+      } else {
+        setBadge("prepared", pillKey || "Prepared");
+      }
       if (note) {
         noteEl.textContent = note;
         noteEl.style.display = "block";
@@ -7075,13 +7417,27 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
       const approveLabel = pendingGate ? "Approve & release" : "Approve";
       const setApproveIdle = () => {
         ap.classList.remove("is-loading");
+        ap.removeAttribute("aria-busy");
         ap.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.approve}</span><span class="op-action__label">${approveLabel}</span>`;
+      };
+      const setApproveStage = (stageLabel) => {
+        const lbl = String(stageLabel || "").trim();
+        ap.classList.add("is-loading");
+        ap.setAttribute("aria-busy", "true");
+        ap.innerHTML = `<span class="op-action__icon" aria-hidden="true"><span class="xv-inline-spinner"></span></span><span class="op-action__label">${escapeHtml(lbl)}</span>`;
       };
       ap.className = pendingGate ? "op-action op-action--primary op-action--primary--hold" : "op-action op-action--primary";
       ap.title = pendingGate
         ? "Releases the staged action under your account — only when you are sure."
         : "Confirms you are satisfied with the prepared path.";
       setApproveIdle();
+      if (pendingGate && !approval.canApprove) {
+        ap.disabled = true;
+        ap.setAttribute("data-xv-tooltip", "Requires approval — sign in as ticket owner");
+      } else {
+        ap.disabled = false;
+        ap.removeAttribute("data-xv-tooltip");
+      }
       const cp = document.createElement("button");
       cp.type = "button";
       cp.className = "op-action op-action--tertiary";
@@ -7165,9 +7521,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
               b.disabled = true;
             });
             sendEdited.disabled = true;
-            sendEdited.textContent = "Sending…";
-            ap.classList.add("is-loading");
+            sendEdited.textContent = "Executing…";
+            setApproveStage("Approving…");
             try {
+              await sleep(460);
+              setApproveStage("Executing…");
+              const execStageStart = perfNow();
               const response = await resolveApproval(ticketId, "approve", {
                 payment_intent_id: approval.paymentIntentId,
                 charge_id: approval.chargeId,
@@ -7188,6 +7547,11 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
               updateSystemNarrative(normalized);
               updateTopbarStatus();
               recordWorkspaceOutcomeClosing(normalized);
+              const execVisible = perfNow() - execStageStart;
+              if (execVisible < 420) await sleep(420 - execVisible);
+              ap.classList.remove("is-loading");
+              ap.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.check}</span><span class="op-action__label">Completed</span>`;
+              pulseSuccess(panel);
               setNotice(
                 "success",
                 "Ticket resolved successfully",
@@ -7195,7 +7559,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
               );
             } catch (error) {
               maybeNudgeIntegrationsFromApproveError(error.message);
-              showErr(error.message || "Approve failed.");
+              showErr(error.message || "Execution failed — no action taken.");
               [rej, ed, ap].forEach((b) => {
                 b.disabled = false;
               });
@@ -7259,6 +7623,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
 
       ap.addEventListener("click", async () => {
         showErr("");
+        clearActionFeedback();
         if (!ticketId && pendingGate) {
           showErr("No ticket id.");
           return;
@@ -7271,7 +7636,12 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           [rej, ed, ap].forEach((b) => {
             b.disabled = true;
           });
-          ap.classList.add("is-loading");
+          const stageStart = perfNow();
+          setApproveStage("Approving…");
+          // Minimum visible processing: never “instant”.
+          await sleep(460);
+          setApproveStage("Executing…");
+          const execStageStart = perfNow();
           try {
             const response = await resolveApproval(ticketId, "approve", {
               payment_intent_id: approval.paymentIntentId,
@@ -7287,6 +7657,24 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             updateSystemNarrative(normalized);
             updateTopbarStatus();
             recordWorkspaceOutcomeClosing(normalized);
+            // Ensure executing stage is perceptible even on fast paths.
+            const execVisible = perfNow() - execStageStart;
+            if (execVisible < 420) await sleep(420 - execVisible);
+            ap.classList.remove("is-loading");
+            ap.innerHTML = `<span class="op-action__icon" aria-hidden="true">${ICONS.check}</span><span class="op-action__label">Completed</span>`;
+            pulseSuccess(panel);
+            const act = String(normalized.action || normalized.decision?.action || "action").toLowerCase();
+            const amt = Number(normalized.amount || 0) || 0;
+            const amtText = amt > 0 ? ` ${formatMoney(amt)}` : "";
+            const title =
+              act === "refund"
+                ? `Refund executed${amtText}`
+                : act === "credit"
+                  ? `Credit executed${amtText}`
+                  : act === "charge"
+                    ? `Charge executed${amtText}`
+                    : "Execution completed";
+            showActionFeedback("success", title, "Outcome recorded — no silent side effects.");
             setNotice(
               "success",
               "Ticket resolved successfully",
@@ -7294,7 +7682,14 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
             );
           } catch (error) {
             maybeNudgeIntegrationsFromApproveError(error.message);
-            showErr(error.message || "Approve failed.");
+            const execVisible = perfNow() - execStageStart;
+            if (execVisible < 420) await sleep(420 - execVisible);
+            showErr(error.message || "Execution failed — no action taken.");
+            showActionFeedback(
+              "error",
+              "Execution failed — no action taken",
+              "Nothing was executed. Fix the blocker, then approve again."
+            );
             [rej, ed, ap].forEach((b) => {
               b.disabled = false;
             });
@@ -7303,7 +7698,7 @@ Keep operating — overage is tracked. Pro removes friction: more included runs,
           return;
         }
         recordWorkspaceOutcomeClosing(data);
-        setTerminal("Approved", "Reply ready — send when it reads right.");
+        setTerminal("Approved", "Prepared reply is ready. No execution hold on this run.");
         setNotice(
           "success",
           "Ticket resolved successfully",
