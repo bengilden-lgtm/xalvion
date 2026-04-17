@@ -1,9 +1,24 @@
 import hashlib
 import logging
 import os
+import sys
 from typing import Any, Optional
 
 logger = logging.getLogger("xalvion.tools")
+
+
+def _append_startup_issue(issue: str) -> None:
+    """
+    Best-effort append into app.STARTUP_ISSUES without importing `app`.
+    This avoids circular-import explosions while ensuring Railway liveness can bind.
+    """
+    try:
+        app_mod = sys.modules.get("app")
+        issues = getattr(app_mod, "STARTUP_ISSUES", None) if app_mod else None
+        if isinstance(issues, list):
+            issues.append(str(issue))
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # Order / shipment data integrity
@@ -322,18 +337,15 @@ _IS_LIVE_STRIPE = _STRIPE_KEY.startswith("sk_live_")
 _ENV = (os.getenv("ENVIRONMENT", "development") or "development").strip().lower()
 
 if _EXEC_MODE != "live" and (_IS_LIVE_STRIPE or _ENV == "production"):
-    import sys
-
-    print(
-        "BOOT FATAL: XALVION_EXEC_MODE is not 'live' but environment is production "
-        "or a live Stripe key is present. Set XALVION_EXEC_MODE=live to proceed.",
-        file=sys.stderr,
-        flush=True,
+    _msg = (
+        "STARTUP DEGRADE: XALVION_EXEC_MODE is not 'live' but environment is production "
+        "or a live Stripe key is present. Liveness will remain available, but readiness "
+        "must be considered degraded until XALVION_EXEC_MODE=live is set."
     )
-    raise RuntimeError(
-        "XALVION_EXEC_MODE must be 'live' in production. "
-        "Set XALVION_EXEC_MODE=live in your environment variables."
-    )
+    logger.critical(_msg)
+    _append_startup_issue("exec_mode_unsafe:tools_py_import")
+    _append_startup_issue(_msg)
+    print("BOOT: readiness degraded (tools.py import-time exec mode safety)", flush=True)
 
 
 def get_execution_mode() -> str:
