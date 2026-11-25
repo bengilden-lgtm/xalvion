@@ -6,8 +6,9 @@
     return;
   }
 
-  const gl =
-    canvas.getContext("webgl2", {
+  let gl = null;
+  try {
+    gl = canvas.getContext("webgl2", {
       alpha: false,
       antialias: false,
       depth: false,
@@ -15,12 +16,32 @@
       premultipliedAlpha: false,
       preserveDrawingBuffer: false,
       powerPreference: "high-performance",
-    }) || null;
-
-  if (!gl) {
-    console.error("WebGL2 not supported");
+    });
+  } catch (err) {
+    console.error("WebGL2 initialization threw:", err);
     return;
   }
+
+  if (!gl) {
+    console.warn("WebGL2 not supported; skipping fluid simulation");
+    return;
+  }
+
+  let rafId = null;
+  let contextLost = false;
+
+  canvas.addEventListener(
+    "webglcontextlost",
+    (e) => {
+      e.preventDefault();
+      contextLost = true;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    },
+    false
+  );
 
   const SHADERS = {
     baseVert: `#version 300 es
@@ -318,9 +339,10 @@
   };
 
   const config = {
-    simScale: 1.15,
-    dyeScale: 1.62,
-    pressureIterations: 18,
+    simScale: 0.5,
+    dyeScale: 1.0,
+    maxDpr: 1.25,
+    pressureIterations: 10,
     velocityDissipation: 0.99835,
     dyeDissipation: 0.99940,
     curlStrength: 10.5,
@@ -369,7 +391,6 @@
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
       const log = gl.getShaderInfoLog(shader);
       console.error(log);
-      console.error(src);
       throw new Error(log || "Shader compile failed");
     }
     return shader;
@@ -424,7 +445,7 @@
   };
 
   function getTextureFormat() {
-    if (ext.colorBufferFloat) {
+    if (ext.colorBufferFloat && ext.textureFloatLinear) {
       return {
         internalFormat: gl.RGBA16F,
         format: gl.RGBA,
@@ -519,18 +540,18 @@
   let curl;
 
   function resizeCanvas() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    canvas.width = Math.floor(window.innerWidth * dpr);
-    canvas.height = Math.floor(window.innerHeight * dpr);
+    const dpr = Math.min(window.devicePixelRatio || 1, config.maxDpr);
+    canvas.width = Math.max(1, Math.floor(window.innerWidth * dpr));
+    canvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
     canvas.style.width = `${window.innerWidth}px`;
     canvas.style.height = `${window.innerHeight}px`;
   }
 
   function initFramebuffers() {
-    const simW = Math.max(384, Math.floor(canvas.width * config.simScale));
-    const simH = Math.max(384, Math.floor(canvas.height * config.simScale));
-    const dyeW = Math.max(768, Math.floor(canvas.width * config.dyeScale));
-    const dyeH = Math.max(768, Math.floor(canvas.height * config.dyeScale));
+    const simW = Math.max(256, Math.floor(canvas.width * config.simScale));
+    const simH = Math.max(256, Math.floor(canvas.height * config.simScale));
+    const dyeW = Math.max(512, Math.floor(canvas.width * config.dyeScale));
+    const dyeH = Math.max(512, Math.floor(canvas.height * config.dyeScale));
 
     velocity = createDoubleFBO(simW, simH);
     pressure = createDoubleFBO(simW, simH);
@@ -545,7 +566,7 @@
     gl.uniform2f(u.point, x, y);
     gl.uniform3f(u.color, color[0], color[1], color[2]);
     gl.uniform1f(u.radius, radius);
-    gl.uniform1f(u.aspect, canvas.width / canvas.height);
+    gl.uniform1f(u.aspect, canvas.width / Math.max(1, canvas.height));
     bindTexture(0, target.read.texture);
     drawTo(target.write);
     target.swap();
@@ -573,8 +594,8 @@
   }
 
   function setPointerFromClient(clientX, clientY) {
-    const nx = clientX / window.innerWidth;
-    const ny = 1.0 - clientY / window.innerHeight;
+    const nx = clientX / Math.max(1, window.innerWidth);
+    const ny = 1.0 - clientY / Math.max(1, window.innerHeight);
     const dx = nx - pointer.x;
     const dy = ny - pointer.y;
     pointer.px = pointer.x;
@@ -605,34 +626,44 @@
     pointer.down = false;
   });
 
-  window.addEventListener("touchstart", (e) => {
-    const t = e.touches[0];
-    if (!t) return;
-    pointer.down = true;
-    setPointerFromClient(t.clientX, t.clientY);
-    pulseAt(pointer.x, pointer.y);
-  }, { passive: true });
+  window.addEventListener(
+    "touchstart",
+    (e) => {
+      const t = e.touches[0];
+      if (!t) return;
+      pointer.down = true;
+      setPointerFromClient(t.clientX, t.clientY);
+      pulseAt(pointer.x, pointer.y);
+    },
+    { passive: true }
+  );
 
-  window.addEventListener("touchmove", (e) => {
-    const t = e.touches[0];
-    if (!t) return;
-    setPointerFromClient(t.clientX, t.clientY);
-  }, { passive: true });
+  window.addEventListener(
+    "touchmove",
+    (e) => {
+      const t = e.touches[0];
+      if (!t) return;
+      setPointerFromClient(t.clientX, t.clientY);
+    },
+    { passive: true }
+  );
 
-  window.addEventListener("touchend", () => {
-    pointer.down = false;
-  }, { passive: true });
+  window.addEventListener(
+    "touchend",
+    () => {
+      pointer.down = false;
+    },
+    { passive: true }
+  );
 
   window.addEventListener("resize", () => {
+    if (contextLost) return;
     resizeCanvas();
     initFramebuffers();
     seedScene();
   });
 
   function seedScene() {
-    // Full-screen symmetric seed so the page opens evenly.
-    // Balanced grid + mirrored inward/outward motion to avoid a heavy side.
-
     const cols = 6;
     const rows = 4;
 
@@ -659,18 +690,16 @@
           [
             Math.cos(angle + Math.PI * 0.5) * 0.010,
             Math.sin(angle + Math.PI * 0.5) * 0.010,
-            0.0
+            0.0,
           ],
           0.16
         );
       }
     }
 
-    // Soft centre fill so the middle never starts empty
     applySplat(dye, 0.50, 0.50, [0.016, 0.020, 0.050], 0.24);
     applySplat(velocity, 0.50, 0.50, [0.0, 0.0, 0.0], 0.20);
 
-    // Edge anchors so corners and side regions feel alive immediately
     [
       [0.08, 0.08],
       [0.50, 0.08],
@@ -679,7 +708,7 @@
       [0.92, 0.50],
       [0.08, 0.92],
       [0.50, 0.92],
-      [0.92, 0.92]
+      [0.92, 0.92],
     ].forEach(([x, y], i) => {
       const tint =
         i % 2 === 0
@@ -696,7 +725,7 @@
         [
           Math.cos(towardCenter) * 0.008,
           Math.sin(towardCenter) * 0.008,
-          0.0
+          0.0,
         ],
         0.12
       );
@@ -704,6 +733,7 @@
   }
 
   function openingPulse() {
+    if (contextLost) return;
     const points = [
       [0.20, 0.22],
       [0.50, 0.22],
@@ -713,7 +743,7 @@
       [0.80, 0.50],
       [0.20, 0.78],
       [0.50, 0.78],
-      [0.80, 0.78]
+      [0.80, 0.78],
     ];
 
     points.forEach(([x, y], i) => {
@@ -728,7 +758,7 @@
         [
           Math.cos(angle) * 0.055,
           Math.sin(angle) * 0.055,
-          0.0
+          0.0,
         ],
         0.10
       );
@@ -743,20 +773,6 @@
         0.13
       );
     });
-
-    setTimeout(() => {
-      points.forEach(([x, y], i) => {
-        applySplat(
-          dye,
-          x,
-          y,
-          i % 2 === 0
-            ? [0.010, 0.020, 0.050]
-            : [0.008, 0.024, 0.042],
-          0.16
-        );
-      });
-    }, 180);
   }
 
   let ambientTime = 0;
@@ -769,7 +785,7 @@
       [0.72, 0.28, 0.12, -0.0048,  0.0032],
       [0.28, 0.72, 0.12,  0.0048, -0.0032],
       [0.72, 0.72, 0.12, -0.0048, -0.0032],
-      [0.50, 0.50, 0.16,  0.0000,  0.0040]
+      [0.50, 0.50, 0.16,  0.0000,  0.0040],
     ];
 
     for (const [x0, y0, r, vx, vy] of fields) {
@@ -787,40 +803,33 @@
     const centers = [
       [0.50 + Math.cos(t * 0.46) * 0.38, 0.50 + Math.sin(t * 0.42) * 0.30, 1.8],
       [0.50 - Math.cos(t * 0.46) * 0.38, 0.50 + Math.sin(t * 0.42) * 0.30, 1.8],
-
       [0.50 + Math.sin(t * 0.34 + 1.2) * 0.34, 0.50 + Math.cos(t * 0.36 + 2.4) * 0.26, 1.7],
       [0.50 + Math.sin(t * 0.34 + 1.2) * 0.34, 0.50 - Math.cos(t * 0.36 + 2.4) * 0.26, 1.7],
-
       [0.12 + Math.sin(t * 0.28) * 0.10, 0.12 + Math.cos(t * 0.24) * 0.10, 1.4],
       [0.88 - Math.sin(t * 0.28) * 0.10, 0.12 + Math.cos(t * 0.24) * 0.10, 1.4],
       [0.12 + Math.sin(t * 0.28) * 0.10, 0.88 - Math.cos(t * 0.24) * 0.10, 1.4],
       [0.88 - Math.sin(t * 0.28) * 0.10, 0.88 - Math.cos(t * 0.24) * 0.10, 1.4],
-
-      [0.50, 0.06 + Math.sin(t * 0.20) * 0.04, 1.2],
-      [0.50, 0.94 - Math.sin(t * 0.20) * 0.04, 1.2],
-      [0.06 + Math.sin(t * 0.18) * 0.04, 0.50, 1.2],
-      [0.94 - Math.sin(t * 0.18) * 0.04, 0.50, 1.2],
     ];
 
     const s = config.backgroundFlowStrength;
+    const c = config.backgroundColorStrength;
 
     for (let i = 0; i < centers.length; i++) {
       const [x, y, mul] = centers[i];
       const phase = t * (0.82 + i * 0.08);
 
-      applySplat(velocity, x, y, [
-        Math.cos(phase * 0.92) * s * mul,
-        Math.sin(phase * 0.88) * s * mul,
-        0.0
-      ], config.ambientRadius * (0.92 + i * 0.02));
+      applySplat(
+        velocity,
+        x,
+        y,
+        [
+          Math.cos(phase * 0.92) * s * mul,
+          Math.sin(phase * 0.88) * s * mul,
+          0.0,
+        ],
+        config.ambientRadius * (0.95 + i * 0.02)
+      );
 
-      applySplat(velocity, x, y, [
-        -Math.sin(phase * 0.74) * s * 0.62 * mul,
-        Math.cos(phase * 0.70) * s * 0.62 * mul,
-        0.0
-      ], config.ambientRadius * (1.06 + i * 0.02));
-
-      const c = config.backgroundColorStrength;
       const isV = i % 3 === 0;
       const isT = i % 3 === 1;
       const bgCol = isV
@@ -828,7 +837,7 @@
         : isT
         ? [c * 0.12, c * 0.70, c * 1.00]
         : [c * 0.30, c * 0.50, c * 1.10];
-      applySplat(dye, x, y, bgCol, config.ambientRadius * (0.76 + i * 0.015));
+      applySplat(dye, x, y, bgCol, config.ambientRadius * (0.78 + i * 0.015));
     }
   }
 
@@ -845,13 +854,8 @@
       const push = Math.min(speed * config.hoverPushScale, 5.34);
       const swirl = Math.min(speed * config.hoverSwirlScale, 75.045);
 
-      applySplat(velocity, pointer.x, pointer.y, [-nx * push, -ny * push, 0.0], config.pointerRadius * 1.25);
-      applySplat(velocity, pointer.x, pointer.y, [-nx * push * 0.95, -ny * push * 0.95, 0.0], config.pointerRadius * 1.95);
-      applySplat(velocity, pointer.x, pointer.y, [-nx * push * 0.65, -ny * push * 0.65, 0.0], config.pointerRadius * 2.55);
-
+      applySplat(velocity, pointer.x, pointer.y, [-nx * push, -ny * push, 0.0], config.pointerRadius * 1.35);
       applySplat(velocity, pointer.x, pointer.y, [tx * swirl, ty * swirl, 0.0], config.pointerRadius * 1.25);
-      applySplat(velocity, pointer.x, pointer.y, [-tx * swirl, -ty * swirl, 0.0], config.pointerRadius * 1.65);
-
       applySplat(dye, pointer.x, pointer.y, [0.0044, 0.0058, 0.0098], config.pointerRadius * 0.92);
 
       if (pointer.down) {
@@ -869,23 +873,20 @@
     const t = (performance.now() + 18000) * 0.00018;
     const idleX = 0.5 + Math.sin(t * 0.34) * 0.24;
     const idleY = 0.5 + Math.cos(t * 0.36) * 0.20;
-    const idleX2 = 0.5 + Math.cos(t * 0.26 + 1.8) * 0.32;
-    const idleY2 = 0.5 + Math.sin(t * 0.30 + 2.3) * 0.26;
 
-    applySplat(velocity, idleX, idleY, [
-      Math.cos(t * 0.70) * config.idleSwirlStrength,
-      Math.sin(t * 0.66) * config.idleSwirlStrength,
-      0.0
-    ], config.pointerRadius * 1.00);
-
-    applySplat(velocity, idleX2, idleY2, [
-      -Math.sin(t * 0.60) * config.idleSwirlStrength,
-      Math.cos(t * 0.64) * config.idleSwirlStrength,
-      0.0
-    ], config.pointerRadius * 0.18);
+    applySplat(
+      velocity,
+      idleX,
+      idleY,
+      [
+        Math.cos(t * 0.70) * config.idleSwirlStrength,
+        Math.sin(t * 0.66) * config.idleSwirlStrength,
+        0.0,
+      ],
+      config.pointerRadius * 1.00
+    );
 
     applySplat(dye, idleX, idleY, [0.0028, 0.0038, 0.0070], config.pointerRadius * 0.82);
-    applySplat(dye, idleX2, idleY2, [0.0026, 0.0036, 0.0066], config.pointerRadius * 0.90);
   }
 
   function step(dt) {
@@ -984,6 +985,14 @@
   let lastTime = performance.now();
 
   function frame(now) {
+    if (contextLost) return;
+    rafId = requestAnimationFrame(frame);
+
+    if (document.hidden) {
+      lastTime = now;
+      return;
+    }
+
     const dt = Math.min((now - lastTime) / 1000, config.maxDt);
     lastTime = now;
 
@@ -992,13 +1001,15 @@
     cursorForces();
     step(dt);
     render(now);
-
-    requestAnimationFrame(frame);
   }
 
-  resizeCanvas();
-  initFramebuffers();
-  seedScene();
-  setTimeout(openingPulse, 700);
-  requestAnimationFrame(frame);
+  try {
+    resizeCanvas();
+    initFramebuffers();
+    seedScene();
+    setTimeout(openingPulse, 700);
+    rafId = requestAnimationFrame(frame);
+  } catch (err) {
+    console.error("Fluid simulation failed to initialize:", err);
+  }
 })();
