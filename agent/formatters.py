@@ -80,21 +80,14 @@ def normalize_text(text: str) -> str:
     replacements = {
         "Iâve": "I’ve",
         "Iâ€™ve": "I’ve",
-        "Iâve": "I’ve",
         "â€™": "’",
-        "â": "’",
         "â€˜": "‘",
-        "â": "‘",
         "â€œ": "“",
-        "â": "“",
-        "â€�": "”",
-        "â": "”",
+        "â€\x9d": "”",
+        "â€ ": "”",
         "â€“": "–",
-        "â": "–",
         "â€”": "—",
-        "â": "—",
         "â€¦": "…",
-        "â¦": "…",
         "Â ": " ",
         "Â": "",
     }
@@ -131,4 +124,3 @@ def is_conversational_message(message: str) -> bool:
         return False
 
     return len(text.split()) <= 4
-

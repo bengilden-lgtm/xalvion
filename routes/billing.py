@@ -328,34 +328,25 @@ async def stripe_webhook(request: Request, db: Session = Depends(app_mod.get_db)
     is_live = stripe_key.startswith("sk_live_")
     env = str(getattr(app_mod, "ENVIRONMENT", "development") or "development").strip().lower()
 
+    if not stripe_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
     if not webhook_secret and (is_live or env == "production"):
         raise HTTPException(
             status_code=500,
             detail="Stripe webhook secret is required in production. Configure STRIPE_WEBHOOK_SECRET."
         )
-    if not app_mod.STRIPE_KEY:
-        raise HTTPException(status_code=500, detail="Stripe not configured")
 
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
-        webhook_secret = str(app_mod.STRIPE_WEBHOOK_SECRET or "").strip()
-        stripe_key = str(app_mod.STRIPE_KEY or "").strip()
-        is_live = stripe_key.startswith("sk_live_")
-
         if webhook_secret:
             event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-        elif is_live:
-            # Live key without webhook secret should have been caught at startup (Fix 2).
-            # If we somehow reach here, refuse to process.
-            raise HTTPException(
-                status_code=500,
-                detail="Cannot process Stripe webhook: STRIPE_WEBHOOK_SECRET is required with a live key."
-            )
         else:
             # Development only — unsigned webhook accepted for local testing
             event = stripe.Event.construct_from(json.loads(payload.decode("utf-8")), stripe.api_key)
+    except HTTPException:
+        raise
     except stripe.error.SignatureVerificationError as exc:
         logger.warning(
             "stripe_webhook_rejected_invalid_signature env=%s detail=%s",

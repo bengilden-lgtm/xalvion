@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
@@ -29,6 +30,44 @@ def client():
 
 def _db():
     return app_mod.SessionLocal()
+
+
+def _recreate_pending_checkouts_table(db) -> None:
+    try:
+        cols = {row[1] for row in db.execute(text("PRAGMA table_info(pending_checkouts)")).fetchall()}
+        if not cols or "id" not in cols:
+            db.execute(text("DROP TABLE IF EXISTS pending_checkouts"))
+            db.commit()
+            bind = db.get_bind()
+            try:
+                app_mod.PendingCheckout.__table__.create(bind=bind, checkfirst=True)
+            except Exception:
+                db.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS pending_checkouts (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id TEXT,
+                            stripe_session_id TEXT,
+                            plan_tier TEXT,
+                            session_id TEXT,
+                            username TEXT,
+                            tier TEXT,
+                            created_at TEXT,
+                            completed_at TEXT,
+                            status TEXT
+                        )
+                        """
+                    )
+                )
+                db.commit()
+            if hasattr(app_mod, "_ensure_pending_checkout_columns"):
+                try:
+                    app_mod._ensure_pending_checkout_columns(db)
+                except Exception:
+                    pass
+    except Exception:
+        db.rollback()
 
 
 def _create_user(db, *, username: str, tier: str = "free", sub_id: str | None = None, sub_status: str | None = None):
@@ -174,6 +213,7 @@ def test_ghost_state_recovery_applies_upgrade_and_marks_completed(client: TestCl
 
     db = _db()
     try:
+        _recreate_pending_checkouts_table(db)
         db_user = db.query(app_mod.User).filter(app_mod.User.username == username).first()
         assert db_user is not None
         session_id = f"cs_{uuid.uuid4().hex[:12]}"

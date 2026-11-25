@@ -4,17 +4,17 @@ from __future__ import annotations
 agent/orchestrator.py — Agent orchestration for sovereign decisioning and execution.
 
 Owns:
-  - run_agent() high-level decision → execution pipeline wiring
-  - Integration points between actions/brain/memory/tools/learning/outcomes
+- run_agent() high-level decision → execution pipeline wiring
+- Integration points between actions/brain/memory/tools/learning/outcomes
 
 Does NOT own:
-  - FastAPI routes or HTTP schemas (app.py, schemas.py)
-  - Plan configuration (plan_config.py)
-  - Final authority financial policy (governor.py)
+- FastAPI routes or HTTP schemas (app.py, schemas.py)
+- Plan configuration (plan_config.py)
+- Final authority financial policy (governor.py)
 
 Imports from:
-  - actions, brain, memory, tools, models (internal)
-  - analytics, feedback, learning, outcome_store (internal integrations)
+- actions, brain, memory, tools, models (internal)
+- analytics, feedback, learning, outcome_store (internal integrations)
 """
 
 import logging
@@ -513,21 +513,23 @@ def run_agent(
     _pattern_exp = get_pattern_expectation(ticket, final_payload)
 
     update_memory(user_id, ticket, customer_message, final_payload)
-    _learning_quality_threshold = None
-    try:
-        if isinstance(executed, dict):
-            _learning_quality_threshold = executed.get("learning_quality_threshold", executed.get("quality_threshold"))
-        if _learning_quality_threshold is None and isinstance(_tool_result, dict):
-            _learning_quality_threshold = _tool_result.get(
-                "learning_quality_threshold", _tool_result.get("quality_threshold")
-            )
-        if _learning_quality_threshold is None and isinstance(clean, dict):
-            _learning_quality_threshold = clean.get("learning_quality_threshold", clean.get("quality_threshold"))
-    except Exception:
-        _learning_quality_threshold = None
+    _learning_quality_threshold: float | None = None
+    for _src in (
+        executed if isinstance(executed, dict) else None,
+        _tool_result if isinstance(_tool_result, dict) else None,
+        clean if isinstance(clean, dict) else None,
+    ):
+        if isinstance(_src, dict):
+            _raw_thresh = _src.get("learning_quality_threshold", _src.get("quality_threshold"))
+            if _raw_thresh is not None:
+                try:
+                    _learning_quality_threshold = float(_raw_thresh)
+                    break
+                except (TypeError, ValueError):
+                    pass
 
     if (not _is_simulated) and (
-        _learning_quality_threshold is None or float(quality) > float(_learning_quality_threshold)
+        _learning_quality_threshold is None or float(quality) >= _learning_quality_threshold
     ):
         learn_from_ticket(ticket, final_payload, executed, outcome_key=_outcome_key)
     process_feedback(clean, customer_message, quality)

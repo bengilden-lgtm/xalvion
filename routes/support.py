@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -76,6 +77,24 @@ def _apply_ticket_search(q, search_term: str):
         | app_mod.Ticket.issue_type.ilike(term)
         | app_mod.Ticket.customer_email.ilike(term)
     )
+
+
+def _normalize_email_send_result(send_result: Any, fallback_to: str | None) -> tuple[str, str | None, str]:
+    if isinstance(send_result, dict):
+        raw_status = str(send_result.get("status") or "").strip().lower()
+        if not raw_status and "sent" in send_result:
+            raw_status = "sent" if bool(send_result.get("sent")) else "failed"
+        to_addr = send_result.get("to") or fallback_to
+        msg = str(send_result.get("message") or send_result.get("error") or "").strip()
+        return raw_status or "failed", to_addr, msg
+
+    sent_attr = getattr(send_result, "sent", None)
+    raw_status = str(getattr(send_result, "status", "") or "").strip().lower()
+    if not raw_status and sent_attr is not None:
+        raw_status = "sent" if bool(sent_attr) else "failed"
+    to_addr = getattr(send_result, "to", None) or fallback_to
+    msg = str(getattr(send_result, "message", "") or getattr(send_result, "error", "") or "").strip()
+    return raw_status or "failed", to_addr, msg
 
 
 @router.get("/tickets")
@@ -252,7 +271,8 @@ def _execute_ticket_reply_send(
         if not owner_key or ticket.username != owner_key:
             raise HTTPException(status_code=403, detail="Forbidden")
 
-    if not normalize_customer_email(getattr(ticket, "customer_email", None)):
+    customer_email = normalize_customer_email(getattr(ticket, "customer_email", None))
+    if not customer_email:
         raise HTTPException(
             status_code=400,
             detail={
@@ -267,45 +287,50 @@ def _execute_ticket_reply_send(
         reply_body=reply_body,
         subject=req.subject,
     )
+    status, to_addr, err_msg = _normalize_email_send_result(send_result, customer_email)
 
     # Persist delivery outcome to ticket regardless of success/failure
     try:
-        delivery_status = str(send_result.get("status", "unknown") or "unknown")
+        delivery_status = str(status or "unknown")
         ticket.updated_at = app_mod._now_iso()
         existing_note = str(ticket.internal_note or "")
         delivery_tag = f"[email_delivery:{delivery_status}]"
         if "[email_delivery:" not in existing_note:
             ticket.internal_note = f"{existing_note} {delivery_tag}".strip()
         else:
-            import re
-
             ticket.internal_note = re.sub(
                 r"\[email_delivery:[^\]]*\]",
                 delivery_tag,
                 existing_note,
             )
         db.commit()
+        db.refresh(ticket)
     except Exception:
         db.rollback()
         logger.warning("ticket_delivery_status_persist_failed ticket_id=%s", ticket_id, exc_info=True)
 
     # Return honest status — never return "sent" if SMTP failed
-    status = str(send_result.get("status") or "")
     if status == "sent":
-        return {"ok": True, "status": "sent", "to": send_result.get("to")}
+        return {
+            "ok": True,
+            "status": "sent",
+            "delivery_status": "sent",
+            "to": to_addr,
+            "ticket": app_mod.serialize_ticket(ticket),
+        }
     if status == "transport_unavailable":
         raise HTTPException(
             status_code=503,
-            detail=f"Email transport not configured. {send_result.get('message', '')}",
+            detail=f"Email transport not configured. {err_msg}",
         )
     if status == "pending_manual":
         raise HTTPException(
             status_code=422,
-            detail=str(send_result.get("message", "Cannot deliver — missing customer email.")),
+            detail=err_msg or "Cannot deliver — missing customer email.",
         )
     raise HTTPException(
         status_code=502,
-        detail=f"Email delivery failed: {send_result.get('message', 'Unknown error')}",
+        detail=f"Email delivery failed: {err_msg or 'Unknown error'}",
     )
 
 

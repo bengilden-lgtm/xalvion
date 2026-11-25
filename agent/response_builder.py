@@ -592,6 +592,109 @@ def build_audit_summary_payload(
     }
 
 
+def _extract_explainability_signals(
+    *,
+    ticket: Dict[str, Any],
+    triage: Dict[str, Any],
+    hard_decision: Dict[str, Any],
+    learned_action: Dict[str, Any] | None,
+    final_action: Dict[str, Any],
+    history: Dict[str, Any],
+    top_rules: list[Dict[str, Any]],
+    confidence: float,
+    quality: float,
+) -> Dict[str, Any]:
+    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
+    action = str(final_action.get("action", "none") or "none").lower()
+    amount = float(final_action.get("amount", 0) or 0)
+    risk_level = str(final_action.get("risk_level", triage.get("risk_level", "medium")) or "medium").lower()
+    urgency = int(triage.get("urgency", 0) or 0)
+    churn_risk = int(triage.get("churn_risk", 0) or 0)
+    abuse_lh = int(triage.get("abuse_likelihood", 0) or 0)
+    refund_lh = int(triage.get("refund_likelihood", 0) or 0)
+    req_approval = bool(final_action.get("requires_approval", False))
+    refund_count = int(history.get("refund_count", 0) or 0)
+    abuse_score = int(history.get("abuse_score", 0) or 0)
+    repeat_customer = bool(history.get("repeat_customer", False))
+    sentiment_avg = float(history.get("sentiment_avg", 5.0) or 5.0)
+
+    hard_act = str(hard_decision.get("action", "none") or "none").lower()
+    policy_triggered = hard_act != "none"
+    policy_reason = str(hard_decision.get("reason", "") or "").strip()
+
+    learned_applied = bool(learned_action) and str(learned_action.get("action", "none") or "none").lower() != "none"
+    learned_trigger = None
+    learned_weight = None
+    if learned_applied and top_rules:
+        lat = str(learned_action.get("action") or "").lower()
+        matched = next(
+            (r for r in top_rules if isinstance(r, dict) and str((r.get("action") or {}).get("type", "")).lower() == lat),
+            None,
+        )
+        if matched:
+            learned_trigger = matched.get("trigger")
+            try:
+                learned_weight = float(matched.get("weight")) if matched.get("weight") is not None else None
+            except Exception:
+                learned_weight = None
+
+    appr_reasons: list[str] = []
+    threshold: str | None = None
+    if req_approval and action in {"refund", "charge"}:
+        appr_reasons.append("Refund or charge motion requires operator approval before execution.")
+        threshold = f"${MAX_APPROVAL_THRESHOLD:.0f}"
+    elif req_approval and action == "credit" and amount > float(MAX_APPROVAL_THRESHOLD):
+        appr_reasons.append(f"Credit amount exceeds ${MAX_APPROVAL_THRESHOLD:.0f} approval threshold.")
+        threshold = f"${MAX_APPROVAL_THRESHOLD:.0f}"
+    elif req_approval:
+        if abuse_score >= 2:
+            appr_reasons.append("Abuse score elevated")
+        elif action == "refund" and amount > 0:
+            appr_reasons.append(f"Refund amount ${amount:.0f} above auto-approval threshold")
+        else:
+            appr_reasons.append("Risk or policy flags require explicit operator approval.")
+    if abuse_score >= 2:
+        appr_reasons.append(f"Abuse score {abuse_score} keeps a human gate recommended.")
+        threshold = threshold or "abuse_score >= 2"
+
+    execution_tier = compute_execution_tier(
+        action,
+        amount,
+        float(confidence or 0),
+        float(quality or 0),
+        risk_level,
+        abuse_score,
+        refund_count,
+        str(ticket.get("operator_mode", "balanced") or "balanced"),
+        req_approval,
+    )
+
+    return {
+        "issue_type": issue_type,
+        "action": action,
+        "amount": amount,
+        "risk_level": risk_level,
+        "urgency": urgency,
+        "churn_risk": churn_risk,
+        "abuse_lh": abuse_lh,
+        "refund_lh": refund_lh,
+        "req_approval": req_approval,
+        "refund_count": refund_count,
+        "abuse_score": abuse_score,
+        "repeat_customer": repeat_customer,
+        "sentiment_avg": sentiment_avg,
+        "hard_act": hard_act,
+        "policy_triggered": policy_triggered,
+        "policy_reason": policy_reason,
+        "learned_applied": learned_applied,
+        "learned_trigger": learned_trigger,
+        "learned_weight": learned_weight,
+        "appr_reason": " ".join(appr_reasons) if appr_reasons else "Within automatic handling thresholds",
+        "threshold": threshold,
+        "execution_tier": execution_tier,
+    }
+
+
 def build_decision_explainability(
     *,
     ticket: Dict[str, Any],
@@ -607,26 +710,32 @@ def build_decision_explainability(
     pattern_expectation: dict | None = None,
 ) -> dict[str, Any]:
     """Deterministic operator explainability — no LLM."""
-    ticket = ticket or {}
-    triage = triage or {}
-    hard_decision = hard_decision or {}
-    final_action = final_action or {}
-    history = history or {}
-    top_rules = top_rules or []
-
-    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
-    action = str(final_action.get("action", "none") or "none")
-    amount = float(final_action.get("amount", 0) or 0)
-    risk_level = str(triage.get("risk_level", "medium") or "medium")
-    urgency = int(triage.get("urgency", 0) or 0)
-    churn_risk = int(triage.get("churn_risk", 0) or 0)
-    abuse_lh = int(triage.get("abuse_likelihood", 0) or 0)
-    refund_lh = int(triage.get("refund_likelihood", 0) or 0)
-    req_approval = bool(final_action.get("requires_approval", False))
-    refund_count = int(history.get("refund_count", 0) or 0)
-    abuse_score = int(history.get("abuse_score", 0) or 0)
-    repeat = bool(history.get("repeat_customer", False))
-    sentiment = float(history.get("sentiment_avg", 5.0) or 5.0)
+    s = _extract_explainability_signals(
+        ticket=ticket or {},
+        triage=triage or {},
+        hard_decision=hard_decision or {},
+        learned_action=learned_action,
+        final_action=final_action or {},
+        history=history or {},
+        top_rules=list(top_rules or []),
+        confidence=confidence,
+        quality=quality,
+    )
+    issue_type = s["issue_type"]
+    action = s["action"]
+    amount = s["amount"]
+    risk_level = s["risk_level"]
+    urgency = s["urgency"]
+    churn_risk = s["churn_risk"]
+    abuse_lh = s["abuse_lh"]
+    refund_lh = s["refund_lh"]
+    req_approval = s["req_approval"]
+    refund_count = s["refund_count"]
+    abuse_score = s["abuse_score"]
+    repeat = s["repeat_customer"]
+    sentiment = s["sentiment_avg"]
+    policy_triggered = s["policy_triggered"]
+    policy_reason = s["policy_reason"]
 
     classification_signals = {
         "billing_duplicate_charge": "Matched duplicate charge pattern",
@@ -659,8 +768,6 @@ def build_decision_explainability(
         + (f" — {', '.join(risk_factors)}" if risk_factors else "")
     )
 
-    policy_triggered = str(hard_decision.get("action", "none")) != "none"
-    policy_reason = str(hard_decision.get("reason", "") or "")
     policy_signal = (
         f"Policy applied: {policy_reason}" if policy_triggered and policy_reason
         else "No hard policy triggered — learning rules applied"
@@ -682,22 +789,6 @@ def build_decision_explainability(
         if memory_parts
         else "No significant memory signals"
     )
-
-    learned_trigger = None
-    learned_weight = None
-    if learned_action and str(learned_action.get("action", "none")) != "none":
-        lat = learned_action.get("action")
-        if top_rules:
-            matched = next(
-                (
-                    r for r in top_rules
-                    if r.get("action", {}).get("type") == lat
-                ),
-                None,
-            )
-            if matched:
-                learned_trigger = matched.get("trigger")
-                learned_weight = matched.get("weight")
 
     if pattern_expectation:
         exp_label = pattern_expectation.get("expectation", "medium")
@@ -734,16 +825,6 @@ def build_decision_explainability(
         else "Other actions were not applicable to this issue type"
     )
 
-    if req_approval:
-        approval_reason = (
-            "Abuse score elevated" if abuse_score >= 2
-            else f"Refund amount ${amount:.0f} above auto-approval threshold"
-            if action == "refund" and amount > 0
-            else "Risk level or policy requires operator confirmation"
-        )
-    else:
-        approval_reason = "Within automatic handling thresholds"
-
     summary_parts = [
         f"{issue_type.replace('_', ' ').title()} detected.",
         f"Risk: {risk_level}.",
@@ -759,14 +840,14 @@ def build_decision_explainability(
     )
     summary = " ".join(summary_parts)
 
-    _bd = final_action.get("decision_confidence_breakdown")
+    _bd = (final_action or {}).get("decision_confidence_breakdown")
     if not isinstance(_bd, dict):
         _bd = {}
     outcome_trust = {
-        "similar_case_count": int(final_action.get("similar_case_count") or 0),
-        "historical_success_rate": final_action.get("historical_success_rate"),
-        "historical_reopen_rate": final_action.get("historical_reopen_rate"),
-        "outcome_confidence_band": final_action.get("outcome_confidence_band"),
+        "similar_case_count": int((final_action or {}).get("similar_case_count") or 0),
+        "historical_success_rate": (final_action or {}).get("historical_success_rate"),
+        "historical_reopen_rate": (final_action or {}).get("historical_reopen_rate"),
+        "outcome_confidence_band": (final_action or {}).get("outcome_confidence_band"),
         "decision_confidence_breakdown": _bd if _bd else None,
     }
 
@@ -795,11 +876,9 @@ def build_decision_explainability(
             "signal":          memory_signal,
         },
         "learned_rule_influence": {
-            "applied": bool(
-                learned_action and str(learned_action.get("action", "none") or "none") != "none"
-            ),
-            "trigger": learned_trigger,
-            "weight":  learned_weight,
+            "applied": s["learned_applied"],
+            "trigger": s["learned_trigger"],
+            "weight":  s["learned_weight"],
         },
         "outcome_expectation": {
             "pattern_key": (
@@ -815,7 +894,7 @@ def build_decision_explainability(
         "why_not_other_actions": why_not,
         "approval_rationale": {
             "required": req_approval,
-            "reason":   approval_reason,
+            "reason":   s["appr_reason"],
         },
         "outcome_trust": outcome_trust,
         "summary": summary,
@@ -836,51 +915,59 @@ def build_decision_explanation(
     quality: float,
     impact_projection: Dict[str, Any],
 ) -> Dict[str, Any]:
-    issue_type = str(ticket.get("issue_type", "general_support") or "general_support")
-    triage = triage or {}
-    hard_decision = hard_decision or {}
-    final_action = final_action or {}
-    executed = executed or {}
-    history = history or {}
-    brain_rules = brain_rules or []
+    s = _extract_explainability_signals(
+        ticket=ticket or {},
+        triage=triage or {},
+        hard_decision=hard_decision or {},
+        learned_action=learned_action,
+        final_action=final_action or {},
+        history=history or {},
+        top_rules=list(brain_rules or []),
+        confidence=confidence,
+        quality=quality,
+    )
+    issue_type = s["issue_type"]
+    risk_level = s["risk_level"]
+    urgency = s["urgency"]
+    churn = s["churn_risk"]
+    abuse_like = s["abuse_lh"]
+    refund_count = s["refund_count"]
+    abuse_score = s["abuse_score"]
+    repeat_customer = s["repeat_customer"]
+    sentiment_avg = s["sentiment_avg"]
+    hard_act = s["hard_act"]
+    policy_triggered = s["policy_triggered"]
+    requires = s["req_approval"]
+    execution_tier = s["execution_tier"]
 
-    complexity = int(triage.get("complexity", 0) or 0)
+    complexity = int((triage or {}).get("complexity", 0) or 0)
     class_conf = round(min(0.99, 0.55 + complexity / 200.0), 2)
-    dup_hint = issue_type == "billing_duplicate_charge" or "duplicate" in str(ticket.get("issue", "")).lower()
+    dup_hint = issue_type == "billing_duplicate_charge" or "duplicate" in str((ticket or {}).get("issue", "")).lower()
     issue_signal = (
         f"Matched {_human_issue_label(issue_type)} pattern"
         + (" with duplicate-charge wording" if dup_hint else "")
     )
 
-    risk_level = str(final_action.get("risk_level", triage.get("risk_level", "medium")) or "medium")
-    urgency = int(triage.get("urgency", 0) or 0)
-    churn = int(triage.get("churn_risk", 0) or 0)
-    abuse_like = int(triage.get("abuse_likelihood", 0) or 0)
-    refund_hist = int(history.get("refund_count", 0) or 0)
     risk_bits = []
-    if refund_hist >= 3:
+    if refund_count >= 3:
         risk_bits.append("repeat refund history detected")
-    if int(history.get("abuse_score", 0) or 0) >= 2:
+    if abuse_score >= 2:
         risk_bits.append("elevated abuse signals")
     risk_signal = f"{risk_level.capitalize()} risk"
     if risk_bits:
         risk_signal += " — " + ", ".join(risk_bits)
 
-    hard_act = str(hard_decision.get("action", "none") or "none").lower()
-    policy_triggered = hard_act != "none"
-    policy_rule = str(hard_decision.get("reason", "") or "").strip() or "No hard policy lane fired"
+    policy_rule = s["policy_reason"] or "No hard policy lane fired"
     if issue_type == "billing_duplicate_charge" and policy_triggered:
         policy_rule = "Duplicate-charge protection"
-    overridable = not bool(final_action.get("requires_approval", False)) and hard_act in {"none", "credit"}
+    overridable = not requires and hard_act in {"none", "credit"}
     policy_signal = (
-        "Hard policy applied — " + str(hard_decision.get("reason", "policy routing")) if policy_triggered else "No hard policy override — LLM/local path drove the motion"
+        "Hard policy applied — " + (s["policy_reason"] or "policy routing")
+        if policy_triggered
+        else "No hard policy override — LLM/local path drove the motion"
     )
 
-    repeat_customer = bool(history.get("repeat_customer", False))
-    refund_count = int(history.get("refund_count", 0) or 0)
-    abuse_score = int(history.get("abuse_score", 0) or 0)
-    sentiment_now = int(ticket.get("sentiment", 5) or 5)
-    sentiment_avg = float(history.get("sentiment_avg", 5.0) or 5.0)
+    sentiment_now = int((ticket or {}).get("sentiment", 5) or 5)
     if sentiment_now < sentiment_avg - 0.75:
         trend = "declining"
     elif sentiment_now > sentiment_avg + 0.75:
@@ -891,47 +978,11 @@ def build_decision_explanation(
         f"{'Repeat' if repeat_customer else 'New'} customer · {refund_count} prior refunds · abuse score {abuse_score}"
     )
 
-    applied_learned = bool(learned_action) and str(hard_decision.get("action", "none") or "none") == "none"
-    trigger = None
-    weight = None
-    if applied_learned and brain_rules:
-        trigger = str(brain_rules[0].get("trigger", "") or "") or None
-        try:
-            weight = float(brain_rules[0].get("weight", 0) or 0)
-        except Exception:
-            weight = None
+    applied_learned = s["learned_applied"] and hard_act == "none"
+    trigger = s["learned_trigger"]
+    weight = s["learned_weight"]
     learned_signal = (
         f"Learned rule {trigger} applied (weight {weight})" if applied_learned and trigger else "No learned rule override applied"
-    )
-
-    requires = bool(final_action.get("requires_approval", False))
-    fact_action = str(final_action.get("action", "none") or "none").lower()
-    amount = float(final_action.get("amount", 0) or 0)
-    appr_reasons: list[str] = []
-    threshold: str | None = None
-    if requires and fact_action in {"refund", "charge"}:
-        appr_reasons.append("Refund or charge motion requires operator approval before execution.")
-        threshold = f"${MAX_APPROVAL_THRESHOLD:.0f}"
-    elif requires and fact_action == "credit" and amount > float(MAX_APPROVAL_THRESHOLD):
-        appr_reasons.append(f"Credit amount exceeds ${MAX_APPROVAL_THRESHOLD:.0f} approval threshold.")
-        threshold = f"${MAX_APPROVAL_THRESHOLD:.0f}"
-    elif requires:
-        appr_reasons.append("Risk or policy flags require explicit operator approval.")
-    if abuse_score >= 2:
-        appr_reasons.append(f"Abuse score {abuse_score} keeps a human gate recommended.")
-        threshold = threshold or "abuse_score >= 2"
-    appr_reason = " ".join(appr_reasons) if appr_reasons else "No approval gate on this path."
-
-    execution_tier = compute_execution_tier(
-        fact_action,
-        amount,
-        float(confidence or 0),
-        float(quality or 0),
-        risk_level,
-        abuse_score,
-        refund_count,
-        str(ticket.get("operator_mode", "balanced") or "balanced"),
-        requires,
     )
 
     summary_parts = [
@@ -940,11 +991,11 @@ def build_decision_explanation(
         mem_signal + ".",
     ]
     if policy_triggered:
-        summary_parts.append(str(hard_decision.get("reason", "Hard policy fired.")))
+        summary_parts.append(s["policy_reason"] or "Hard policy fired.")
     if applied_learned and trigger:
         summary_parts.append(f"Top learned signal: {trigger}.")
     if requires:
-        summary_parts.append(appr_reason)
+        summary_parts.append(s["appr_reason"])
     summary_parts.append(
         f"Projected value: {impact_projection.get('type', 'saved')} · "
         f"${float(impact_projection.get('money_saved', 0) or 0):.0f} surfaced · "
@@ -987,8 +1038,8 @@ def build_decision_explanation(
         },
         "approval_rationale": {
             "required": requires,
-            "reason": appr_reason,
-            "threshold": threshold,
+            "reason": s["appr_reason"],
+            "threshold": s["threshold"],
         },
         "projected_impact": {
             "type": str(impact_projection.get("type", "saved") or "saved"),
