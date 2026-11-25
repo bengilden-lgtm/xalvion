@@ -38,29 +38,3 @@ httpx>=0.27.0,<1.0
 
 # --- Testing ---
 pytest>=8.0.0,<9.0
-```[cite: 4]
-
-<Steps>
-  <Step subtitle="Project root (`requirements.txt`)" title="Save the Updated requirements.txt">
-    Replace the contents of `C:\Users\bengi\xalvion\requirements.txt` with the file above and save it.
-    *Verification:* Opening `requirements.txt` shows `psycopg[binary]>=3.2.0,<4.0` listed under `# --- Database ---`[cite: 4].
-  </Step>
-  <Step subtitle="Terminal in `C:\Users\bengi\xalvion`" title="Commit and Push to Trigger a New Railway Build">
-    Stage and commit `requirements.txt`, then push to `main`:
-    ```bash
-    git add requirements.txt
-    git commit -m "Add psycopg[binary] for Railway PostgreSQL predeploy"
-    git push origin main
-    ```
-    *Verification:* Git outputs a new commit hash and a successful push to `origin/main` without `GH007` or auth errors.
-  </Step>
-  <Step subtitle="Railway Dashboard or CLI" title="Check Predeploy and Runtime Logs">
-    Watch the new deployment in Railway (`railway logs --lines 100` or the Deployments tab) to confirm `deploy_init_db.py` completes without `ModuleNotFoundError: No module named 'psycopg'` and the container stays running.
-    *Verification:* Predeploy passes and deploy/runtime logs show the server starting up cleanly rather than exiting.
-  </Step>
-</Steps>
-
-<ElicitationsGroup message="If the next Railway deploy hits another issue, let me know what happened:">
-  <Elicitation label="Predeploy still failing" query="I added psycopg[binary] and pushed, but deploy_init_db.py is still failing. What should I check next?"/>
-  <Elicitation label="Container crashes after boot" query="Predeploy passed, but the container crashes right after starting on Railway. How do I debug it?"/>
-</ElicitationsGroup>
